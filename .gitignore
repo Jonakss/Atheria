@@ -1,0 +1,9 @@
+output/
+*.log
+temp/
+.lightning_studio/
+.vscode/
+__pycache__/
+.ipynb_checkpoints/
+.triton/
+.streamlit/
