@@ -1,4 +1,6 @@
 output/
+output/*
+output/**/*
 *.log
 temp/
 .lightning_studio/
@@ -7,3 +9,81 @@ __pycache__/
 .ipynb_checkpoints/
 .triton/
 .streamlit/
+// ...existing code...
+# Byte-compiled / caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtualenvs
+.env/
+.venv/
+env/
+venv/
+pip-wheel-metadata/
+venv*/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+# Notebook outputs (si no quieres versionar notebooks con salidas)
+*.nbconvert.ipynb
+
+# IDEs / editors
+.vscode/
+.vscode-server/
+.idea/
+*.iml
+*.sublime-workspace
+*.sublime-project
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and runtime files
+*.log
+tmp/
+temp/
+*.pid
+
+# Testing / coverage
+.coverage
+.pytest_cache/
+
+# Model checkpoints, outputs, media y otros binarios grandes
+# (Si quieres conservar checkpoints/outputs en repo, elimina estas líneas)
+output/
+checkpoints_optimized/
+large_sim_checkpoints_1024/
+*.pth
+*.pt
+*.ckpt
+*.h5
+*.npy
+*.npz
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# TensorBoard / runs
+runs/
+events.out.tfevents.*
+
+# Secrets / keys / env
+.env
+*.key
+*.pem
+*.crt
+
+# Misc editor temp files
+*~ 
+*.swp
+*.swo
