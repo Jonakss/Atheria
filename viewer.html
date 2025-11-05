@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Visor AETHERIA</title>
+    <style>
+        body { font-family: system-ui, sans-serif; display: grid; place-items: center; min-height: 90vh; background: #111; color: #eee; margin: 0; }
+        #container { text-align: center; border: 1px solid #444; padding: 1rem 2rem; border-radius: 10px; background: #1a1a1a; }
+        h1 { font-weight: 300; }
+        #simCanvas {
+            width: 80vmin; /* Escala la imagen para que quepa en la pantalla */
+            height: 80vmin;
+            max-width: 800px;
+            max-height: 800px;
+            background: #000;
+            border: 1px solid #555;
+            /* Mantiene la pixelación al escalar */
+            image-rendering: pixelated; 
+        }
+        #status { font-size: 1.2rem; margin-top: 1rem; }
+        #status.connected { color: #4ade80; }
+        #status.error { color: #f87171; }
+        #stepCounter { color: #aaa; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>Visor de Simulación AETHERIA</h1>
+        
+        <canvas id="simCanvas" width="100" height="100"></canvas>
+        
+        <div id="status">Conectando...</div>
+        <div id="stepCounter">Paso: 0</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusEl = document.getElementById('status');
+        const stepCounterEl = document.getElementById('stepCounter');
+
+        // Cambia esto si tu servidor está en otra IP
+        const WEBSOCKET_URL = "ws://8765-01k95p45n43bdtt9r4rzw4a5z1.cloudspaces.litng.ai"; 
+        const ws = new WebSocket(WEBSOCKET_URL);
+
+        // Objeto de imagen reutilizable para dibujar en el canvas
+        const img = new Image();
+        
+        // Cuando la imagen (Base64) termina de cargarse, la dibujamos
+        img.onload = () => {
+            // Ajustar el tamaño del canvas al de la imagen recibida (solo si es necesario)
+            if (canvas.width !== img.width || canvas.height !== img.height) {
+                canvas.width = img.width;
+                canvas.height = img.height;
+            }
+            // Dibujar la imagen
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        };
+
+        ws.onopen = () => {
+            console.log("Conectado al servidor AETHERIA.");
+            statusEl.textContent = "Conectado";
+            statusEl.className = "connected";
+        };
+
+        ws.onclose = () => {
+            console.log("Desconectado del servidor.");
+            statusEl.textContent = "Desconectado. (Reinicia main.py y recarga la página)";
+            statusEl.className = "error";
+        };
+
+        ws.onerror = (err) => {
+            console.error("Error de WebSocket:", err);
+            statusEl.textContent = "Error de conexión. ¿Está main.py corriendo?";
+            statusEl.className = "error";
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                // 1. Parsear el JSON recibido
+                const data = JSON.parse(event.data);
+
+                // 2. Actualizar contadores
+                stepCounterEl.textContent = `Paso: ${data.step} (Tipo: ${data.frame_type})`;
+
+                // 3. Asignar el string Base64 a la fuente de la imagen.
+                // Esto dispara el evento 'img.onload'
+                img.src = data.image_data;
+            } catch (e) {
+                console.error("Error procesando el mensaje:", e, event.data);
+            }
+        };
+
+    </script>
+</body>
+</html>

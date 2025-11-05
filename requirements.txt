@@ -1,0 +1,16 @@
+# requirements.txt
+
+# --- Frameworks de App ---
+lightning
+streamlit
+
+# --- Servidor y Simulación ---
+torch
+websockets
+numpy
+Pillow
+imageio
+
+opencv-python
+uvicorn
+fastapi
