@@ -14,19 +14,11 @@ import base64
 from io import BytesIO
 from PIL import Image
 
-# Importamos 'lightning.app' de forma opcional
-try:
-    import lightning.app as la
-    LIGHTNING_AVAILABLE = True
-except ImportError:
-    LIGHTNING_AVAILABLE = False
-    # Creamos una clase "falsa" para que los type hints no fallen
-    class LightningWork: pass
-    la = LightningWork 
+# (No hay importaciones de 'lightning.app' aquí)
 
 # ¡Importaciones relativas!
 from . import config as cfg
-from .qca_engine import QCA_State, Aetheria_Motor
+from .qca_engine import QCA_State, Aetheria_Motor # Motor y Estado
 from .visualization import (
     downscale_frame, get_density_frame_gpu, get_channel_frame_gpu,
     get_state_magnitude_frame_gpu, get_state_phase_frame_gpu,
@@ -43,12 +35,25 @@ from .qca_operator_mlp import QCA_Operator_MLP as ActiveModel
 # -----------------------------------------------
 
 
+# --- ¡NUEVO! Clase de Estado Global ---
+class GlobalState:
+    def __init__(self):
+        self.viz_type = cfg.REAL_TIME_VIZ_TYPE
+        self.pause_event = asyncio.Event()
+        self.pause_event.set() # .set() significa "no pausado" (continúa)
+        self.reset_event = asyncio.Event()
+        
+g_state = GlobalState()
+# ------------------------------------
+
 # --- Globales del Servidor WebSocket ---
-g_data_queue = asyncio.Queue(maxsize=5)
+g_data_queue = asyncio.Queue(maxsize=10)
 g_clients = set()
 
 # --- Funciones de Ayuda del Servidor ---
+
 def numpy_to_base64_png(frame_numpy):
+    """Convierte un frame de numpy (H, W, 3) a un string Base64 PNG."""
     try:
         img = Image.fromarray(frame_numpy, 'RGB')
         buffer = BytesIO()
@@ -59,16 +64,42 @@ def numpy_to_base64_png(frame_numpy):
         print(f"Error convirtiendo frame a Base64: {e}")
         return None
 
-async def register_client(websocket):
+async def handle_client_commands(websocket):
+    """Escucha los comandos de un cliente específico."""
     print(f"🔌 Cliente conectado: {websocket.remote_address}")
     g_clients.add(websocket)
     try:
-        await websocket.wait_closed()
+        async for message in websocket:
+            try:
+                data = json.loads(message)
+                command = data.get("command")
+                
+                if command == "set_viz":
+                    g_state.viz_type = data.get("type", cfg.REAL_TIME_VIZ_TYPE)
+                    print(f"🖥️  Cliente cambió el tipo de visualización a: {g_state.viz_type}")
+                
+                elif command == "pause":
+                    g_state.pause_event.clear() # .clear() significa "pausar"
+                    print("⏸️  Simulación pausada por el cliente.")
+                
+                elif command == "resume":
+                    g_state.pause_event.set() # .set() significa "continuar"
+                    print("▶️  Simulación reanudada por el cliente.")
+                
+                elif command == "reset":
+                    g_state.reset_event.set() # Activa el flag de reseteo
+                    print("🔄  Cliente solicitó reseteo de la simulación.")
+            
+            except json.JSONDecodeError:
+                print(f"Error: Mensaje no válido recibido de {websocket.remote_address}")
+            except Exception as e:
+                print(f"Error procesando comando: {e}")
     finally:
         print(f"🔌 Cliente desconectado: {websocket.remote_address}")
         g_clients.remove(websocket)
 
-async def broadcast_data_loop(work: 'la.LightningWork | None' = None):
+async def broadcast_data_loop():
+    """Espera datos de la simulación y los envía a todos los clientes."""
     while True:
         data_package = await g_data_queue.get()
         if not g_clients:
@@ -76,13 +107,8 @@ async def broadcast_data_loop(work: 'la.LightningWork | None' = None):
             continue
 
         step = data_package.get('step', 0)
-        
-        if work and hasattr(work, 'viz_type'):
-            current_viz_type = work.viz_type
-        else:
-            current_viz_type = cfg.REAL_TIME_VIZ_TYPE
-
-        frame_to_send = data_package.get(current_viz_type)
+        current_viz_type = data_package.get('viz_type')
+        frame_to_send = data_package.get('frame')
 
         if frame_to_send is None:
             g_data_queue.task_done()
@@ -100,49 +126,51 @@ async def broadcast_data_loop(work: 'la.LightningWork | None' = None):
             'image_data': frame_b64
         })
 
-        clients_to_send = list(g_clients) 
-        for client in clients_to_send:
+        for client in g_clients:
             if client.open:
-                try:
-                    await client.send(payload)
-                except websockets.ConnectionClosed:
-                    pass
+                asyncio.create_task(client.send(payload))
         
-        if step % 100 == 0:
-             print(f"📡 Datos del paso {step} enviados a {len(clients_to_send)} clientes.")
         g_data_queue.task_done()
 
-# --- ¡¡AQUÍ ESTÁ LA CORRECCIÓN DE LA FUGA DE MEMORIA!! ---
-async def run_simulation_loop(motor, start_step, work: 'la.LightningWork | None' = None):
+async def run_simulation_loop(motor, start_step):
+    """Bucle principal de simulación que obedece al estado global."""
     print(f"\n🎬 Iniciando simulación infinita en {motor.size}x{motor.size}...")
     
     t = start_step
 
-    # --- LÓGICA CORREGIDA ---
-    # 1. Creamos UN solo objeto 'prev_state' para reutilizarlo.
+    # Arreglo de fuga de memoria: crea prev_state UNA VEZ
     prev_state = QCA_State(motor.state.size, motor.state.d_state)
-    
-    # 2. Copiamos los datos iniciales (estado t=0) en él.
     prev_state.x_real.data = motor.state.x_real.data.clone().to(cfg.DEVICE)
     prev_state.x_imag.data = motor.state.x_imag.data.clone().to(cfg.DEVICE)
-    # -------------------------
 
     with torch.no_grad():
         while True:
-            # 1. Evolucionar el estado (motor.state ahora es t+1)
-            await asyncio.to_thread(motor.evolve_step)
-            current_state = motor.state # Este es el estado t+1
+            # --- 1. Comprobar comandos de control ---
+            
+            await g_state.pause_event.wait() # Si está "pausado", espera aquí
+            
+            if g_state.reset_event.is_set():
+                print("🔄  Reseteando estado de la simulación...")
+                if cfg.INITIAL_STATE_MODE_INFERENCE == 'complex_noise':
+                    motor.state._reset_state_complex_noise()
+                else:
+                    motor.state._reset_state_random()
+                
+                prev_state.x_real.data = motor.state.x_real.data.clone().to(cfg.DEVICE)
+                prev_state.x_imag.data = motor.state.x_imag.data.clone().to(cfg.DEVICE)
+                t = 0
+                g_state.reset_event.clear() # Baja el flag de reseteo
 
-            # 2. Capturar y enviar frames periódicamente
+            # 2. Evolucionar el estado
+            await asyncio.to_thread(motor.evolve_step)
+            current_state = motor.state
+
+            # 3. Capturar y enviar frames
             if (t + 1) % cfg.REAL_TIME_VIZ_INTERVAL == 0:
                 try:
-                    if work and hasattr(work, 'viz_type'):
-                        current_viz_type = work.viz_type
-                    else:
-                        current_viz_type = cfg.REAL_TIME_VIZ_TYPE
+                    current_viz_type = g_state.viz_type # Leer el tipo de la UI
                     
                     frame = None
-                    # Genera dinámicamente SÓLO el frame solicitado
                     if current_viz_type == 'density':
                         frame = await asyncio.to_thread(get_density_frame_gpu, current_state)
                     elif current_viz_type == 'channels':
@@ -152,15 +180,17 @@ async def run_simulation_loop(motor, start_step, work: 'la.LightningWork | None'
                     elif current_viz_type == 'phase':
                         frame = await asyncio.to_thread(get_state_phase_frame_gpu, current_state)
                     elif current_viz_type == 'change':
-                        # --- LÓGICA CORREGIDA ---
-                        # Compara el estado actual (t+1) con el estado previo (t)
                         frame = await asyncio.to_thread(get_state_change_magnitude_frame_gpu, current_state, prev_state)
 
                     if frame is not None:
                         if cfg.REAL_TIME_VIZ_DOWNSCALE > 1:
                             frame = await asyncio.to_thread(downscale_frame, frame, cfg.REAL_TIME_VIZ_DOWNSCALE)
                         
-                        data_package = { 'step': t + 1, current_viz_type: frame }
+                        data_package = {
+                            'step': t + 1,
+                            'viz_type': current_viz_type,
+                            'frame': frame
+                        }
                         
                         try:
                             g_data_queue.put_nowait(data_package)
@@ -170,14 +200,11 @@ async def run_simulation_loop(motor, start_step, work: 'la.LightningWork | None'
                 except Exception as e:
                      print(f"⚠️  Error al generar frame en paso {t+1}: {e}")
 
-            # --- LÓGICA CORREGIDA ---
-            # 3. Actualizamos 'prev_state' para que contenga t+1, listo para la SIGUIENTE iteración.
-            # NO creamos un objeto nuevo, solo copiamos los datos.
+            # 4. Actualizar prev_state para la próxima iteración
             prev_state.x_real.data = current_state.x_real.data.clone().to(cfg.DEVICE)
             prev_state.x_imag.data = current_state.x_imag.data.clone().to(cfg.DEVICE)
-            # -------------------------
 
-            # 4. Guardar Checkpoint
+            # 5. Guardar Checkpoint
             if cfg.LARGE_SIM_CHECKPOINT_INTERVAL and (t + 1) % cfg.LARGE_SIM_CHECKPOINT_INTERVAL == 0:
                 await asyncio.to_thread(
                     save_qca_state, 
@@ -185,7 +212,7 @@ async def run_simulation_loop(motor, start_step, work: 'la.LightningWork | None'
                     cfg.LARGE_SIM_CHECKPOINT_DIR
                 )
 
-            # 5. Imprimir progreso
+            # 6. Imprimir progreso
             if (t + 1) % 100 == 0: 
                 print(f"📈 Progreso Simulación: Paso {t+1}. Clientes: {len(g_clients)}. Cola: {g_data_queue.qsize()}")
             
@@ -193,14 +220,15 @@ async def run_simulation_loop(motor, start_step, work: 'la.LightningWork | None'
             await asyncio.sleep(0.001)
 
 # --- Función Principal del Servidor ---
-async def run_server_pipeline(M_FILENAME: str | None, work: 'la.LightningWork | None' = None):
+async def run_server_pipeline(M_FILENAME: str | None):
+    """
+    Ejecuta la FASE 7: Inicia el servidor de simulación grande.
+    Esta versión es agnóstica a Lightning.
+    """
     print("\n" + "="*60)
     print(">>> INICIANDO FASE DE SIMULACIÓN GRANDE (FASE 7) COMO SERVIDOR <<<")
     print(f"Modelo Activo: {ActiveModel.__name__}")
-    if work:
-        print("Modo: Interactivo (Controlado por Lightning App)")
-    else:
-        print(f"Modo: Local/Agnóstico (Usando viz_type: '{cfg.REAL_TIME_VIZ_TYPE}')")
+    print(f"Modo: Local/Agnóstico (Controlado por WebSocket)")
     print("="*60)
 
     # --- 7.1: Configuración Síncrona ---
@@ -210,7 +238,6 @@ async def run_server_pipeline(M_FILENAME: str | None, work: 'la.LightningWork | 
         hidden_channels=cfg.HIDDEN_CHANNELS
     )
 
-    # --- Reactivamos torch.compile (ya que estamos en una T4) ---
     if cfg.DEVICE.type == 'cuda':
         try:
             print("Aplicando torch.compile() al modelo de inferencia...")
@@ -220,7 +247,6 @@ async def run_server_pipeline(M_FILENAME: str | None, work: 'la.LightningWork | 
             print(f"Advertencia: torch.compile() falló: {e}")
     else:
         print("INFO: Omitiendo torch.compile() en CPU.")
-    # -----------------------------------------------------------
 
     large_scale_motor = Aetheria_Motor(cfg.GRID_SIZE_INFERENCE, cfg.D_STATE, operator_model_inference)
 
@@ -275,6 +301,9 @@ async def run_server_pipeline(M_FILENAME: str | None, work: 'la.LightningWork | 
     
     if start_step == 0:
         print(f"\nIniciando nueva simulación con modo: '{cfg.INITIAL_STATE_MODE_INFERENCE}'.")
+        
+        # --- ¡¡AQUÍ ESTÁ LA CORRECCIÓN!! ---
+        # El nombre de la variable es 'large_scale_motor', no 'motor'
         if cfg.INITIAL_STATE_MODE_INFERENCE == 'complex_noise':
             large_scale_motor.state._reset_state_complex_noise()
         else:
@@ -285,11 +314,11 @@ async def run_server_pipeline(M_FILENAME: str | None, work: 'la.LightningWork | 
     # --- 7.2: Iniciar Tareas Asíncronas ---
     print(f"\n--- 🚀 Iniciando Tareas Asíncronas ---")
     
-    broadcast_task = asyncio.create_task(broadcast_data_loop(work))
-    simulation_task = asyncio.create_task(run_simulation_loop(large_scale_motor, start_step, work))
+    broadcast_task = asyncio.create_task(broadcast_data_loop())
+    simulation_task = asyncio.create_task(run_simulation_loop(large_scale_motor, start_step))
 
     print(f"--- ✅ Iniciando Servidor WebSocket en ws://{cfg.WEBSOCKET_HOST}:{cfg.WEBSOCKET_PORT} ---")
     
-    async with websockets.serve(register_client, cfg.WEBSOCKET_HOST, cfg.WEBSOCKET_PORT):
+    async with websockets.serve(handle_client_commands, cfg.WEBSOCKET_HOST, cfg.WEBSOCKET_PORT):
         print("✅ Servidor iniciado. Simulación y broadcast corriendo en segundo plano.")
         await asyncio.gather(broadcast_task, simulation_task)

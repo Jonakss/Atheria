@@ -3,7 +3,6 @@ import torch
 import os
 
 # --- Ruta Base del Proyecto ---
-# (Asume que config.py está en /src, así que subimos un nivel)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ------------------------------------------------------------------------------
@@ -11,109 +10,198 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # ------------------------------------------------------------------------------
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# --- Directorios de Salida (¡MODIFICADO!) ---
-# Todas las salidas ahora van a la carpeta /output en la raíz
+# --- Directorios de Salida ---
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 CHECKPOINT_DIR = os.path.join(OUTPUT_DIR, "training_checkpoints")
 LARGE_SIM_CHECKPOINT_DIR = os.path.join(OUTPUT_DIR, "simulation_checkpoints")
-
-# Crear directorios si no existen
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 os.makedirs(LARGE_SIM_CHECKPOINT_DIR, exist_ok=True)
 
+# --- Constantes del Servidor (¡¡NUEVO!!) ---
+# El 'lab_server.py' usará estos puertos
+LAB_SERVER_HOST = '0.0.0.0'
+LAB_SERVER_PORT = 8765 # El puerto principal para la UI del Laboratorio
+
+# El servidor de simulación (que se lanza DESDE el lab)
+# usará un puerto diferente
+SIM_SERVER_HOST = '0.0.0.0'
+SIM_SERVER_PORT = 8766 # Puerto solo para el WebSocket de simulación
+
+# ==============================================================================
+# --- FASE 3: PARÁMETROS GLOBALES (Ahora son 'Defaults') ---
+# Estos son los valores por defecto que aparecerán en la UI del Laboratorio
+# ==============================================================================
+
+# --- ¡¡NUEVO!! ---
+# Nombre del experimento por defecto
+EXPERIMENT_NAME = "My_Test_Run_01"
+
 # --- Constantes del Servidor WebSocket ---
-WEBSOCKET_HOST = '0.0.0.0' # Escuchar en todas las interfaces
-WEBSOCKET_PORT = 8765      # Puerto para la conexión
-
-# ------------------------------------------------------------------------------
-# 0.3: CONFIGURACIÓN OPCIONAL DEL MODELO DE ENTRADA
-# ------------------------------------------------------------------------------
-USE_INPUT_MODEL = False
-INPUT_MODEL_PATH = "" 
-USING_INPUT_MODEL_FLAG = False
-if USE_INPUT_MODEL and INPUT_MODEL_PATH and os.path.exists(INPUT_MODEL_PATH):
-    USING_INPUT_MODEL_FLAG = True
-USE_INPUT_MODEL_FOR_TRAINING_RESUME = False
-
-
+# Qué: El host y puerto para el servidor "a mano" (python main.py).
+# Qué esperar: '0.0.0.0' es correcto para Lightning AI. Puedes cambiar el 8765 si está ocupado.
+WEBSOCKET_HOST = '0.0.0.0'
+WEBSOCKET_PORT = 8765
 # ==============================================================================
 # --- FASE 3: PARÁMETROS GLOBALES Y CONFIGURACIÓN ---
 # ==============================================================================
 
-# --- Control de Ejecución ---
-RUN_TRAINING = False      # Poner en True para ejecutar la fase de entrenamiento.
-RUN_POST_TRAINING_VIZ = False # Poner en True para la visualización post-entrenamiento.
-RUN_LARGE_SIM = True     # Poner en True para ejecutar la simulación grande.
+# ------------------------------------------------------------------------------
+# A. CONTROL DE EJECUCIÓN
+# Qué: Estos flags deciden qué script se ejecuta.
+# ------------------------------------------------------------------------------
 
-CONTINUE_TRAINING = False   # Poner en True para reanudar el entrenamiento.
+# Qué: (python train.py) Ejecuta el pipeline de entrenamiento.
+# Qué esperar: Poner en `True` para entrenar un modelo. Poner en `False` para simular.
+RUN_TRAINING = True
 
-# --- Parámetros de Simulación (Entrenamiento) ---
-GRID_SIZE_TRAINING = 128     # Tamaño de la cuadrícula para entrenamiento
-D_STATE = 11               # Dimensión del estado cuántico
-HIDDEN_CHANNELS = 32        # Canales en la red de la Ley-M
+# Qué: (python train.py) Al final del entrenamiento, genera videos de muestra.
+# Qué esperar: Poner en `True` si quieres ver videos de tu nuevo modelo.
+RUN_POST_TRAINING_VIZ = False
 
-# --- Parámetros de Entrenamiento Optimizados ---
-EPISODES_TO_ADD = 500      # Número de episodios de entrenamiento a ejecutar
-STEPS_PER_EPISODE = 50       # Pasos de simulación por episodio
-LR_RATE_M = 5e-4           # Tasa de aprendizaje para el optimizador
-PERSISTENCE_COUNT = 10       # (k en BPTT-k)
+# Qué: (python main.py) Ejecuta el servidor de simulación en vivo (el WebSocket).
+# Qué esperar: Poner en `True` para iniciar el servidor. Poner en `False` para entrenar.
+RUN_LARGE_SIM = True
 
-# --- Parámetros de Recompensa (Annealing Optimizado) ---
-ALPHA_START = 3.0          # Peso inicial para R_Density_Target
-ALPHA_END = 30.0           # Peso final para R_Density_Target
-GAMMA_START = 3.0          # Peso inicial para R_Stability
-GAMMA_END = 0.6            # Peso final para R_Stability
-BETA_CAUSALITY = 3.0       # Peso fijo para R_Causality
+# Qué: (python train.py) Si `True`, busca el último checkpoint de entrenamiento y continúa.
+# Qué esperar: `True` para seguir un entrenamiento. `False` para empezar uno de cero (¡importante al cambiar de modelo!).
+CONTINUE_TRAINING = True
 
-# --- Pesos para Nuevas Recompensas ---
-LAMBDA_ACTIVITY_VAR = 1.0  # Peso para R_Activity_Var
-LAMBDA_VELOCIDAD = 0.5     # Peso para R_Velocidad
+# ------------------------------------------------------------------------------
+# B. ARQUITECTURA DE LA LEY M (¡MUY IMPORTANTE!)
+# Qué: Definen la forma y el tamaño de tu "cerebro" (Ley M).
+# ------------------------------------------------------------------------------
 
-# --- Parámetros de "Búsqueda de Objetivo" y Penalización ---
-TARGET_STD_DENSITY = 1.2   # Desviación estándar objetivo para la densidad
-EXPLOSION_THRESHOLD = 0.7  # Densidad máx. por celda para activar penalización
-EXPLOSION_PENALTY_MULTIPLIER = 20.0 # Multiplicador para penalización por explosión
+# Qué: El tamaño de la cuadrícula (ej. 256x256) usado para ENTRENAR.
+# Qué esperar: Más grande (512) aprende patrones espaciales más grandes, pero
+#             es MUCHO más lento y consume más VRAM. 256 es un buen balance.
+GRID_SIZE_TRAINING = 256
 
-# --- Parámetros de Estancamiento ---
-STAGNATION_WINDOW = 500    # Episodios sin mejora antes de estancamiento
-MIN_LOSS_IMPROVEMENT = 5e-5  # Mejora mínima de pérdida requerida
+# Qué: El "número de canales" o dimensión de cada celda.
+# Qué esperar: Es la complejidad de tu "partícula" cuántica.
+#             Más alto (ej. 32, 64) permite físicas más ricas, pero
+#             aumenta el tamaño del modelo y el uso de VRAM exponencialmente.
+#             ¡¡Debe coincidir con el modelo que intentas cargar!!
+D_STATE = 21
 
-# --- Parámetros de Reactivación ---
-REACTIVATION_COUNT = 2     # Número de intentos de reactivación
-REACTIVATION_STATE_MODE = 'random' # 'random', 'seeded', 'complex_noise'
-REACTIVATION_LR_MULTIPLIER = 0.5 # Factor para multiplicar LR en reactivación
+# Qué: El "ancho" de la red neuronal (Ley M).
+# Qué esperar: Es la "inteligencia" del modelo.
+#             - Para QCA_Operator_MLP: 256 es un buen valor.
+#             - Para QCA_Operator_UNet: 64 es un buen punto de partida (256 explotará tu VRAM).
+HIDDEN_CHANNELS = 64
 
-# --- Recorte de Gradiente ---
-GRADIENT_CLIP = 0.85       # Umbral para recorte de gradiente
+# ------------------------------------------------------------------------------
+# C. PARÁMETROS DE ENTRENAMIENTO
+# Qué: Controlan CÓMO aprende el modelo.
+# ------------------------------------------------------------------------------
 
-# --- Frecuencia de Checkpoints (Entrenamiento) ---
-SAVE_EVERY_EPISODES = 50   # Guardar checkpoint de entrenamiento cada N episodios.
+# Qué: Cuántos "universos de prueba" (episodios) ejecutar.
+# Qué esperar: Más episodios = mejor entrenamiento. 1000 es un buen comienzo.
+EPISODES_TO_ADD = 1000
 
-# --- Parámetros de Visualización Post-Entrenamiento ---
-NUM_FRAMES_VIZ = 1500      # Número de pasos para el video de visualización
-FPS_VIZ_TRAINING = 24      # FPS para el video de visualización
+# Qué: Cuántos pasos de simulación dura cada "universo de prueba".
+# Qué esperar: Más pasos (ej. 100) permite al trainer ver efectos a más largo plazo.
+STEPS_PER_EPISODE = 50
 
-# --- Parámetros de Simulación Grande (Inferencia) ---
-GRID_SIZE_INFERENCE = 128    # Tamaño de la cuadrícula para simulación grande
-# NUM_INFERENCE_STEPS ya no es necesario, el servidor corre indefinidamente
+# Qué: Tasa de Aprendizaje (Learning Rate). ¡EL MÁS IMPORTANTE!
+# Qué esperar: Controla qué tan "rápido" aprende el modelo.
+#             - Para U-Net (10M+ params): Debe ser MUY bajo (ej. 1e-5 o 2e-5) o explotará (NaN).
+#             - Para MLP (300k params): Puede ser más alto (ej. 5e-4).
+LR_RATE_M = 2e-5 
 
-# --- Configuración de Inicialización (Inferencia) ---
-INITIAL_STATE_MODE_INFERENCE = 'complex_noise' # 'random', 'seeded', 'complex_noise'
-LOAD_STATE_CHECKPOINT_INFERENCE = False # Cargar checkpoint de estado de simulación grande
-STATE_CHECKPOINT_PATH_INFERENCE = "" # Ruta específica al checkpoint de estado
+# Qué: "Backpropagation Through Time" (BPTT-k). Cuántos pasos "recuerda" el error.
+# Qué esperar: Más alto (ej. 20) aprende mejor la causalidad, pero consume
+#             MUCHA más VRAM y RAM. 10 es un balance.
+PERSISTENCE_COUNT = 10
 
-# --- Frecuencia de Checkpoints (Simulación Grande) ---
-LARGE_SIM_CHECKPOINT_INTERVAL = 10000 # Guardar checkpoint de estado cada N pasos.
+# Qué: Límite para el recorte de gradientes.
+# Qué esperar: Previene que los gradientes exploten (NaN). 0.85-1.0 es estándar.
+GRADIENT_CLIP = 0.85
 
-# --- Parámetros de Guardado de Video (Simulación Grande) ---
-# (Estos se usan en pipeline_viz, no en el servidor en tiempo real)
-VIDEO_FPS = 35             # FPS para los videos generados
-VIDEO_SAVE_INTERVAL_STEPS = 2 # Guardar un frame de video cada N pasos
-VIDEO_DOWNSCALE_FACTOR = 2   # Factor para reducir resolución (1 = sin reducción)
-VIDEO_QUALITY = 8            # Calidad de video (0-51, menor es mejor)
+# ------------------------------------------------------------------------------
+# D. FUNCIÓN DE RECOMPENSA (El "Alma" de la IA)
+# Qué: Estos pesos le dicen al entrenador QUÉ universo nos gusta.
+# ------------------------------------------------------------------------------
 
-# --- Parámetros de Visualización en Tiempo Real (Simulación Grande) ---
-REAL_TIME_VIZ_INTERVAL = 5   # Mostrar un frame cada N pasos
-REAL_TIME_VIZ_TYPE = 'phase' # 'density', 'channels', 'magnitude', 'phase', 'change'
-REAL_TIME_VIZ_DOWNSCALE = 2   # Factor para reducir resolución para visualización
+# Qué: (ALPHA) Peso para R_Density_Target (Complejidad/Caos).
+# Qué esperar: Sube de START a END. Un valor final ALTO (ej. 30.0)
+#             fuerza al universo a ser "interesante" y no morir.
+ALPHA_START = 3.0
+ALPHA_END = 30.0
+
+# Qué: (GAMMA) Peso para R_Stability (Estabilidad).
+# Qué esperar: Baja de START a END. Un valor final BAJO (ej. 0.6)
+#             permite que el universo sea un poco más caótico al final.
+GAMMA_START = 3.0
+GAMMA_END = 0.6
+
+# Qué: (BETA) Peso para R_Causality (Actividad/Movimiento).
+# Qué esperar: Un valor constante. Si tu universo se "congela", sube esto.
+BETA_CAUSALITY = 3.0
+
+# Qué: (LAMBDA 1) Recompensa la "varianza de la actividad".
+# Qué esperar: Evita que el universo se vuelva uniformemente "ruidoso".
+#             Promueve la creación de "cosas" localizadas.
+LAMBDA_ACTIVITY_VAR = 1.0
+
+# Qué: (LAMBDA 2) Recompensa la "varianza de la densidad".
+# Qué esperar: Promueve el movimiento. Penaliza las estructuras estáticas.
+LAMBDA_VELOCIDAD = 0.5
+
+# Qué: El "objetivo" de R_Density_Target.
+# Qué esperar: Un valor > 1.0 le pide al modelo que cree picos y valles.
+TARGET_STD_DENSITY = 1.2
+
+# Qué: Penalización por "explosión" (si una celda se vuelve demasiado brillante).
+# Qué esperar: Valores altos (ej. 20.0) castigan duramente la inestabilidad.
+EXPLOSION_THRESHOLD = 0.7
+EXPLOSION_PENALTY_MULTIPLIER = 20.0
+
+# ------------------------------------------------------------------------------
+# E. PARÁMETROS DE REANUDACIÓN Y ESTANCAMIENTO
+# ------------------------------------------------------------------------------
+
+# Qué: Cuántos episodios esperar sin mejora antes de "reactivar".
+STAGNATION_WINDOW = 500
+MIN_LOSS_IMPROVEMENT = 5e-6
+
+# Qué: Lógica para "desatascar" el entrenamiento.
+# Qué esperar: Si el entrenamiento se estanca, reinicia el estado (ej. 'random')
+#             y reduce el learning rate (LR_MULTIPLIER = 0.5).
+REACTIVATION_COUNT = 2
+REACTIVATION_STATE_MODE = 'random'
+REACTIVATION_LR_MULTIPLIER = 0.5
+
+# ------------------------------------------------------------------------------
+# F. PARÁMETROS DE SIMULACIÓN Y VISUALIZACIÓN
+# ------------------------------------------------------------------------------
+
+# Qué: Frecuencia de guardado de checkpoints de entrenamiento.
+SAVE_EVERY_EPISODES = 50
+
+# Qué: (pipeline_viz.py) Parámetros para los videos MP4 generados post-entrenamiento.
+NUM_FRAMES_VIZ = 1500
+FPS_VIZ_TRAINING = 24
+
+# Qué: (pipeline_server.py) Tamaño de la cuadrícula de simulación en "producción".
+# Qué esperar: Más grande = más impresionante, pero más lento.
+#             ¡Cuidado con el 'std::bad_alloc' si la RAM del sistema es baja!
+GRID_SIZE_INFERENCE = 500 # (Empieza con 256, luego prueba 468 o 512)
+
+# Qué: (pipeline_server.py) Cómo iniciar la simulación si no se carga un checkpoint.
+INITIAL_STATE_MODE_INFERENCE = 'random'
+
+# Qué: (pipeline_server.py) Si `True`, busca el último checkpoint de simulación y lo carga.
+LOAD_STATE_CHECKPOINT_INFERENCE = True
+STATE_CHECKPOINT_PATH_INFERENCE = "" # Dejar vacío para cargar el último
+
+# Qué: (pipeline_server.py) Frecuencia de guardado del estado de simulación.
+# Qué esperar: ¡Poner un valor alto (ej. 10000)! Guardar es lento.
+LARGE_SIM_CHECKPOINT_INTERVAL = 10000 
+
+# Qué: (pipeline_server.py) Parámetros para el visor "a mano".
+# Qué esperar: `INTERVAL` = cada cuántos pasos se envía un frame (más bajo = más fluido).
+#             `TYPE` = qué frame enviar (el que controlas desde la UI).
+REAL_TIME_VIZ_INTERVAL = 5
+REAL_TIME_VIZ_TYPE = 'change' # 'density', 'channels', 'magnitude', 'phase', 'change'
+REAL_TIME_VIZ_DOWNSCALE = 2

@@ -1,145 +1,149 @@
 # ui.py
 import streamlit as st
 import streamlit.components.v1 as components
+import os
+import re
 
-# --- NUEVO: Lista de todas las visualizaciones posibles ---
-VIZ_OPTIONS = [
-    "change",
-    "density",
-    "phase",
-    "magnitude",
-    "channels"
-]
+# Esta función de plantilla se usa en la pestaña "Visor"
+def load_html_template(file_name: str) -> str:
+    """Carga un archivo HTML (ej. 'viewer.html') y lo devuelve como un string."""
+    try:
+        template_path = os.path.join(os.path.dirname(__file__), file_name)
+        with open(template_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception:
+        return "<h2>Error: No se encontró 'viewer.html'.</h2>"
 
-def render_app(app_state, ws_url: str):
+def render_lab_ui(app_state):
     """
-    Renderiza el visor de AETHERIA usando Streamlit components.
-    
-    Args:
-        app_state: El objeto LightningFlow (AetheriaApp).
-        ws_url: La URL del WebSocket del backend.
+    Renderiza la UI completa del Laboratorio con pestañas.
+    'app_state' es el LightningFlow (AetheriaLab).
     """
-    
-    st.set_page_config(page_title="Visor AETHERIA", layout="wide")
-    
-    # --- NUEVO: Sidebar para controles ---
-    with st.sidebar:
-        st.image("https://storage.googleapis.com/lightning-ai-docs/app/components/logos/A-L-A-logo-color-ondark.png", width=200)
-        st.header("Controles de AETHERIA")
-        
-        # El valor actual se lee desde el estado del Flow
-        current_index = VIZ_OPTIONS.index(app_state.viz_type)
-        
-        # --- El Menú Desplegable ---
-        selected_viz_type = st.selectbox(
-            "Tipo de Visualización",
-            options=VIZ_OPTIONS,
-            index=current_index
-        )
-        
-        # --- Aquí está la magia (UI -> Flow) ---
-        # Si el usuario cambia la selección, actualizamos el estado del Flow.
-        if selected_viz_type != app_state.viz_type:
-            app_state.viz_type = selected_viz_type
-            # No es necesario hacer nada más, el Flow lo detectará
-            # y se lo comunicará al backend automáticamente.
-        
-        st.info("La simulación se ejecuta en un backend de GPU. El visor solo recibe los frames.")
+    st.set_page_config(page_title="AETHERIA Lab", layout="wide")
+    st.title("Laboratorio AETHERIA")
 
-    # El HTML/JS del visor (el mismo de antes)
-    html_content = f"""
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-        <meta charset="UTF-8">
-        <title>Visor AETHERIA</title>
-        <style>
-            body {{ font-family: system-ui, sans-serif; background: #111; color: #eee; margin: 0; padding: 0; }}
-            #container {{ text-align: center; padding-top: 1rem; }}
-            /* Quita el h1 del HTML, lo manejamos con Streamlit */
-            #simCanvas {{
-                width: 90vmin;
-                height: 90vmin;
-                max-width: 800px;
-                max-height: 800px;
-                background: #000;
-                border: 1px solid #555;
-                image-rendering: pixelated; 
-            }}
-            #status {{ font-size: 1.2rem; margin-top: 1rem; color: #eee; }}
-            #status.connected {{ color: #4ade80; }}
-            #status.error {{ color: #f87171; }}
-            #stepCounter {{ color: #aaa; }}
-        </style>
-    </head>
-    <body>
-        <div id="container">
-            <canvas id="simCanvas" width="100" height="100"></canvas>
-            <div id="status">Conectando a {ws_url}...</div>
-            <div id="stepCounter">Paso: 0</div>
-        </div>
+    tab_visor, tab_lab = st.tabs(["Visor en Vivo", "Laboratorio (Control)"])
 
-        <script>
-            const canvas = document.getElementById('simCanvas');
-            const ctx = canvas.getContext('2d');
-            const statusEl = document.getElementById('status');
-            const stepCounterEl = document.getElementById('stepCounter');
-            const WEBSOCKET_URL = "{ws_url}"; 
+    # -----------------------------------------------------------------
+    # Pestaña 1: El Visor en Vivo
+    # -----------------------------------------------------------------
+    with tab_visor:
+        st.header("Visor de Simulación en Tiempo Real")
+        
+        # --- Sidebar de Controles del Visor ---
+        with st.sidebar:
+            st.header("Controles del Visor")
             
-            console.log("Conectando a:", WEBSOCKET_URL);
-
-            const ws = new WebSocket(WEBSOCKET_URL);
-            const img = new Image();
+            # 1. Selector de Visualización
+            viz_options = ["change", "density", "phase", "magnitude", "channels"]
+            current_viz_index = viz_options.index(app_state.viz_type) if app_state.viz_type in viz_options else 0
             
-            img.onload = () => {{
-                if (canvas.width !== img.width || canvas.height !== img.height) {{
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                }}
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            }};
+            selected_viz_type = st.selectbox(
+                "Tipo de Visualización:",
+                options=viz_options,
+                index=current_viz_index
+            )
+            
+            # Si el usuario cambia, actualiza el estado del Flow
+            if selected_viz_type != app_state.viz_type:
+                app_state.viz_type = selected_viz_type
 
-            ws.onopen = () => {{
-                console.log("Conectado al servidor AETHERIA.");
-                statusEl.textContent = "Conectado";
-                statusEl.className = "connected";
-            }};
-            ws.onclose = () => {{
-                console.log("Desconectado del servidor.");
-                statusEl.textContent = "Desconectado.";
-                statusEl.className = "error";
-            }};
-            ws.onerror = (err) => {{
-                console.error("Error de WebSocket:", err);
-                statusEl.textContent = "Error de conexión.";
-                statusEl.className = "error";
-            }};
+            # 2. Controles de Pausa/Reset
+            # (Estos comandos los envía el 'viewer.html', no el Flow)
+            st.info("Los controles de Pausa/Reset están en el visor.")
 
-            ws.onmessage = (event) => {{
-                try {{
-                    const data = JSON.parse(event.data);
-                    stepCounterEl.textContent = `Paso: ${{data.step}} (Tipo: ${{data.frame_type}})`;
-                    img.src = data.image_data;
-                }} catch (e) {{
-                    console.error("Error procesando mensaje:", e, event.data);
-                }}
-            }};
-        </script>
-    </body>
-    </html>
-    """
-    
-    # Título principal de la app Streamlit
-    st.title("Visor de Simulación AETHERIA")
-    
-    # Renderiza el componente HTML
-    components.html(html_content, height=900, scrolling=False)
+        # --- Cargar el Visor HTML ---
+        html_template = load_html_template("viewer.html")
+        
+        ws_url = ""
+        if app_state.mode == "simulating" and app_state.simulation_server.url:
+            ws_url = app_state.simulation_server.url.replace("http", "ws")
+            ws_url = f"{ws_url}:{app_state.simulation_server.port}"
+        
+        if "{ws_url}" in html_template:
+            html_content = html_template.replace("{ws_url}", ws_url)
+        else:
+            st.error("Error: 'viewer.html' no tiene el placeholder {ws_url}.")
+            html_content = ""
 
-# Esto permite probar el UI localmente (sin backend)
-if __name__ == "__main__":
-    # Simula un 'app_state' falso para la prueba
-    class FakeAppState:
-        viz_type = "change"
-        backend = None
-    
-    render_app(app_state=FakeAppState(), ws_url="ws://127.0.0.1:8765")
+        if app_state.mode != "simulating":
+             st.info("El servidor de simulación no está activo. Inícialo desde la pestaña 'Laboratorio'.")
+        
+        components.html(html_content, height=950, scrolling=False)
+
+
+    # -----------------------------------------------------------------
+    # Pestaña 2: El Laboratorio
+    # -----------------------------------------------------------------
+    with tab_lab:
+        st.header("Panel de Control Principal")
+        
+        # --- Sección de Estado Actual ---
+        st.subheader("Estado del Sistema")
+        
+        current_status = app_state.mode.capitalize()
+        if app_state.mode == "training" and not app_state.training_work.status.is_succeeded:
+            current_status = "Entrenando..."
+            st.info("El trabajo de entrenamiento se está ejecutando en la GPU. El servidor de simulación está detenido.")
+            st.spinner("Entrenando...")
+        
+        st.metric("Estado Actual", current_status)
+        
+        col1, col2 = st.columns(2)
+        
+        # --- Sección de Entrenamiento ---
+        with col1:
+            st.subheader("Entrenamiento (Fase 5)")
+            st.write("Inicia un nuevo trabajo de entrenamiento. Esto detendrá la simulación si se está ejecutando.")
+            
+            # Botón de Entrenamiento
+            if st.button("🚀 Iniciar Entrenamiento", disabled=(app_state.mode == "training")):
+                app_state.mode = "training" # ¡Le dice al Flow que entrene!
+                if app_state.simulation_server.status.is_running:
+                    app_state.simulation_server.stop()
+            
+            st.write("**Modelos Entrenados (.pth):**")
+            st.dataframe(app_state.file_lister.training_models, use_container_width=True)
+
+        # --- Sección de Simulación ---
+        with col2:
+            st.subheader("Simulación (Fase 7)")
+            st.write("Inicia el servidor de simulación en vivo.")
+            
+            # 1. Selector de Modelo
+            model_options = list(app_state.file_lister.training_models)
+            if not model_options:
+                st.warning("No se han encontrado modelos. Entrena un modelo primero.")
+            
+            selected_model = st.selectbox(
+                "Elige un Modelo (.pth) para cargar:",
+                options=model_options,
+                index=0 if model_options else -1
+            )
+            
+            # 2. Selector de Estado
+            state_options = ["(Empezar desde cero)"] + list(app_state.file_lister.sim_states)
+            selected_state_file = st.selectbox(
+                "Elige un Estado (.pth) para reanudar (opcional):",
+                options=state_options,
+                index=0
+            )
+            
+            # Botón de Simulación
+            if st.button("🛰️ Iniciar Servidor de Simulación", disabled=(app_state.mode == "simulating" or not selected_model)):
+                app_state.mode = "simulating" # ¡Le dice al Flow que simule!
+                app_state.selected_model = os.path.join("output/training_checkpoints", selected_model)
+                
+                # Extraer el número de paso del nombre del archivo
+                if selected_state_file != "(Empezar desde cero)":
+                    try:
+                        match = re.search(r"step_(\d+)\.pth", selected_state_file)
+                        app_state.start_step = int(match.group(1)) if match else 0
+                        app_state.selected_state = os.path.join("output/simulation_checkpoints", selected_state_file)
+                    except Exception:
+                        app_state.start_step = 0
+                else:
+                    app_state.start_step = 0
+                
+                if app_state.training_work.status.is_running:
+                    app_state.training_work.stop()

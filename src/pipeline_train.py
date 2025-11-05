@@ -8,11 +8,9 @@ import numpy as np
 # ¡Importaciones relativas!
 from . import config as cfg
 from .trainer import QC_Trainer_v3
-from .qca_engine import Aetheria_Motor # El motor siempre se importa
+from .qca_engine import Aetheria_Motor 
 
 # --- CAMBIO AQUÍ: Selector de Modelo (Ley M) ---
-# Descomenta la línea del modelo que quieres entrenar.
-
 # Opción 1: El MLP 1x1 original (Rápido, pero "míope")
 from .qca_operator_mlp import QCA_Operator_MLP as ActiveModel
 
@@ -28,14 +26,23 @@ def run_training_pipeline():
     """
     print("\n" + "="*60)
     print(">>> INICIANDO FASE DE ENTRENAMIENTO (FASE 5) <<<")
+    # --- ¡NUEVO! Imprime el nombre del experimento ---
+    print(f"Nombre del Experimento: {cfg.EXPERIMENT_NAME}")
     print(f"Modelo Activo: {ActiveModel.__name__}")
     print("="*60)
     
-    model_id = ActiveModel.__name__ # Usar el nombre de la clase
+    model_id = ActiveModel.__name__
     
     # 1. Crear el modelo
     model_M = ActiveModel(cfg.D_STATE, cfg.HIDDEN_CHANNELS)
     
+    if cfg.DEVICE.type == 'cuda':
+        try:
+            print("Aplicando torch.compile() al modelo...")
+            model_M = torch.compile(model_M, mode="reduce-overhead")
+            print("¡torch.compile() aplicado exitosamente!")
+        except Exception as e:
+            print(f"Advertencia: torch.compile() falló. Se usará el modelo estándar. Error: {e}")
 
     # 2. Crear el motor con el modelo (genérico)
     Aetheria_Motor_Train = Aetheria_Motor(cfg.GRID_SIZE_TRAINING, cfg.D_STATE, model_M)
@@ -46,7 +53,12 @@ def run_training_pipeline():
                                                  else Aetheria_Motor_Train.operator.parameters()) if p.requires_grad)
     print(f"Parámetros Entrenables: {trainable_params}")
 
-    trainer = QC_Trainer_v3(Aetheria_Motor_Train, cfg.LR_RATE_M)
+    # --- ¡¡MODIFICADO!! Pasamos el experiment_name al trainer ---
+    trainer = QC_Trainer_v3(
+        Aetheria_Motor_Train, 
+        cfg.LR_RATE_M,
+        cfg.EXPERIMENT_NAME
+    )
 
     if cfg.CONTINUE_TRAINING:
         print("Intentando continuar entrenamiento...")
@@ -54,7 +66,7 @@ def run_training_pipeline():
     else:
         print("Iniciando nuevo entrenamiento desde cero.")
 
-    print(f"Directorio de Checkpoints: {cfg.CHECKPOINT_DIR}")
+    print(f"Directorio de Checkpoints: {trainer.experiment_checkpoint_dir}")
     print(f"Iniciando desde episodio {trainer.current_episode}. Entrenando por {cfg.EPISODES_TO_ADD} episodios más.")
 
     start_time = time.time()
@@ -72,11 +84,11 @@ def run_training_pipeline():
                 last_r_density = trainer.history['R_Density_Target'][-1] if trainer.history['R_Density_Target'] else float('nan')
                 print(f"Eps {episode:04}: Loss={avg_loss:.3e} | R_Dens={last_r_density:.3f} | α={alpha:.2f}, γ={gamma:.2f}, LR={trainer.optimizer.param_groups[0]['lr']:.2e}")
 
-            if episode % cfg.SAVE_EVERY_EPISODES == 0 and episode > trainer.current_episode:
-                trainer._save_checkpoint(episode)
+            if (episode + 1) % cfg.SAVE_EVERY_EPISODES == 0:
+                trainer._save_checkpoint(episode + 1)
                 if not np.isnan(avg_loss) and not np.isinf(avg_loss) and avg_loss < trainer.best_loss:
-                    trainer._save_checkpoint(episode, is_best=True)
-                    print(f"🏆 Nuevo mejor modelo guardado en episodio {episode}")
+                    trainer._save_checkpoint(episode + 1, is_best=True)
+                    print(f"🏆 Nuevo mejor modelo guardado en episodio {episode + 1}")
 
             if trainer.check_stagnation_and_reactivate(final_episode):
                 print("Entrenamiento detenido por estancamiento.")
@@ -97,13 +109,12 @@ def run_training_pipeline():
     M_FILENAME = None
     if trainer:
         TIMESTAMP = int(time.time())
-        # Guarda en el directorio de checkpoints configurado
+        # --- ¡¡MODIFICADO!! Usa la subcarpeta del experimento ---
         M_FILENAME = os.path.join(
-            cfg.CHECKPOINT_DIR, 
+            trainer.experiment_checkpoint_dir, 
             f"{model_id}_G{cfg.GRID_SIZE_TRAINING}_Eps{trainer.current_episode}_{TIMESTAMP}_FINAL.pth"
         )
         try:
-            # Lógica para guardar el estado del modelo (manejando DP y compile)
             model_to_save = trainer.motor.operator
             if isinstance(model_to_save, nn.DataParallel):
                 model_to_save = model_to_save.module

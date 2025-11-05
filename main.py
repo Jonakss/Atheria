@@ -56,8 +56,8 @@ async def main_pipeline():
     if cfg.RUN_LARGE_SIM:
         
         # --- ¡¡MODIFICACIÓN IMPORTANTE!! ---
-        # Pasamos 'work=None' explícitamente para ejecutar en modo local/agnóstico
-        await run_server_pipeline(M_FILENAME, work=None)
+        # Llamamos al pipeline sin el argumento 'work'
+        await run_server_pipeline(M_FILENAME)
         
     else:
         print("\n>>> FASE DE SIMULACIÓN GRANDE (FASE 7) OMITIDA <<<")
