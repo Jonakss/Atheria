@@ -4,8 +4,6 @@ import os
 import sys
 
 # --- Configuración del Path ---
-# Añade la carpeta 'src' al path de Python para que podamos importar desde ella
-# Esto es crucial ya que main.py está en la raíz
 script_dir = os.path.dirname(os.path.abspath(__file__))
 src_dir = os.path.join(script_dir, "src")
 if src_dir not in sys.path:
@@ -39,7 +37,6 @@ async def main_pipeline():
     # FASE 5: LÓGICA PRINCIPAL DE ENTRENAMIENTO (Síncrono)
     # --------------------------------------------------------------------------
     if cfg.RUN_TRAINING:
-        # Esta es una función síncrona (bloqueante)
         Aetheria_Motor_Train, M_FILENAME = run_training_pipeline()
     else:
         print("\n>>> FASE DE ENTRENAMIENTO (FASE 5) OMITIDA <<<")
@@ -48,7 +45,6 @@ async def main_pipeline():
     # FASE 6: VISUALIZACIÓN POST-ENTRENAMIENTO (Síncrono)
     # --------------------------------------------------------------------------
     if cfg.RUN_POST_TRAINING_VIZ:
-        # Esta también es una función síncrona
         run_visualization_pipeline(Aetheria_Motor_Train, M_FILENAME)
     else:
         print("\n>>> FASE DE VISUALIZACIÓN POST-ENTRENAMIENTO (FASE 6) OMITIDA <<<")
@@ -58,8 +54,11 @@ async def main_pipeline():
     # FASE 7: LÓGICA DE SIMULACIÓN GRANDE (Asíncrono/Servidor)
     # --------------------------------------------------------------------------
     if cfg.RUN_LARGE_SIM:
-        # Esta es una función asíncrona que correrá indefinidamente
-        await run_server_pipeline(M_FILENAME)
+        
+        # --- ¡¡MODIFICACIÓN IMPORTANTE!! ---
+        # Pasamos 'work=None' explícitamente para ejecutar en modo local/agnóstico
+        await run_server_pipeline(M_FILENAME, work=None)
+        
     else:
         print("\n>>> FASE DE SIMULACIÓN GRANDE (FASE 7) OMITIDA <<<")
 
@@ -71,7 +70,6 @@ async def main_pipeline():
 # ==============================================================================
 if __name__ == "__main__":
     try:
-        # Usamos asyncio.run() para ejecutar nuestro pipeline asíncrono
         asyncio.run(main_pipeline())
     except KeyboardInterrupt:
         print("\n🛑 Proceso principal interrumpido por el usuario.")

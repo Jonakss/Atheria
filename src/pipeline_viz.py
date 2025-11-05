@@ -7,7 +7,8 @@ import glob
 
 # ¡Importaciones relativas!
 from . import config as cfg
-from .qca_engine import QCA_State, QCA_Operator_Deep, Aetheria_Motor
+from .qca_engine import QCA_State, Aetheria_Motor
+from .qca_operator_mlp import QCA_Operator_MLP
 from .visualization import (
     get_density_frame_gpu, get_channel_frame_gpu,
     get_state_magnitude_frame_gpu, get_state_phase_frame_gpu,
@@ -26,7 +27,7 @@ def run_visualization_pipeline(Aetheria_Motor_Train: Aetheria_Motor | None, M_FI
     # Si no se entrenó, intentar cargar el motor y el modelo
     if Aetheria_Motor_Train is None:
         print("Motor de entrenamiento no proporcionado. Inicializando uno nuevo para visualización...")
-        model_M = QCA_Operator_Deep(cfg.D_STATE, cfg.HIDDEN_CHANNELS)
+        model_M = QCA_Operator_MLP(cfg.D_STATE, cfg.HIDDEN_CHANNELS)
         Aetheria_Motor_Train = Aetheria_Motor(cfg.GRID_SIZE_TRAINING, cfg.D_STATE, model_M)
         
         if not M_FILENAME: # Buscar el último modelo si no se pasó

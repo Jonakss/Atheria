@@ -36,14 +36,6 @@ def run_training_pipeline():
     # 1. Crear el modelo
     model_M = ActiveModel(cfg.D_STATE, cfg.HIDDEN_CHANNELS)
     
-    # --- Potenciación: Aplicar torch.compile ---
-    if cfg.DEVICE.type == 'cuda':
-        try:
-            print("Aplicando torch.compile() al modelo...")
-            model_M = torch.compile(model_M, mode="reduce-overhead")
-            print("¡torch.compile() aplicado exitosamente!")
-        except Exception as e:
-            print(f"Advertencia: torch.compile() falló. Se usará el modelo estándar. Error: {e}")
 
     # 2. Crear el motor con el modelo (genérico)
     Aetheria_Motor_Train = Aetheria_Motor(cfg.GRID_SIZE_TRAINING, cfg.D_STATE, model_M)

@@ -2,13 +2,51 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-def render_app(ws_url: str):
+# --- NUEVO: Lista de todas las visualizaciones posibles ---
+VIZ_OPTIONS = [
+    "change",
+    "density",
+    "phase",
+    "magnitude",
+    "channels"
+]
+
+def render_app(app_state, ws_url: str):
     """
     Renderiza el visor de AETHERIA usando Streamlit components.
-    Recibe la URL del WebSocket (ws_url) desde el Lightning Flow.
+    
+    Args:
+        app_state: El objeto LightningFlow (AetheriaApp).
+        ws_url: La URL del WebSocket del backend.
     """
     
-    # Inyecta la URL del backend directamente en tu código HTML/JavaScript
+    st.set_page_config(page_title="Visor AETHERIA", layout="wide")
+    
+    # --- NUEVO: Sidebar para controles ---
+    with st.sidebar:
+        st.image("https://storage.googleapis.com/lightning-ai-docs/app/components/logos/A-L-A-logo-color-ondark.png", width=200)
+        st.header("Controles de AETHERIA")
+        
+        # El valor actual se lee desde el estado del Flow
+        current_index = VIZ_OPTIONS.index(app_state.viz_type)
+        
+        # --- El Menú Desplegable ---
+        selected_viz_type = st.selectbox(
+            "Tipo de Visualización",
+            options=VIZ_OPTIONS,
+            index=current_index
+        )
+        
+        # --- Aquí está la magia (UI -> Flow) ---
+        # Si el usuario cambia la selección, actualizamos el estado del Flow.
+        if selected_viz_type != app_state.viz_type:
+            app_state.viz_type = selected_viz_type
+            # No es necesario hacer nada más, el Flow lo detectará
+            # y se lo comunicará al backend automáticamente.
+        
+        st.info("La simulación se ejecuta en un backend de GPU. El visor solo recibe los frames.")
+
+    # El HTML/JS del visor (el mismo de antes)
     html_content = f"""
     <!DOCTYPE html>
     <html lang="es">
@@ -16,12 +54,11 @@ def render_app(ws_url: str):
         <meta charset="UTF-8">
         <title>Visor AETHERIA</title>
         <style>
-            /* Estilos para que se vea bien dentro de Streamlit */
             body {{ font-family: system-ui, sans-serif; background: #111; color: #eee; margin: 0; padding: 0; }}
             #container {{ text-align: center; padding-top: 1rem; }}
-            h1 {{ font-weight: 300; color: #eee; }}
+            /* Quita el h1 del HTML, lo manejamos con Streamlit */
             #simCanvas {{
-                width: 90vmin; /* Escala la imagen */
+                width: 90vmin;
                 height: 90vmin;
                 max-width: 800px;
                 max-height: 800px;
@@ -37,24 +74,17 @@ def render_app(ws_url: str):
     </head>
     <body>
         <div id="container">
-            <h1>Visor de Simulación AETHERIA</h1>
             <canvas id="simCanvas" width="100" height="100"></canvas>
             <div id="status">Conectando a {ws_url}...</div>
             <div id="stepCounter">Paso: 0</div>
         </div>
 
         <script>
-            // Tu código JS original, sin cambios,
-            // excepto por la variable WEBSOCKET_URL
-            
             const canvas = document.getElementById('simCanvas');
             const ctx = canvas.getContext('2d');
             const statusEl = document.getElementById('status');
             const stepCounterEl = document.getElementById('stepCounter');
-
-            // --- ¡AQUÍ ESTÁ LA MAGIA! ---
-            // Usamos la URL que Streamlit/Lightning inyectó
-            const WEBSOCKET_URL = "wss://8765-01k95p45n43bdtt9r4rzw4a5z1.cloudspaces.litng.ai"; 
+            const WEBSOCKET_URL = "{ws_url}"; 
             
             console.log("Conectando a:", WEBSOCKET_URL);
 
@@ -74,16 +104,14 @@ def render_app(ws_url: str):
                 statusEl.textContent = "Conectado";
                 statusEl.className = "connected";
             }};
-
             ws.onclose = () => {{
                 console.log("Desconectado del servidor.");
                 statusEl.textContent = "Desconectado.";
                 statusEl.className = "error";
             }};
-
             ws.onerror = (err) => {{
                 console.error("Error de WebSocket:", err);
-                statusEl.textContent = "Error de conexión. ¿Está el backend corriendo?";
+                statusEl.textContent = "Error de conexión.";
                 statusEl.className = "error";
             }};
 
@@ -101,13 +129,17 @@ def render_app(ws_url: str):
     </html>
     """
     
-    # Configura la página de Streamlit
-    st.set_page_config(page_title="Visor AETHERIA", layout="wide")
+    # Título principal de la app Streamlit
+    st.title("Visor de Simulación AETHERIA")
     
     # Renderiza el componente HTML
-    components.html(html_content, height=900, scrolling=True)
+    components.html(html_content, height=900, scrolling=False)
 
-# Esto permite probar el UI localmente si se desea, 
-# aunque fallará al conectar sin un backend.
+# Esto permite probar el UI localmente (sin backend)
 if __name__ == "__main__":
-    render_app(ws_url="ws://127.0.0.1:8765")
+    # Simula un 'app_state' falso para la prueba
+    class FakeAppState:
+        viz_type = "change"
+        backend = None
+    
+    render_app(app_state=FakeAppState(), ws_url="ws://127.0.0.1:8765")

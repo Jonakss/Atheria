@@ -49,9 +49,9 @@ RUN_LARGE_SIM = True     # Poner en True para ejecutar la simulación grande.
 CONTINUE_TRAINING = False   # Poner en True para reanudar el entrenamiento.
 
 # --- Parámetros de Simulación (Entrenamiento) ---
-GRID_SIZE_TRAINING = 256     # Tamaño de la cuadrícula para entrenamiento
-D_STATE = 21               # Dimensión del estado cuántico
-HIDDEN_CHANNELS = 64        # Canales en la red de la Ley-M
+GRID_SIZE_TRAINING = 128     # Tamaño de la cuadrícula para entrenamiento
+D_STATE = 11               # Dimensión del estado cuántico
+HIDDEN_CHANNELS = 32        # Canales en la red de la Ley-M
 
 # --- Parámetros de Entrenamiento Optimizados ---
 EPISODES_TO_ADD = 500      # Número de episodios de entrenamiento a ejecutar
@@ -95,12 +95,12 @@ NUM_FRAMES_VIZ = 1500      # Número de pasos para el video de visualización
 FPS_VIZ_TRAINING = 24      # FPS para el video de visualización
 
 # --- Parámetros de Simulación Grande (Inferencia) ---
-GRID_SIZE_INFERENCE = 512    # Tamaño de la cuadrícula para simulación grande
+GRID_SIZE_INFERENCE = 128    # Tamaño de la cuadrícula para simulación grande
 # NUM_INFERENCE_STEPS ya no es necesario, el servidor corre indefinidamente
 
 # --- Configuración de Inicialización (Inferencia) ---
 INITIAL_STATE_MODE_INFERENCE = 'complex_noise' # 'random', 'seeded', 'complex_noise'
-LOAD_STATE_CHECKPOINT_INFERENCE = True # Cargar checkpoint de estado de simulación grande
+LOAD_STATE_CHECKPOINT_INFERENCE = False # Cargar checkpoint de estado de simulación grande
 STATE_CHECKPOINT_PATH_INFERENCE = "" # Ruta específica al checkpoint de estado
 
 # --- Frecuencia de Checkpoints (Simulación Grande) ---
@@ -115,5 +115,5 @@ VIDEO_QUALITY = 8            # Calidad de video (0-51, menor es mejor)
 
 # --- Parámetros de Visualización en Tiempo Real (Simulación Grande) ---
 REAL_TIME_VIZ_INTERVAL = 5   # Mostrar un frame cada N pasos
-REAL_TIME_VIZ_TYPE = 'magnitude' # 'density', 'channels', 'magnitude', 'phase', 'change'
+REAL_TIME_VIZ_TYPE = 'phase' # 'density', 'channels', 'magnitude', 'phase', 'change'
 REAL_TIME_VIZ_DOWNSCALE = 2   # Factor para reducir resolución para visualización
