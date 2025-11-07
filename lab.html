@@ -100,7 +100,7 @@
 
         // --- Conexión al WebSocket del Laboratorio ---
         const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const ws = new WebSocket(`${proto}//${window.location.host}/ws_lab`);
+        const ws = new WebSocket(`${proto}//localhost:8765`);
 
         function log(message, type = 'log') {
             const line = document.createElement('div');

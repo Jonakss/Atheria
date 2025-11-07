@@ -12,10 +12,10 @@ from .qca_engine import Aetheria_Motor
 
 # --- CAMBIO AQUÍ: Selector de Modelo (Ley M) ---
 # Opción 1: El MLP 1x1 original (Rápido, pero "míope")
-from .qca_operator_mlp import QCA_Operator_MLP as ActiveModel
+# from .qca_operator_mlp import QCA_Operator_MLP as ActiveModel
 
 # Opción 2: La U-Net (Más lenta, pero con "conciencia regional")
-# from .qca_operator_unet import QCA_Operator_UNet as ActiveModel
+from .qca_operator_unet import QCA_Operator_UNet as ActiveModel
 # -----------------------------------------------
 
 

@@ -216,15 +216,10 @@ async def run_simulation_loop(motor, start_step):
 
             # 5. Guardar Checkpoint
             if cfg.LARGE_SIM_CHECKPOINT_INTERVAL and (t + 1) % cfg.LARGE_SIM_CHECKPOINT_INTERVAL == 0:
-                # Determinar el directorio de checkpoints de simulación según la configuración
-                sim_checkpoints_dir = cfg.LARGE_SIM_CHECKPOINT_DIR
-                if cfg.CHECKPOINTS_OUTPUT_DIR:
-                    sim_checkpoints_dir = os.path.join(cfg.CHECKPOINTS_OUTPUT_DIR, cfg.EXPERIMENT_NAME, "simulation_checkpoints")
-                
                 await asyncio.to_thread(
                     save_qca_state, 
                     motor, t + 1, 
-                    sim_checkpoints_dir
+                    cfg.LARGE_SIM_CHECKPOINT_DIR
                 )
 
             # 6. Imprimir progreso
@@ -234,7 +229,7 @@ async def run_simulation_loop(motor, start_step):
             t += 1
             await asyncio.sleep(0.001)
 
-# --- Función Principal del Servidor con opción de torch.compile ---
+# --- Función Principal del Servidor ---
 async def run_server_pipeline(M_FILENAME: str | None):
     """
     Ejecuta la FASE 7: Inicia el servidor de simulación grande.
@@ -253,33 +248,23 @@ async def run_server_pipeline(M_FILENAME: str | None):
         hidden_channels=cfg.HIDDEN_CHANNELS
     )
 
-    if cfg.USE_TORCH_COMPILE and cfg.DEVICE.type == 'cuda':
+    if cfg.DEVICE.type == 'cuda':
         try:
             print("Aplicando torch.compile() al modelo de inferencia...")
             operator_model_inference = torch.compile(operator_model_inference, mode="reduce-overhead")
             print("¡torch.compile() aplicado exitosamente!")
         except Exception as e:
             print(f"Advertencia: torch.compile() falló: {e}")
-    elif cfg.USE_TORCH_COMPILE and cfg.DEVICE.type != 'cuda':
-        print("INFO: torch.compile() solicitado en config.py, pero omitiendo en CPU (solo para CUDA).")
-    elif not cfg.USE_TORCH_COMPILE and cfg.DEVICE.type == 'cuda':
-        print("INFO: torch.compile() no está habilitado en config.py. Continuando sin compilación.")
-    else: # not cfg.USE_TORCH_COMPILE and cfg.DEVICE.type != 'cuda'
+    else:
         print("INFO: Omitiendo torch.compile() en CPU.")
 
     large_scale_motor = Aetheria_Motor(cfg.GRID_SIZE_INFERENCE, cfg.D_STATE, operator_model_inference)
 
     model_id = ActiveModel.__name__
-    
-    # Determinar el directorio de checkpoints según la configuración
-    checkpoints_dir = cfg.CHECKPOINT_DIR
-    if cfg.CHECKPOINTS_OUTPUT_DIR:
-        checkpoints_dir = os.path.join(cfg.CHECKPOINTS_OUTPUT_DIR, cfg.EXPERIMENT_NAME)
-    
     if not M_FILENAME:
-         model_files = glob.glob(os.path.join(checkpoints_dir, f"{model_id}_G{cfg.GRID_SIZE_TRAINING}_Eps*_FINAL.pth"))
+         model_files = glob.glob(os.path.join(cfg.CHECKPOINT_DIR, f"{model_id}_G{cfg.GRID_SIZE_TRAINING}_Eps*_FINAL.pth"))
          if not model_files: 
-             model_files = glob.glob(os.path.join(checkpoints_dir, f"PEF_Deep_v3_G{cfg.GRID_SIZE_TRAINING}_Eps*_FINAL.pth"))
+             model_files = glob.glob(os.path.join(cfg.CHECKPOINT_DIR, f"PEF_Deep_v3_G{cfg.GRID_SIZE_TRAINING}_Eps*_FINAL.pth"))
          M_FILENAME = max(model_files, key=os.path.getctime, default=None) if model_files else None
 
     if M_FILENAME and os.path.exists(M_FILENAME):
@@ -309,18 +294,13 @@ async def run_server_pipeline(M_FILENAME: str | None):
     if cfg.LOAD_STATE_CHECKPOINT_INFERENCE:
         latest_checkpoint_filepath = cfg.STATE_CHECKPOINT_PATH_INFERENCE
         if not latest_checkpoint_filepath or not os.path.exists(latest_checkpoint_filepath):
-             # Determinar el directorio de checkpoints de simulación según la configuración
-             sim_checkpoints_dir = cfg.LARGE_SIM_CHECKPOINT_DIR
-             if cfg.CHECKPOINTS_OUTPUT_DIR:
-                 sim_checkpoints_dir = os.path.join(cfg.CHECKPOINTS_OUTPUT_DIR, cfg.EXPERIMENT_NAME, "simulation_checkpoints")
-                 
-             checkpoint_files = [f for f in os.listdir(sim_checkpoints_dir) if f.startswith("large_sim_state_step_") and f.endswith(".pth")]
+             checkpoint_files = [f for f in os.listdir(cfg.LARGE_SIM_CHECKPOINT_DIR) if f.startswith("large_sim_state_step_") and f.endswith(".pth")]
              if checkpoint_files:
                  def extract_step(f):
                      match = re.search(r"large_sim_state_step_(\d+)\.pth", f)
                      return int(match.group(1)) if match else 0
                  checkpoint_files.sort(key=extract_step)
-                 latest_checkpoint_filepath = os.path.join(sim_checkpoints_dir, checkpoint_files[-1])
+                 latest_checkpoint_filepath = os.path.join(cfg.LARGE_SIM_CHECKPOINT_DIR, checkpoint_files[-1])
         
         if latest_checkpoint_filepath and os.path.exists(latest_checkpoint_filepath):
             print(f"Cargando estado desde: {latest_checkpoint_filepath}")

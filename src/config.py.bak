@@ -18,13 +18,6 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 os.makedirs(LARGE_SIM_CHECKPOINT_DIR, exist_ok=True)
 
-
-
-# Crear directorio de checkpoints externo si está configurado
-if CHECKPOINTS_OUTPUT_DIR:
-    CHECKPOINTS_OUTPUT_DIR = os.path.join(PROJECT_ROOT, CHECKPOINTS_OUTPUT_DIR.lstrip("../"))
-    os.makedirs(CHECKPOINTS_OUTPUT_DIR, exist_ok=True)
-
 # --- Constantes del Servidor (¡¡NUEVO!!) ---
 # El 'lab_server.py' usará estos puertos
 LAB_SERVER_HOST = '0.0.0.0'
@@ -42,7 +35,7 @@ SIM_SERVER_PORT = 8766 # Puerto solo para el WebSocket de simulación
 
 # --- ¡¡NUEVO!! ---
 # Nombre del experimento por defecto
-EXPERIMENT_NAME = "UNET_32ch_D5_LR2e-5"
+EXPERIMENT_NAME = "MyNewExperiment"
 
 # --- Constantes del Servidor WebSocket ---
 # Qué: El host y puerto para el servidor "a mano" (python main.py).
@@ -74,19 +67,6 @@ RUN_LARGE_SIM = True
 # Qué esperar: `True` para seguir un entrenamiento. `False` para empezar uno de cero (¡importante al cambiar de modelo!).
 CONTINUE_TRAINING = True
 
-# Qué: (python pipeline_server.py) Habilita/deshabilita torch.compile para el modelo de inferencia.
-# Qué esperar: `True` para optimizar el rendimiento de inferencia en CUDA. `False` para desactivarlo.
-USE_TORCH_COMPILE = False
-
-# Qué: Directorio para guardar checkpoints y modelo final fuera de la carpeta del experimento.
-# Qué esperar: Si `"../checkpoints"`, los archivos se guardarán en `../checkpoints/nombre_experimento/`.
-#             Si `None`, se guardarán en la carpeta del experimento (comportamiento actual).
-CHECKPOINTS_OUTPUT_DIR = "../checkpoints"
-
-# Qué: Ruta relativa para guardar checkpoints separados por nombre de experimento.
-# Qué esperar: Los checkpoints se guardarán en `experiments/checkpoints/experiment_name/`
-CHECKPOINTS_DIR_RELATIVE = "../checkpoints/experiment_name"
-
 # ------------------------------------------------------------------------------
 # B. ARQUITECTURA DE LA LEY M (¡MUY IMPORTANTE!)
 # Qué: Definen la forma y el tamaño de tu "cerebro" (Ley M).
@@ -95,14 +75,14 @@ CHECKPOINTS_DIR_RELATIVE = "../checkpoints/experiment_name"
 # Qué: El tamaño de la cuadrícula (ej. 256x256) usado para ENTRENAR.
 # Qué esperar: Más grande (512) aprende patrones espaciales más grandes, pero
 #             es MUCHO más lento y consume más VRAM. 256 es un buen balance.
-GRID_SIZE_TRAINING = 48
+GRID_SIZE_TRAINING = 128
 
 # Qué: El "número de canales" o dimensión de cada celda.
 # Qué esperar: Es la complejidad de tu "partícula" cuántica.
 #             Más alto (ej. 32, 64) permite físicas más ricas, pero
 #             aumenta el tamaño del modelo y el uso de VRAM exponencialmente.
 #             ¡¡Debe coincidir con el modelo que intentas cargar!!
-D_STATE = 5
+D_STATE = 21
 
 # Qué: El "ancho" de la red neuronal (Ley M).
 # Qué esperar: Es la "inteligencia" del modelo.
@@ -117,17 +97,17 @@ HIDDEN_CHANNELS = 64
 
 # Qué: Cuántos "universos de prueba" (episodios) ejecutar.
 # Qué esperar: Más episodios = mejor entrenamiento. 1000 es un buen comienzo.
-EPISODES_TO_ADD = 200
+EPISODES_TO_ADD = 500
 
 # Qué: Cuántos pasos de simulación dura cada "universo de prueba".
 # Qué esperar: Más pasos (ej. 100) permite al trainer ver efectos a más largo plazo.
-STEPS_PER_EPISODE = 150
+STEPS_PER_EPISODE = 50
 
 # Qué: Tasa de Aprendizaje (Learning Rate). ¡EL MÁS IMPORTANTE!
 # Qué esperar: Controla qué tan "rápido" aprende el modelo.
 #             - Para U-Net (10M+ params): Debe ser MUY bajo (ej. 1e-5 o 2e-5) o explotará (NaN).
 #             - Para MLP (300k params): Puede ser más alto (ej. 5e-4).
-LR_RATE_M = 2e-07
+LR_RATE_M = 0.0001
 
 # Qué: "Backpropagation Through Time" (BPTT-k). Cuántos pasos "recuerda" el error.
 # Qué esperar: Más alto (ej. 20) aprende mejor la causalidad, pero consume
@@ -206,10 +186,10 @@ FPS_VIZ_TRAINING = 24
 # Qué: (pipeline_server.py) Tamaño de la cuadrícula de simulación en "producción".
 # Qué esperar: Más grande = más impresionante, pero más lento.
 #             ¡Cuidado con el 'std::bad_alloc' si la RAM del sistema es baja!
-GRID_SIZE_INFERENCE = 128 # (Empieza con 256, luego prueba 468 o 512)
+GRID_SIZE_INFERENCE = 500 # (Empieza con 256, luego prueba 468 o 512)
 
 # Qué: (pipeline_server.py) Cómo iniciar la simulación si no se carga un checkpoint.
-INITIAL_STATE_MODE_INFERENCE = 'complex-noise'
+INITIAL_STATE_MODE_INFERENCE = 'random'
 
 # Qué: (pipeline_server.py) Si `True`, busca el último checkpoint de simulación y lo carga.
 LOAD_STATE_CHECKPOINT_INFERENCE = True

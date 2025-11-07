@@ -17,7 +17,7 @@ from .config import (
     EXPLOSION_THRESHOLD, EXPLOSION_PENALTY_MULTIPLIER, STAGNATION_WINDOW,
     MIN_LOSS_IMPROVEMENT, REACTIVATION_COUNT, REACTIVATION_STATE_MODE,
     REACTIVATION_LR_MULTIPLIER, GRADIENT_CLIP, STEPS_PER_EPISODE,
-    PERSISTENCE_COUNT
+    PERSISTENCE_COUNT, CHECKPOINTS_DIR_RELATIVE
 )
 
 # ------------------------------------------------------------------------------
@@ -36,8 +36,10 @@ class QC_Trainer_v3:
         
         # --- ¡¡NUEVO!! Guardar el nombre del experimento ---
         self.experiment_name = experiment_name
-        self.experiment_checkpoint_dir = os.path.join(CHECKPOINT_DIR, self.experiment_name)
+        # --- ¡¡MODIFICADO!! Usar directorio de checkpoints fuera del experimento ---
+        self.experiment_checkpoint_dir = os.path.abspath(os.path.join(CHECKPOINT_DIR, CHECKPOINTS_DIR_RELATIVE.replace('experiment_name', self.experiment_name)))
         os.makedirs(self.experiment_checkpoint_dir, exist_ok=True)
+        print(f"Checkpoints se guardarán en: {self.experiment_checkpoint_dir}")
         # --------------------------------------------------
 
         self.history = {
