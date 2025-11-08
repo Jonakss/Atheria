@@ -313,7 +313,10 @@ async def run_server_pipeline(M_FILENAME: str | None):
              sim_checkpoints_dir = cfg.LARGE_SIM_CHECKPOINT_DIR
              if cfg.CHECKPOINTS_OUTPUT_DIR:
                  sim_checkpoints_dir = os.path.join(cfg.CHECKPOINTS_OUTPUT_DIR, cfg.EXPERIMENT_NAME, "simulation_checkpoints")
-                 
+             
+             # Crear el directorio si no existe
+             os.makedirs(sim_checkpoints_dir, exist_ok=True)
+             
              checkpoint_files = [f for f in os.listdir(sim_checkpoints_dir) if f.startswith("large_sim_state_step_") and f.endswith(".pth")]
              if checkpoint_files:
                  def extract_step(f):

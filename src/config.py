@@ -18,6 +18,15 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 os.makedirs(LARGE_SIM_CHECKPOINT_DIR, exist_ok=True)
 
+# Qué: Directorio para guardar checkpoints y modelo final fuera de la carpeta del experimento.
+# Qué esperar: Si `"../checkpoints"`, los archivos se guardarán en `../checkpoints/nombre_experimento/`.
+#             Si `None`, se guardarán en la carpeta del experimento (comportamiento actual).
+CHECKPOINTS_OUTPUT_DIR = "../checkpoints"
+
+# Qué: Ruta relativa para guardar checkpoints separados por nombre de experimento.
+# Qué esperar: Los checkpoints se guardarán en `experiments/checkpoints/experiment_name/`
+CHECKPOINTS_DIR_RELATIVE = "../checkpoints/experiment_name"
+
 
 
 # Crear directorio de checkpoints externo si está configurado
@@ -78,15 +87,6 @@ CONTINUE_TRAINING = True
 # Qué esperar: `True` para optimizar el rendimiento de inferencia en CUDA. `False` para desactivarlo.
 USE_TORCH_COMPILE = False
 
-# Qué: Directorio para guardar checkpoints y modelo final fuera de la carpeta del experimento.
-# Qué esperar: Si `"../checkpoints"`, los archivos se guardarán en `../checkpoints/nombre_experimento/`.
-#             Si `None`, se guardarán en la carpeta del experimento (comportamiento actual).
-CHECKPOINTS_OUTPUT_DIR = "../checkpoints"
-
-# Qué: Ruta relativa para guardar checkpoints separados por nombre de experimento.
-# Qué esperar: Los checkpoints se guardarán en `experiments/checkpoints/experiment_name/`
-CHECKPOINTS_DIR_RELATIVE = "../checkpoints/experiment_name"
-
 # ------------------------------------------------------------------------------
 # B. ARQUITECTURA DE LA LEY M (¡MUY IMPORTANTE!)
 # Qué: Definen la forma y el tamaño de tu "cerebro" (Ley M).
@@ -102,13 +102,13 @@ GRID_SIZE_TRAINING = 48
 #             Más alto (ej. 32, 64) permite físicas más ricas, pero
 #             aumenta el tamaño del modelo y el uso de VRAM exponencialmente.
 #             ¡¡Debe coincidir con el modelo que intentas cargar!!
-D_STATE = 5
+D_STATE = 11
 
 # Qué: El "ancho" de la red neuronal (Ley M).
 # Qué esperar: Es la "inteligencia" del modelo.
 #             - Para QCA_Operator_MLP: 256 es un buen valor.
 #             - Para QCA_Operator_UNet: 64 es un buen punto de partida (256 explotará tu VRAM).
-HIDDEN_CHANNELS = 64
+HIDDEN_CHANNELS = 128
 
 # ------------------------------------------------------------------------------
 # C. PARÁMETROS DE ENTRENAMIENTO
@@ -136,7 +136,7 @@ PERSISTENCE_COUNT = 10
 
 # Qué: Límite para el recorte de gradientes.
 # Qué esperar: Previene que los gradientes exploten (NaN). 0.85-1.0 es estándar.
-GRADIENT_CLIP = 0.85
+GRADIENT_CLIP = 0.8
 
 # ------------------------------------------------------------------------------
 # D. FUNCIÓN DE RECOMPENSA (El "Alma" de la IA)
@@ -146,14 +146,14 @@ GRADIENT_CLIP = 0.85
 # Qué: (ALPHA) Peso para R_Density_Target (Complejidad/Caos).
 # Qué esperar: Sube de START a END. Un valor final ALTO (ej. 30.0)
 #             fuerza al universo a ser "interesante" y no morir.
-ALPHA_START = 3.0
+ALPHA_START = 1.5
 ALPHA_END = 30.0
 
 # Qué: (GAMMA) Peso para R_Stability (Estabilidad).
 # Qué esperar: Baja de START a END. Un valor final BAJO (ej. 0.6)
 #             permite que el universo sea un poco más caótico al final.
-GAMMA_START = 3.0
-GAMMA_END = 0.6
+GAMMA_START = 3.5
+GAMMA_END = 0.5
 
 # Qué: (BETA) Peso para R_Causality (Actividad/Movimiento).
 # Qué esperar: Un valor constante. Si tu universo se "congela", sube esto.
@@ -166,11 +166,11 @@ LAMBDA_ACTIVITY_VAR = 1.0
 
 # Qué: (LAMBDA 2) Recompensa la "varianza de la densidad".
 # Qué esperar: Promueve el movimiento. Penaliza las estructuras estáticas.
-LAMBDA_VELOCIDAD = 0.5
+LAMBDA_VELOCIDAD = 0.8
 
 # Qué: El "objetivo" de R_Density_Target.
 # Qué esperar: Un valor > 1.0 le pide al modelo que cree picos y valles.
-TARGET_STD_DENSITY = 1.2
+TARGET_STD_DENSITY = 2.3
 
 # Qué: Penalización por "explosión" (si una celda se vuelve demasiado brillante).
 # Qué esperar: Valores altos (ej. 20.0) castigan duramente la inestabilidad.
@@ -206,7 +206,7 @@ FPS_VIZ_TRAINING = 24
 # Qué: (pipeline_server.py) Tamaño de la cuadrícula de simulación en "producción".
 # Qué esperar: Más grande = más impresionante, pero más lento.
 #             ¡Cuidado con el 'std::bad_alloc' si la RAM del sistema es baja!
-GRID_SIZE_INFERENCE = 128 # (Empieza con 256, luego prueba 468 o 512)
+GRID_SIZE_INFERENCE = 256 # (Empieza con 256, luego prueba 468 o 512)
 
 # Qué: (pipeline_server.py) Cómo iniciar la simulación si no se carga un checkpoint.
 INITIAL_STATE_MODE_INFERENCE = 'complex-noise'
