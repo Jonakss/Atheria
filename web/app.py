@@ -6,12 +6,11 @@ import glob
 import json
 import logging
 from aiohttp import web
-import argparse
 import websockets # Importar websockets para ConnectionClosed
 
 # --- Configuración del Path ---
-script_dir = os.path.dirname(os.path.abspath(__file__))
-src_dir = os.path.join(script_dir, "src")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+src_dir = os.path.join(PROJECT_ROOT, "src")
 if src_dir not in sys.path:
     sys.path.append(src_dir)
 
@@ -53,6 +52,7 @@ g_state = {
     "sim_step_count": 0,
     "sim_density_history": deque(maxlen=2000),
     "sim_spacetime_buffer": deque(maxlen=cfg.GRID_SIZE),
+    "sim_cube_buffer": deque(maxlen=cfg.STEPS_PER_EPISODE), # <-- ¡NUEVO! Para el cubo 3D
     "sim_latest_metrics": {},
     "sim_connected_clients": {}, # {ws_aiohttp: {"viewport": ...}}
     "sim_viewport_cache": {},
@@ -149,11 +149,52 @@ def generate_spacetime_plot():
     ax.set_title('Diagrama Espacio-Tiempo (Fila Central)'); ax.set_xlabel('Posición en la Fila'); ax.set_ylabel('Tiempo (Pasos)')
     return fig
 
+def generate_spacetime_cube_plot():
+    """Genera una visualización de cubo 3D de los últimos 50 pasos."""
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    
+    if not g_state["sim_cube_buffer"]:
+        ax.set_title("Buffer de Cubo Espacio-Tiempo Vacío")
+        return fig_to_base64(fig)
+
+    all_x, all_y, all_t, all_colors = [], [], [], []
+    
+    # Umbral para visualizar solo las celdas "activas"
+    density_threshold = 0.1
+
+    for t, psi_t in enumerate(g_state["sim_cube_buffer"]):
+        real_parts, imag_parts = get_complex_parts(psi_t)
+        density_grid = torch.sum(real_parts.pow(2) + imag_parts.pow(2), dim=1).squeeze(0).cpu().numpy()
+        
+        # Encontrar coordenadas por encima del umbral
+        y_coords, x_coords = np.where(density_grid > density_threshold)
+        
+        if len(x_coords) > 0:
+            densities = density_grid[y_coords, x_coords]
+            all_x.extend(x_coords)
+            all_y.extend(y_coords)
+            all_t.extend([t] * len(x_coords))
+            all_colors.extend(densities)
+
+    if all_x:
+        scatter = ax.scatter(all_x, all_y, all_t, c=all_colors, cmap='viridis', s=2, alpha=0.7)
+        fig.colorbar(scatter, ax=ax, label='Densidad de Estado')
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel(f'Tiempo (Últimos {cfg.STEPS_PER_EPISODE} pasos)')
+    ax.set_title('Cubo Espacio-Tiempo')
+    ax.view_init(elev=20, azim=-60)
+    
+    return fig_to_base64(fig)
+
 def get_visualization_as_base64(psi, prev_psi, viz_type, viewport):
     # Visualizaciones que no son de grid y no se recortan
     if viz_type == 'poincare': return fig_to_base64(generate_poincare_plot())
     if viz_type == 'density_histogram': return fig_to_base64(generate_density_histogram(psi))
     if viz_type == 'spacetime_slice': return fig_to_base64(generate_spacetime_plot())
+    if viz_type == 'spacetime_cube': return generate_spacetime_cube_plot()
     
     # Aplicar viewport para visualizaciones de grid
     psi_to_render = generate_view_tensor(psi, viewport)
@@ -229,9 +270,9 @@ async def simulation_loop():
                 g_state["sim_density_history"].append(g_state["sim_latest_metrics"].get("mean_density", 0))
                 
                 # Actualizar buffer espacio-tiempo
-                real_parts, imag_parts = get_complex_parts(g_state["sim_latest_psi"])
                 center_row_density = torch.sum(real_parts.pow(2) + imag_parts.pow(2), dim=1).squeeze(0)[cfg.GRID_SIZE // 2, :].cpu().numpy()
                 g_state["sim_spacetime_buffer"].append(center_row_density)
+                g_state["sim_cube_buffer"].append(g_state["sim_latest_psi"].clone()) # <-- ¡NUEVO!
             await asyncio.sleep(1 / 60)
         except asyncio.CancelledError:
             logging.info("Bucle de simulación detenido.")
@@ -399,7 +440,7 @@ async def websocket_handler(request):
                             # Construir el comando para train.py
                             cmd = [
                                 sys.executable, 
-                                os.path.join(script_dir, "train.py"), # Ruta absoluta a train.py
+                                os.path.join(PROJECT_ROOT, "scripts", "train.py"),
                                 "--name", args.get("name", cfg.EXPERIMENT_NAME),
                                 "--model", args.get("model", "unet"),
                                 "--lr", str(args.get("lr", cfg.LR_RATE_M)),
@@ -430,6 +471,7 @@ async def websocket_handler(request):
                                 g_state["sim_step_count"] = 0
                                 g_state["sim_density_history"].clear()
                                 g_state["sim_spacetime_buffer"].clear()
+                                g_state["sim_cube_buffer"].clear() # <-- ¡NUEVO!
                                 g_state["sim_latest_psi"] = g_state["sim_motor"].state.psi.clone()
                                 g_state["sim_previous_psi"] = g_state["sim_latest_psi"].clone()
                                 for client_ws in g_state["sim_connected_clients"]:
@@ -454,7 +496,7 @@ async def websocket_handler(request):
 # --- Configuración y Punto de Entrada ---
 def setup_app():
     app = web.Application()
-    app.router.add_get('/', lambda r: web.FileResponse(os.path.join(script_dir, 'index.html')))
+    app.router.add_get('/', lambda r: web.FileResponse(os.path.join(PROJECT_ROOT, "web", "index.html")))
     app.router.add_get('/ws', websocket_handler)
     logging.info(f"Servidor de Aetheria iniciado en http://{cfg.LAB_SERVER_HOST}:{cfg.LAB_SERVER_PORT}")
     return app

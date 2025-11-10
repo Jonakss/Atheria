@@ -111,6 +111,7 @@
             </optgroup>
             <optgroup label="Análisis Temporal y Estadístico">
                 <option value="spacetime_slice">Diagrama Espacio-Tiempo</option>
+                <option value="spacetime_cube">Cubo Espacio-Tiempo</option>
                 <option value="poincare">Gráfico de Poincaré</option>
                 <option value="density_histogram">Histograma de Densidad</option>
             </optgroup>
@@ -176,7 +177,8 @@
         <div class="form-group">
             <label for="train_model_type">Tipo Modelo:</label>
             <select id="train_model_type">
-                <option value="unet">U-Net</option>
+                <option value="unet">U-Net (Estándar)</option>
+                <option value="unet_unitary">U-Net (Unitario)</option>
                 <option value="mlp">MLP</option>
             </select>
         </div>

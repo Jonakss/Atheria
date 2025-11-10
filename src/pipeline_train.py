@@ -10,19 +10,18 @@ from . import config as cfg
 from .trainer import QC_Trainer_v3
 from .qca_engine import Aetheria_Motor 
 
-# --- ¡¡MODIFICADO!! Selector de Modelo Dinámico ---
-# Ahora lee la configuración desde config.py
-print(f"Cargando Ley M: {cfg.ACTIVE_QCA_OPERATOR}")
-if cfg.ACTIVE_QCA_OPERATOR == "MLP":
-    from .qca_operator_mlp import QCA_Operator_MLP as ActiveModel
-elif cfg.ACTIVE_QCA_OPERATOR == "UNET_UNITARIA":
-    from .qca_operator_unet_unitary import QCA_Operator_UNet_Unitary as ActiveModel
-# elif cfg.ACTIVE_QCA_OPERATOR == "UNET_COSMOLOGICA":
-#     from .qca_operator_unet import QCA_Operator_UNet as ActiveModel
-else:
-    raise ValueError(f"Operador QCA '{cfg.ACTIVE_QCA_OPERATOR}' no reconocido en config.py")
-# -----------------------------------------------
+# src/pipeline_train.py
+import torch
+import torch.nn as nn
+import time
+import os
+import numpy as np
 
+# ¡Importaciones relativas!
+from . import config as cfg
+from .trainer import QC_Trainer_v3
+from .qca_engine import Aetheria_Motor 
+from . import models # <-- ¡NUEVO!
 
 def run_training_pipeline():
     """
@@ -31,26 +30,39 @@ def run_training_pipeline():
     print("\n" + "="*60)
     print(">>> INICIANDO FASE DE ENTRENAMIENTO (FASE 5) <<<")
     print(f"Nombre del Experimento: {cfg.EXPERIMENT_NAME}")
+
+    # --- Selector de Modelo Dinámico ---
+    ActiveModel = models.get_model_class(cfg.ACTIVE_QCA_OPERATOR)
     print(f"Modelo Activo: {ActiveModel.__name__}")
-    print("="*60)
+    # -----------------------------------
     
     model_id = ActiveModel.__name__
     
-    # --- ¡¡MODIFICADO!! Usa STATE_VECTOR_DIM ---
-    model_M = cfg.D_STATE
-    
+    # --- Instanciación y Compilación del Modelo ---
+    # Manejar el caso especial del constructor de UNET_UNITARIA
+    if cfg.ACTIVE_QCA_OPERATOR == "UNET_UNITARIA":
+        model_M = ActiveModel(d_vector=cfg.D_STATE, hidden_channels=cfg.HIDDEN_CHANNELS)
+    else:
+        model_M = ActiveModel(d_state=cfg.D_STATE, hidden_channels=cfg.HIDDEN_CHANNELS)
+
     if cfg.DEVICE.type == 'cuda':
         try:
             print("Aplicando torch.compile() al modelo...")
+            # ¡CORREGIDO! Compilar la instancia del modelo, no un entero.
             model_M = torch.compile(model_M, mode="reduce-overhead")
             print("¡torch.compile() aplicado exitosamente!")
         except Exception as e:
             print(f"Advertencia: torch.compile() falló. Se usará el modelo estándar. Error: {e}")
 
-    # --- ¡¡MODIFICADO!! Usa STATE_VECTOR_DIM ---
-    Aetheria_Motor_Train = Aetheria_Motor(cfg.GRID_SIZE_TRAINING, cfg.STATE_VECTOR_DIM, model_M)
+    # --- Inicialización del Motor ---
+    # ¡CORREGIDO! Pasar la instancia del modelo y el d_vector correcto.
+    Aetheria_Motor_Train = Aetheria_Motor(
+        size=cfg.GRID_SIZE_TRAINING, 
+        d_vector=cfg.D_STATE * 2, # El motor espera el total de canales (real + imag)
+        operator_model=model_M
+    )
     print(f"Motor y Ley-M ({model_id}) inicializados. Cuadrícula: {cfg.GRID_SIZE_TRAINING}x{cfg.GRID_SIZE_TRAINING}.")
-    # --------------------------------------------
+    # --------------------------------
 
     trainable_params = sum(p.numel() for p in (Aetheria_Motor_Train.operator.module.parameters()
                                                  if isinstance(Aetheria_Motor_Train.operator, nn.DataParallel)

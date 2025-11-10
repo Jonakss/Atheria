@@ -1,11 +1,14 @@
-# src/qca_operator_unet.py
+# src/models/deep_qca.py
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from . import register_model
+
 # ------------------------------------------------------------------------------
 # 1.2: QCA_Operator_Deep Class (The "Deep" M-Law)
 # ------------------------------------------------------------------------------
+@register_model('DEEP_QCA')
 class QCA_Operator_Deep(nn.Module):
     def __init__(self, d_state, hidden_channels):
         super().__init__()

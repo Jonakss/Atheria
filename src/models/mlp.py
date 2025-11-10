@@ -1,10 +1,12 @@
-# src/qca_operator_mlp.py
+# src/models/mlp.py
 # Contiene la Ley M original (basada en MLP 1x1, "míope").
 import torch
 import torch.nn as nn
 
-from .config import DEVICE
+from ..config import DEVICE
+from . import register_model
 
+@register_model('MLP')
 class QCA_Operator_MLP(nn.Module):
     """
     La Ley M "Profunda" original (QCA_Operator_Deep).

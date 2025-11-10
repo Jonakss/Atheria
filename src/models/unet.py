@@ -1,7 +1,9 @@
-# src/qca_operator_unet_unitary.py
+# src/models/unet.py
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+from . import register_model
 
 # --- Bloque de Convolución de Ayuda ---
 class ConvBlock(nn.Module):
@@ -17,7 +19,9 @@ class ConvBlock(nn.Module):
         # debe ser un divisor de 'mid_channels'
         num_groups_mid = max(1, mid_channels // 8)
         if mid_channels % num_groups_mid != 0:
-             divisors = [4, 2, 1]
+             # Fallback si 8 no es un divisor (ej. 64 % 8 sí, pero 21 % 8 no)
+             # Buscamos el divisor más grande posible <= 8
+             divisors = [8, 4, 2, 1]
              for d in divisors:
                  if mid_channels % d == 0:
                      num_groups_mid = d
@@ -27,7 +31,7 @@ class ConvBlock(nn.Module):
         # debe ser un divisor de 'out_channels'
         num_groups_out = max(1, out_channels // 8)
         if out_channels % num_groups_out != 0:
-             divisors = [4, 2, 1]
+             divisors = [8, 4, 2, 1]
              for d in divisors:
                  if out_channels % d == 0:
                      num_groups_out = d
@@ -47,23 +51,18 @@ class ConvBlock(nn.Module):
         return self.conv_block(x)
 
 # --- El Operador U-Net (Versión 3-Niveles / 7.7M params) ---
-class QCA_Operator_UNet_Unitary(nn.Module):
+@register_model('UNET')
+class QCA_Operator_UNet(nn.Module):
     """
     Arquitectura U-Net con 3 NIVELES de bajada/subida (inc + 2 down).
     Esta es la versión estable de ~7.7M de parámetros (con base_c=64).
     """
-    def _initialize_weights(self):
-        """Inicializa los pesos de la capa de salida para que sean muy pequeños."""
-        print("Inicializando capa de salida (outc) con pesos pequeños.")
-        nn.init.normal_(self.outc.weight, mean=0.0, std=1e-5)
-    
-    
-    def __init__(self, d_vector, hidden_channels):
+    def __init__(self, d_state, hidden_channels):
         super().__init__()
-        self.d_vector = d_vector # ej. 4
-        base_c = hidden_channels     # ej. 64
-        in_c = d_vector              # ej. 4
-        
+        self.d_state = d_state
+        base_c = hidden_channels # ej: 64
+        in_c = 2 * d_state 
+
         # --- Encoder (Contracción) ---
         self.inc = ConvBlock(in_c, base_c)           # x1 (H) -> 64
         self.down1 = nn.Sequential(nn.MaxPool2d(2), ConvBlock(base_c, base_c * 2))     # x2 (H/2) -> 128
@@ -82,22 +81,19 @@ class QCA_Operator_UNet_Unitary(nn.Module):
         self.conv_up2 = ConvBlock(base_c * 3, base_c) # (H) -> 64
 
         # --- Salida ---
-        self.outc = nn.Conv2d(base_c, self.d_vector * self.d_vector, kernel_size=1)
-        
-        # --- ¡¡NUEVA LÍNEA!! ---
-        self._initialize_weights() # Asegura que el delta inicial sea pequeño
+        self.outc = nn.Conv2d(base_c, 2 * d_state, kernel_size=1)
         
     def forward(self, x_cat):
-        # x_cat (psi_t) tiene forma [B, C, H, W] (ej: [1, 4, 256, 256])
-        B, C, H, W = x_cat.shape 
+        # x_cat tiene forma [B, 2*d_state, H, W]
         
-        # --- 1. U-Net ---
+        # --- Encoder ---
         x1 = self.inc(x_cat)  # [B, 64, H=256]
         x2 = self.down1(x1) # [B, 128, H=128]
         x3 = self.down2(x2) # [B, 256, H=64]
         
         b = self.bot(x3)    # [B, 512, H=64]
 
+        # --- Decoder (¡¡CONEXIONES CORREGIDAS!!) ---
         u1 = self.up1(b)                                # [B, 256, H=128]
         s1 = torch.cat([u1, x2], dim=1)                 # Concat: [B, 256 + 128 = 384, H=128]
         c1 = self.conv_up1(s1)                          # [B, 256, H=128]
@@ -106,24 +102,16 @@ class QCA_Operator_UNet_Unitary(nn.Module):
         s2 = torch.cat([u2, x1], dim=1)                 # Concat: [B, 128 + 64 = 192, H=256]
         c2 = self.conv_up2(s2)                          # [B, 64, H=256]
         
-        # --- 2. Predecir la Matriz 'A' ---
-        # A_raw tiene forma [B, D*D, H, W] (ej: [1, 16, 256, 256])
-        A_raw = self.outc(c2) 
+        output = self.outc(c2) # Forma: [B, 42, H=256]
+
+        # --- Reformatear a la salida esperada por Aetheria_Motor ---
+        output = output.permute(0, 2, 3, 1) # (B, H, W, 2*d_state)
+        output = output.squeeze(0) # Forma: [H, W, 2*d_state]
         
-        # --- 3. Reformatear A ---
-        # [B, D*D, H, W] -> [B, H, W, D, D]
-        A_raw = A_raw.permute(0, 2, 3, 1).view(B, H, W, self.d_vector, self.d_vector)
+        delta_real = output[..., :self.d_state]
+        delta_imag = output[..., self.d_state:]
         
-        # --- 4. Forzar Anti-Simetría (A = -A.T) ---
-        # A shape: [B, H, W, D, D] (ej: [1, 256, 256, 4, 4])
-        A = 0.5 * (A_raw - A_raw.transpose(-1, -2)) 
-        
-        # --- 5. Calcular el Delta (dΨ/dt = A * Ψ) usando einsum ---
-        # A (bxyij):      [B, H, W, D, D] (b=batch, xy=coords, ij=matriz A)
-        # x_cat (bjxy):   [B, D, H, W]    (b=batch, j=vector psi, xy=coords)
-        # Ecuación: delta_psi[b, i, x, y] = sum_j ( A[b, x, y, i, j] * psi[b, j, x, y] )
-        delta_psi = torch.einsum('bxyij,bjxy -> bixy', A, x_cat)
-        
-        # --- 6. Devolver el Delta ---
-        # delta_psi ya está en el formato [B, C, H, W] que necesita el motor.
-        return delta_psi
+        delta_real = delta_real * 0.1
+        delta_imag = delta_imag * 0.1
+
+        return delta_real, delta_imag

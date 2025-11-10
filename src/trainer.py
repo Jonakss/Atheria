@@ -79,6 +79,9 @@ class QC_Trainer_v3:
 
         state = {
             'episode': episode,
+            'model_architecture': cfg.ACTIVE_QCA_OPERATOR,
+            'd_state': cfg.D_STATE,
+            'hidden_channels': cfg.HIDDEN_CHANNELS,
             'model_state_dict': model_state_dict,
             'optimizer_state_dict': self.optimizer.state_dict(),
             'best_loss': self.best_loss,

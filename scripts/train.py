@@ -5,8 +5,8 @@ import asyncio
 import argparse # <-- ¡NUEVO! Para leer argumentos de la terminal
 
 # --- Configuración del Path ---
-script_dir = os.path.dirname(os.path.abspath(__file__))
-src_dir = os.path.join(script_dir, "src")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+src_dir = os.path.join(PROJECT_ROOT, "src")
 if src_dir not in sys.path:
     sys.path.append(src_dir)
 
@@ -36,9 +36,11 @@ def main_training(args):
     
     # Seleccionar el modelo
     if args.model == 'unet':
-        cfg.ACTIVE_MODEL_KEY = 'unet'
+        cfg.ACTIVE_QCA_OPERATOR = 'UNET'
+    elif args.model == 'unet_unitary':
+        cfg.ACTIVE_QCA_OPERATOR = 'UNET_UNITARIA'
     else:
-        cfg.ACTIVE_MODEL_KEY = 'mlp'
+        cfg.ACTIVE_QCA_OPERATOR = 'MLP'
     # -------------------------------------------------
 
     # --- Imprimir configuración para logging ---
@@ -67,7 +69,7 @@ if __name__ == "__main__":
     # --- ¡NUEVO! Definir los argumentos de línea de comandos ---
     parser = argparse.ArgumentParser(description="Lanzador de Entrenamiento AETHERIA")
     parser.add_argument('--name', type=str, default=cfg.EXPERIMENT_NAME, help='Nombre de la carpeta del experimento')
-    parser.add_argument('--model', type=str, default='unet', choices=['mlp', 'unet'], help='Modelo a entrenar (mlp o unet)')
+    parser.add_argument('--model', type=str, default='unet', choices=['mlp', 'unet', 'unet_unitary'], help='Modelo a entrenar')
     parser.add_argument('--hidden_channels', type=int, default=cfg.HIDDEN_CHANNELS, help='Canales ocultos (ancho) del modelo')
     parser.add_argument('--lr', type=float, default=cfg.LR_RATE_M, help='Tasa de aprendizaje')
     parser.add_argument('--episodes', type=int, default=cfg.EPISODES_TO_ADD, help='Número de episodios a entrenar')

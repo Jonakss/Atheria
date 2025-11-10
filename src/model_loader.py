@@ -1,41 +1,79 @@
 # /home/jonathan.correa/Projects/Atheria/src/model_loader.py
 import torch
 import logging
+import os
 
-# Importa las variables de configuración y las arquitecturas de modelo necesarias
-from src.config import MODEL_ARCHITECTURE, D_STATE, HIDDEN_CHANNELS
-from src.qca_operator_unet_unitary import QCA_Operator_UNet_Unitary
-from src.qca_operator_unet import QCA_Operator_UNet
-from src.qca_operator_mlp import QCA_Operator_MLP
+# Importa las variables de configuración y el nuevo sistema de modelos
+from . import config as cfg
+from . import models
 
-def load_model():
+def load_model(model_path=None):
     """
-    Carga y devuelve la arquitectura del modelo especificada en el archivo de configuración.
+    Carga un modelo. Si se proporciona model_path, carga desde el checkpoint.
+    Si no, crea un nuevo modelo basado en la configuración global.
     """
-    logging.info(f"Intentando cargar la arquitectura del modelo: {MODEL_ARCHITECTURE}")
     
-    model = None
-    
-    if MODEL_ARCHITECTURE == "UNET_UNITARIA":
-        # Modelo U-Net con pesos unitarios (ideal para estabilidad a largo plazo)
-        model = QCA_Operator_UNet_Unitary(d_vector=D_STATE, hidden_channels=HIDDEN_CHANNELS)
-        logging.info("Modelo QCA_Operator_UNet_Unitary cargado.")
-        
-    elif MODEL_ARCHITECTURE == "UNET":
-        # Modelo U-Net estándar
-        model = QCA_Operator_UNet(d_state=D_STATE, hidden_channels=HIDDEN_CHANNELS)
-        logging.info("Modelo QCA_Operator_UNet cargado.")
+    # --- Si se proporciona una ruta, cargar desde el checkpoint ---
+    if model_path:
+        # Construir la ruta completa si es relativa
+        if not os.path.isabs(model_path):
+            full_path = os.path.join(cfg.CHECKPOINT_DIR, model_path)
+        else:
+            full_path = model_path
 
-    elif MODEL_ARCHITECTURE == "MLP":
-        # Perceptrón Multicapa simple
-        model = QCA_Operator_MLP(d_state=D_STATE, hidden_channels=HIDDEN_CHANNELS)
-        logging.info("Modelo QCA_Operator_MLP cargado.")
+        if not os.path.exists(full_path):
+            error_msg = f"No se encontró el archivo de checkpoint: {full_path}"
+            logging.error(error_msg)
+            raise FileNotFoundError(error_msg)
+
+        logging.info(f"Cargando modelo desde el checkpoint: {full_path}")
+        checkpoint = torch.load(full_path, map_location=cfg.DEVICE)
+
+        # Extraer metadatos del checkpoint
+        architecture = checkpoint.get('model_architecture')
+        d_state = checkpoint.get('d_state')
+        hidden_channels = checkpoint.get('hidden_channels')
+
+        if not all([architecture, d_state, hidden_channels]):
+            error_msg = "El checkpoint no contiene los metadatos necesarios (model_architecture, d_state, hidden_channels)."
+            logging.error(error_msg)
+            raise ValueError(error_msg)
         
+        logging.info(f"Metadatos del checkpoint: Arch={architecture}, D_State={d_state}, HiddenCh={hidden_channels}")
+
+        # Instanciar el modelo correcto usando el sistema de registro
+        ModelClass = models.get_model_class(architecture)
+        
+        # Manejar el caso especial del constructor de UNET_UNITARIA
+        if architecture == "UNET_UNITARIA":
+            model = ModelClass(d_vector=d_state, hidden_channels=hidden_channels)
+        else:
+            model = ModelClass(d_state=d_state, hidden_channels=hidden_channels)
+            
+        # Cargar los pesos (state_dict)
+        state_dict = checkpoint['model_state_dict']
+        # Manejar el caso en que el modelo se guardó con DataParallel (contiene 'module.')
+        if next(iter(state_dict)).startswith('module.'):
+            new_state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
+            model.load_state_dict(new_state_dict)
+        else:
+            model.load_state_dict(state_dict)
+        
+        logging.info("Modelo cargado y pesos aplicados desde el checkpoint exitosamente.")
+
+    # --- Si no se proporciona ruta, crear un modelo nuevo desde config ---
     else:
-        # Si la arquitectura no se reconoce, lanza un error claro.
-        error_msg = f"Arquitectura de modelo '{MODEL_ARCHITECTURE}' no reconocida en model_loader.py"
-        logging.error(error_msg)
-        raise ValueError(error_msg)
+        logging.info(f"No se proporcionó model_path. Creando un nuevo modelo desde la configuración global: {cfg.MODEL_ARCHITECTURE}")
         
+        ModelClass = models.get_model_class(cfg.MODEL_ARCHITECTURE)
+        
+        # Manejar el caso especial del constructor de UNET_UNITARIA
+        if cfg.MODEL_ARCHITECTURE == "UNET_UNITARIA":
+            model = ModelClass(d_vector=cfg.D_STATE, hidden_channels=cfg.HIDDEN_CHANNELS)
+        else:
+            model = ModelClass(d_state=cfg.D_STATE, hidden_channels=cfg.HIDDEN_CHANNELS)
+
+        logging.info("Nuevo modelo creado exitosamente.")
+
     return model
 

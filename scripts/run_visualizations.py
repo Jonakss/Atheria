@@ -4,8 +4,18 @@
 # las herramientas de visualización para crear gráficos.
 
 import torch
+import os
+import sys
+
+# --- Configuración del Path ---
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+src_dir = os.path.join(PROJECT_ROOT, "src")
+if src_dir not in sys.path:
+    sys.path.append(src_dir)
+
 from src.visualization_tools import visualize_poincare_disk, visualize_3d_slices
 from src.qca_operator_unet import QCA_Operator_UNet
+from src import config as cfg # <-- ¡NUEVO!
 
 def run_visualization_pipeline():
     """
@@ -17,14 +27,13 @@ def run_visualization_pipeline():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Usando dispositivo: {device}")
 
-    # Parámetros correctos para tu QCA_Operator_UNet
-    D_STATE = 21  # O el valor correcto que uses en tu simulación
-    HIDDEN_CHANNELS = 64
-
     try:
-        # Corregido: Usar los parámetros d_state y hidden_channels
-        model = QCA_Operator_UNet(d_state=D_STATE, hidden_channels=HIDDEN_CHANNELS).to(device)
-        print("Modelo U-Net cargado exitosamente.")
+        # Corregido: Usar parámetros desde src/config.py
+        model = QCA_Operator_UNet(
+            d_state=cfg.D_STATE, 
+            hidden_channels=cfg.HIDDEN_CHANNELS
+        ).to(device)
+        print("Modelo U-Net cargado exitosamente con la configuración de 'src/config.py'.")
     except Exception as e:
         print(f"Error al cargar QCA_Operator_UNet: {e}")
         print("Asegúrate de que 'src/qca_operator_unet.py' existe y es correcto.")
@@ -49,9 +58,9 @@ def run_visualization_pipeline():
     # 2. Generar un tensor de datos de ejemplo
     # El modelo espera una entrada con shape [B, 2 * d_state, H, W]
     batch_size = 64
-    # Aumentado el tamaño para que sea divisible por los MaxPool
-    height, width = 128, 128 
-    input_tensor = torch.randn(batch_size, 2 * D_STATE, height, width).to(device)
+    # Usar tamaño de config para inferencia
+    height, width = cfg.GRID_SIZE_INFERENCE, cfg.GRID_SIZE_INFERENCE
+    input_tensor = torch.randn(batch_size, 2 * cfg.D_STATE, height, width).to(device)
     print(f"Tensor de entrada de ejemplo generado con shape: {input_tensor.shape}")
 
     # 3. Pasar los datos por el modelo para capturar el espacio latente y la salida
