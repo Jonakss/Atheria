@@ -6,9 +6,8 @@ import argparse # <-- ¡NUEVO! Para leer argumentos de la terminal
 
 # --- Configuración del Path ---
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-src_dir = os.path.join(PROJECT_ROOT, "src")
-if src_dir not in sys.path:
-    sys.path.append(src_dir)
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
 
 # Importa solo los módulos que necesitas para entrenar
 try:

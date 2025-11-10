@@ -2,40 +2,49 @@
 
 AETHERIA es un laboratorio de software para simular la emergencia de estructuras complejas a partir de reglas físicas fundamentales.
 
-Este proyecto modela un universo discreto como una cuadrícula de Autómatas Celulares Cuánticos (QCA). La evolución de este universo no está pre-programada, sino que es gobernada por una **"Ley M" (Ley Fundamental)**: un modelo de Deep Learning (U-Net) que se entrena desde cero para descubrir las "leyes de la física" de este universo.
+Este proyecto modela un universo discreto como una cuadrícula de Autómatas Celulares Cuánticos (QCA). La evolución de este universo no está pre-programada, sino que es gobernada por una **"Ley M" (Ley Fundamental)**: un modelo de Deep Learning (U-Net) que se entrena desde cero para descubrir las "Leyes de la Física" de este universo.
 
 El objetivo es descubrir, mediante Aprendizaje por Refuerzo, una Ley M que opere en el **"Borde del Caos"**: el régimen crítico donde la información puede propagarse, la estabilidad se mantiene y la complejidad estructural emerge espontáneamente.
 
-## 🚀 Arquitectura Simplificada
+## 🚀 Arquitectura Simplificada y Organizada
 
-El proyecto ha sido refactorizado en una arquitectura unificada y fácil de usar:
-
-- **`app.py`**: Un único servidor que maneja tanto el backend de simulación como el frontend web.
-- **`index.html`**: Una única interfaz de usuario (UI) web para controlar todo: entrenamiento, simulación y visualización.
-- **`train.py`**: El script de entrenamiento, que ahora es llamado como un subproceso por el servidor principal.
-- **`src/`**: Contiene toda la lógica del núcleo (motor QCA, modelos, configuración).
+El proyecto ha sido refactorizado en una arquitectura unificada y fácil de usar, con una estructura de carpetas más limpia:
 
 ```
 aetheria/
-├── app.py              <-- 🚀 El SERVIDOR UNIFICADO (ejecutar este archivo)
-├── index.html          <-- 🖥️ La INTERFAZ DE USUARIO web
-├── train.py            <-- 🏋️ El script de entrenamiento (llamado por app.py)
-├── requirements.txt    <-- 📋 Dependencias del proyecto
+├── web/                <-- 🌐 Contiene el servidor web y la interfaz de usuario
+│   ├── app.py          <-- 🚀 El SERVIDOR UNIFICADO (ejecutar este archivo)
+│   └── index.html      <-- 🖥️ La INTERFAZ DE USUARIO web
+│
+├── scripts/            <-- ⚙️ Scripts de utilidad y ejecución
+│   ├── train.py        <-- 🏋️ El script de entrenamiento (llamado por app.py)
+│   └── run_visualizations.py <-- 📊 Script para visualizaciones offline
+│
+├── notebooks/          <-- 📝 Jupyter Notebooks para experimentación y análisis
+│   ├── Atheria.ipynb
+│   └── AtheriaV3.ipynb
 │
 ├── src/                <-- 🧠 Todo el código fuente del núcleo
 │   ├── config.py         <-- ⚙️ Parámetros globales (tamaño de grilla, etc.)
 │   ├── qca_engine.py     <-- 🌌 Motor de simulación QCA
-│   ├── qca_operator_*.py <-- 🧬 Las "Leyes M" (modelos U-Net)
+│   ├── models/           <-- 🧬 Las "Leyes M" (modelos U-Net, MLP, etc.)
+│   │   ├── __init__.py   <-- Sistema de registro dinámico de modelos
+│   │   ├── mlp.py
+│   │   ├── unet.py
+│   │   └── unet_unitary.py
 │   └── model_loader.py   <-- 📦 Utilidad para cargar modelos
 │
-└── checkpoints/        <-- 💾 Los modelos entrenados (.pth) se guardan aquí
+├── checkpoints/        <-- 💾 Los modelos entrenados (.pth) se guardan aquí
+├── output/             <-- 📊 Salidas de simulaciones y visualizaciones
+├── docs/               <-- 📄 Documentación adicional
+└── requirements.txt    <-- 📋 Dependencias del proyecto
 ```
 
 ## ⚙️ Cómo Empezar
 
 ### 1. Instalación
 
-Asegúrate de tener Python 3.8+ y `pip`. Clona el repositorio y navega al directorio del proyecto. Luego, instala las dependencias:
+Asegúrate de tener Python 3.8+ y `pip`. Clona el repositorio y navega al directorio raíz del proyecto. Luego, instala las dependencias:
 
 ```bash
 pip install -r requirements.txt
@@ -43,10 +52,10 @@ pip install -r requirements.txt
 
 ### 2. Ejecutar la Aplicación
 
-Para iniciar el laboratorio, simplemente ejecuta el servidor `app.py`:
+Para iniciar el laboratorio, ejecuta el servidor `app.py` que ahora se encuentra en la carpeta `web/`:
 
 ```bash
-python3 app.py
+python3 web/app.py
 ```
 
 El servidor se iniciará y te mostrará la URL para acceder a la interfaz web (normalmente `http://localhost:8000`).
@@ -57,6 +66,7 @@ Abre tu navegador en `http://localhost:8000`. Desde esta única interfaz, puedes
 
 - **Entrenar un Nuevo Modelo**:
   - En el panel "Controles de Entrenamiento", ajusta los parámetros como el nombre del experimento, la tasa de aprendizaje y los episodios.
+  - **Selecciona el tipo de modelo** a entrenar: `U-Net (Estándar)`, `U-Net (Unitario)` o `MLP`.
   - Haz clic en "🚀 Iniciar Entrenamiento".
   - Verás los logs del entrenamiento en tiempo real en la sección "Log de Entrenamiento".
   - Los modelos (`.pth`) se guardarán en el directorio `checkpoints/`.
@@ -85,5 +95,6 @@ Abre tu navegador en `http://localhost:8000`. Desde esta única interfaz, puedes
 
 - **Análisis Temporal y Estadístico**:
   - `Diagrama Espacio-Tiempo`: Muestra la evolución de una fila de píxeles a lo largo del tiempo.
+  - `Cubo Espacio-Tiempo`: Visualización 3D de la evolución de la grilla en los últimos 50 pasos (X/Y para la grilla, Z para el tiempo).
   - `Gráfico de Poincaré`: Ayuda a identificar atractores y caos en la dinámica de la densidad.
   - `Histograma de Densidad`: Muestra la distribución de los valores de densidad en la grilla.

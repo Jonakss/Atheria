@@ -10,9 +10,8 @@ import websockets # Importar websockets para ConnectionClosed
 
 # --- Configuración del Path ---
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-src_dir = os.path.join(PROJECT_ROOT, "src")
-if src_dir not in sys.path:
-    sys.path.append(src_dir)
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
 
 # --- Importaciones del Proyecto ---
 try:
