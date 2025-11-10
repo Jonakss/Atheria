@@ -1,0 +1,34 @@
+name = "train"
+description = "Starts the Aetheria training pipeline."
+command = "python .gemini/commands/run_train_with_config_update.py --experiment_name \"{{experiment_name}}\" --episodes {{episodes}} --lr {{lr}} --grid_size {{grid_size}} --continue_training {{continue_training}}"
+
+[[parameters]]
+name = "experiment_name"
+type = "string"
+
+description = "Name for the training experiment."
+default = "Default_Experiment"
+
+[[parameters]]
+name = "episodes"
+type = "integer"    
+description = "Number of episodes to train for."
+default = 1000
+
+[[parameters]]
+name = "lr"
+type = "float"
+description = "Learning rate for the model."
+default = 2e-5
+
+[[parameters]]
+name = "grid_size"
+type = "integer"
+description = "Grid size for training (e.g., 256)."
+default = 256
+
+[[parameters]]
+name = "continue_training"
+type = "boolean"
+description = "Whether to continue training from the last checkpoint."
+default = false

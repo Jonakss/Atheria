@@ -41,6 +41,16 @@ def main_training(args):
         cfg.ACTIVE_MODEL_KEY = 'mlp'
     # -------------------------------------------------
 
+    # --- Imprimir configuración para logging ---
+    print("Configuración de Entrenamiento:")
+    print(f"  - Nombre Experimento: {cfg.EXPERIMENT_NAME}")
+    print(f"  - Modelo:             {cfg.ACTIVE_QCA_OPERATOR}")
+    print(f"  - Canales Ocultos:    {cfg.HIDDEN_CHANNELS}")
+    print(f"  - Tasa de Aprendizaje:  {cfg.LR_RATE_M}")
+    print(f"  - Episodios:          {cfg.EPISODES_TO_ADD}")
+    print(f"  - Dimensión Estado (D): {cfg.D_STATE}")
+    print("-------------------------------------------------")
+
     try:
         # Llamar a la función de pipeline (que ahora leerá el cfg actualizado)
         run_training_pipeline()

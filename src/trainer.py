@@ -11,13 +11,14 @@ from torch.amp import GradScaler, autocast
 # ¡Importaciones relativas!
 from .qca_engine import Aetheria_Motor
 from .config import (
-    DEVICE, CHECKPOINT_DIR, EXPERIMENT_NAME, # <-- ¡NUEVO! Importa el nombre
-    ALPHA_START, ALPHA_END, GAMMA_START, GAMMA_END,
-    BETA_CAUSALITY, LAMBDA_ACTIVITY_VAR, LAMBDA_VELOCIDAD, TARGET_STD_DENSITY,
-    EXPLOSION_THRESHOLD, EXPLOSION_PENALTY_MULTIPLIER, STAGNATION_WINDOW,
-    MIN_LOSS_IMPROVEMENT, REACTIVATION_COUNT, REACTIVATION_STATE_MODE,
-    REACTIVATION_LR_MULTIPLIER, GRADIENT_CLIP, STEPS_PER_EPISODE,
-    PERSISTENCE_COUNT, CHECKPOINTS_DIR_RELATIVE
+    DEVICE, CHECKPOINT_DIR, EXPERIMENT_NAME, 
+    # --- ¡¡NUEVAS RECOMPENSAS IMPORTADAS!! ---
+    PESO_QUIETUD, PESO_COMPLEJIDAD_LOCALIZADA,
+    # -----------------------------------------
+    STAGNATION_WINDOW, MIN_LOSS_IMPROVEMENT, REACTIVATION_COUNT, 
+    REACTIVATION_STATE_MODE, REACTIVATION_LR_MULTIPLIER, 
+    GRADIENT_CLIP, STEPS_PER_EPISODE, PERSISTENCE_COUNT,
+    STATE_VECTOR_DIM # <--- ¡NUEVO!
 )
 
 # ------------------------------------------------------------------------------
@@ -26,52 +27,45 @@ from .config import (
 class QC_Trainer_v3:
     def __init__(self, motor: Aetheria_Motor, lr_rate: float, experiment_name: str):
         self.motor = motor
+        if isinstance(self.motor.operator, nn.DataParallel):
+            params_to_optimize = self.motor.operator.module.parameters()
+        else:
+            params_to_optimize = self.motor.operator.parameters()
+
         self.optimizer = optim.AdamW(
-            self.motor.operator.parameters(), # (Simplificado, DataParallel maneja esto)
+            params_to_optimize,
             lr=lr_rate,
             weight_decay=1e-6,
             betas=(0.9, 0.999)
         )
+        
         self.scaler = GradScaler(device=DEVICE, enabled=(DEVICE.type == 'cuda'))
         
-        # --- ¡¡NUEVO!! Guardar el nombre del experimento ---
         self.experiment_name = experiment_name
-        # --- ¡¡MODIFICADO!! Usar directorio de checkpoints fuera del experimento ---
-        self.experiment_checkpoint_dir = os.path.abspath(os.path.join(CHECKPOINT_DIR, CHECKPOINTS_DIR_RELATIVE.replace('experiment_name', self.experiment_name)))
+        self.experiment_checkpoint_dir = os.path.join(CHECKPOINT_DIR, self.experiment_name)
         os.makedirs(self.experiment_checkpoint_dir, exist_ok=True)
-        print(f"Checkpoints se guardarán en: {self.experiment_checkpoint_dir}")
-        # --------------------------------------------------
 
+        # --- ¡¡MODIFICADO!! Historial de las nuevas recompensas ---
         self.history = {
-            'Loss': [], 'R_Density_Target': [], 'R_Causalidad': [],
-            'R_Stability': [], 'P_Explosion': [], 'Gradient_Norm': [],
-            'R_Activity_Var': [], 'R_Velocidad': []
+            'Loss': [],
+            'R_Quietud': [],
+            'R_Complejidad_Localizada': [],
+            'Gradient_Norm': [],
         }
+        # -------------------------------------------------------
+
         self.current_episode = 0
         self.best_loss = float('inf')
         self.stagnation_counter = 0
         self.reactivation_counter = 0
         self.gradient_norms = []
 
-    # ... ( _calculate_annealed_alpha_gamma no cambia) ...
-    def _calculate_annealed_alpha_gamma(self, total_episodes):
-        total_episodes_for_annealing = total_episodes * 0.75
-        progress = min(1.0, self.current_episode / max(1.0, total_episodes_for_annealing))
-        alpha_progress = 1 - (1 - progress) ** 1.5
-        gamma_progress = progress ** 0.7
-        current_alpha = ALPHA_START + (ALPHA_END - ALPHA_START) * alpha_progress
-        current_gamma = GAMMA_START + (GAMMA_END - GAMMA_START) * gamma_progress
-        return current_alpha, current_gamma
-
-
     def _save_checkpoint(self, episode, is_best=False):
         """Saves the training state to the specific experiment folder."""
-        # --- ¡¡MODIFICADO!! Usa la subcarpeta del experimento ---
         if is_best:
             filename = os.path.join(self.experiment_checkpoint_dir, f"qca_best_eps{episode}.pth")
         else:
             filename = os.path.join(self.experiment_checkpoint_dir, f"qca_checkpoint_eps{episode}.pth")
-        # -----------------------------------------------------
 
         if isinstance(self.motor.operator, nn.DataParallel):
             model_to_save = self.motor.operator.module
@@ -99,7 +93,6 @@ class QC_Trainer_v3:
     def _load_checkpoint(self):
         """Loads the latest training checkpoint from the specific experiment folder."""
         try:
-            # --- ¡¡MODIFICADO!! Busca en la subcarpeta del experimento ---
             search_path = os.path.join(self.experiment_checkpoint_dir, "qca_checkpoint_eps*.pth")
             list_of_files = glob.glob(search_path)
             list_of_best_files = glob.glob(os.path.join(self.experiment_checkpoint_dir, "qca_best_eps*.pth"))
@@ -108,12 +101,10 @@ class QC_Trainer_v3:
             if not all_checkpoint_files:
                 print(f"No checkpoints found in '{self.experiment_checkpoint_dir}'. Starting from scratch.")
                 return
-            # ---------------------------------------------------------
 
             latest_file = max(all_checkpoint_files, key=os.path.getmtime)
             
             print(f"Cargando checkpoint: {latest_file}...")
-            # CORRECCIÓN: weights_only=False para cargar el optimizador y el historial
             checkpoint = torch.load(latest_file, map_location=DEVICE, weights_only=False)
 
             target_model = self.motor.operator
@@ -157,8 +148,8 @@ class QC_Trainer_v3:
             self.gradient_norms = []
             self.scaler = GradScaler(device=DEVICE, enabled=(DEVICE.type == 'cuda'))
 
-    # ... (check_stagnation_and_reactivate no cambia) ...
     def check_stagnation_and_reactivate(self, total_episodes):
+        """Checks for training stagnation and triggers reactivation if configured."""
         current_loss = self.history['Loss'][-1] if self.history['Loss'] else float('inf')
         if not np.isnan(current_loss) and not np.isinf(current_loss) and current_loss < (self.best_loss - MIN_LOSS_IMPROVEMENT):
             self.best_loss = current_loss
@@ -166,31 +157,20 @@ class QC_Trainer_v3:
             return False 
         else:
             self.stagnation_counter += 1
+            # ... (Lógica de estancamiento y reactivación, sin cambios) ...
             if self.stagnation_counter >= STAGNATION_WINDOW:
-                print(f"\nSTAGNATION DETECTED at episode {self.current_episode}!")
-                print(f"No improvement of {MIN_LOSS_IMPROVEMENT} in {STAGNATION_WINDOW} episodes (or NaN detected).")
                 if self.reactivation_counter < REACTIVATION_COUNT:
                     self.reactivation_counter += 1
+                    # ... (lógica de reseteo de estado y LR) ...
                     print(f"Attempting reactivation {self.reactivation_counter}/{REACTIVATION_COUNT}...")
-                    if REACTIVATION_STATE_MODE == 'random':
-                        self.motor.state._reset_state_random()
-                        print("-> Resetting state with random noise.")
-                    elif REACTIVATION_STATE_MODE == 'seeded':
-                         self.motor.state._reset_state_seeded()
-                         print("-> Resetting state with central seed.")
-                    elif REACTIVATION_STATE_MODE == 'complex_noise':
-                         self.motor.state._reset_state_complex_noise()
-                         print("-> Resetting state with complex noise.")
-                    else:
-                         print(f"State reactivation mode '{REACTIVATION_STATE_MODE}' not recognized. Resetting to random.")
-                         self.motor.state._reset_state_random()
+                    self.motor.state._reset_state_random() # <--- Simplificado
+                    print("-> Resetting state with random noise.")
                     current_lr = self.optimizer.param_groups[0]['lr']
                     new_lr = current_lr * REACTIVATION_LR_MULTIPLIER
                     for param_group in self.optimizer.param_groups:
                         param_group['lr'] = new_lr
                     print(f"-> Learning rate adjusted from {current_lr:.2e} to {new_lr:.2e}.")
                     self.stagnation_counter = 0
-                    print("-> Reactivation complete. Continuing training.")
                     return False
                 else:
                     print(f"Maximum number of reactivations ({REACTIVATION_COUNT}) reached.")
@@ -200,85 +180,69 @@ class QC_Trainer_v3:
     def train_episode(self, total_episodes):
         """Runs one full training episode (BPTT-k) with mixed precision."""
         self.motor.state._reset_state_random()
-        alpha, gamma = self._calculate_annealed_alpha_gamma(total_episodes)
 
         episode_total_loss = 0.0
         bptt_cumulative_loss = 0.0
         valid_steps = 0
-        current_real = self.motor.state.x_real.clone().requires_grad_(True).to(DEVICE)
-        current_imag = self.motor.state.x_imag.clone().requires_grad_(True).to(DEVICE)
-        activity_variances_per_step_mean = []
-        density_variances_per_step = []
-        last_R_density, last_R_causalidad, last_R_stability, last_P_explosion = (float('nan'),)*4
+        
+        # --- ¡¡MODIFICADO!! Un solo tensor 'psi' ---
+        current_psi = self.motor.state.psi.clone().requires_grad_(True).to(DEVICE)
+        
+        last_R_quietud, last_R_complex = (float('nan'),)*2
         self.optimizer.zero_grad()
 
         for t in range(STEPS_PER_EPISODE):
             with autocast(device_type=DEVICE.type, dtype=torch.float16, enabled=(DEVICE.type == 'cuda')):
-                if torch.isnan(current_real).any() or torch.isinf(current_real).any():
+                if torch.isnan(current_psi).any() or torch.isinf(current_psi).any():
                     print(f"⚠️  NaN/Inf detected in state at step {t} of episode {self.current_episode}.")
                     episode_total_loss = float('nan')
                     break
 
-                prev_real_detached = current_real.detach()
-                prev_imag_detached = current_imag.detach()
-                x_cat = torch.cat([current_real.permute(0, 3, 1, 2), current_imag.permute(0, 3, 1, 2)], dim=1)
+                prev_psi_detached = current_psi.detach()
+                
+                # [B, H, W, C] -> [B, C, H, W]
+                x_cat = current_psi.permute(0, 3, 1, 2)
 
-                if isinstance(self.motor.operator, nn.DataParallel):
-                    F_int_real, F_int_imag = self.motor.operator(x_cat)
-                else:
-                    F_int_real, F_int_imag = self.motor.operator(x_cat)
-
-                if torch.isnan(F_int_real).any() or torch.isinf(F_int_real).any():
-                    print(f"⚠️  NaN/Inf detected in F_int at step {t} of episode {self.current_episode}.")
+                # --- 1. Aplicar Ley M (Unitaria) ---
+                # delta_psi tiene forma [B, C, H, W]
+                delta_psi = self.motor.operator(x_cat)
+                
+                if torch.isnan(delta_psi).any() or torch.isinf(delta_psi).any():
+                    print(f"⚠️  NaN/Inf detected in delta_psi at step {t} of episode {self.current_episode}.")
                     episode_total_loss = float('nan')
                     break
                 
-                bias_real = 0.0
-                bias_imag = 0.0
-                op_to_check = self.motor.operator.module if isinstance(self.motor.operator, nn.DataParallel) else self.motor.operator
-                if hasattr(op_to_check, '_orig_mod'):
-                    op_to_check = op_to_check._orig_mod
-                if hasattr(op_to_check, 'M_bias_real'):
-                    bias_real = op_to_check.M_bias_real.to(DEVICE)
-                if hasattr(op_to_check, 'M_bias_imag'):
-                    bias_imag = op_to_check.M_bias_imag.to(DEVICE)
+                # --- 2. Aplicar Método de Euler ---
+                # [B, H, W, C] + [B, C, H, W] -> [B, H, W, C]
+                next_psi = current_psi + delta_psi.permute(0, 2, 3, 1)
 
-                new_real = current_real.squeeze(0) + F_int_real + bias_real
-                new_imag = current_imag.squeeze(0) + F_int_imag + bias_imag
+                # ¡¡NORMALIZACIÓN ELIMINADA!!
+                # La física de la U-Net (A - A.T) se encarga de esto.
 
-                prob_sq = new_real.pow(2) + new_imag.pow(2)
-                norm = torch.sqrt(prob_sq.sum(dim=-1, keepdim=True) + 1e-8)
-                next_real = new_real / norm
-                next_imag = new_imag / norm
+                # --- 3. ¡¡NUEVA LÓGICA DE RECOMPENSA!! ---
+                
+                # Calcular la norma (energía/densidad)
+                # Suma los cuadrados de los 42 canales en cada celda
+                density_map = torch.sum(next_psi.pow(2), dim=-1).squeeze(0) # [H, W]
+                
+                # Calcular el cambio (actividad)
+                change_vector = next_psi - prev_psi_detached
+                change_magnitude_per_cell = torch.sum(change_vector.pow(2), dim=-1).squeeze(0) # [H, W]
 
-                if torch.isnan(next_real).any() or torch.isinf(next_real).any():
-                    print(f"⚠️  NaN/Inf detected in next_state at step {t} of episode {self.current_episode}.")
-                    episode_total_loss = float('nan')
-                    break
+                # R_Quietud: Fomenta el "vacío".
+                R_Quietud = -change_magnitude_per_cell.mean() 
+                
+                # R_Complejidad: Fomenta la "materia".
+                R_Complejidad_Localizada = density_map.std()
+                
+                last_R_quietud = R_Quietud.item()
+                last_R_complex = R_Complejidad_Localizada.item()
 
-                density_map = torch.clamp(prob_sq.sum(dim=-1), 0.0, 3.0)
-                current_std_density = density_map.std()
-                density_error = torch.abs(current_std_density - TARGET_STD_DENSITY)
-                R_density_target = -density_error * (1.0 + density_error)
-                change_real = next_real - prev_real_detached.squeeze(0)
-                change_imag = next_imag - prev_imag_detached.squeeze(0)
-                R_Causalidad = -(change_real.abs().mean() + change_imag.abs().mean())
-                density_t_plus_1 = next_real.pow(2) + next_imag.pow(2)
-                R_Stability = -density_t_plus_1.var(dim=-1).mean()
-                change_magnitude_per_cell = torch.sqrt(change_real.pow(2) + change_imag.pow(2)).sum(dim=-1)
-                activity_variances_per_step_mean.append(change_magnitude_per_cell.mean().item())
-                density_variances_per_step.append(density_map.var().item())
-                P_Explosion = torch.relu(density_map.max() - EXPLOSION_THRESHOLD) * EXPLOSION_PENALTY_MULTIPLIER
-
-                last_R_density, last_R_causalidad, last_R_stability, last_P_explosion = \
-                    R_density_target.item(), R_Causalidad.item(), R_Stability.item(), P_Explosion.item()
-
-                reward_step_bptt = (alpha * R_density_target) + \
-                                   (BETA_CAUSALITY * R_Causalidad) + \
-                                   (gamma * R_Stability) + \
-                                   (LAMBDA_ACTIVITY_VAR * change_magnitude_per_cell.var()) - \
-                                   (LAMBDA_VELOCIDAD * density_map.var())
-                step_loss = -reward_step_bptt + P_Explosion
+                recompensa_total = (PESO_QUIETUD * R_Quietud) + \
+                                   (PESO_COMPLEJIDAD_LOCALIZADA * R_Complejidad_Localizada)
+                                   
+                step_loss = -recompensa_total
+                # --- FIN DE LA NUEVA LÓGICA ---
             
             if torch.isnan(step_loss) or torch.isinf(step_loss):
                 print(f"⚠️  NaN/Inf detected in step_loss at step {t} of episode {self.current_episode}.")
@@ -292,11 +256,12 @@ class QC_Trainer_v3:
 
             if (t + 1) % PERSISTENCE_COUNT == 0 or (t + 1) == STEPS_PER_EPISODE:
                 if bptt_cumulative_loss != 0 and not torch.isnan(bptt_cumulative_loss) and not torch.isinf(bptt_cumulative_loss):
+                    
                     self.scaler.scale(bptt_cumulative_loss).backward()
                     self.scaler.unscale_(self.optimizer)
+                    
                     all_grads_valid = True
                     params_to_check = [p for p in self.motor.operator.parameters() if p.requires_grad]
-                        
                     for p in params_to_check:
                         if p.grad is not None and (torch.isnan(p.grad).any() or torch.isinf(p.grad).any()):
                             all_grads_valid = False
@@ -328,24 +293,20 @@ class QC_Trainer_v3:
                     self.optimizer.zero_grad() 
 
                 bptt_cumulative_loss = 0.0
-                current_real = next_real.unsqueeze(0).detach().to(DEVICE).requires_grad_(True)
-                current_imag = next_imag.unsqueeze(0).detach().to(DEVICE).requires_grad_(True)
+                current_psi = next_psi.detach().to(DEVICE).requires_grad_(True)
             
             else: 
-                current_real = next_real.unsqueeze(0)
-                current_imag = next_imag.unsqueeze(0)
+                current_psi = next_psi
 
         # --- Fin del Episodio ---
         avg_loss = episode_total_loss / max(valid_steps, 1)
+
         self.history['Loss'].append(avg_loss)
-        self.history['R_Density_Target'].append(last_R_density)
-        self.history['R_Causalidad'].append(last_R_causalidad)
-        self.history['R_Stability'].append(last_R_stability)
-        self.history['P_Explosion'].append(last_P_explosion)
-        self.history['R_Activity_Var'].append(np.var(activity_variances_per_step_mean) if len(activity_variances_per_step_mean) > 1 else 0.0)
-        self.history['R_Velocidad'].append(np.mean(density_variances_per_step) if density_variances_per_step else 0.0)
+        self.history['R_Quietud'].append(last_R_quietud)
+        self.history['R_Complejidad_Localizada'].append(last_R_complex)
         self.history['Gradient_Norm'].append(np.mean(self.gradient_norms) if self.gradient_norms else 0.0)
         self.gradient_norms = []
+        
         self.current_episode += 1
         gc.collect()
         if torch.cuda.is_available(): torch.cuda.empty_cache()

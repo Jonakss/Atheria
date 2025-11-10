@@ -10,31 +10,34 @@ from . import config as cfg
 from .trainer import QC_Trainer_v3
 from .qca_engine import Aetheria_Motor 
 
-# --- CAMBIO AQUÍ: Selector de Modelo (Ley M) ---
-# Opción 1: El MLP 1x1 original (Rápido, pero "míope")
-# from .qca_operator_mlp import QCA_Operator_MLP as ActiveModel
-
-# Opción 2: La U-Net (Más lenta, pero con "conciencia regional")
-from .qca_operator_unet import QCA_Operator_UNet as ActiveModel
+# --- ¡¡MODIFICADO!! Selector de Modelo Dinámico ---
+# Ahora lee la configuración desde config.py
+print(f"Cargando Ley M: {cfg.ACTIVE_QCA_OPERATOR}")
+if cfg.ACTIVE_QCA_OPERATOR == "MLP":
+    from .qca_operator_mlp import QCA_Operator_MLP as ActiveModel
+elif cfg.ACTIVE_QCA_OPERATOR == "UNET_UNITARIA":
+    from .qca_operator_unet_unitary import QCA_Operator_UNet_Unitary as ActiveModel
+# elif cfg.ACTIVE_QCA_OPERATOR == "UNET_COSMOLOGICA":
+#     from .qca_operator_unet import QCA_Operator_UNet as ActiveModel
+else:
+    raise ValueError(f"Operador QCA '{cfg.ACTIVE_QCA_OPERATOR}' no reconocido en config.py")
 # -----------------------------------------------
 
 
 def run_training_pipeline():
     """
     Ejecuta la FASE 5: Lógica Principal de Entrenamiento.
-    Retorna el motor entrenado y la ruta al archivo del modelo final.
     """
     print("\n" + "="*60)
     print(">>> INICIANDO FASE DE ENTRENAMIENTO (FASE 5) <<<")
-    # --- ¡NUEVO! Imprime el nombre del experimento ---
     print(f"Nombre del Experimento: {cfg.EXPERIMENT_NAME}")
     print(f"Modelo Activo: {ActiveModel.__name__}")
     print("="*60)
     
     model_id = ActiveModel.__name__
     
-    # 1. Crear el modelo
-    model_M = ActiveModel(cfg.D_STATE, cfg.HIDDEN_CHANNELS)
+    # --- ¡¡MODIFICADO!! Usa STATE_VECTOR_DIM ---
+    model_M = cfg.D_STATE
     
     if cfg.DEVICE.type == 'cuda':
         try:
@@ -44,16 +47,16 @@ def run_training_pipeline():
         except Exception as e:
             print(f"Advertencia: torch.compile() falló. Se usará el modelo estándar. Error: {e}")
 
-    # 2. Crear el motor con el modelo (genérico)
-    Aetheria_Motor_Train = Aetheria_Motor(cfg.GRID_SIZE_TRAINING, cfg.D_STATE, model_M)
+    # --- ¡¡MODIFICADO!! Usa STATE_VECTOR_DIM ---
+    Aetheria_Motor_Train = Aetheria_Motor(cfg.GRID_SIZE_TRAINING, cfg.STATE_VECTOR_DIM, model_M)
     print(f"Motor y Ley-M ({model_id}) inicializados. Cuadrícula: {cfg.GRID_SIZE_TRAINING}x{cfg.GRID_SIZE_TRAINING}.")
+    # --------------------------------------------
 
     trainable_params = sum(p.numel() for p in (Aetheria_Motor_Train.operator.module.parameters()
                                                  if isinstance(Aetheria_Motor_Train.operator, nn.DataParallel)
                                                  else Aetheria_Motor_Train.operator.parameters()) if p.requires_grad)
     print(f"Parámetros Entrenables: {trainable_params}")
 
-    # --- ¡¡MODIFICADO!! Pasamos el experiment_name al trainer ---
     trainer = QC_Trainer_v3(
         Aetheria_Motor_Train, 
         cfg.LR_RATE_M,
@@ -79,10 +82,18 @@ def run_training_pipeline():
             if np.isnan(avg_loss) or np.isinf(avg_loss):
                 print(f"⚠️  Episodio {episode:04}: Entrenamiento fallido (NaN/Inf).")
             
+            # --- ¡¡MODIFICADO!! Imprimir las nuevas recompensas ---
             if episode % 10 == 0 or episode == final_episode - 1:
-                alpha, gamma = trainer._calculate_annealed_alpha_gamma(final_episode)
-                last_r_density = trainer.history['R_Density_Target'][-1] if trainer.history['R_Density_Target'] else float('nan')
-                print(f"Eps {episode:04}: Loss={avg_loss:.3e} | R_Dens={last_r_density:.3f} | α={alpha:.2f}, γ={gamma:.2f}, LR={trainer.optimizer.param_groups[0]['lr']:.2e}")
+                last_r_quiet = trainer.history['R_Quietud'][-1] if trainer.history['R_Quietud'] else float('nan')
+                last_r_complex = trainer.history['R_Complejidad_Localizada'][-1] if trainer.history['R_Complejidad_Localizada'] else float('nan')
+                last_grad_norm = trainer.history['Gradient_Norm'][-1] if trainer.history['Gradient_Norm'] else float('nan')
+
+                print(f"Eps {episode:04}: Loss={avg_loss:.3e} | "
+                      f"R_Quietud={last_r_quiet:.3f} (Peso: {cfg.PESO_QUIETUD}) | "
+                      f"R_Complex={last_r_complex:.3f} (Peso: {cfg.PESO_COMPLEJIDAD_LOCALIZADA}) | "
+                      f"GradNorm={last_grad_norm:.3e} | "
+                      f"LR={trainer.optimizer.param_groups[0]['lr']:.2e}")
+            # ---------------------------------------------------
 
             if (episode + 1) % cfg.SAVE_EVERY_EPISODES == 0:
                 trainer._save_checkpoint(episode + 1)
@@ -105,11 +116,9 @@ def run_training_pipeline():
     end_time = time.time()
     print(f"\nEntrenamiento completado en {end_time - start_time:.2f}s.")
     
-    # --- GUARDAR MODELO FINAL (Ley M) ---
     M_FILENAME = None
     if trainer:
         TIMESTAMP = int(time.time())
-        # --- ¡¡MODIFICADO!! Usa la subcarpeta del experimento ---
         M_FILENAME = os.path.join(
             trainer.experiment_checkpoint_dir, 
             f"{model_id}_G{cfg.GRID_SIZE_TRAINING}_Eps{trainer.current_episode}_{TIMESTAMP}_FINAL.pth"

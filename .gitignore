@@ -1,89 +1,82 @@
-output/
-output/*
-output/**/*
-*.log
-temp/
-.lightning_studio/
-.vscode/
-__pycache__/
-.ipynb_checkpoints/
-.triton/
-.streamlit/
-// ...existing code...
-# Byte-compiled / caches
+# Byte-compiled / cache
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Virtualenvs
-.env/
-.venv/
+# Virtual Environments
+.env
+.venv
 env/
 venv/
+torch_venv/
 pip-wheel-metadata/
-venv*/
 
-# Build / packaging
+# Build / Distribution
 build/
 dist/
 *.egg-info/
 .eggs/
 
-# Jupyter
+# Jupyter Notebooks
 .ipynb_checkpoints/
-*.ipynb_checkpoints
-# Notebook outputs (si no quieres versionar notebooks con salidas)
-*.nbconvert.ipynb
 
-# IDEs / editors
+# IDEs and Editors
 .vscode/
-.vscode-server/
 .idea/
-*.iml
 *.sublime-workspace
 *.sublime-project
 
-# OS files
+# OS-generated files
 .DS_Store
 Thumbs.db
 
-# Logs and runtime files
+# Logs and Temporary Files
 *.log
+log/
+logs/
 tmp/
 temp/
 *.pid
+*~
+*.swp
+*.swo
 
-# Testing / coverage
+# Testing & Coverage
 .coverage
 .pytest_cache/
 
-# Model checkpoints, outputs, media y otros binarios grandes
-# (Si quieres conservar checkpoints/outputs en repo, elimina estas líneas)
+# Data, Models, and Outputs
+# These are typically large binary files that should not be versioned.
+# They should be stored in a dedicated artifact storage.
 output/
-checkpoints_optimized/
-large_sim_checkpoints_1024/
+checkpoints/
 *.pth
 *.pt
 *.ckpt
 *.h5
 *.npy
 *.npz
+
+# Media Files
 *.mp4
 *.avi
 *.mov
 *.mkv
+*.gif
+*.png
+*.jpg
+*.jpeg
 
-# TensorBoard / runs
-runs/
-events.out.tfevents.*
+# Lightning AI / Streamlit specific
+.lightning_studio/
+.streamlit/
 
-# Secrets / keys / env
+# Triton cache
+.triton/
+
+# Secrets
 .env
+secrets.toml
 *.key
 *.pem
 *.crt
-
-# Misc editor temp files
-*~ 
-*.swp
-*.swo

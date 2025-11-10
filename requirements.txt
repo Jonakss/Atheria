@@ -1,14 +1,18 @@
 # requirements.txt
 
-# --- Frameworks de App ---
-# lightning (la quitamos por ahora)
-# streamlit (la quitamos)
-aiohttp # <-- ¡NUEVO! Servidor web
+# --- Servidor Web y Sockets ---
+aiohttp
 websockets
 
-# --- Simulación ---
+# --- Simulación y ML ---
 torch
 numpy
 Pillow
 imageio
 opencv-python
+
+# --- Utilidades ---
+tqdm # si quieres barras de progreso
+matplotlib
+scikit-learn
+scipy

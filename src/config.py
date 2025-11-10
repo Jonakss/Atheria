@@ -18,176 +18,74 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 os.makedirs(LARGE_SIM_CHECKPOINT_DIR, exist_ok=True)
 
-# Qué: Directorio para guardar checkpoints y modelo final fuera de la carpeta del experimento.
-# Qué esperar: Si `"../checkpoints"`, los archivos se guardarán en `../checkpoints/nombre_experimento/`.
-#             Si `None`, se guardarán en la carpeta del experimento (comportamiento actual).
-CHECKPOINTS_OUTPUT_DIR = "../checkpoints"
-
-# Qué: Ruta relativa para guardar checkpoints separados por nombre de experimento.
-# Qué esperar: Los checkpoints se guardarán en `experiments/checkpoints/experiment_name/`
-CHECKPOINTS_DIR_RELATIVE = "../checkpoints/experiment_name"
-
-
-
-# Crear directorio de checkpoints externo si está configurado
-if CHECKPOINTS_OUTPUT_DIR:
-    CHECKPOINTS_OUTPUT_DIR = os.path.join(PROJECT_ROOT, CHECKPOINTS_OUTPUT_DIR.lstrip("../"))
-    os.makedirs(CHECKPOINTS_OUTPUT_DIR, exist_ok=True)
-
-# --- Constantes del Servidor (¡¡NUEVO!!) ---
-# El 'lab_server.py' usará estos puertos
-LAB_SERVER_HOST = '0.0.0.0'
-LAB_SERVER_PORT = 8765 # El puerto principal para la UI del Laboratorio
-
-# El servidor de simulación (que se lanza DESDE el lab)
-# usará un puerto diferente
-SIM_SERVER_HOST = '0.0.0.0'
-SIM_SERVER_PORT = 8766 # Puerto solo para el WebSocket de simulación
-
-# ==============================================================================
-# --- FASE 3: PARÁMETROS GLOBALES (Ahora son 'Defaults') ---
-# Estos son los valores por defecto que aparecerán en la UI del Laboratorio
-# ==============================================================================
-
-# --- ¡¡NUEVO!! ---
-# Nombre del experimento por defecto
-EXPERIMENT_NAME = "UNET_32ch_D5_LR2e-5"
-
 # --- Constantes del Servidor WebSocket ---
-# Qué: El host y puerto para el servidor "a mano" (python main.py).
-# Qué esperar: '0.0.0.0' es correcto para Lightning AI. Puedes cambiar el 8765 si está ocupado.
 WEBSOCKET_HOST = '0.0.0.0'
 WEBSOCKET_PORT = 8765
+
+# --- Constantes del Servidor de Laboratorio ---
+LAB_SERVER_HOST = '0.0.0.0'
+LAB_SERVER_PORT = 8000
+
 # ==============================================================================
 # --- FASE 3: PARÁMETROS GLOBALES Y CONFIGURACIÓN ---
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# A. CONTROL DE EJECUCIÓN
-# Qué: Estos flags deciden qué script se ejecuta.
+# G. NOMBRE DEL EXPERIMENTO
 # ------------------------------------------------------------------------------
+EXPERIMENT_NAME = "Unitary_4D_v1" # <--- ¡Prueba con 4D primero!
 
-# Qué: (python train.py) Ejecuta el pipeline de entrenamiento.
-# Qué esperar: Poner en `True` para entrenar un modelo. Poner en `False` para simular.
+# ------------------------------------------------------------------------------
+# A. CONTROL DE EJECUCIÓN (Ajusta esto para entrenar)
+# ------------------------------------------------------------------------------
 RUN_TRAINING = True
-
-# Qué: (python train.py) Al final del entrenamiento, genera videos de muestra.
-# Qué esperar: Poner en `True` si quieres ver videos de tu nuevo modelo.
 RUN_POST_TRAINING_VIZ = False
-
-# Qué: (python main.py) Ejecuta el servidor de simulación en vivo (el WebSocket).
-# Qué esperar: Poner en `True` para iniciar el servidor. Poner en `False` para entrenar.
 RUN_LARGE_SIM = True
-
-# Qué: (python train.py) Si `True`, busca el último checkpoint de entrenamiento y continúa.
-# Qué esperar: `True` para seguir un entrenamiento. `False` para empezar uno de cero (¡importante al cambiar de modelo!).
-CONTINUE_TRAINING = True
-
-# Qué: (python pipeline_server.py) Habilita/deshabilita torch.compile para el modelo de inferencia.
-# Qué esperar: `True` para optimizar el rendimiento de inferencia en CUDA. `False` para desactivarlo.
-USE_TORCH_COMPILE = False
+CONTINUE_TRAINING = False # False para empezar el nuevo experimento
 
 # ------------------------------------------------------------------------------
-# B. ARQUITECTURA DE LA LEY M (¡MUY IMPORTANTE!)
-# Qué: Definen la forma y el tamaño de tu "cerebro" (Ley M).
+# B. ARQUITECTURA DE LA LEY M (¡¡MODIFICADO!!)
 # ------------------------------------------------------------------------------
+GRID_SIZE_TRAINING = 64
 
-# Qué: El tamaño de la cuadrícula (ej. 256x256) usado para ENTRENAR.
-# Qué esperar: Más grande (512) aprende patrones espaciales más grandes, pero
-#             es MUCHO más lento y consume más VRAM. 256 es un buen balance.
-GRID_SIZE_TRAINING = 48
+# ¡¡NUEVO!! Especifica qué operador QCA usar.
+# Opciones: "MLP", "UNET_UNITARIA"
+ACTIVE_QCA_OPERATOR = "UNET_UNITARIA" 
+MODEL_ARCHITECTURE = "UNET_UNITARIA"
 
-# Qué: El "número de canales" o dimensión de cada celda.
-# Qué esperar: Es la complejidad de tu "partícula" cuántica.
-#             Más alto (ej. 32, 64) permite físicas más ricas, pero
-#             aumenta el tamaño del modelo y el uso de VRAM exponencialmente.
-#             ¡¡Debe coincidir con el modelo que intentas cargar!!
-D_STATE = 11
+# ¡¡NUEVO!! Dimensión del vector de estado REAL
+# (Ya no usamos D_STATE=21)
+# (Prueba con 4, 8, 16... 42)
+D_STATE = 21 # Renombrado desde STATE_VECTOR_DIM para consistencia
 
-# Qué: El "ancho" de la red neuronal (Ley M).
-# Qué esperar: Es la "inteligencia" del modelo.
-#             - Para QCA_Operator_MLP: 256 es un buen valor.
-#             - Para QCA_Operator_UNet: 64 es un buen punto de partida (256 explotará tu VRAM).
-HIDDEN_CHANNELS = 128
+# Ancho de la U-Net
+HIDDEN_CHANNELS = 32
 
 # ------------------------------------------------------------------------------
 # C. PARÁMETROS DE ENTRENAMIENTO
-# Qué: Controlan CÓMO aprende el modelo.
 # ------------------------------------------------------------------------------
-
-# Qué: Cuántos "universos de prueba" (episodios) ejecutar.
-# Qué esperar: Más episodios = mejor entrenamiento. 1000 es un buen comienzo.
-EPISODES_TO_ADD = 200
-
-# Qué: Cuántos pasos de simulación dura cada "universo de prueba".
-# Qué esperar: Más pasos (ej. 100) permite al trainer ver efectos a más largo plazo.
-STEPS_PER_EPISODE = 150
-
-# Qué: Tasa de Aprendizaje (Learning Rate). ¡EL MÁS IMPORTANTE!
-# Qué esperar: Controla qué tan "rápido" aprende el modelo.
-#             - Para U-Net (10M+ params): Debe ser MUY bajo (ej. 1e-5 o 2e-5) o explotará (NaN).
-#             - Para MLP (300k params): Puede ser más alto (ej. 5e-4).
-LR_RATE_M = 2e-07
-
-# Qué: "Backpropagation Through Time" (BPTT-k). Cuántos pasos "recuerda" el error.
-# Qué esperar: Más alto (ej. 20) aprende mejor la causalidad, pero consume
-#             MUCHA más VRAM y RAM. 10 es un balance.
+EPISODES_TO_ADD = 2000
+STEPS_PER_EPISODE = 50
+LR_RATE_M = 1e-6 # (Bajo, bueno para U-Net)
 PERSISTENCE_COUNT = 10
-
-# Qué: Límite para el recorte de gradientes.
-# Qué esperar: Previene que los gradientes exploten (NaN). 0.85-1.0 es estándar.
-GRADIENT_CLIP = 0.8
+GRADIENT_CLIP = 0.85
 
 # ------------------------------------------------------------------------------
-# D. FUNCIÓN DE RECOMPENSA (El "Alma" de la IA)
-# Qué: Estos pesos le dicen al entrenador QUÉ universo nos gusta.
+# D. FUNCIÓN DE RECOMPENSA (¡¡MODIFICADA PARA FÍSICA UNITARIA!!)
 # ------------------------------------------------------------------------------
+# (El modelo unitario no puede "explotar", así que quitamos esas penalizaciones)
 
-# Qué: (ALPHA) Peso para R_Density_Target (Complejidad/Caos).
-# Qué esperar: Sube de START a END. Un valor final ALTO (ej. 30.0)
-#             fuerza al universo a ser "interesante" y no morir.
-ALPHA_START = 1.5
-ALPHA_END = 30.0
+# Qué: (R_Quietud) Fomenta el "espacio vacío".
+PESO_QUIETUD = 1.0
 
-# Qué: (GAMMA) Peso para R_Stability (Estabilidad).
-# Qué esperar: Baja de START a END. Un valor final BAJO (ej. 0.6)
-#             permite que el universo sea un poco más caótico al final.
-GAMMA_START = 3.5
-GAMMA_END = 0.5
-
-# Qué: (BETA) Peso para R_Causality (Actividad/Movimiento).
-# Qué esperar: Un valor constante. Si tu universo se "congela", sube esto.
-BETA_CAUSALITY = 3.0
-
-# Qué: (LAMBDA 1) Recompensa la "varianza de la actividad".
-# Qué esperar: Evita que el universo se vuelva uniformemente "ruidoso".
-#             Promueve la creación de "cosas" localizadas.
-LAMBDA_ACTIVITY_VAR = 1.0
-
-# Qué: (LAMBDA 2) Recompensa la "varianza de la densidad".
-# Qué esperar: Promueve el movimiento. Penaliza las estructuras estáticas.
-LAMBDA_VELOCIDAD = 0.8
-
-# Qué: El "objetivo" de R_Density_Target.
-# Qué esperar: Un valor > 1.0 le pide al modelo que cree picos y valles.
-TARGET_STD_DENSITY = 2.3
-
-# Qué: Penalización por "explosión" (si una celda se vuelve demasiado brillante).
-# Qué esperar: Valores altos (ej. 20.0) castigan duramente la inestabilidad.
-EXPLOSION_THRESHOLD = 0.7
-EXPLOSION_PENALTY_MULTIPLIER = 20.0
+# Qué: (R_Complejidad) Fomenta la "materia".
+PESO_COMPLEJIDAD_LOCALIZADA = 20.0
 
 # ------------------------------------------------------------------------------
 # E. PARÁMETROS DE REANUDACIÓN Y ESTANCAMIENTO
 # ------------------------------------------------------------------------------
-
-# Qué: Cuántos episodios esperar sin mejora antes de "reactivar".
 STAGNATION_WINDOW = 500
 MIN_LOSS_IMPROVEMENT = 5e-6
-
-# Qué: Lógica para "desatascar" el entrenamiento.
-# Qué esperar: Si el entrenamiento se estanca, reinicia el estado (ej. 'random')
-#             y reduce el learning rate (LR_MULTIPLIER = 0.5).
 REACTIVATION_COUNT = 2
 REACTIVATION_STATE_MODE = 'random'
 REACTIVATION_LR_MULTIPLIER = 0.5
@@ -195,33 +93,15 @@ REACTIVATION_LR_MULTIPLIER = 0.5
 # ------------------------------------------------------------------------------
 # F. PARÁMETROS DE SIMULACIÓN Y VISUALIZACIÓN
 # ------------------------------------------------------------------------------
-
-# Qué: Frecuencia de guardado de checkpoints de entrenamiento.
+GRID_SIZE = 512 # Tamaño de la grilla para servidores de visualización
 SAVE_EVERY_EPISODES = 50
-
-# Qué: (pipeline_viz.py) Parámetros para los videos MP4 generados post-entrenamiento.
 NUM_FRAMES_VIZ = 1500
 FPS_VIZ_TRAINING = 24
-
-# Qué: (pipeline_server.py) Tamaño de la cuadrícula de simulación en "producción".
-# Qué esperar: Más grande = más impresionante, pero más lento.
-#             ¡Cuidado con el 'std::bad_alloc' si la RAM del sistema es baja!
-GRID_SIZE_INFERENCE = 256 # (Empieza con 256, luego prueba 468 o 512)
-
-# Qué: (pipeline_server.py) Cómo iniciar la simulación si no se carga un checkpoint.
-INITIAL_STATE_MODE_INFERENCE = 'complex-noise'
-
-# Qué: (pipeline_server.py) Si `True`, busca el último checkpoint de simulación y lo carga.
+GRID_SIZE_INFERENCE = 64
+INITIAL_STATE_MODE_INFERENCE = 'complex_noise'
 LOAD_STATE_CHECKPOINT_INFERENCE = True
-STATE_CHECKPOINT_PATH_INFERENCE = "" # Dejar vacío para cargar el último
-
-# Qué: (pipeline_server.py) Frecuencia de guardado del estado de simulación.
-# Qué esperar: ¡Poner un valor alto (ej. 10000)! Guardar es lento.
+STATE_CHECKPOINT_PATH_INFERENCE = ""
 LARGE_SIM_CHECKPOINT_INTERVAL = 10000 
-
-# Qué: (pipeline_server.py) Parámetros para el visor "a mano".
-# Qué esperar: `INTERVAL` = cada cuántos pasos se envía un frame (más bajo = más fluido).
-#             `TYPE` = qué frame enviar (el que controlas desde la UI).
 REAL_TIME_VIZ_INTERVAL = 5
-REAL_TIME_VIZ_TYPE = 'change' # 'density', 'channels', 'magnitude', 'phase', 'change'
+REAL_TIME_VIZ_TYPE = 'change'
 REAL_TIME_VIZ_DOWNSCALE = 2

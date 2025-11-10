@@ -1,167 +1,89 @@
-# AETHERIA: Simulación de Complejidad Emergente con QCA
+# AETHERIA: Laboratorio de Complejidad Emergente
 
-Bienvenido a AETHERIA, una aplicación para simular la emergencia de estructuras complejas a partir de reglas físicas fundamentales.
+AETHERIA es un laboratorio de software para simular la emergencia de estructuras complejas a partir de reglas físicas fundamentales.
 
-Este proyecto modela un universo discreto como una cuadrícula de Autómatas Celulares Cuánticos (QCA). La evolución de este universo no está pre-programada, sino que es gobernada por una **"Ley M" (Ley Fundamental)**: un modelo de Deep Learning (como un MLP o una U-Net) que se entrena desde cero.
+Este proyecto modela un universo discreto como una cuadrícula de Autómatas Celulares Cuánticos (QCA). La evolución de este universo no está pre-programada, sino que es gobernada por una **"Ley M" (Ley Fundamental)**: un modelo de Deep Learning (U-Net) que se entrena desde cero para descubrir las "leyes de la física" de este universo.
 
-El objetivo es descubrir, mediante un proceso de "evolución artificial" (Aprendizaje por Refuerzo), una Ley M que opere en el **"Borde del Caos"**: el régimen crítico donde la información puede propagarse, la estabilidad se mantiene y la complejidad estructural emerge espontáneamente.
+El objetivo es descubrir, mediante Aprendizaje por Refuerzo, una Ley M que opere en el **"Borde del Caos"**: el régimen crítico donde la información puede propagarse, la estabilidad se mantiene y la complejidad estructural emerge espontáneamente.
 
-Esta aplicación está construida como una **App de Lightning AI**, permitiendo un entrenamiento pesado en GPU y un despliegue de simulación en tiempo real a través de un servidor WebSocket.
+## 🚀 Arquitectura Simplificada
 
------
+El proyecto ha sido refactorizado en una arquitectura unificada y fácil de usar:
 
-## 🚀 Arquitectura del Proyecto
-
-El proyecto está separado en un lanzador de aplicación (`app.py`), una interfaz de usuario (`ui.py`), un lanzador de script local (`main.py`) y un paquete de código fuente (`src/`).
+- **`app.py`**: Un único servidor que maneja tanto el backend de simulación como el frontend web.
+- **`index.html`**: Una única interfaz de usuario (UI) web para controlar todo: entrenamiento, simulación y visualización.
+- **`train.py`**: El script de entrenamiento, que ahora es llamado como un subproceso por el servidor principal.
+- **`src/`**: Contiene toda la lógica del núcleo (motor QCA, modelos, configuración).
 
 ```
 aetheria/
-├── app.py              <-- 🚀 El lanzador de la App Lightning (Frontend + Backend)
-├── ui.py               <-- 🖥️ El visor web (Streamlit UI)
-├── main.py             <-- 🔬 El lanzador para ejecución local (entrenamiento/scripts)
+├── app.py              <-- 🚀 El SERVIDOR UNIFICADO (ejecutar este archivo)
+├── index.html          <-- 🖥️ La INTERFAZ DE USUARIO web
+├── train.py            <-- 🏋️ El script de entrenamiento (llamado por app.py)
 ├── requirements.txt    <-- 📋 Dependencias del proyecto
 │
-├── src/                <-- 🧠 Todo el código fuente
-│   ├── __init__.py
-│   ├── config.py         <-- ⚙️ ¡Parámetros globales y flags de ejecución aquí!
-│   │
-│   ├── qca_engine.py     <-- 🌌 Clases Aetheria_Motor y QCA_State
-│   ├── qca_operator_mlp.py  <-- 🧬 Ley M v1: MLP 1x1 (Visión local, "míope")
-│   ├── qca_operator_unet.py <-- 🧬 Ley M v2: U-Net (Visión regional, "consciente")
-│   │
-│   ├── trainer.py        <-- 🏋️ Clase de entrenamiento (QC_Trainer_v3)
-│   ├── visualization.py  <-- 🎨 Funciones get_frame_gpu()
-│   ├── utils.py          <-- 📦 Funciones de ayuda (load/save_state)
-│   │
-│   ├── pipeline_train.py   <-- 🏭 Script: FASE 5 (Entrenamiento)
-│   ├── pipeline_viz.py     <-- 🎬 Script: FASE 6 (Generar Vídeos)
-│   └── pipeline_server.py  <-- 📡 Script: FASE 7 (Servidor WebSocket)
+├── src/                <-- 🧠 Todo el código fuente del núcleo
+│   ├── config.py         <-- ⚙️ Parámetros globales (tamaño de grilla, etc.)
+│   ├── qca_engine.py     <-- 🌌 Motor de simulación QCA
+│   ├── qca_operator_*.py <-- 🧬 Las "Leyes M" (modelos U-Net)
+│   └── model_loader.py   <-- 📦 Utilidad para cargar modelos
 │
-└── output/             <-- 📊 Todos los resultados (vídeos y checkpoints)
-    ├── training_checkpoints/
-    └── simulation_checkpoints/
+└── checkpoints/        <-- 💾 Los modelos entrenados (.pth) se guardan aquí
 ```
-
------
 
 ## ⚙️ Cómo Empezar
 
-### 1\. Instalación
+### 1. Instalación
 
-Asegúrate de tener todas las dependencias instaladas en tu entorno.
+Asegúrate de tener Python 3.8+ y `pip`. Clona el repositorio y navega al directorio del proyecto. Luego, instala las dependencias:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2\. Configuración
+### 2. Ejecutar la Aplicación
 
-**Casi todo se controla desde `src/config.py`**. Antes de ejecutar, revisa este archivo para:
+Para iniciar el laboratorio, simplemente ejecuta el servidor `app.py`:
 
-  * Ajustar los *flags* de ejecución (`RUN_TRAINING`, `RUN_LARGE_SIM`, etc.).
-  * Configurar los parámetros de entrenamiento (`GRID_SIZE_TRAINING`, `EPISODES_TO_ADD`).
-  * Configurar los parámetros de la simulación (`GRID_SIZE_INFERENCE`).
-
-### 3\. Elegir tu "Ley M" (El Cerebro)
-
-Puedes cambiar fácilmente qué modelo de física quieres entrenar o ejecutar. Abre `src/pipeline_train.py` y `src/pipeline_server.py` y edita el "Selector de Modelo" en la parte superior:
-
-```python
-# --- Elige tu "Ley M" (Cerebro) aquí ---
-
-# Opción 1: El MLP 1x1 original (Rápido, pero "míope")
-from .qca_operator_mlp import QCA_Operator_MLP as ActiveModel
-
-# Opción 2: La U-Net (Más lenta, pero con "conciencia regional")
-# from .qca_operator_unet import QCA_Operator_UNet as ActiveModel
+```bash
+python3 app.py
 ```
 
------
+El servidor se iniciará y te mostrará la URL para acceder a la interfaz web (normalmente `http://localhost:8000`).
 
-## 🏃 Cómo Ejecutar
+### 3. Usar la Interfaz Web
 
-Este proyecto tiene **dos modos de ejecución principales**:
+Abre tu navegador en `http://localhost:8000`. Desde esta única interfaz, puedes:
 
-### Modo 1: Entrenamiento y Scripting (Local)
+- **Entrenar un Nuevo Modelo**:
+  - En el panel "Controles de Entrenamiento", ajusta los parámetros como el nombre del experimento, la tasa de aprendizaje y los episodios.
+  - Haz clic en "🚀 Iniciar Entrenamiento".
+  - Verás los logs del entrenamiento en tiempo real en la sección "Log de Entrenamiento".
+  - Los modelos (`.pth`) se guardarán en el directorio `checkpoints/`.
 
-Usa `main.py` para tareas de "un solo uso" como entrenar un nuevo modelo o generar un lote de videos.
+- **Ejecutar una Simulación**:
+  - Una vez que un modelo ha sido entrenado, haz clic en "🔄 Refrescar Modelos" para que aparezca en la lista desplegable.
+  - Selecciona el modelo que deseas cargar en el panel "Cargar Modelo para Simulación".
+  - Haz clic en "▶️ Iniciar Simulación".
 
-1.  **Configura:** Abre `src/config.py` y pon:
-      * `RUN_TRAINING = True`
-      * `RUN_POST_TRAINING_VIZ = True`
-      * `RUN_LARGE_SIM = False` (¡Importante\!)
-2.  **Ejecuta:**
-    ```bash
-    python main.py
-    ```
-3.  **Resultado:** El script ejecutará el `pipeline_train.py` y luego el `pipeline_viz.py`. Todos los modelos (`.pth`) y videos (`.mp4`) se guardarán en la carpeta `output/`.
+- **Visualizar y Analizar**:
+  - La simulación se mostrará en el visor central.
+  - Usa el menú "Tipo de Visualización" para cambiar entre diferentes modos de análisis (densidad, fase, FFT, etc.).
+  - **Haz clic y arrastra** para moverte por la simulación (pan).
+  - **Usa la rueda del ratón** para acercar y alejar (zoom).
+  - Las métricas globales como la entropía y la densidad se actualizan en tiempo real.
+  - La configuración de la simulación actual (modelo cargado, tamaño de la grilla) se muestra en el panel "Configuración de Simulación".
 
-### Modo 2: Servidor de Simulación (Producción)
+## 🔬 Visualizaciones Disponibles
 
-Usa `app.py` para lanzar la simulación persistente como un servicio en la nube (o localmente) con un visor web en tiempo real.
+- **Análisis de Grid**:
+  - `Densidad`: Mapa de calor de la "materia" o "energía".
+  - `Magnitud del Cambio`: Resalta las áreas de mayor actividad entre pasos.
+  - `Canales RGB`: Mapea los primeros 3 canales complejos a colores para ver la dinámica interna.
+  - `Fase Agregada`: Muestra la coherencia de fase, útil para detectar comportamiento de onda.
+  - `Transformada de Fourier 2D`: Analiza las frecuencias espaciales de la estructura.
 
-1.  **Configura:** Abre `src/config.py` y pon:
-      * `RUN_TRAINING = False`
-      * `RUN_POST_TRAINING_VIZ = False`
-      * `RUN_LARGE_SIM = True`
-2.  **Ejecuta (Localmente):**
-    ```bash
-    lightning run app app.py
-    ```
-3.  **Ejecuta (En la Nube de Lightning AI):**
-    ```bash
-    lightning run app app.py --cloud
-    ```
-4.  **Resultado:** Esto lanzará el backend de simulación (`SimulationServer`) en una GPU y el frontend (`ui.py`) en un servidor web. Abre la URL que te da la terminal para ver la simulación en tiempo real.
-
------
-
-## 📊 Interpretación de Resultados
-
-El visor te permite observar la dinámica emergente del QCA en tiempo real:
-
-  * **Densidad:** Mapa de calor que muestra la concentración de "energía" o "materia".
-  * **Canales Internos:** Mapeo a RGB de los primeros canales del estado. Ayuda a ver la actividad de los componentes del campo.
-  * **Magnitud de Estado:** Intensidad total del vector de estado en cada celda.
-  * **Fase de Estado:** Coherencia de fase, crucial para el comportamiento tipo onda.
-  * **Cambio de Estado / Actividad:** Resalta las regiones activas o "vivas" del universo.
-
------
-
-## 💾 Checkpointing y Reanudación
-
-El proyecto guarda el progreso automáticamente en la carpeta `output/`.
-
-  * **Checkpoints de Entrenamiento (`output/training_checkpoints/`):**
-      * Contienen el estado del modelo, optimizador e historial.
-      * Para reanudar el entrenamiento, pon `CONTINUE_TRAINING = True` en `src/config.py`.
-  * **Checkpoints de Simulación (`output/simulation_checkpoints/`):**
-      * Contienen el estado crudo (`x_real`, `x_imag`) de la simulación grande.
-      * Para reanudar una simulación, pon `LOAD_STATE_CHECKPOINT_INFERENCE = True` en `src/config.py`.
-
------
-
-## 🧬 Parámetros Clave en `src/config.py`
-
-### Arquitectura y Entrenamiento
-
-  * `GRID_SIZE_TRAINING`: Tamaño de la cuadrícula para entrenar (ej. 256).
-  * `D_STATE`: Canales/dimensiones de cada celda (ej. 21).
-  * `HIDDEN_CHANNELS`: Ancho de la Ley M (ej. 64 para U-Net, 256 para MLP).
-  * `EPISODES_TO_ADD`: Cuántos episodios de entrenamiento ejecutar.
-  * `PERSISTENCE_COUNT`: Pasos de BPTT (memoria del entrenamiento).
-
-### Recompensas (El "Objetivo" de la Física)
-
-  * `ALPHA_START`/`ALPHA_END`: Peso de la recompensa de **complejidad** (`R_Density_Target`).
-  * `GAMMA_START`/`GAMMA_END`: Peso de la recompensa de **estabilidad** (`R_Stability`).
-  * `BETA_CAUSALITY`: Peso de la recompensa de **actividad** (`R_Causality`).
-  * `LAMBDA_ACTIVITY_VAR`: Recompensa por varianza de actividad (crea "vida" interesante).
-  * `LAMBDA_VELOCIDAD`: Recompensa por la varianza de la densidad (crea "movimiento").
-
-### Simulación y Servidor
-
-  * `GRID_SIZE_INFERENCE`: Tamaño de la cuadrícula de producción (ej. 468, 1024).
-  * `REAL_TIME_VIZ_INTERVAL`: Cada cuántos pasos se envía un frame al visor (ej. 5).
-  * `REAL_TIME_VIZ_TYPE`: Qué tipo de frame enviar (`density`, `change`, `phase`, etc.).
-  * `REAL_TIME_VIZ_DOWNSCALE`: Factor de reducción de la imagen para el visor (ej. 2).
+- **Análisis Temporal y Estadístico**:
+  - `Diagrama Espacio-Tiempo`: Muestra la evolución de una fila de píxeles a lo largo del tiempo.
+  - `Gráfico de Poincaré`: Ayuda a identificar atractores y caos en la dinámica de la densidad.
+  - `Histograma de Densidad`: Muestra la distribución de los valores de densidad en la grilla.
