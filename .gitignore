@@ -80,3 +80,7 @@ secrets.toml
 *.key
 *.pem
 *.crt
+
+.obsidian
+*/.obsidian/*
+frontend/node_modules/**
