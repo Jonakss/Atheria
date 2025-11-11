@@ -9,9 +9,8 @@ import sys
 
 # --- Configuración del Path ---
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-src_dir = os.path.join(PROJECT_ROOT, "src")
-if src_dir not in sys.path:
-    sys.path.append(src_dir)
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
 
 from src.visualization_tools import visualize_poincare_disk, visualize_3d_slices
 from src.qca_operator_unet import QCA_Operator_UNet

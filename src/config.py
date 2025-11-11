@@ -12,11 +12,9 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # --- Directorios de Salida ---
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
-CHECKPOINT_DIR = os.path.join(OUTPUT_DIR, "training_checkpoints")
-LARGE_SIM_CHECKPOINT_DIR = os.path.join(OUTPUT_DIR, "simulation_checkpoints")
+EXPERIMENTS_DIR = os.path.join(OUTPUT_DIR, "experiments")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-os.makedirs(CHECKPOINT_DIR, exist_ok=True)
-os.makedirs(LARGE_SIM_CHECKPOINT_DIR, exist_ok=True)
+os.makedirs(EXPERIMENTS_DIR, exist_ok=True)
 
 # --- Constantes del Servidor WebSocket ---
 WEBSOCKET_HOST = '0.0.0.0'
@@ -31,9 +29,19 @@ LAB_SERVER_PORT = 8000
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# G. NOMBRE DEL EXPERIMENTO
+# G. GESTIÓN DE EXPERIMENTOS
 # ------------------------------------------------------------------------------
-EXPERIMENT_NAME = "Unitary_4D_v1" # <--- ¡Prueba con 4D primero!
+# ¡¡CAMBIA ESTO PARA CADA NUEVO ENTRENAMIENTO!!
+EXPERIMENT_NAME = "Fase1_Estabilidad_4D"
+
+# --- ¡¡NUEVO!! Para Entrenamiento Progresivo ---
+# Qué: Si `CONTINUE_TRAINING = False`, puedes cargar los pesos de un
+#      experimento anterior para hacer "Transfer Learning".
+# Qué esperar: Pon el NOMBRE de la carpeta del experimento (ej. "Fase1_Estabilidad_4D")
+#             para usarlo como punto de partida para uno nuevo.
+#             Pon `None` para empezar desde cero.
+LOAD_FROM_EXPERIMENT = None 
+# -----------------------------------------------
 
 # ------------------------------------------------------------------------------
 # A. CONTROL DE EJECUCIÓN (Ajusta esto para entrenar)
@@ -49,14 +57,14 @@ CONTINUE_TRAINING = False # False para empezar el nuevo experimento
 GRID_SIZE_TRAINING = 64
 
 # ¡¡NUEVO!! Especifica qué operador QCA usar.
-# Opciones: "MLP", "UNET_UNITARIA"
+# Opciones: "MLP", "UNET_UNITARIA", "SNN_UNET"
 ACTIVE_QCA_OPERATOR = "UNET_UNITARIA" 
 MODEL_ARCHITECTURE = "UNET_UNITARIA"
 
 # ¡¡NUEVO!! Dimensión del vector de estado REAL
 # (Ya no usamos D_STATE=21)
 # (Prueba con 4, 8, 16... 42)
-D_STATE = 21 # Renombrado desde STATE_VECTOR_DIM para consistencia
+D_STATE = 4 # Renombrado desde STATE_VECTOR_DIM para consistencia
 
 # Ancho de la U-Net
 HIDDEN_CHANNELS = 32
@@ -66,7 +74,7 @@ HIDDEN_CHANNELS = 32
 # ------------------------------------------------------------------------------
 EPISODES_TO_ADD = 2000
 STEPS_PER_EPISODE = 50
-LR_RATE_M = 1e-6 # (Bajo, bueno para U-Net)
+LR_RATE_M = 1e-4 # (Más alto, tarea fácil)
 PERSISTENCE_COUNT = 10
 GRADIENT_CLIP = 0.85
 
@@ -76,10 +84,10 @@ GRADIENT_CLIP = 0.85
 # (El modelo unitario no puede "explotar", así que quitamos esas penalizaciones)
 
 # Qué: (R_Quietud) Fomenta el "espacio vacío".
-PESO_QUIETUD = 1.0
+PESO_QUIETUD = 10.0
 
 # Qué: (R_Complejidad) Fomenta la "materia".
-PESO_COMPLEJIDAD_LOCALIZADA = 20.0
+PESO_COMPLEJIDAD_LOCALIZADA = 0.0
 
 # ------------------------------------------------------------------------------
 # E. PARÁMETROS DE REANUDACIÓN Y ESTANCAMIENTO
@@ -93,7 +101,7 @@ REACTIVATION_LR_MULTIPLIER = 0.5
 # ------------------------------------------------------------------------------
 # F. PARÁMETROS DE SIMULACIÓN Y VISUALIZACIÓN
 # ------------------------------------------------------------------------------
-GRID_SIZE = 512 # Tamaño de la grilla para servidores de visualización
+GRID_SIZE = 128 # Tamaño de la grilla para servidores de visualización
 SAVE_EVERY_EPISODES = 50
 NUM_FRAMES_VIZ = 1500
 FPS_VIZ_TRAINING = 24

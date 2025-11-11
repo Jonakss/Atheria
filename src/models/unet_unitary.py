@@ -65,7 +65,7 @@ class QCA_Operator_UNet_Unitary(nn.Module):
         super().__init__()
         self.d_vector = d_vector # ej. 4
         base_c = hidden_channels     # ej. 64
-        in_c = d_vector              # ej. 4
+        in_c = 2 * d_vector              # ej. 4 <--- CORREGIDO
         
         # --- Encoder (Contracción) ---
         self.inc = ConvBlock(in_c, base_c)           # x1 (H) -> 64
@@ -91,26 +91,34 @@ class QCA_Operator_UNet_Unitary(nn.Module):
         self._initialize_weights() # Asegura que el delta inicial sea pequeño
         
     def forward(self, x_cat):
-        # x_cat (psi_t) tiene forma [B, C, H, W] (ej: [1, 4, 256, 256])
+        # x_cat (psi_t) tiene forma [B, C, H, W] (ej: [1, 42, 256, 256])
         B, C, H, W = x_cat.shape 
         
-        # --- 1. U-Net ---
-        x1 = self.inc(x_cat)  # [B, 64, H=256]
-        x2 = self.down1(x1) # [B, 128, H=128]
-        x3 = self.down2(x2) # [B, 256, H=64]
-        
-        b = self.bot(x3)    # [B, 512, H=64]
+        # 1. Convertir x_cat a representación compleja
+        # x_cat es [B, 2*D_STATE, H, W]
+        # d_vector es D_STATE
+        x_real = x_cat[:, :self.d_vector, :, :] # [B, D_STATE, H, W]
+        x_imag = x_cat[:, self.d_vector:, :, :] # [B, D_STATE, H, W]
+        complex_psi = torch.complex(x_real, x_imag) # [B, D_STATE, H, W]
 
-        u1 = self.up1(b)                                # [B, 256, H=128]
-        s1 = torch.cat([u1, x2], dim=1)                 # Concat: [B, 256 + 128 = 384, H=128]
-        c1 = self.conv_up1(s1)                          # [B, 256, H=128]
+        # --- 1. U-Net ---
+        # La U-Net opera sobre la representación real-valorada x_cat
+        x1 = self.inc(x_cat)
+        x2 = self.down1(x1)
+        x3 = self.down2(x2)
         
-        u2 = self.up2(c1)                               # [B, 128, H=256]
-        s2 = torch.cat([u2, x1], dim=1)                 # Concat: [B, 128 + 64 = 192, H=256]
-        c2 = self.conv_up2(s2)                          # [B, 64, H=256]
+        b = self.bot(x3)
+
+        u1 = self.up1(b)
+        s1 = torch.cat([u1, x2], dim=1)
+        c1 = self.conv_up1(s1)
+        
+        u2 = self.up2(c1)
+        s2 = torch.cat([u2, x1], dim=1)
+        c2 = self.conv_up2(s2)
         
         # --- 2. Predecir la Matriz 'A' ---
-        # A_raw tiene forma [B, D*D, H, W] (ej: [1, 16, 256, 256])
+        # A_raw tiene forma [B, D*D, H, W]
         A_raw = self.outc(c2) 
         
         # --- 3. Reformatear A ---
@@ -118,15 +126,30 @@ class QCA_Operator_UNet_Unitary(nn.Module):
         A_raw = A_raw.permute(0, 2, 3, 1).view(B, H, W, self.d_vector, self.d_vector)
         
         # --- 4. Forzar Anti-Simetría (A = -A.T) ---
-        # A shape: [B, H, W, D, D] (ej: [1, 256, 256, 4, 4])
+        # A shape: [B, H, W, D, D]
         A = 0.5 * (A_raw - A_raw.transpose(-1, -2)) 
         
-        # --- 5. Calcular el Delta (dΨ/dt = A * Ψ) usando einsum ---
-        # A (bxyij):      [B, H, W, D, D] (b=batch, xy=coords, ij=matriz A)
-        # x_cat (bjxy):   [B, D, H, W]    (b=batch, j=vector psi, xy=coords)
-        # Ecuación: delta_psi[b, i, x, y] = sum_j ( A[b, x, y, i, j] * psi[b, j, x, y] )
-        delta_psi = torch.einsum('bxyij,bjxy -> bixy', A, x_cat)
+        # Convertir A a tipo complejo con parte imaginaria cero
+        A_complex = A.to(complex_psi.dtype) # Convert A to ComplexFloat
         
-        # --- 6. Devolver el Delta ---
-        # delta_psi ya está en el formato [B, C, H, W] que necesita el motor.
+        # --- 5. Calcular el Delta (dΨ/dt = A * Ψ) usando matmul ---
+        # A_complex (bxyij):      [B, H, W, D, D] (ahora complejo)
+        # complex_psi (bjxy):   [B, D, H, W] (complejo)
+
+        # Permutar complex_psi to [B, H, W, D] for matmul
+        complex_psi_permuted = complex_psi.permute(0, 2, 3, 1) # [B, H, W, D]
+
+        # Perform batch matrix-vector multiplication
+        # Result will be [B, H, W, D]
+        delta_complex_psi_permuted = torch.matmul(A_complex, complex_psi_permuted.unsqueeze(-1)).squeeze(-1)
+
+        # Permute back to [B, D, H, W]
+        delta_complex_psi = delta_complex_psi_permuted.permute(0, 3, 1, 2)
+        
+        # 6. Convertir delta_complex_psi de nuevo a representación real-valorada
+        delta_psi_real = delta_complex_psi.real
+        delta_psi_imag = delta_complex_psi.imag
+        delta_psi = torch.cat([delta_psi_real, delta_psi_imag], dim=1) # [B, 2*D_STATE, H, W]
+        
+        # --- 7. Devolver el Delta ---
         return delta_psi

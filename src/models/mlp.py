@@ -50,15 +50,24 @@ class QCA_Operator_MLP(nn.Module):
         x_neighbors = self.conv_neighbors(x_cat)
         F_int = self.processing_net(x_neighbors) # [B, 8*d_state, H, W]
 
+        F_int = self.processing_net(x_neighbors) # [B, 8*d_state, H, W]
+
         # Reformatear a la salida esperada
-        F_int = F_int.squeeze(0).permute(1, 2, 0) # [H, W, 8*d_state]
-        H, W, C = F_int.shape
+        # Permutar para que los canales estén al final para la división
+        F_int_permuted = F_int.permute(0, 2, 3, 1) # [B, H, W, 8*d_state]
+        B, H, W, C_total = F_int_permuted.shape
         D4 = 4 * self.d_state
 
-        F_int_real_raw = F_int[..., :D4]
-        F_int_imag_raw = F_int[..., D4:]
+        F_int_real_raw = F_int_permuted[..., :D4]
+        F_int_imag_raw = F_int_permuted[..., D4:]
         
-        F_int_real = F_int_real_raw.reshape(H, W, 4, self.d_state).mean(dim=2) * 0.1
-        F_int_imag = F_int_imag_raw.reshape(H, W, 4, self.d_state).mean(dim=2) * 0.1
+        F_int_real = F_int_real_raw.reshape(B, H, W, 4, self.d_state).mean(dim=3) * 0.1 # Mean over 4
+        F_int_imag = F_int_imag_raw.reshape(B, H, W, 4, self.d_state).mean(dim=3) * 0.1 # Mean over 4
 
-        return F_int_real, F_int_imag
+        # Permutar de nuevo a [B, C, H, W] para concatenar
+        delta_real = F_int_real.permute(0, 3, 1, 2) # [B, d_state, H, W]
+        delta_imag = F_int_imag.permute(0, 3, 1, 2) # [B, d_state, H, W]
+
+        delta_psi = torch.cat([delta_real, delta_imag], dim=1) # [B, 2*d_state, H, W]
+        
+        return delta_psi

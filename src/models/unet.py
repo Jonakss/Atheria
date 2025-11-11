@@ -102,16 +102,22 @@ class QCA_Operator_UNet(nn.Module):
         s2 = torch.cat([u2, x1], dim=1)                 # Concat: [B, 128 + 64 = 192, H=256]
         c2 = self.conv_up2(s2)                          # [B, 64, H=256]
         
-        output = self.outc(c2) # Forma: [B, 42, H=256]
+        output = self.outc(c2) # Forma: [B, 2*d_state, H, W]
 
         # --- Reformatear a la salida esperada por Aetheria_Motor ---
-        output = output.permute(0, 2, 3, 1) # (B, H, W, 2*d_state)
-        output = output.squeeze(0) # Forma: [H, W, 2*d_state]
+        # The output is already in [B, C, H, W] format, where C = 2*d_state
+        # We just need to split and then concatenate again to apply the 0.1 factor
         
-        delta_real = output[..., :self.d_state]
-        delta_imag = output[..., self.d_state:]
+        # Permute to [B, H, W, 2*d_state] for splitting
+        output_permuted = output.permute(0, 2, 3, 1)
+        
+        delta_real = output_permuted[..., :self.d_state]
+        delta_imag = output_permuted[..., self.d_state:]
         
         delta_real = delta_real * 0.1
         delta_imag = delta_imag * 0.1
 
-        return delta_real, delta_imag
+        # Permute back to [B, C, H, W] and concatenate
+        delta_psi = torch.cat([delta_real.permute(0, 3, 1, 2), delta_imag.permute(0, 3, 1, 2)], dim=1)
+        
+        return delta_psi

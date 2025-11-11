@@ -11,19 +11,16 @@ from torch.amp import GradScaler, autocast
 # ¡Importaciones relativas!
 from .qca_engine import Aetheria_Motor
 from .config import (
-    DEVICE, CHECKPOINT_DIR, EXPERIMENT_NAME, 
-    # --- ¡¡NUEVAS RECOMPENSAS IMPORTADAS!! ---
+    DEVICE, EXPERIMENTS_DIR, EXPERIMENT_NAME, 
+    LOAD_FROM_EXPERIMENT,
     PESO_QUIETUD, PESO_COMPLEJIDAD_LOCALIZADA,
-    # -----------------------------------------
     STAGNATION_WINDOW, MIN_LOSS_IMPROVEMENT, REACTIVATION_COUNT, 
     REACTIVATION_STATE_MODE, REACTIVATION_LR_MULTIPLIER, 
     GRADIENT_CLIP, STEPS_PER_EPISODE, PERSISTENCE_COUNT,
-    STATE_VECTOR_DIM # <--- ¡NUEVO!
+    D_STATE, CONTINUE_TRAINING
 )
 
-# ------------------------------------------------------------------------------
-# 2.1: QC_Trainer_v3 Class
-# ------------------------------------------------------------------------------
+# ... (resto de la clase sin cambios hasta el __init__) ...
 class QC_Trainer_v3:
     def __init__(self, motor: Aetheria_Motor, lr_rate: float, experiment_name: str):
         self.motor = motor
@@ -42,23 +39,11 @@ class QC_Trainer_v3:
         self.scaler = GradScaler(device=DEVICE, enabled=(DEVICE.type == 'cuda'))
         
         self.experiment_name = experiment_name
-        self.experiment_checkpoint_dir = os.path.join(CHECKPOINT_DIR, self.experiment_name)
+        # ¡¡NUEVA RUTA!! Directorio de checkpoints específico para este experimento
+        self.experiment_checkpoint_dir = os.path.join(EXPERIMENTS_DIR, self.experiment_name, "checkpoints")
         os.makedirs(self.experiment_checkpoint_dir, exist_ok=True)
 
-        # --- ¡¡MODIFICADO!! Historial de las nuevas recompensas ---
-        self.history = {
-            'Loss': [],
-            'R_Quietud': [],
-            'R_Complejidad_Localizada': [],
-            'Gradient_Norm': [],
-        }
-        # -------------------------------------------------------
-
-        self.current_episode = 0
-        self.best_loss = float('inf')
-        self.stagnation_counter = 0
-        self.reactivation_counter = 0
-        self.gradient_norms = []
+        # ... (resto del __init__ sin cambios) ...
 
     def _save_checkpoint(self, episode, is_best=False):
         """Saves the training state to the specific experiment folder."""
@@ -94,61 +79,84 @@ class QC_Trainer_v3:
         print(f"\n[Checkpoint saved to: {filename}]")
 
     def _load_checkpoint(self):
-        """Loads the latest training checkpoint from the specific experiment folder."""
-        try:
+        """
+        Carga un checkpoint desde la nueva estructura de directorios.
+        - Si `CONTINUE_TRAINING` es True, reanuda el *mismo* experimento.
+        - Si `LOAD_FROM_EXPERIMENT` está definido, carga *solo los pesos* de ese experimento
+          para hacer Transfer Learning.
+        """
+        search_path = None
+        load_mode = "scratch" # ('scratch', 'resume', 'transfer')
+
+        if CONTINUE_TRAINING:
+            # Modo 1: Reanudar este experimento desde su carpeta de checkpoints
             search_path = os.path.join(self.experiment_checkpoint_dir, "qca_checkpoint_eps*.pth")
+            load_mode = "resume"
+        elif LOAD_FROM_EXPERIMENT:
+            # Modo 2: Cargar pesos de la carpeta de checkpoints de un experimento anterior
+            source_exp_dir = os.path.join(EXPERIMENTS_DIR, LOAD_FROM_EXPERIMENT, "checkpoints")
+            search_path = os.path.join(source_exp_dir, "*_FINAL.pth") # Asumiendo que guardas un _FINAL
+            load_mode = "transfer"
+
+        if not search_path:
+            print(f"Iniciando desde cero (CONTINUE_TRAINING=False, LOAD_FROM_EXPERIMENT=None).")
+            return
+
+        try:
             list_of_files = glob.glob(search_path)
-            list_of_best_files = glob.glob(os.path.join(self.experiment_checkpoint_dir, "qca_best_eps*.pth"))
-            all_checkpoint_files = list_of_files + list_of_best_files
+            if not list_of_files:
+                # Fallback: si no hay _FINAL.pth, busca el 'best'
+                if load_mode == "transfer":
+                    source_exp_dir = os.path.join(EXPERIMENTS_DIR, LOAD_FROM_EXPERIMENT, "checkpoints")
+                    search_path = os.path.join(source_exp_dir, "qca_best_eps*.pth")
+                    list_of_files = glob.glob(search_path)
 
-            if not all_checkpoint_files:
-                print(f"No checkpoints found in '{self.experiment_checkpoint_dir}'. Starting from scratch.")
-                return
+                if not list_of_files:
+                    print(f"No se encontraron checkpoints en '{os.path.dirname(search_path)}'. Empezando desde cero.")
+                    return
 
-            latest_file = max(all_checkpoint_files, key=os.path.getmtime)
+            latest_file = max(list_of_files, key=os.path.getmtime)
+            print(f"Cargando checkpoint: {latest_file} (Modo: {load_mode})")
             
-            print(f"Cargando checkpoint: {latest_file}...")
-            checkpoint = torch.load(latest_file, map_location=DEVICE, weights_only=False)
+            # Para transfer, solo necesitamos los pesos, no el estado del optimizador, etc.
+            weights_only = load_mode == "transfer"
+            checkpoint = torch.load(latest_file, map_location=DEVICE, weights_only=weights_only)
 
             target_model = self.motor.operator
-            if isinstance(target_model, nn.DataParallel):
-                target_model = target_model.module
-            if hasattr(target_model, '_orig_mod'):
-                 target_model = target_model._orig_mod
+            if isinstance(target_model, nn.DataParallel): target_model = target_model.module
+            if hasattr(target_model, '_orig_mod'): target_model = target_model._orig_mod
+            
+            state_dict = checkpoint if weights_only else checkpoint['model_state_dict']
 
-            state_dict = checkpoint['model_state_dict']
             is_dataparallel_saved = next(iter(state_dict)).startswith('module.')
-
             if is_dataparallel_saved:
                 new_state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
                 target_model.load_state_dict(new_state_dict, strict=False)
             else:
                 target_model.load_state_dict(state_dict, strict=False)
 
-            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            
-            if 'scaler_state_dict' in checkpoint:
-                self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
-                print("GradScaler state loaded.")
-                
-            self.current_episode = checkpoint['episode'] + 1
-            self.best_loss = checkpoint['best_loss']
-            loaded_history = checkpoint.get('history', {})
-            for key in self.history.keys():
-                self.history[key] = loaded_history.get(key, [])
-            self.stagnation_counter = checkpoint.get('stagnation_counter', 0)
-            self.reactivation_counter = checkpoint.get('reactivation_counter', 0)
+            print("Pesos del modelo cargados exitosamente (strict=False).")
 
-            print(f"Checkpoint loaded successfully. Resuming from episode {self.current_episode}.")
+            if load_mode == "resume":
+                self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+                if 'scaler_state_dict' in checkpoint:
+                    self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
+                self.current_episode = checkpoint['episode'] + 1
+                self.best_loss = checkpoint['best_loss']
+                self.history = checkpoint.get('history', self.history)
+                self.stagnation_counter = checkpoint.get('stagnation_counter', 0)
+                self.reactivation_counter = checkpoint.get('reactivation_counter', 0)
+                print(f"Checkpoint reanudado. Empezando desde episodio {self.current_episode}.")
+            else:
+                print("Transferencia de pesos completada. Empezando nuevo entrenamiento desde episodio 0.")
 
         except Exception as e:
-            print(f"Error loading checkpoint: {e}. Starting from scratch.")
+            print(f"Error al cargar checkpoint: {e}. Empezando desde cero.")
             self.current_episode = 0
             self.history = {k: [] for k in self.history.keys()}
             self.best_loss = float('inf')
             self.stagnation_counter = 0
             self.reactivation_counter = 0
-            self.gradient_norms = []
             self.scaler = GradScaler(device=DEVICE, enabled=(DEVICE.type == 'cuda'))
 
     def check_stagnation_and_reactivate(self, total_episodes):

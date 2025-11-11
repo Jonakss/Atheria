@@ -10,6 +10,7 @@ numpy
 Pillow
 imageio
 opencv-python
+snnTorch
 
 # --- Utilidades ---
 tqdm # si quieres barras de progreso

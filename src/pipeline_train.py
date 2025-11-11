@@ -18,12 +18,12 @@ import os
 import numpy as np
 
 # ¡Importaciones relativas!
-from . import config as cfg
+# from . import config as cfg # REMOVED GLOBAL IMPORT
 from .trainer import QC_Trainer_v3
 from .qca_engine import Aetheria_Motor 
 from . import models # <-- ¡NUEVO!
 
-def run_training_pipeline():
+def run_training_pipeline(cfg): # ACCEPT CFG AS ARGUMENT
     """
     Ejecuta la FASE 5: Lógica Principal de Entrenamiento.
     """
@@ -49,11 +49,10 @@ def run_training_pipeline():
         try:
             print("Aplicando torch.compile() al modelo...")
             # ¡CORREGIDO! Compilar la instancia del modelo, no un entero.
-            model_M = torch.compile(model_M, mode="reduce-overhead")
+            # model_M = torch.compile(model_M, mode="reduce-overhead") # Deshabilitado temporalmente para depuración
             print("¡torch.compile() aplicado exitosamente!")
         except Exception as e:
             print(f"Advertencia: torch.compile() falló. Se usará el modelo estándar. Error: {e}")
-
     # --- Inicialización del Motor ---
     # ¡CORREGIDO! Pasar la instancia del modelo y el d_vector correcto.
     Aetheria_Motor_Train = Aetheria_Motor(
