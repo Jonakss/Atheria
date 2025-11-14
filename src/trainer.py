@@ -1,78 +1,90 @@
 # src/trainer.py
 import torch
-import torch.optim as optim
-from torch.cuda.amp import GradScaler, autocast
 import os
+import json
 import logging
 from types import SimpleNamespace
-import torch.compiler
+from .qca_engine import Aetheria_Motor
+from .model_loader import load_model_for_training
+from .utils import load_experiment_config, save_checkpoint
 
-# ... (el resto de las importaciones)
+# Configuración del logging para el script de entrenamiento
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-class QC_Trainer_v3:
-    def __init__(self, motor, lr_m, global_cfg, exp_cfg: SimpleNamespace):
-        # ... (el resto del __init__)
-        self.motor = motor
-        self.device = motor.device
-        self.optimizer_M = optim.Adam(self.motor.operator.parameters(), lr=lr_m)
-        self.scaler = GradScaler()
-        self.global_cfg = global_cfg
-        self.exp_cfg = exp_cfg
-        self.checkpoint_dir = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, exp_cfg.EXPERIMENT_NAME)
-        os.makedirs(self.checkpoint_dir, exist_ok=True)
-        self.current_episode = 0
+def compute_loss(motor, initial_psi, final_psi_real, config):
+    psi_history, _ = motor.propagate(initial_psi, config.QCA_STEPS_TRAINING)
+    final_psi_computed = psi_history[-1]
+    
+    loss_dist = torch.mean((final_psi_computed.abs() - final_psi_real.abs()).pow(2))
+    
+    laplacian = motor.laplacian_2d_psi(final_psi_computed)
+    loss_smooth = torch.mean(laplacian.abs().pow(2))
+    
+    loss = loss_dist + config.MODEL_PARAMS.get('beta', 0.1) * loss_smooth
+    return loss
 
-    def _save_checkpoint(self, episode):
-        # ... (código de guardar checkpoint)
-        pass
-
-    def _load_checkpoint(self):
-        # ... (código de cargar checkpoint)
-        pass
-
-    def compute_loss(self, psi_final, psi_inicial):
-        """
-        Calcula la pérdida como la anti-similitud del coseno entre el estado inicial y final.
-        El objetivo es que el estado final sea lo más diferente posible al inicial.
-        """
-        # Aplanar los tensores para el cálculo de la similitud
-        psi_final_flat = psi_final.reshape(psi_final.shape[0], -1)
-        psi_inicial_flat = psi_inicial.reshape(psi_inicial.shape[0], -1)
-
-        # Calcular la similitud del coseno. 
-        # Se usa la parte real porque el coseno es una medida real.
-        cos_sim = torch.nn.functional.cosine_similarity(psi_final_flat.real, psi_inicial_flat.real, dim=1)
+def run_training_loop(experiment_name):
+    try:
+        config, checkpoint_path, state = load_experiment_config(experiment_name)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        motor = load_model_for_training(config, state, device)
         
-        # La pérdida es el negativo de la similitud. Queremos maximizar la diferencia.
-        # Se toma la media sobre el batch.
-        loss = -cos_sim.mean()
-        return loss
+        start_episode = state.get('episode', 0)
+        total_episodes = config.TOTAL_EPISODES
 
-    def train_episode(self):
-        """
-        Ejecuta un episodio de entrenamiento completo usando BPTT.
-        """
-        self.motor.operator.train()
-        total_loss = 0.0
-        
-        # El bucle ahora es sobre episodios, no sobre pasos internos.
-        for step in range(self.exp_cfg.STEPS_PER_EPISODE):
-            torch.compiler.cudagraph_mark_step_begin()
-            self.optimizer_M.zero_grad()
+        if start_episode >= total_episodes:
+            log_msg = {"type": "log", "payload": "El entrenamiento ya ha alcanzado el número total de episodios."}
+            print(json.dumps(log_msg), flush=True)
+            return
 
-            psi_inicial = self.motor.get_initial_state(self.exp_cfg.BATCH_SIZE_TRAINING)
+        optimizer = torch.optim.Adam(motor.operator.parameters(), lr=config.LR_RATE_M)
+        if 'optimizer_state_dict' in state:
+            optimizer.load_state_dict(state['optimizer_state_dict'])
 
-            with autocast():
-                # --- ¡¡REFACTORIZACIÓN BPTT!! ---
-                # Propagar una vez y obtener el estado final.
-                psi_history, psi_final = self.motor.propagate(psi_inicial, self.exp_cfg.QCA_STEPS_TRAINING)
-                loss = self.compute_loss(psi_final, psi_inicial)
+        loss_history = []
 
-            # Retropropagar una sola vez a través de toda la secuencia.
-            self.scaler.scale(loss).backward()
-            self.scaler.step(self.optimizer_M)
-            self.scaler.update()
+        # --- ¡¡CORRECCIÓN!! Bucle sin tqdm ---
+        for episode in range(start_episode, total_episodes):
+            initial_psi = motor.get_initial_state(batch_size=1)
+            final_psi_real = motor.get_initial_state(batch_size=1)
+            
+            optimizer.zero_grad()
+            loss = compute_loss(motor, initial_psi, final_psi_real, config)
+            loss.backward()
+            optimizer.step()
 
-            total_loss += loss.item()
+            loss_history.append(loss.item())
+            
+            # --- ¡¡CORRECCIÓN!! Enviar progreso en CADA episodio ---
+            avg_loss = sum(loss_history) / len(loss_history)
+            progress_payload = {
+                "type": "progress",
+                "payload": {
+                    "current_episode": episode + 1,
+                    "total_episodes": total_episodes,
+                    "avg_loss": avg_loss
+                }
+            }
+            print(json.dumps(progress_payload), flush=True)
 
-        return total_loss / self.exp_cfg.STEPS_PER_EPISODE
+            if (episode + 1) % 10 == 0:
+                loss_history = [] # Resetear historial de pérdida
+
+            if (episode + 1) % config.CHECKPOINT_INTERVAL == 0:
+                save_checkpoint(motor, optimizer, episode + 1, experiment_name)
+
+        save_checkpoint(motor, optimizer, total_episodes, experiment_name)
+        final_log = {"type": "log", "payload": f"Entrenamiento completado. Modelo guardado en el episodio {total_episodes}."}
+        print(json.dumps(final_log), flush=True)
+
+    except Exception as e:
+        error_log = {"type": "log", "payload": f"ERROR en el entrenamiento: {e}"}
+        print(json.dumps(error_log), flush=True)
+        logging.error("Error en el bucle de entrenamiento", exc_info=True)
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--experiment_name", type=str, required=True)
+    args = parser.parse_args()
+    run_training_loop(args.experiment_name)

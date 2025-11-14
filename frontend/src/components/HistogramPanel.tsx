@@ -1,35 +1,60 @@
-import { Paper, Title, Text, Box } from '@mantine/core';
+// frontend/src/components/HistogramPanel.tsx
+import { Paper, Select, Title, Box, Center, Text, Stack } from '@mantine/core';
 import { BarChart } from '@mantine/charts';
+import { useWebSocket } from '../hooks/useWebSocket';
+import { useState } from 'react';
+import classes from './LogOverlay.module.css'; // Reutilizamos el estilo
+import { IconInfoCircle } from '@tabler/icons-react';
 
-interface HistogramPanelProps {
-  histogramData: any[];
-}
+export function HistogramPanel() {
+    const { simData } = useWebSocket();
+    const [selectedHist, setSelectedHist] = useState('density');
 
-const HistogramPanel: React.FC<HistogramPanelProps> = ({ histogramData }) => {
-  if (!histogramData || histogramData.length === 0) {
+    const hasHistData = simData?.hist_data && Object.keys(simData.hist_data).length > 0;
+
+    if (!hasHistData) {
+        return (
+            <Paper shadow="md" p="sm" className={classes.overlay} style={{ width: 450, height: 350, left: 20, right: 'auto' }}>
+                <Center h="100%">
+                    <Stack align="center" gap="xs">
+                        <IconInfoCircle size={32} color="gray" />
+                        <Text c="dimmed" size="sm">
+                            Esperando datos de simulación...
+                        </Text>
+                    </Stack>
+                </Center>
+            </Paper>
+        );
+    }
+
+    const histOptions = Object.keys(simData.hist_data).map(key => ({
+        value: key,
+        label: key.charAt(0).toUpperCase() + key.slice(1)
+    }));
+
+    const currentData = simData.hist_data[selectedHist] || [];
+
     return (
-      <Paper withBorder shadow="sm" p="xs" mt="md">
-        <Title order={5}>Activación de Canales</Title>
-        <Text size="xs" c="dimmed" ta="center" mt="md">Esperando datos de la simulación...</Text>
-      </Paper>
+        <Paper shadow="md" p="sm" className={classes.overlay} style={{ width: 450, height: 350, left: 20, right: 'auto', minHeight: 350 }}>
+            <Box style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--mantine-spacing-sm)' }}>
+                <Title order={6}>Histogramas</Title>
+                <Select
+                    size="xs"
+                    value={selectedHist}
+                    onChange={(value) => setSelectedHist(value || 'density')}
+                    data={histOptions}
+                />
+            </Box>
+            <Box style={{ flexGrow: 1, minHeight: 280 }}>
+                <BarChart
+                    h="100%"
+                    data={currentData}
+                    dataKey="bin"
+                    series={[{ name: 'count', color: 'blue.6' }]}
+                    tickLine="y"
+                    withXAxis={false}
+                />
+            </Box>
+        </Paper>
     );
-  }
-
-  return (
-    <Paper withBorder shadow="sm" p="xs" mt="md">
-      <Title order={5}>Activación de Canales</Title>
-      <Text size="xs" c="dimmed">Promedio de activación para cada canal del vector de estado.</Text>
-      <Box style={{ height: 200, marginTop: '10px' }}>
-        <BarChart
-          h="100%"
-          data={histogramData}
-          dataKey="channel"
-          series={[{ name: 'activation', color: 'blue.6' }]}
-          tickLine="y"
-        />
-      </Box>
-    </Paper>
-  );
-};
-
-export default HistogramPanel;
+}

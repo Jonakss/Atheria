@@ -1,45 +1,63 @@
 // frontend/src/App.tsx
-import { MantineProvider, AppShell, Burger, Group } from '@mantine/core';
+import { AppShell, Burger, Group, NavLink, Box, Tabs } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { Notifications } from '@mantine/notifications';
-import { WebSocketProvider } from './context/WebSocketContext';
-import { LabSider } from './components/LabSider'; // ¡¡CORRECCIÓN!! Importación nombrada
+import { MainHeader } from './components/MainHeader';
+import { LabSider } from './components/LabSider';
 import { PanZoomCanvas } from './components/PanZoomCanvas';
-import MainHeader from './components/MainHeader';
 import { LogOverlay } from './components/LogOverlay';
-import '@mantine/core/styles.css';
-import '@mantine/notifications/styles.css';
+import { HistogramPanel } from './components/HistogramPanel';
+import { IconChartBar, IconFileText } from '@tabler/icons-react';
 
 function App() {
-    const [opened, { toggle }] = useDisclosure();
+    const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
+    const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(true);
 
     return (
-        <MantineProvider defaultColorScheme="dark">
-            <Notifications />
-            <WebSocketProvider>
-                <AppShell
-                    header={{ height: 60 }}
-                    navbar={{ width: 400, breakpoint: 'sm', collapsed: { mobile: !opened } }}
-                    padding="md"
-                >
-                    <AppShell.Header>
-                        <Group h="100%" px="md">
-                            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-                            <MainHeader />
-                        </Group>
-                    </AppShell.Header>
+        <AppShell
+            header={{ height: 60 }}
+            navbar={{
+                width: 400,
+                breakpoint: 'sm',
+                collapsed: { mobile: !mobileOpened, desktop: !desktopOpened },
+            }}
+            padding="md"
+        >
+            <AppShell.Header>
+                <MainHeader 
+                    mobileOpened={mobileOpened} 
+                    desktopOpened={desktopOpened} 
+                    toggleMobile={toggleMobile} 
+                    toggleDesktop={toggleDesktop} 
+                />
+            </AppShell.Header>
 
-                    <AppShell.Navbar p="md">
-                        <LabSider />
-                    </AppShell.Navbar>
+            <AppShell.Navbar p="md">
+                <LabSider />
+            </AppShell.Navbar>
 
-                    <AppShell.Main>
+            <AppShell.Main>
+                <Tabs defaultValue="inference" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <Tabs.List>
+                        <Tabs.Tab value="inference" leftSection={<IconChartBar size={14} />}>
+                            Inferencia y Visualización
+                        </Tabs.Tab>
+                        <Tabs.Tab value="training" leftSection={<IconFileText size={14} />}>
+                            Log de Entrenamiento
+                        </Tabs.Tab>
+                    </Tabs.List>
+
+                    <Tabs.Panel value="inference" style={{ flex: 1, position: 'relative' }}>
                         <PanZoomCanvas />
+                        <HistogramPanel />
+                    </Tabs.Panel>
+
+                    <Tabs.Panel value="training" style={{ flex: 1, position: 'relative', paddingTop: '1rem' }}>
+                        {/* El LogOverlay ahora es relativo a este panel */}
                         <LogOverlay />
-                    </AppShell.Main>
-                </AppShell>
-            </WebSocketProvider>
-        </MantineProvider>
+                    </Tabs.Panel>
+                </Tabs>
+            </AppShell.Main>
+        </AppShell>
     );
 }
 

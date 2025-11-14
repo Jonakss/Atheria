@@ -10,7 +10,7 @@ from . import config as global_cfg
 from .server_state import g_state
 from .utils import get_experiment_list, load_experiment_config
 from .server_handlers import create_experiment_handler
-from .pipeline_viz import run_visualization_pipeline
+from .pipeline_viz import get_visualization_data
 from .model_loader import load_model
 from .qca_engine import Aetheria_Motor, QuantumState
 
@@ -22,14 +22,24 @@ async def simulation_loop():
     logging.info("Iniciando bucle de simulación (en pausa).")
     while True:
         try:
-            if g_state.get('inference_running') and g_state.get('motor'):
-                viz_type = g_state.get('viz_type', 'density_map')
-                frame_data = run_visualization_pipeline(g_state['motor'], viz_type)
-                if frame_data: await broadcast({"type": "simulation_frame", "payload": frame_data})
+            if not g_state.get('is_paused', True) and g_state.get('motor'):
+                g_state['motor'].evolve_internal_state() # ¡¡CORRECCIÓN!!
+                viz_data = get_visualization_data(g_state['motor'].state.psi, g_state['viz_type'])
+                
+                frame_payload = {
+                    "step": g_state['simulation_step'],
+                    "map_data": viz_data["map_data"],
+                    "hist_data": viz_data["hist_data"]
+                }
+                
+                tasks = [ws.send_json({"type": "simulation_frame", "payload": frame_payload}) for ws in g_state['websockets'].values()]
+                await asyncio.gather(*tasks)
+                
+                g_state['simulation_step'] += 1
             await asyncio.sleep(0.1)
         except Exception as e:
             logging.error(f"Error en el bucle de simulación: {e}", exc_info=True)
-            g_state['inference_running'] = False
+            g_state['is_paused'] = True # ¡¡CORRECCIÓN!!
             await broadcast({"type": "inference_status_update", "payload": {"status": "paused"}})
             await asyncio.sleep(2)
 
@@ -47,13 +57,30 @@ async def websocket_handler(request):
                 data = json.loads(msg.data)
                 scope, cmd, args = data.get("scope"), data.get("command"), data.get("args", {})
                 args['ws_id'] = ws_id
-                if scope == "experiment" and cmd == "create": asyncio.create_task(create_experiment_handler(args))
+                if scope == "experiment" and cmd == "create": 
+                    args['CONTINUE_TRAINING'] = False
+                    asyncio.create_task(create_experiment_handler(args))
+                elif scope == "experiment" and cmd == "continue":
+                    args['CONTINUE_TRAINING'] = True
+                    asyncio.create_task(create_experiment_handler(args))
+                elif scope == "experiment" and cmd == "stop":
+                    logging.info(f"Recibida orden de detener el entrenamiento para el cliente {ws_id}.")
+                    if g_state.get('training_process'):
+                        try:
+                            g_state['training_process'].kill()
+                            await g_state['training_process'].wait()
+                            g_state['training_process'] = None
+                            await ws.send_json({"type": "training_status_update", "payload": {"status": "idle"}})
+                            await ws.send_json({"type": "notification", "payload": {"status": "info", "message": "Entrenamiento detenido por el usuario."}})
+                        except ProcessLookupError:
+                            g_state['training_process'] = None
+                            await ws.send_json({"type": "training_status_update", "payload": {"status": "idle"}})
                 elif scope == "simulation" and cmd == "set_viz": g_state['viz_type'] = args.get("viz_type", "density_map")
                 elif scope == "inference" and cmd == "play":
-                    g_state['inference_running'] = True
+                    g_state['is_paused'] = False
                     await broadcast({"type": "inference_status_update", "payload": {"status": "running"}})
                 elif scope == "inference" and cmd == "pause":
-                    g_state['inference_running'] = False
+                    g_state['is_paused'] = True
                     await broadcast({"type": "inference_status_update", "payload": {"status": "paused"}})
                 # --- ¡¡NUEVO!! Handlers de Herramientas de Inferencia ---
                 elif scope == "inference" and cmd == "load_experiment":

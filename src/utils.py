@@ -2,75 +2,53 @@
 import os
 import json
 import logging
-import glob
 from types import SimpleNamespace
-from . import config as cfg
+
+from . import config as global_cfg
 
 def get_experiment_list():
     """
-    Escanea el directorio de experimentos de forma robusta.
-    Devuelve una lista de experimentos que tienen un config.json válido.
+    Escanea el directorio de experimentos y devuelve una lista de experimentos válidos.
+    Ahora es robusto a ficheros config.json corruptos.
     """
-    exp_list = []
-    if not os.path.exists(cfg.EXPERIMENTS_DIR):
-        os.makedirs(cfg.EXPERIMENTS_DIR)
-        return exp_list
+    experiments = []
+    if not os.path.exists(global_cfg.EXPERIMENTS_DIR):
+        return experiments
 
-    for exp_name in sorted(os.listdir(cfg.EXPERIMENTS_DIR)):
-        exp_path = os.path.join(cfg.EXPERIMENTS_DIR, exp_name)
-        if os.path.isdir(exp_path):
-            config_path = os.path.join(exp_path, 'config.json')
-            if os.path.exists(config_path):
-                try:
-                    with open(config_path, 'r') as f:
-                        config_data = json.load(f)
-                    # Verificación mínima: el config debe ser un diccionario
-                    if isinstance(config_data, dict):
-                        exp_list.append({'name': exp_name, 'config': config_data})
-                    else:
-                        logging.warning(f"El config.json de '{exp_name}' no es un objeto JSON válido. Omitiendo.")
-                except Exception as e:
-                    logging.error(f"Error al leer o parsear el config.json para el experimento '{exp_name}': {e}. Omitiendo.")
-            # No añadir experimentos sin config.json a la lista
-    return exp_list
+    for exp_name in os.listdir(global_cfg.EXPERIMENTS_DIR):
+        exp_path = os.path.join(global_cfg.EXPERIMENTS_DIR, exp_name)
+        config_path = os.path.join(exp_path, 'config.json')
+        if os.path.isdir(exp_path) and os.path.exists(config_path):
+            try:
+                with open(config_path, 'r') as f:
+                    config_data = json.load(f)
+                    experiments.append({'name': exp_name, 'config': config_data})
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                logging.error(f"Error al leer o parsear el config.json para el experimento '{exp_name}': {e}. Omitiendo.")
+    return experiments
 
-def load_experiment_config(experiment_name):
-    """Carga la configuración de un experimento y la devuelve como un SimpleNamespace."""
-    config_path = os.path.join(cfg.EXPERIMENTS_DIR, experiment_name, 'config.json')
+def load_experiment_config(experiment_name: str):
+    """
+    Carga la configuración de un experimento específico y la devuelve como un SimpleNamespace.
+    """
+    config_path = os.path.join(global_cfg.EXPERIMENTS_DIR, experiment_name, 'config.json')
+    if not os.path.exists(config_path):
+        logging.error(f"No se encontró el fichero de configuración: {config_path}")
+        return None
     try:
         with open(config_path, 'r') as f:
             config_dict = json.load(f)
-        return SimpleNamespace(**config_dict)
-    except FileNotFoundError:
-        logging.error(f"No se encontró el fichero de configuración para el experimento: {experiment_name}")
-        return None
-    except json.JSONDecodeError:
-        logging.error(f"Error al decodificar el JSON del fichero de configuración para el experimento: {experiment_name}")
-        return None
+            
+            # --- ¡¡SOLUCIÓN DEFINITIVA!! Convertir recursivamente a SimpleNamespace ---
+            def dict_to_sns(d):
+                if isinstance(d, dict):
+                    for key, value in d.items():
+                        d[key] = dict_to_sns(value)
+                    return SimpleNamespace(**d)
+                return d
 
-def save_experiment_config(experiment_name, config_dict):
-    """Guarda la configuración de un experimento."""
-    exp_dir = os.path.join(cfg.EXPERIMENTS_DIR, experiment_name)
-    os.makedirs(exp_dir, exist_ok=True)
-    config_path = os.path.join(exp_dir, 'config.json')
-    with open(config_path, 'w') as f:
-        json.dump(config_dict, f, indent=4)
-
-def get_latest_checkpoint(experiment_name, checkpoint_type="qca"):
-    """Encuentra el último checkpoint para un tipo dado en un experimento."""
-    checkpoint_dir = os.path.join(cfg.EXPERIMENTS_DIR, experiment_name, "checkpoints")
-    if not os.path.exists(checkpoint_dir):
+            return dict_to_sns(config_dict)
+            
+    except Exception as e:
+        logging.error(f"Error al cargar la configuración del experimento '{experiment_name}': {e}", exc_info=True)
         return None
-    
-    search_pattern = os.path.join(checkpoint_dir, f"{checkpoint_type}_checkpoint_eps*.pth")
-    list_of_files = glob.glob(search_pattern)
-    
-    if not list_of_files:
-        # Si no hay checkpoints de episodios, buscar el 'best'
-        best_file = os.path.join(checkpoint_dir, f"{checkpoint_type}_best.pth")
-        if os.path.exists(best_file):
-            return best_file
-        return None
-        
-    latest_file = max(list_of_files, key=os.path.getctime)
-    return latest_file

@@ -1,81 +1,127 @@
 // frontend/src/context/WebSocketContext.tsx
-import React, { createContext, useState, useCallback, useRef } from 'react';
-import { notifications } from '@mantine/notifications';
+import React, { createContext, useState, useCallback, useRef, ReactNode } from 'react';
 
-// --- Tipos ---
-interface Experiment { name: string; config: any; }
-interface SimData { step: number; viz_type: string; map_data: any; }
-type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
-type TrainingStatus = 'idle' | 'running' | 'finished' | 'error';
-type InferenceStatus = 'running' | 'paused';
-
-export interface WebSocketContextType {
-    connectionStatus: ConnectionStatus;
-    trainingStatus: TrainingStatus;
-    inferenceStatus: InferenceStatus;
-    experimentsData: Experiment[] | null;
-    simData: SimData | null;
-    trainingLog: string[];
-    sendCommand: (scope: string, command: string, args?: any) => void;
-    connect: () => void;
+// --- TYPE DEFINITIONS ---
+interface ExperimentConfig {
+    MODEL_ARCHITECTURE: string;
+    TOTAL_EPISODES?: number;
+}
+interface ExperimentData {
+    name: string;
+    config: ExperimentConfig;
+}
+interface TrainingProgress {
+    current_episode: number;
+    total_episodes: number;
+    avg_loss: number;
+}
+interface SimData {
+    map_data: number[][];
+    hist_data: { [key: string]: { bin: string; count: number }[] };
+    poincare_coords: number[][];
+    viz_type: string;
 }
 
-// --- ¡¡REFACTORIZACIÓN!! Exportar el Context para que el hook pueda usarlo ---
+// --- CONTEXT TYPE ---
+interface WebSocketContextType {
+    connect: () => void;
+    sendCommand: (scope: string, cmd: string, payload?: any) => void;
+    connectionStatus: string;
+    experimentsData: ExperimentData[] | null;
+    trainingStatus: string;
+    trainingLog: string[];
+    trainingProgress: TrainingProgress | null;
+    simData: SimData | null;
+    inferenceStatus: string;
+    selectedViz: string;
+    setSelectedViz: (viz: string) => void;
+}
+
 export const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
 
-export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
-    const [trainingStatus, setTrainingStatus] = useState<TrainingStatus>('idle');
-    const [inferenceStatus, setInferenceStatus] = useState<InferenceStatus>('paused');
-    const [experimentsData, setExperimentsData] = useState<Experiment[] | null>(null);
-    const [simData, setSimData] = useState<SimData | null>(null);
+// --- PROVIDER COMPONENT ---
+export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
+    const [connectionStatus, setConnectionStatus] = useState('disconnected');
+    const [experimentsData, setExperimentsData] = useState<ExperimentData[] | null>(null);
+    const [trainingStatus, setTrainingStatus] = useState('idle');
     const [trainingLog, setTrainingLog] = useState<string[]>([]);
-    const socketRef = useRef<WebSocket | null>(null);
+    const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
+    const [simData, setSimData] = useState<SimData | null>(null);
+    const [inferenceStatus, setInferenceStatus] = useState('paused');
+    const [selectedViz, setSelectedViz] = useState('density');
+    
+    const ws = useRef<WebSocket | null>(null);
 
     const connect = useCallback(() => {
-        if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) return;
+        if (ws.current && ws.current.readyState === WebSocket.OPEN) return;
+
         setConnectionStatus('connecting');
-        const ws = new WebSocket(`ws://${window.location.hostname}:8000/ws`);
-        ws.onopen = () => setConnectionStatus('connected');
-        ws.onmessage = (event) => {
+        const wsUrl = `ws://${window.location.hostname}:8000/ws`;
+        ws.current = new WebSocket(wsUrl);
+
+        ws.current.onopen = () => {
+            setConnectionStatus('connected');
+            sendCommand('initial_data', 'get_experiments');
+        };
+
+        ws.current.onmessage = (event) => {
             const data = JSON.parse(event.data);
             switch (data.type) {
-                case 'initial_state':
-                    setExperimentsData(data.payload.experiments || []);
-                    setTrainingStatus(data.payload.training_status || 'idle');
-                    setInferenceStatus(data.payload.inference_status || 'paused');
-                    break;
-                case 'notification':
-                    notifications.show({ title: 'Notificación', message: data.payload.message, color: data.payload.status === 'error' ? 'red' : 'blue' });
+                case 'initial_experiments':
+                    setExperimentsData(data.payload);
                     break;
                 case 'training_log':
                     setTrainingLog(prev => [...prev, data.payload]);
                     break;
-                case 'simulation_frame':
+                case 'training_progress':
+                    setTrainingProgress(data.payload);
+                    break;
+                case 'training_status_update':
+                    setTrainingStatus(data.payload.status);
+                    if (data.payload.status === 'idle') {
+                        setTrainingProgress(null);
+                        setTrainingLog([]);
+                    }
+                    break;
+                case 'simulation_update':
                     setSimData(data.payload);
                     break;
                 case 'inference_status_update':
                     setInferenceStatus(data.payload.status);
                     break;
+                case 'notification':
+                    // Aquí se podría manejar la notificación, por ejemplo con una librería de toasts
+                    console.log(`Notification: ${data.payload.message}`);
+                    break;
             }
         };
-        ws.onclose = () => setConnectionStatus('disconnected');
-        ws.onerror = () => setConnectionStatus('error');
-        socketRef.current = ws;
+
+        ws.current.onclose = () => {
+            setConnectionStatus('disconnected');
+        };
+
+        ws.current.onerror = (error) => {
+            console.error('WebSocket Error:', error);
+            setConnectionStatus('disconnected');
+        };
     }, []);
 
-    const sendCommand = useCallback((scope: string, command: string, args: any = {}) => {
-        if (socketRef.current?.readyState === WebSocket.OPEN) {
-            socketRef.current.send(JSON.stringify({ scope, command, args }));
-        } else {
-            notifications.show({ title: 'Error', message: 'No hay conexión.', color: 'red' });
+    const sendCommand = useCallback((scope: string, cmd: string, payload: any = {}) => {
+        if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+            ws.current.send(JSON.stringify({ scope, cmd, payload }));
         }
     }, []);
 
+    const handleSetSelectedViz = (viz: string) => {
+        setSelectedViz(viz);
+        sendCommand('simulation', 'set_viz', { viz_type: viz });
+    };
+
     return (
         <WebSocketContext.Provider value={{
-            connectionStatus, trainingStatus, inferenceStatus, experimentsData, simData, trainingLog,
-            sendCommand, connect
+            connect, sendCommand, connectionStatus, experimentsData,
+            trainingStatus, trainingLog, trainingProgress, simData, inferenceStatus,
+            selectedViz, setSelectedViz: handleSetSelectedViz
         }}>
             {children}
         </WebSocketContext.Provider>

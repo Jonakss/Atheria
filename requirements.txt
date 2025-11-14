@@ -1,22 +1,9 @@
-# requirements.txt
-
-# --- Servidor Web y Sockets ---
-aiohttp
-websockets
-msgpack
-msgpack-numpy
-
-# --- Simulación y ML ---
 torch
+snntorch
 numpy
-Pillow
-imageio
-opencv-python
-snnTorch
-
-# --- Utilidades ---
-tqdm # si quieres barras de progreso
-matplotlib
+aiohttp
+types-aiobotocore[aiohttp]
+# Añadido para las transformaciones de redimensionado en SNN_UNET
+torchvision
+# Añadido para PCA en la visualización de Poincaré
 scikit-learn
-scipy
-ruff

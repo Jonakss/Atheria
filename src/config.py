@@ -53,11 +53,15 @@ MODEL_PARAMS = {
 # Poner a 0.0 para una simulación unitaria "perfecta" (sin decaimiento).
 GAMMA_DECAY = 0.01
 
-# --- Parámetros de Entrenamiento ---
-EPISODES_TO_ADD = 2000
+# Hiperparámetros de Entrenamiento
+TOTAL_EPISODES = 2000 # ¡¡CAMBIO!!
 STEPS_PER_EPISODE = 50
-LR_RATE_M = 0.0001
+LR_RATE_M = 1e-4
 GRADIENT_CLIP = 1.0
+GAMMA_DECAY = 0.01
+SAVE_EVERY_EPISODES = 50
+BATCH_SIZE_TRAINING = 4
+QCA_STEPS_TRAINING = 16
 
 # --- Función de Recompensa ---
 PESO_QUIETUD = 10.0
@@ -67,3 +71,5 @@ PESO_COMPLEJIDAD_LOCALIZADA = 1.0
 GRID_SIZE_TRAINING = 64
 GRID_SIZE_INFERENCE = 256
 SAVE_EVERY_EPISODES = 50
+BATCH_SIZE_TRAINING = 4
+QCA_STEPS_TRAINING = 16

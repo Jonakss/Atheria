@@ -9,8 +9,7 @@ export const modelOptions = [
 ];
 
 export const vizOptions = [
-    { value: 'density_map', label: 'Mapa de Densidad' },
-    { value: 'channels_map', label: 'Mapa de Canales RGB' },
-    { value: 'phase_map', label: 'Mapa de Fase' },
-    { value: 'change_map', label: 'Mapa de Cambio' },
+    { value: 'density', label: 'Densidad' },
+    { value: 'phase', label: 'Fase' },
+    { value: 'poincare', label: 'Gráfico de Poincaré' },
 ];

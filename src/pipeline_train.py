@@ -38,14 +38,8 @@ def run_training_pipeline(exp_cfg: SimpleNamespace):
 
     # 4. Inicializar el Entrenador
     trainer = QC_Trainer_v3(motor, exp_cfg.LR_RATE_M, global_cfg, exp_cfg)
-    trainer._load_checkpoint() # Cargar si es necesario
 
-    # 5. Bucle de Entrenamiento
-    for episode in range(trainer.current_episode, trainer.current_episode + exp_cfg.EPISODES_TO_ADD):
-        avg_loss = trainer.train_episode()
-        print(f"Episodio {episode + 1} completado. Pérdida Promedio: {avg_loss:.6f}")
-
-        if (episode + 1) % exp_cfg.SAVE_EVERY_EPISODES == 0:
-            trainer._save_checkpoint(episode + 1)
+    # 5. Bucle de Entrenamiento (ahora gestionado por el trainer)
+    trainer.run_training_loop()
 
     logging.info("Pipeline de entrenamiento finalizado.")
