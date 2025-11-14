@@ -1,100 +1,125 @@
 # src/qca_engine.py
 import torch
 import torch.nn as nn
-from .config import DEVICE, D_STATE # ¡Importa la nueva config!
+import os
+from . import config as cfg
 
-# ------------------------------------------------------------------------------
-# 1.1: QCA_State Class (Revisada para ser Unitaria)
-# ------------------------------------------------------------------------------
-class QCA_State:
-    def __init__(self, size, d_vector):
-        self.size = size
-        self.d_vector = d_vector
-        # ¡¡SIMPLIFICADO!! Un solo vector de estado real.
-        # Forma: [Batch, Altura, Ancho, Dimensiones_Vector]
-        self.psi = torch.zeros(1, size, size, d_vector, device=DEVICE)
-        # NUEVO: Estado de voltaje para la SNN
-        self.v_mem = torch.zeros(1, size, size, d_vector, device=DEVICE)
+class QuantumState:
+    def __init__(self, grid_size, d_state, device):
+        self.grid_size = grid_size
+        self.d_state = d_state
+        self.device = device
+        self.psi = self._initialize_state()
+
+    def _initialize_state(self, mode='complex_noise', complex_noise_strength=0.1):
+        if mode == 'random':
+            real = torch.randn(1, self.grid_size, self.grid_size, self.d_state, device=self.device)
+            imag = torch.randn(1, self.grid_size, self.grid_size, self.d_state, device=self.device)
+            psi_complex = torch.complex(real, imag)
+            norm = torch.sqrt(torch.sum(psi_complex.abs().pow(2), dim=-1, keepdim=True))
+            return psi_complex / norm
+        elif mode == 'complex_noise':
+            noise = torch.randn(1, self.grid_size, self.grid_size, self.d_state, device=self.device) * complex_noise_strength
+            real, imag = torch.cos(noise), torch.sin(noise)
+            return torch.complex(real, imag)
+        else:
+            return torch.zeros(1, self.grid_size, self.grid_size, self.d_state, device=self.device, dtype=torch.complex64)
 
     def _reset_state_random(self):
-        """Inicializa el estado con ruido de baja amplitud."""
-        noise = (torch.rand(1, self.size, self.size, self.d_vector, device=DEVICE) * 2 - 1) * 1e-2
-        self.psi.data = noise
-        self.v_mem.data.zero_() # Reiniciar voltaje
-        # ¡No se necesita normalización!
-        
-    def _reset_state_complex_noise(self):
-        """Inicializa el estado con ruido estructurado."""
-        # (Esto es solo un ejemplo, puedes mejorarlo)
-        noise = (torch.rand(1, self.size, self.size, self.d_vector, device=DEVICE) * 2 - 1) * 1e-3
-        y_coords, x_coords = torch.meshgrid(torch.linspace(-1, 1, self.size, device=DEVICE),
-                                            torch.linspace(-1, 1, self.size, device=DEVICE),
-                                            indexing='ij')
-        
-        if self.d_vector > 0:
-            pattern1 = torch.sin(x_coords * 10) * 0.1
-            noise[0, :, :, 0] += pattern1
-        if self.d_vector > 1:
-            pattern2 = torch.cos(y_coords * 12) * 0.1
-            noise[0, :, :, 1] += pattern2
-            
-        self.psi.data = noise
-        self.v_mem.data.zero_() # Reiniciar voltaje
+        self.psi = self._initialize_state(mode='random')
 
-    def get_cat_input(self):
-        """Prepara el estado para la U-Net (B, C, H, W)."""
-        # [B, H, W, C] -> [B, C, H, W]
-        return self.psi.permute(0, 3, 1, 2)
-        
-    def normalize_(self):
-        """Normalizes the entire grid state to have a constant total norm."""
-        # Calculate the total norm squared of the entire grid
-        total_norm_sq = torch.sum(self.psi.pow(2))
-        
-        # Avoid division by zero
-        total_norm = torch.sqrt(total_norm_sq) + 1e-9
-        
-        # Normalize the entire tensor in-place
-        self.psi.data /= total_norm
+    def load_state(self, filepath):
+        try:
+            state_dict = torch.load(filepath, map_location=self.device)
+            self.psi = state_dict['psi'].to(self.device)
+            print(f"Estado cargado desde {filepath}")
+        except Exception as e:
+            print(f"Error al cargar el estado: {e}. Reiniciando a un estado aleatorio.")
+            self._reset_state_random()
 
-# ------------------------------------------------------------------------------
-# 1.3: Aetheria_Motor Class (Revisada para ser Unitaria)
-# ------------------------------------------------------------------------------
+    def save_state(self, filepath):
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        torch.save({'psi': self.psi.cpu()}, filepath)
+
+
 class Aetheria_Motor:
-    def __init__(self, size, d_vector, operator_model: nn.Module):
-        self.size = size
-        self.operator = operator_model.to(DEVICE)
-        if torch.cuda.device_count() > 1:
-            self.operator = nn.DataParallel(self.operator)
+    def __init__(self, model_operator: nn.Module, grid_size: int, d_state: int, device):
+        self.device = device
+        # --- ¡¡CORRECCIÓN CLAVE!! Asegurar que los tamaños son enteros ---
+        if grid_size is None or d_state is None:
+            raise ValueError(f"grid_size y d_state no pueden ser None. Recibido: grid_size={grid_size}, d_state={d_state}")
+        self.grid_size = int(grid_size)
+        self.d_state = int(d_state)
         
-        # El motor usa el nuevo estado
-        self.state = QCA_State(size, d_vector)
+        self.operator = model_operator.to(self.device)
+        self.state = QuantumState(self.grid_size, self.d_state, device)
+        self.is_compiled = False
+        self.cfg = cfg
 
-    def evolve_step(self):
-        """Evoluciona el estado usando la Ley M (unitaria o SNN)."""
-        with torch.no_grad():
-            # Importar SNN_UNET aquí para evitar dependencia circular
-            from .models.snn_unet import SNN_UNET
+    def get_initial_state(self, batch_size: int):
+        """
+        Genera un estado inicial aleatorio y normalizado para el entrenamiento.
+        """
+        real = torch.randn(batch_size, self.grid_size, self.grid_size, self.d_state, device=self.device)
+        imag = torch.randn(batch_size, self.grid_size, self.grid_size, self.d_state, device=self.device)
+        psi_complex = torch.complex(real, imag)
+        norm = torch.sqrt(torch.sum(psi_complex.abs().pow(2), dim=-1, keepdim=True))
+        return psi_complex / norm
 
-            # 1. Preparar el estado (B, C, H, W)
-            x_cat_total = self.state.get_cat_input()
-
-            # 2. Comprobar si el operador es una SNN
-            if isinstance(self.operator, SNN_UNET):
-                # La Ley M (SNN) toma el estado y el voltaje, y devuelve picos y nuevo voltaje
-                spikes, new_v_mem = self.operator(x_cat_total, self.state.v_mem.permute(0, 3, 1, 2))
-                
-                # Los picos actúan como el delta
-                delta_psi = spikes
-                
-                # Guardar el nuevo voltaje
-                self.state.v_mem.data = new_v_mem.permute(0, 2, 3, 1)
-            else:
-                # La Ley M (U-Net) predice el Delta (la derivada)
-                delta_psi = self.operator(x_cat_total) # Salida: [B, C, H, W]
+    def propagate(self, psi_inicial, num_steps):
+        """
+        Propaga un estado inicial a lo largo de un número de pasos.
+        """
+        psi_actual = psi_inicial
+        for _ in range(num_steps):
+            # Calcular x_cat a partir del estado actual
+            x_cat_real = psi_actual.real.permute(0, 3, 1, 2)
+            x_cat_imag = psi_actual.imag.permute(0, 3, 1, 2)
+            x_cat_total = torch.cat([x_cat_real, x_cat_imag], dim=1)
             
-            # 3. Aplicar el Método de Euler
-            new_psi = self.state.psi + delta_psi.permute(0, 2, 3, 1)
+            # Usar evolve_step para obtener el siguiente estado
+            psi_actual = self.evolve_step(is_training=True, x_cat=x_cat_total)
+        return psi_actual
 
-            # 4. Guardar el estado t+1
-            self.state.psi.data = new_psi
+
+
+    def compile_model(self):
+        if not self.is_compiled:
+            try:
+                print("Aplicando torch.compile() al modelo...")
+                self.operator = torch.compile(self.operator, mode="reduce-overhead")
+                self.is_compiled = True
+                print("¡torch.compile() aplicado exitosamente!")
+            except Exception as e:
+                print(f"torch.compile() falló: {e}. El modelo se ejecutará sin compilar.")
+
+    def evolve_step(self, is_training=False, x_cat=None):
+        """
+        Ejecuta un paso de evolución. La física ahora es condicional.
+        """
+        if is_training and x_cat is not None:
+            # En modo entrenamiento, el delta se calcula a partir del x_cat proporcionado
+            delta_psi_unitario_complex = self.operator(x_cat)
+        else:
+            # En modo simulación, calculamos el x_cat internamente
+            with torch.no_grad():
+                x_cat_real = self.state.psi.real.permute(0, 3, 1, 2)
+                x_cat_imag = self.state.psi.imag.permute(0, 3, 1, 2)
+                x_cat_total = torch.cat([x_cat_real, x_cat_imag], dim=1)
+                delta_psi_unitario_complex = self.operator(x_cat_total)
+
+        delta_real, delta_imag = torch.chunk(delta_psi_unitario_complex, 2, dim=1)
+        delta_psi_unitario = torch.complex(delta_real, delta_imag).permute(0, 2, 3, 1)
+
+        if hasattr(self.cfg, 'GAMMA_DECAY') and self.cfg.GAMMA_DECAY > 0:
+            delta_psi_decay = -self.cfg.GAMMA_DECAY * self.state.psi
+            delta_psi_total = delta_psi_unitario + delta_psi_decay
+            new_psi = self.state.psi + delta_psi_total
+            if not is_training: self.state.psi = new_psi
+        else:
+            new_psi = self.state.psi + delta_psi_unitario
+            norm = torch.sqrt(torch.sum(new_psi.abs().pow(2), dim=-1, keepdim=True))
+            new_psi = new_psi / norm
+            if not is_training: self.state.psi = new_psi
+            
+        return new_psi

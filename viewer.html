@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aetheria Viewer</title>
+    <style>
+        body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; display: flex; margin: 0; height: 100vh; }
+        #main-container { display: flex; flex-grow: 1; }
+        #canvas-container { flex-grow: 1; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        canvas { border: 1px solid #444; background-color: #000; max-width: 100%; max-height: 100%; }
+        #controls-panel { width: 350px; background-color: #1e1e1e; padding: 20px; border-left: 1px solid #444; display: flex; flex-direction: column; gap: 20px; }
+        .control-group { border: 1px solid #333; padding: 15px; border-radius: 5px; }
+        h2, h3 { color: #00aaff; border-bottom: 1px solid #444; padding-bottom: 5px; margin-top: 0; }
+        button, input, select { width: 100%; padding: 10px; background-color: #333; color: white; border: 1px solid #555; border-radius: 4px; }
+        button:hover { background-color: #00aaff; color: #000; cursor: pointer; }
+        label { display: block; margin-bottom: 5px; }
+    </style>
+    <!-- msgpack.js para decodificar los datos binarios del WebSocket -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/msgpack-javascript/2.8.0/msgpack.min.js"></script>
+</head>
+<body>
+    <div id="main-container">
+        <div id="canvas-container">
+            <canvas id="simulationCanvas"></canvas>
+        </div>
+        <div id="controls-panel">
+            <div class="control-group">
+                <h2>Estado del Servidor</h2>
+                <p id="status">Desconectado</p>
+            </div>
+
+            <div class="control-group">
+                <h3>Control de Simulación</h3>
+                <button id="pause-btn">Pausar</button>
+                <button id="resume-btn">Reanudar</button>
+                <button id="stop-btn">Detener</button>
+            </div>
+
+            <div class="control-group">
+                <h3>Iniciar Nuevo Entrenamiento</h3>
+                <label for="new-experiment-name">Nombre del Experimento:</label>
+                <input type="text" id="new-experiment-name" placeholder="Ej: UNET_Unitary_D8">
+                <button id="start-training-btn">Crear y Entrenar</button>
+            </div>
+
+            <div class="control-group">
+                <h3>Continuar Simulación</h3>
+                <label for="experiment-select">Seleccionar Experimento:</label>
+                <select id="experiment-select">
+                    <option value="">Cargando experimentos...</option>
+                </select>
+                <button id="continue-simulation-btn">Cargar y Simular</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('simulationCanvas');
+            const ctx = canvas.getContext('2d');
+            const statusEl = document.getElementById('status');
+            let ws;
+
+            const MSG_TYPE_FRAME = 'simulation_frame';
+
+            function connectWebSocket() {
+                const wsProtocol = window.location.protocol === 'https' ? 'wss' : 'ws';
+                const wsUrl = `${wsProtocol}://${window.location.host}/ws`;
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = () => {
+                    statusEl.textContent = 'Conectado';
+                    console.log('WebSocket conectado.');
+                };
+
+                ws.onclose = () => {
+                    statusEl.textContent = 'Desconectado';
+                    console.log('WebSocket desconectado. Intentando reconectar en 3 segundos...');
+                    setTimeout(connectWebSocket, 3000);
+                };
+
+                ws.onerror = (error) => {
+                    console.error('WebSocket Error:', error);
+                    ws.close();
+                };
+
+                // Escuchamos mensajes binarios
+                ws.onmessage = async (event) => {
+                    if (event.data instanceof Blob) {
+                        const arrayBuffer = await event.data.arrayBuffer();
+                        try {
+                            const decoded = msgpack.decode(arrayBuffer);
+                            if (decoded.type === MSG_TYPE_FRAME) {
+                                updateCanvas(decoded);
+                            }
+                        } catch (e) {
+                            console.error('Error decodificando msgpack:', e);
+                        }
+                    }
+                };
+            }
+            
+            function updateCanvas(data) {
+                const { height, width, frame_data } = data;
+                if (canvas.width !== width || canvas.height !== height) {
+                    canvas.width = width;
+                    canvas.height = height;
+                }
+                const imageData = new ImageData(new Uint8ClampedArray(frame_data), width, height);
+                ctx.putImageData(imageData, 0, 0);
+            }
+
+            function sendCommand(command, payload = {}) {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ command, payload }));
+                }
+            }
+
+            // --- Lógica para poblar el selector de experimentos ---
+            async function fetchAndPopulateExperiments() {
+                const selectEl = document.getElementById('experiment-select');
+                try {
+                    const response = await fetch('/api/experiments');
+                    if (!response.ok) {
+                        throw new Error(`Error del servidor: ${response.status}`);
+                    }
+                    const experiments = await response.json();
+                    selectEl.innerHTML = '<option value="">-- Seleccione un experimento --</option>'; // Limpiar
+                    experiments.forEach(exp => {
+                        const option = document.createElement('option');
+                        option.value = exp;
+                        option.textContent = exp;
+                        selectEl.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Error al cargar experimentos:', error);
+                    selectEl.innerHTML = '<option value="">Error al cargar</option>';
+                }
+            }
+
+            // --- Event Listeners para los botones ---
+            document.getElementById('pause-btn').onclick = () => sendCommand('pause_simulation');
+            document.getElementById('resume-btn').onclick = () => sendCommand('resume_simulation');
+            document.getElementById('stop-btn').onclick = () => sendCommand('stop_simulation');
+
+            document.getElementById('start-training-btn').onclick = () => {
+                const experimentName = document.getElementById('new-experiment-name').value;
+                if (experimentName) {
+                    sendCommand('create_and_start_training', { experiment_name: experimentName });
+                }
+            };
+
+            document.getElementById('continue-simulation-btn').onclick = () => {
+                const experimentName = document.getElementById('experiment-select').value;
+                if (experimentName) {
+                    // Para simulación, iniciamos con el nombre del experimento, no la ruta completa.
+                    sendCommand('start_simulation', { experiment_name: experimentName });
+                }
+            };
+
+            // Iniciar todo
+            connectWebSocket();
+            fetchAndPopulateExperiments();
+        });
+    </script>
+</body>
+</html>

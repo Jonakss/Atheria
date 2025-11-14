@@ -1,103 +1,64 @@
-# /home/jonathan.correa/Projects/Atheria/src/model_loader.py
+# src/model_loader.py
 import torch
 import logging
-import os
-import glob
+from types import SimpleNamespace
 
-# Importa las variables de configuración y el nuevo sistema de modelos
-from . import config as cfg
 from . import models
+from .models.unet import UNet
+from .models.snn_unet import SNNUNet
+from .models.deep_qca import DeepQCA
+from .models.mlp import MLP
+from .models.unet_unitary import UNetUnitary
 
-def load_model(model_path=None):
+MODEL_MAP = {
+    "UNET": UNet,
+    "SNN_UNET": SNNUNet,
+    "DEEP_QCA": DeepQCA,
+    "MLP": MLP,
+    "UNET_UNITARY": UNetUnitary,
+}
+
+def _namespace_to_dict(ns):
+    """Convierte recursivamente un SimpleNamespace a un diccionario."""
+    if not isinstance(ns, SimpleNamespace):
+        return ns
+    return {key: _namespace_to_dict(value) for key, value in ns.__dict__.items()}
+
+def load_model(experiment_config: SimpleNamespace, checkpoint_path: str = None):
     """
-    Carga un modelo y devuelve tanto el modelo como sus metadatos.
-    Si se proporciona model_path, carga desde el checkpoint.
-    Si no, crea un nuevo modelo basado en la configuración global.
-    Devuelve: (model, metadata_dict)
+    Carga un modelo de forma robusta basado en la configuración del experimento.
     """
-    metadata = {}
-    
-    # --- Si se proporciona una ruta, cargar desde el checkpoint ---
-    if model_path:
-        if not os.path.isabs(model_path):
-            full_path = os.path.join(cfg.CHECKPOINT_DIR, model_path)
-        else:
-            full_path = model_path
+    try:
+        model_arch_name = experiment_config.MODEL_ARCHITECTURE
+        model_class = MODEL_MAP.get(model_arch_name)
 
-        if os.path.isdir(full_path):
-            logging.info(f"La ruta '{full_path}' es un directorio. Buscando el checkpoint más reciente...")
-            checkpoints = glob.glob(os.path.join(full_path, '*.pth'))
-            if not checkpoints:
-                raise FileNotFoundError(f"No se encontraron archivos .pth en el directorio: {full_path}")
-            latest_checkpoint = max(checkpoints, key=os.path.getctime)
-            full_path = latest_checkpoint
+        if not model_class:
+            logging.error(f"Arquitectura de modelo desconocida: '{model_arch_name}'")
+            return None
 
-        if not os.path.exists(full_path):
-            raise FileNotFoundError(f"No se encontró el archivo de checkpoint: {full_path}")
-
-        logging.info(f"Cargando modelo desde el checkpoint: {full_path}")
-        checkpoint = torch.load(full_path, map_location=cfg.DEVICE, weights_only=False)
-
-        architecture = checkpoint.get('model_architecture', cfg.MODEL_ARCHITECTURE)
-        d_state = checkpoint.get('d_state', cfg.D_STATE)
-        hidden_channels = checkpoint.get('hidden_channels', cfg.HIDDEN_CHANNELS)
+        # --- ¡¡SOLUCIÓN DEFINITIVA!! Convertir SimpleNamespace a dict de forma robusta ---
+        model_params_ns = experiment_config.MODEL_PARAMS
+        model_params_dict = _namespace_to_dict(model_params_ns)
         
-        metadata = {
-            'model_architecture': architecture,
-            'd_state': d_state,
-            'hidden_channels': hidden_channels
-        }
+        model = model_class(**model_params_dict)
+        logging.info(f"Modelo '{model_arch_name}' instanciado exitosamente.")
 
-        if not all(metadata.values()):
-            raise ValueError("El checkpoint o la configuración global no proporcionan los metadatos necesarios.")
-        
-        if 'model_architecture' not in checkpoint:
-            logging.warning(f"Faltan metadatos en el checkpoint. Usando defaults de config: {metadata}")
-        else:
-            logging.info(f"Metadatos del checkpoint: {metadata}")
-
-        ModelClass = models.get_model_class(architecture)
-        
-        if architecture == "UNET_UNITARIA":
-            model = ModelClass(d_vector=d_state, hidden_channels=hidden_channels)
-        elif architecture == "SNN_UNET":
-            model = ModelClass(in_channels=d_state, out_channels=d_state, hidden_channels=hidden_channels)
-        else:
-            model = ModelClass(d_state=d_state, hidden_channels=hidden_channels)
+        if checkpoint_path:
+            logging.info(f"Cargando checkpoint desde: {checkpoint_path}")
+            checkpoint = torch.load(checkpoint_path, map_location='cpu')
             
-        state_dict = checkpoint['model_state_dict']
-        if next(iter(state_dict)).startswith('module.'):
-            state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
-        
-        load_result = model.load_state_dict(state_dict, strict=False)
-        
-        # (Logging de claves faltantes/inesperadas)
-        if load_result.missing_keys or load_result.unexpected_keys:
-            logging.warning(f"Claves faltantes: {load_result.missing_keys}")
-            logging.warning(f"Claves inesperadas: {load_result.unexpected_keys}")
+            state_dict = checkpoint.get('model_state_dict', checkpoint)
+            is_compiled = any(k.startswith('_orig_mod.') for k in model.state_dict())
+            
+            if is_compiled and not all(k.startswith('_orig_mod.') for k in state_dict):
+                logging.info("Adaptando checkpoint para modelo compilado...")
+                state_dict = {'_orig_mod.' + k: v for k, v in state_dict.items()}
+            
+            model.load_state_dict(state_dict)
+            logging.info("Checkpoint cargado exitosamente.")
 
-        logging.info("Modelo cargado y pesos aplicados desde el checkpoint.")
+        return model
 
-    # --- Si no se proporciona ruta, crear un modelo nuevo desde config ---
-    else:
-        logging.info(f"Creando un nuevo modelo desde la configuración global: {cfg.MODEL_ARCHITECTURE}")
-        
-        metadata = {
-            'model_architecture': cfg.MODEL_ARCHITECTURE,
-            'd_state': cfg.D_STATE,
-            'hidden_channels': cfg.HIDDEN_CHANNELS
-        }
-        
-        ModelClass = models.get_model_class(cfg.MODEL_ARCHITECTURE)
-        
-        if cfg.MODEL_ARCHITECTURE == "UNET_UNITARIA":
-            model = ModelClass(d_vector=cfg.D_STATE, hidden_channels=cfg.HIDDEN_CHANNELS)
-        elif cfg.MODEL_ARCHITECTURE == "SNN_UNET":
-            model = ModelClass(in_channels=cfg.D_STATE, out_channels=cfg.D_STATE, hidden_channels=cfg.HIDDEN_CHANNELS)
-        else:
-            model = ModelClass(d_state=cfg.D_STATE, hidden_channels=cfg.HIDDEN_CHANNELS)
-
-        logging.info("Nuevo modelo creado exitosamente.")
-
-    return model, metadata
-
+    except Exception as e:
+        logging.error(f"Error al cargar el modelo: {e}", exc_info=True)
+        return None

@@ -1,50 +1,76 @@
 # src/utils.py
-import torch
 import os
-import re
+import json
+import logging
+import glob
+from types import SimpleNamespace
+from . import config as cfg
 
-# ¡Importación relativa!
-from .qca_engine import Aetheria_Motor
+def get_experiment_list():
+    """
+    Escanea el directorio de experimentos de forma robusta.
+    Devuelve una lista de experimentos que tienen un config.json válido.
+    """
+    exp_list = []
+    if not os.path.exists(cfg.EXPERIMENTS_DIR):
+        os.makedirs(cfg.EXPERIMENTS_DIR)
+        return exp_list
 
-# ------------------------------------------------------------------------------
-# 4.2: State Checkpointing Functions
-# ------------------------------------------------------------------------------
+    for exp_name in sorted(os.listdir(cfg.EXPERIMENTS_DIR)):
+        exp_path = os.path.join(cfg.EXPERIMENTS_DIR, exp_name)
+        if os.path.isdir(exp_path):
+            config_path = os.path.join(exp_path, 'config.json')
+            if os.path.exists(config_path):
+                try:
+                    with open(config_path, 'r') as f:
+                        config_data = json.load(f)
+                    # Verificación mínima: el config debe ser un diccionario
+                    if isinstance(config_data, dict):
+                        exp_list.append({'name': exp_name, 'config': config_data})
+                    else:
+                        logging.warning(f"El config.json de '{exp_name}' no es un objeto JSON válido. Omitiendo.")
+                except Exception as e:
+                    logging.error(f"Error al leer o parsear el config.json para el experimento '{exp_name}': {e}. Omitiendo.")
+            # No añadir experimentos sin config.json a la lista
+    return exp_list
 
-def load_qca_state(motor_instance: Aetheria_Motor, checkpoint_filepath: str):
-    """Loads the QCA state (x_real, x_imag) from a checkpoint file."""
+def load_experiment_config(experiment_name):
+    """Carga la configuración de un experimento y la devuelve como un SimpleNamespace."""
+    config_path = os.path.join(cfg.EXPERIMENTS_DIR, experiment_name, 'config.json')
     try:
-        device = motor_instance.state.x_real.device
-        checkpoint = torch.load(checkpoint_filepath, map_location=device)
-        if 'x_real' in checkpoint and 'x_imag' in checkpoint and \
-           checkpoint['x_real'].shape == motor_instance.state.x_real.shape and \
-           checkpoint['x_imag'].shape == motor_instance.state.x_imag.shape:
-
-            motor_instance.state.x_real.data = checkpoint['x_real'].data.to(device)
-            motor_instance.state.x_imag.data = checkpoint['x_imag'].data.to(device)
-            print(f"✅ State loaded successfully from: {checkpoint_filepath}")
-            return checkpoint.get('step', -1)
-        else:
-            print(f"❌ Error loading state: Checkpoint file invalid or dimensions mismatch.")
-            return -1
+        with open(config_path, 'r') as f:
+            config_dict = json.load(f)
+        return SimpleNamespace(**config_dict)
     except FileNotFoundError:
-        print(f"❌ Error loading state: File '{checkpoint_filepath}' not found.")
-        return -1
-    except Exception as e:
-        print(f"❌ Error loading state from '{checkpoint_filepath}': {e}")
-        return -1
+        logging.error(f"No se encontró el fichero de configuración para el experimento: {experiment_name}")
+        return None
+    except json.JSONDecodeError:
+        logging.error(f"Error al decodificar el JSON del fichero de configuración para el experimento: {experiment_name}")
+        return None
 
-def save_qca_state(motor_instance: Aetheria_Motor, step: int, checkpoint_dir: str):
-    """Saves the current QCA state (x_real, x_imag) and step number."""
-    checkpoint_filename = os.path.join(
-        checkpoint_dir,
-        f"large_sim_state_step_{step}.pth"
-    )
-    try:
-        torch.save({
-            'step': step,
-            'x_real': motor_instance.state.x_real.data.cpu(),
-            'x_imag': motor_instance.state.x_imag.data.cpu()
-        }, checkpoint_filename)
-        print(f"\n💾 Large simulation checkpoint saved to: {checkpoint_filename}")
-    except Exception as e:
-        print(f"⚠️  Error saving large simulation checkpoint at step {step}: {e}")
+def save_experiment_config(experiment_name, config_dict):
+    """Guarda la configuración de un experimento."""
+    exp_dir = os.path.join(cfg.EXPERIMENTS_DIR, experiment_name)
+    os.makedirs(exp_dir, exist_ok=True)
+    config_path = os.path.join(exp_dir, 'config.json')
+    with open(config_path, 'w') as f:
+        json.dump(config_dict, f, indent=4)
+
+def get_latest_checkpoint(experiment_name, checkpoint_type="qca"):
+    """Encuentra el último checkpoint para un tipo dado en un experimento."""
+    checkpoint_dir = os.path.join(cfg.EXPERIMENTS_DIR, experiment_name, "checkpoints")
+    if not os.path.exists(checkpoint_dir):
+        return None
+    
+    search_pattern = os.path.join(checkpoint_dir, f"{checkpoint_type}_checkpoint_eps*.pth")
+    list_of_files = glob.glob(search_pattern)
+    
+    if not list_of_files:
+        # Si no hay checkpoints de episodios, buscar el 'best'
+        best_file = os.path.join(checkpoint_dir, f"{checkpoint_type}_best.pth")
+        if os.path.exists(best_file):
+            return best_file
+        return None
+        
+    latest_file = max(list_of_files, key=os.path.getctime)
+    return latest_file

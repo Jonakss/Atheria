@@ -1,109 +1,67 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+// frontend/src/components/PanZoomCanvas.tsx
+import { useRef, useEffect } from 'react';
+import { Box, Text } from '@mantine/core';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import { useWebSocket } from '../context/WebSocketContext';
+import classes from './PanZoomCanvas.module.css';
 
-interface PanZoomCanvasProps {
-  imageData: string | null;
-  sendCommand: (cmd: any) => void;
+export function PanZoomCanvas() {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const { simData } = useWebSocket();
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        // Si no hay datos de simulación, no hacer nada
+        if (!canvas || !simData || !simData.frame_data || !simData.frame_data.density_map) {
+            return;
+        }
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const densityMap = simData.frame_data.density_map;
+        const gridSize = densityMap.length;
+        const cellSize = canvas.width / gridSize; // Asumimos canvas cuadrado
+
+        // Limpiar el canvas antes de dibujar
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Dibujar la densidad
+        for (let y = 0; y < gridSize; y++) {
+            for (let x = 0; x < gridSize; x++) {
+                const value = densityMap[y][x];
+                // Mapeo de color: 0 = azul (frío), 1 = rojo (caliente)
+                const hue = 240 * (1 - value); 
+                ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+                ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+            }
+        }
+    }, [simData]); // Redibujar solo cuando simData cambia
+
+    return (
+        <Box className={classes.canvasContainer}>
+            <TransformWrapper
+                limitToBounds={false}
+                minScale={0.2}
+                maxScale={15}
+                initialScale={1}
+                initialPositionX={0}
+                initialPositionY={0}
+            >
+                <TransformComponent
+                    wrapperStyle={{ width: '100%', height: '100%' }}
+                    contentStyle={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+                >
+                    <canvas ref={canvasRef} width="800" height="800" className={classes.canvas} />
+                </TransformComponent>
+            </TransformWrapper>
+            
+            {/* Mensaje de espera si no hay datos de simulación */}
+            {!simData && (
+                <Text c="dimmed" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+                    Esperando datos de la simulación...
+                </Text>
+            )}
+        </Box>
+    );
 }
-
-const PanZoomCanvas: React.FC<PanZoomCanvasProps> = ({ imageData, sendCommand }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const viewport = useRef({ x: 0, y: 0, width: 1, height: 1 });
-  const panning = useRef({ active: false, startX: 0, startY: 0 });
-  const ZOOM_SENSITIVITY = 0.001;
-
-  const sendViewportChange = useCallback(() => {
-    sendCommand({ scope: 'sim', command: 'set_viewport', args: { viewport: viewport.current } });
-  }, [sendCommand]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Set fixed internal resolution for the canvas
-    canvas.width = 512; // Assuming a default fixed size, can be made configurable
-    canvas.height = 512; // Assuming a default fixed size, can be made configurable
-
-    const img = new window.Image();
-    img.onload = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      // Draw the image, scaling it to fit the fixed canvas dimensions
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    };
-    if (imageData) {
-      img.src = imageData;
-    } else {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-  }, [imageData]);
-
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    panning.current.active = true;
-    panning.current.startX = e.clientX;
-    panning.current.startY = e.clientY;
-  }, []);
-
-  const onMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!panning.current.active) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const dx = e.clientX - panning.current.startX;
-    const dy = e.clientY - panning.current.startY;
-    viewport.current.x -= (dx / canvas.clientWidth) * viewport.current.width;
-    viewport.current.y -= (dy / canvas.clientHeight) * viewport.current.height;
-    panning.current.startX = e.clientX;
-    panning.current.startY = e.clientY;
-    sendViewportChange();
-  }, [sendViewportChange]);
-
-  const onMouseUp = useCallback(() => { panning.current.active = false; }, []);
-  const onMouseLeave = useCallback(() => { panning.current.active = false; }, []);
-
-  const onWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const mouseNormX = mouseX / canvas.clientWidth;
-    const mouseNormY = mouseY / canvas.clientHeight;
-
-    const zoomAmount = e.deltaY * ZOOM_SENSITIVITY;
-    const zoomFactor = 1 + zoomAmount;
-    
-    const newWidth = viewport.current.width * zoomFactor;
-    const newHeight = viewport.current.height * zoomFactor;
-
-    if (newWidth < 0.001 || newWidth > 50) {
-        return;
-    }
-
-    const focalX = viewport.current.x + mouseNormX * viewport.current.width;
-    const focalY = viewport.current.y + mouseNormY * viewport.current.height;
-
-    viewport.current.width = newWidth;
-    viewport.current.height = newHeight;
-    viewport.current.x = focalX - mouseNormX * newWidth;
-    viewport.current.y = focalY - mouseNormY * newHeight;
-
-    sendViewportChange();
-  }, [sendViewportChange]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      style={{ width: '100%', height: 'auto', maxHeight: '85vh', aspectRatio: '1 / 1', background: '#000', cursor: panning.current.active ? 'grabbing' : 'grab' }}
-      onMouseDown={onMouseDown}
-      onMouseMove={onMouseMove}
-      onMouseUp={onMouseUp}
-      onMouseLeave={onMouseLeave}
-      onWheel={onWheel}
-    />
-  );
-};
-
-export default PanZoomCanvas;

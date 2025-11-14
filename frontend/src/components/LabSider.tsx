@@ -1,151 +1,105 @@
-import React from 'react';
-import { Group, Text, Badge, Divider, Fieldset, TextInput, Select, NumberInput, Button, Tooltip, ActionIcon, UnstyledButton, Center, Stack } from '@mantine/core';
-import { IconRefresh, IconBulb, IconCheckbox, IconArrowRight, IconArrowLeft, IconPlayerPlay } from '@tabler/icons-react';
+// frontend/src/components/LabSider.tsx
+import { useState, useEffect } from 'react';
+import { 
+    Box, NavLink, Group, Text, ScrollArea, Title,
+    NumberInput, TextInput, Select, Switch, Button, Divider
+} from '@mantine/core';
+import { useForm } from '@mantine/form';
+import { IconPlayerPlay, IconBrain } from '@tabler/icons-react';
+import { useWebSocket } from '../context/WebSocketContext'; // ¡¡CORRECCIÓN!! Nombre del hook
 import classes from './LabSider.module.css';
 
-interface LabSiderProps {
-  collapsed: boolean;
-  toggle: () => void;
-  
-  // --- Nuevas props para selección ---
-  checkpointData: Record<string, string[]>;
-  selectedExperiment: string | null;
-  setSelectedExperiment: (exp: string | null) => void;
-  selectedCheckpoint: string | null;
-  setSelectedCheckpoint: (ckpt: string | null) => void;
-  loadSimulation: (path: string | null) => void;
-  // ---------------------------------
-
-  status: string;
-  stepCount: number;
-  expName: string;
-  setExpName: (name: string) => void;
-  trainModelType: string;
-  setTrainModelType: (type: string) => void;
-  hiddenChannels: number;
-  setHiddenChannels: (channels: number) => void;
-  trainingGridSize: number;
-  setTrainingGridSize: (size: number) => void;
-  learningRate: number;
-  setLearningRate: (rate: number) => void;
-  episodes: number;
-  setEpisodes: (count: number) => void;
-  startTraining: () => void;
-  isTrainingLoading: boolean;
-  stopTraining: () => void;
-  refreshCheckpoints: () => void;
-  isRefreshingCheckpoints: boolean;
+interface Experiment {
+    name: string;
+    config: {
+        MODEL_ARCHITECTURE?: string;
+        LR_RATE_M?: number;
+        [key: string]: any;
+    };
 }
 
-const LabSider: React.FC<LabSiderProps> = (props) => {
-  const experimentOptions = Object.keys(props.checkpointData);
-  const checkpointOptions = props.selectedExperiment ? props.checkpointData[props.selectedExperiment] || [] : [];
+export function LabSider() {
+    const { sendCommand, experimentsData, trainingStatus } = useWebSocket();
+    const [experiments, setExperiments] = useState<Experiment[]>([]);
 
-  const mainLinks = [
-    { icon: IconBulb, label: 'Estado Simulación', value: props.status, color: props.status === 'running' ? 'green' : 'gray' },
-    { icon: IconCheckbox, label: 'Paso Actual', value: props.stepCount.toString() },
-  ];
+    useEffect(() => {
+        if (experimentsData) {
+            setExperiments(experimentsData);
+        }
+    }, [experimentsData]);
 
-  const mainLinkItems = mainLinks.map((link) => (
-    <UnstyledButton key={link.label} className={classes.mainLink}>
-      <div className={classes.mainLinkInner}>
-        <Tooltip label={link.label} position="right" withArrow>
-          <link.icon size={20} className={classes.mainLinkIcon} stroke={1.5} />
-        </Tooltip>
-        {!props.collapsed && <span>{link.label}</span>}
-      </div>
-      {!props.collapsed && link.value && (
-        <Badge size="sm" variant="filled" className={classes.mainLinkBadge} color={link.color}>
-          {link.value}
-        </Badge>
-      )}
-    </UnstyledButton>
-  ));
+    const form = useForm({
+        initialValues: {
+            experiment_name: 'SNN_UNET-D8-H32-G64-LR1e-4',
+            model_architecture: 'SNN_UNET',
+            d_state: 8,
+            hidden_channels: 32,
+            grid_size_training: 64,
+            lr_rate_m: 0.0001,
+            continue_training: false,
+        },
+    });
 
-  return (
-    <div className={classes.navbarWrapper}>
-      <nav className={classes.navbar}>
-        <div className={classes.section}>
-          <Group className={classes.collectionsHeader} justify="space-between" p="xs">
-            {!props.collapsed && <Text size="xs" fw={500} c="dimmed">Simulador</Text>}
-            <Tooltip label="Refrescar Experimentos" withArrow position="right">
-              <ActionIcon variant="default" size={18} onClick={props.refreshCheckpoints} loading={props.isRefreshingCheckpoints}>
-                <IconRefresh size={12} stroke={1.5} />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-          
-          {!props.collapsed && (
-            <Stack p="xs" gap="sm">
-              <Select
-                label="Experimento"
-                placeholder="Selecciona un experimento"
-                value={props.selectedExperiment}
-                onChange={props.setSelectedExperiment}
-                data={experimentOptions}
-                searchable
-              />
-              <Select
-                label="Checkpoint"
-                placeholder="Selecciona un checkpoint"
-                value={props.selectedCheckpoint}
-                onChange={props.setSelectedCheckpoint}
-                data={checkpointOptions}
-                disabled={!props.selectedExperiment}
-                searchable
-              />
-              <Button
-                fullWidth
-                leftSection={<IconPlayerPlay size={14} />}
-                disabled={!props.selectedCheckpoint}
-                onClick={() => props.loadSimulation(props.selectedCheckpoint)}
-              >
-                Cargar en Simulador
-              </Button>
-            </Stack>
-          )}
-        </div>
+    const handleCreateExperiment = (values: typeof form.values) => {
+        sendCommand('lab', 'create_experiment', { params: values });
+    };
 
-        <Divider />
+    return (
+        <Box className={classes.sider}>
+            <div className={classes.header}>
+                <Title order={3}>Atheria Lab</Title>
+                <Text size="sm" c="dimmed">Control de Entrenamiento</Text>
+            </div>
 
-        <div className={classes.section}>
-          <div className={classes.mainLinks}>{mainLinkItems}</div>
-        </div>
+            <ScrollArea className={classes.scrollArea}>
+                <Title order={5} className={classes.sectionTitle}>Experimentos</Title>
+                {experiments.length > 0 ? (
+                    experiments.map((exp) => (
+                        <NavLink
+                            key={exp.name}
+                            href="#"
+                            label={
+                                <Text size="sm" truncate>{exp.name}</Text>
+                            }
+                            description={
+                                <Text size="xs" c="dimmed">
+                                    {exp.config.MODEL_ARCHITECTURE || 'N/A'} - LR: {exp.config.LR_RATE_M || 'N/A'}
+                                </Text>
+                            }
+                            leftSection={<IconBrain size="1rem" stroke={1.5} />}
+                            variant="subtle"
+                            className={classes.navLink}
+                        />
+                    ))
+                ) : (
+                    <Text size="sm" c="dimmed" ta="center" p="md">No se encontraron experimentos.</Text>
+                )}
+            </ScrollArea>
 
-        {!props.collapsed && (
-          <div className={classes.section}>
-            <Fieldset legend="Laboratorio de Entrenamiento">
-              <Stack p="xs" gap="sm">
-                <TextInput size="xs" label="Nuevo Experimento" value={props.expName} onChange={(e) => props.setExpName(e.currentTarget.value)} />
-                <Select
-                  size="xs"
-                  label="Modelo"
-                  value={props.trainModelType}
-                  onChange={(value) => props.setTrainModelType(value || 'unet')}
-                  data={['unet', 'unet_unitary', 'mlp', 'deep_qca', 'SNN_UNET']}
-                />
-                <NumberInput size="xs" label="Canales Ocultos" value={props.hiddenChannels} onChange={(val) => props.setHiddenChannels(Number(val))} />
-                <NumberInput size="xs" label="Tamaño de Grilla" value={props.trainingGridSize} onChange={(val) => props.setTrainingGridSize(Number(val))} />
-                <NumberInput size="xs" label="Tasa de Aprendizaje" value={props.learningRate} onChange={(val) => props.setLearningRate(Number(val))} step={0.0000001} decimalScale={8} />
-                <NumberInput size="xs" label="Episodios" value={props.episodes} onChange={(val) => props.setEpisodes(Number(val))} />
-                <Button size="xs" onClick={props.startTraining} loading={props.isTrainingLoading} mt="md">Iniciar Entrenamiento</Button>
-                <Button size="xs" onClick={props.stopTraining} color="red">Detener</Button>
-              </Stack>
-            </Fieldset>
-          </div>
-        )}
-      </nav>
-      <div className={classes.footer}>
-        <Center>
-          <ActionIcon onClick={props.toggle} variant="default" size="lg">
-            {props.collapsed ? <IconArrowRight size={18} /> : <IconArrowLeft size={18} />}
-          </ActionIcon>
-        </Center>
-      </div>
-    </div>
-  );
-};
-
-export default LabSider;
-
-
+            <div className={classes.formSection}>
+                <Divider my="sm" label="Crear Nuevo Experimento" labelPosition="center" />
+                <form onSubmit={form.onSubmit(handleCreateExperiment)}>
+                    <TextInput label="Nombre del Experimento" required {...form.getInputProps('experiment_name')} />
+                    <Select
+                        label="Arquitectura del Modelo"
+                        required
+                        data={['UNET', 'SNN_UNET', 'DEEP_QCA', 'MLP', 'UNET_UNITARY']}
+                        {...form.getInputProps('model_architecture')}
+                    />
+                    <Group grow>
+                        <NumberInput label="d_state" min={2} max={16} step={1} {...form.getInputProps('d_state')} />
+                        <NumberInput label="Hidden Channels" min={8} max={64} step={8} {...form.getInputProps('hidden_channels')} />
+                    </Group>
+                    <Group grow>
+                        <NumberInput label="Grid Size" min={16} max={128} step={16} {...form.getInputProps('grid_size_training')} />
+                        <NumberInput label="Learning Rate" step={0.00001} decimalScale={5} {...form.getInputProps('lr_rate_m')} />
+                    </Group>
+                    <Switch mt="md" label="Continuar Entrenamiento" {...form.getInputProps('continue_training', { type: 'checkbox' })} />
+                    <Button type="submit" fullWidth mt="md" leftSection={<IconPlayerPlay size={16} />} disabled={trainingStatus === 'running'}>
+                        {trainingStatus === 'running' ? 'Entrenando...' : 'Lanzar Entrenamiento'}
+                    </Button>
+                </form>
+            </div>
+        </Box>
+    );
+}

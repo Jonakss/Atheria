@@ -1,1 +1,33 @@
-/* Archivo CSS para LabSider - puede estar vacío por ahora */
+/* frontend/src/components/LabSider.module.css */
+.sider {
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Ocupar toda la altura del contenedor */
+}
+
+.header {
+    padding-bottom: var(--mantine-spacing-md);
+    border-bottom: 1px solid var(--mantine-color-dark-4);
+}
+
+.scrollArea {
+    flex-grow: 1; /* ¡¡CORRECCIÓN!! Hacer que esta área ocupe el espacio disponible */
+    margin-top: var(--mantine-spacing-md);
+    margin-bottom: var(--mantine-spacing-md);
+}
+
+.sectionTitle {
+    padding-left: var(--mantine-spacing-xs);
+    margin-bottom: var(--mantine-spacing-xs);
+    color: var(--mantine-color-gray-6);
+}
+
+.navLink {
+    border-radius: var(--mantine-radius-sm);
+}
+
+.formSection {
+    /* Esta sección no necesita crecer, tendrá altura fija */
+    border-top: 1px solid var(--mantine-color-dark-4);
+    padding-top: var(--mantine-spacing-sm);
+}

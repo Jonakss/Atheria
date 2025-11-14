@@ -3,6 +3,8 @@
 # --- Servidor Web y Sockets ---
 aiohttp
 websockets
+msgpack
+msgpack-numpy
 
 # --- Simulación y ML ---
 torch
@@ -17,3 +19,4 @@ tqdm # si quieres barras de progreso
 matplotlib
 scikit-learn
 scipy
+ruff

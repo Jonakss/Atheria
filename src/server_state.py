@@ -1,21 +1,40 @@
 # src/server_state.py
 import asyncio
-from . import config as cfg
+import json
 
-class GlobalState:
-    """Una clase para mantener el estado global del servidor de forma organizada."""
-    def __init__(self):
-        # --- Estado del Servidor de Laboratorio ---
-        self.training_process = None
-        self.clients = set()  # Clientes conectados al WebSocket principal
+# Estado global de la aplicación
+g_state = {
+    "websockets": [],
+    "training": {
+        "process": None,
+        "status": "idle", # idle, running, finished, error
+        "current_experiment": None,
+    },
+    "simulation": {
+        "is_running": False,
+        "current_experiment": None,
+        "current_step": 0,
+        "pipeline": None,
+        "fps": 10,
+    }
+}
 
-        # --- Estado de la Simulación ---
-        self.simulation_tasks = []
-        self.sim_is_paused = False
-        self.sim_viz_type = 'density'
-        self.sim_motor = None
-        self.sim_model = None
-        self.sim_step_count = 0
-        self.sim_connected_clients = {}  # {ws_aiohttp: {"viewport": ...}}
+# --- ¡¡FUNCIÓN MOVIDA AQUÍ!! ---
+# Se mueve aquí para romper la dependencia circular entre utils.py y server_handlers.py
+async def send_notification(message, n_type='info'):
+    """Envía una notificación a todos los clientes WebSocket conectados."""
+    if not g_state['websockets']:
+        return
 
-g_state = GlobalState()
+    notification = {
+        "type": "notification",
+        "payload": {
+            "message": message,
+            "type": n_type
+        }
+    }
+    
+    # Usar asyncio.gather para enviar a todos los clientes en paralelo
+    await asyncio.gather(
+        *[ws.send_str(json.dumps(notification)) for ws in g_state['websockets']]
+    )
