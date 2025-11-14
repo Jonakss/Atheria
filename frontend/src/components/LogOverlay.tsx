@@ -1,7 +1,7 @@
 // frontend/src/components/LogOverlay.tsx
 import { Box, ScrollArea, Text, Title } from '@mantine/core';
 import { useEffect, useRef } from 'react';
-import { useWebSocket } from '../context/WebSocketContext'; // ¡¡CORRECCIÓN!! Nombre del hook
+import { useWebSocket } from '../hooks/useWebSocket'; // ¡¡CORRECCIÓN!! Nombre del hook
 import classes from './LogOverlay.module.css';
 
 export function LogOverlay() {

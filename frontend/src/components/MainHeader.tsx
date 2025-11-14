@@ -1,7 +1,7 @@
 // frontend/src/components/MainHeader.tsx
 import { Group, Title, Box, Badge, Button, ActionIcon } from '@mantine/core';
 import { IconPlayerPlay, IconPlayerPause } from '@tabler/icons-react';
-import { useWebSocket } from '../context/WebSocketContext';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 export default function MainHeader() {
     const { connectionStatus, connect, sendCommand, inferenceStatus } = useWebSocket();

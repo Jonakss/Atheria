@@ -2,7 +2,7 @@
 import { useRef, useEffect } from 'react';
 import { Box, Text } from '@mantine/core';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { useWebSocket } from '../context/WebSocketContext';
+import { useWebSocket } from '../hooks/useWebSocket';
 import classes from './PanZoomCanvas.module.css';
 
 export function PanZoomCanvas() {

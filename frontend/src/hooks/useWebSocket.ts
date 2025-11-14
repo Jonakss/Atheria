@@ -1,4 +1,11 @@
 // frontend/src/hooks/useWebSocket.ts
-// Este fichero se ha vaciado intencionadamente.
-// La lógica del WebSocket ha sido centralizada en WebSocketContext.tsx.
-export {};
+import { useContext } from 'react';
+import { WebSocketContext } from '../context/WebSocketContext';
+
+export const useWebSocket = () => {
+    const context = useContext(WebSocketContext);
+    if (context === undefined) {
+        throw new Error('useWebSocket must be used within a WebSocketProvider');
+    }
+    return context;
+};

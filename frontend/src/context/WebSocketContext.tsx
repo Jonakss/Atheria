@@ -1,5 +1,5 @@
 // frontend/src/context/WebSocketContext.tsx
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useState, useCallback, useRef } from 'react';
 import { notifications } from '@mantine/notifications';
 
 // --- Tipos ---
@@ -7,12 +7,12 @@ interface Experiment { name: string; config: any; }
 interface SimData { step: number; viz_type: string; map_data: any; }
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 type TrainingStatus = 'idle' | 'running' | 'finished' | 'error';
-type InferenceStatus = 'running' | 'paused'; // ¡¡NUEVO!!
+type InferenceStatus = 'running' | 'paused';
 
-interface WebSocketContextType {
+export interface WebSocketContextType {
     connectionStatus: ConnectionStatus;
     trainingStatus: TrainingStatus;
-    inferenceStatus: InferenceStatus; // ¡¡NUEVO!!
+    inferenceStatus: InferenceStatus;
     experimentsData: Experiment[] | null;
     simData: SimData | null;
     trainingLog: string[];
@@ -20,12 +20,13 @@ interface WebSocketContextType {
     connect: () => void;
 }
 
-const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
+// --- ¡¡REFACTORIZACIÓN!! Exportar el Context para que el hook pueda usarlo ---
+export const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
 
 export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
     const [trainingStatus, setTrainingStatus] = useState<TrainingStatus>('idle');
-    const [inferenceStatus, setInferenceStatus] = useState<InferenceStatus>('paused'); // ¡¡NUEVO!!
+    const [inferenceStatus, setInferenceStatus] = useState<InferenceStatus>('paused');
     const [experimentsData, setExperimentsData] = useState<Experiment[] | null>(null);
     const [simData, setSimData] = useState<SimData | null>(null);
     const [trainingLog, setTrainingLog] = useState<string[]>([]);
@@ -53,7 +54,6 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 case 'simulation_frame':
                     setSimData(data.payload);
                     break;
-                // --- ¡¡NUEVO!! Actualizar estado de inferencia ---
                 case 'inference_status_update':
                     setInferenceStatus(data.payload.status);
                     break;
@@ -80,10 +80,4 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             {children}
         </WebSocketContext.Provider>
     );
-};
-
-export const useWebSocket = () => {
-    const context = useContext(WebSocketContext);
-    if (!context) throw new Error('useWebSocket debe ser usado dentro de un WebSocketProvider');
-    return context;
 };

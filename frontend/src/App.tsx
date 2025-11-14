@@ -19,7 +19,7 @@ function App() {
             <WebSocketProvider>
                 <AppShell
                     header={{ height: 60 }}
-                    navbar={{ width: 350, breakpoint: 'sm', collapsed: { mobile: !opened } }}
+                    navbar={{ width: 400, breakpoint: 'sm', collapsed: { mobile: !opened } }}
                     padding="md"
                 >
                     <AppShell.Header>
