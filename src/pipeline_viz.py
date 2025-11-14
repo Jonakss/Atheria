@@ -1,55 +1,42 @@
 # src/pipeline_viz.py
-import torch
-import numpy as np
-from .qca_engine import Aetheria_Motor, QuantumState
-from .visualization_tools import (
-    get_density_map,
-    get_channels_map,
-    get_phase_map,
-    get_change_map
-)
+import logging
+from . import visualization_tools as viz
 
-class VisualizationPipeline:
+# --- ¡¡NUEVO!! Mapa de Despacho de Visualizaciones ---
+VIZ_MAP = {
+    'density_map': viz.get_density_map,
+    'channels_map': viz.get_channels_map,
+    'phase_map': viz.get_phase_map,
+    'change_map': viz.get_change_map,
+}
+
+def run_visualization_pipeline(motor, viz_type: str):
     """
-    Gestiona la visualización de una simulación en tiempo real.
+    Ejecuta el pipeline de visualización para un motor y un tipo de mapa dados.
     """
-    def __init__(self, model, config):
-        self.device = config.get('DEVICE', 'cuda' if torch.cuda.is_available() else 'cpu')
-        grid_size = config.get('GRID_SIZE_VIZ', 128)
+    try:
+        # 1. Ejecutar un paso de evolución en el motor (sin entrenamiento)
+        motor.evolve_step(is_training=False)
         
-        # Extraer d_state de MODEL_PARAMS, con un valor por defecto
-        model_params = config.get('MODEL_PARAMS', {})
-        d_state = model_params.get('d_state', 8)
-
-        self.motor = Aetheria_Motor(model, grid_size, d_state, self.device)
-        self.motor.compile_model()
-        self.motor.state._reset_state_random()
+        # 2. Obtener el estado cuántico actual
+        psi = motor.state.psi
         
-        self.prev_psi = self.motor.state.psi.clone()
-        self.step_count = 0
-
-    def run_step(self):
-        """
-        Avanza un paso en la simulación y genera un diccionario de frames de visualización.
-        """
-        self.prev_psi = self.motor.state.psi.clone()
+        # 3. Usar el mapa para obtener la función de visualización correcta
+        viz_function = VIZ_MAP.get(viz_type)
         
-        # Evolucionar el estado usando el motor
-        next_psi = self.motor.evolve_step()
+        if not viz_function:
+            logging.warning(f"Tipo de visualización desconocido: '{viz_type}'. Usando 'density_map' por defecto.")
+            viz_function = viz.get_density_map
 
-        # --- ¡¡CORRECCIÓN CLAVE!! Usar las funciones correctas ---
-        # Las funciones de visualization_tools ahora esperan tensores complejos.
-        density_frame = get_density_map(next_psi)
-        channel_frame = get_channels_map(next_psi)
-        phase_frame = get_phase_map(next_psi)
-        change_frame = get_change_map(next_psi, self.prev_psi)
-
-        self.step_count += 1
-
-        # Devolver los frames como arrays de numpy
+        # 4. Generar el mapa y convertirlo a una lista para JSON
+        frame_map = viz_function(psi)
+        
         return {
-            'density': np.array(density_frame).tolist(),
-            'channels': np.array(channel_frame).tolist(),
-            'phase': np.array(phase_frame).tolist(),
-            'change': np.array(change_frame).tolist(),
+            "step": motor.state.psi.shape[0], # Placeholder para el número de paso
+            "viz_type": viz_type,
+            "map_data": frame_map.tolist()
         }
+
+    except Exception as e:
+        logging.error(f"Error en el pipeline de visualización: {e}", exc_info=True)
+        return None

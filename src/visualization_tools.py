@@ -32,44 +32,41 @@ def get_change_map(psi, prev_psi) -> np.ndarray:
     magnitude = torch.sum(real**2 + imag**2, dim=-1)
     return magnitude.squeeze(0).numpy()
 
-def get_phase_map(psi) -> np.ndarray:
-    """Calcula el mapa de fase (ángulo promedio) de un estado psi."""
-    import torch
-    if psi is None: return np.zeros((256, 256))
-    real, imag = get_complex_parts(psi.cpu())
-    if real is None: return np.zeros((psi.shape[1], psi.shape[2]))
-    # Calcular el ángulo para cada componente y luego promediar
-    angles = torch.atan2(imag, real)
-    mean_angle = torch.mean(angles, dim=-1)
-    return mean_angle.squeeze(0).numpy()
+def get_phase_map(psi):
+    """
+    Visualiza la fase del estado cuántico.
+    """
+    # Calcular el ángulo (fase) y convertirlo a un array de floats
+    phase = torch.angle(psi[0]).cpu().numpy()
+    
+    # Normalizar de [-pi, pi] a [0, 255]
+    phase_normalized = (phase + np.pi) / (2 * np.pi)
+    return (phase_normalized * 255).astype(np.uint8)
 
-def get_channels_map(psi) -> np.ndarray:
-    """Mapea los primeros 3 componentes de densidad a canales RGB de forma segura."""
-    import torch
-    if psi is None: return np.zeros((256, 256, 3), dtype=np.uint8)
-    
-    real, imag = get_complex_parts(psi.cpu())
-    if real is None: return np.zeros((psi.shape[1], psi.shape[2], 3), dtype=np.uint8)
-    
-    density_per_channel = real**2 + imag**2
-    num_channels = density_per_channel.shape[-1]
-    
-    # Crea un canvas RGB vacío
-    h, w = density_per_channel.shape[1], density_per_channel.shape[2]
-    rgb_image = np.zeros((h, w, 3), dtype=np.float32)
+def get_channels_map(psi):
+    """
+    Visualiza los primeros 3 canales del estado cuántico como un mapa RGB.
+    Utiliza normalización compartida para preservar las proporciones de color.
+    """
+    if psi.shape[-1] < 3:
+        # Si no hay suficientes canales, devolver un mapa negro
+        return np.zeros((psi.shape[1], psi.shape[2], 3), dtype=np.uint8)
 
-    # Llena los canales que existen, normalizando cada uno individualmente
-    if num_channels > 0:
-        r = density_per_channel[0, ..., 0].numpy()
-        rgb_image[..., 0] = (r - r.min()) / (r.max() - r.min() + 1e-8)
-    if num_channels > 1:
-        g = density_per_channel[0, ..., 1].numpy()
-        rgb_image[..., 1] = (g - g.min()) / (g.max() - g.min() + 1e-8)
-    if num_channels > 2:
-        b = density_per_channel[0, ..., 2].numpy()
-        rgb_image[..., 2] = (b - b.min()) / (b.max() - b.min() + 1e-8)
-        
-    return (rgb_image * 255).astype(np.uint8)
+    # Tomar la magnitud de los primeros 3 canales
+    channels = psi.abs()[0, :, :, :3].cpu().numpy()
+
+    # --- ¡¡CORRECCIÓN CLAVE!! Normalización Compartida ---
+    # 1. Encontrar el valor máximo global en los 3 canales
+    max_val = channels.max()
+    if max_val == 0:
+        max_val = 1 # Evitar división por cero
+
+    # 2. Normalizar todos los canales usando ese máximo global
+    normalized_channels = channels / max_val
+    
+    # Convertir a uint8 para visualización
+    img = (normalized_channels * 255).astype(np.uint8)
+    return img
 
 def fig_to_base64(fig):
     """Convierte una figura de Matplotlib a una imagen en base64."""

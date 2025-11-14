@@ -1,23 +1,16 @@
-const vizOptions = [
-  {
-    label: 'Análisis de Grid',
-    options: [
-      { value: 'density', label: 'Densidad' },
-      { value: 'state_change', label: 'Magnitud del Cambio' },
-      { value: 'channels', label: 'Canales RGB' },
-      { value: 'aggregate_phase', label: 'Fase Agregada' },
-      { value: 'fft', label: 'Transformada de Fourier 2D' },
-    ],
-  },
-  {
-    label: 'Análisis Temporal y Estadístico',
-    options: [
-      { value: 'spacetime_slice', label: 'Diagrama Espacio-Tiempo' },
-      { value: 'spacetime_cube', label: 'Cubo Espacio-Tiempo' },
-      { value: 'poincare', label: 'Gráfico de Poincaré' },
-      { value: 'density_histogram', label: 'Histograma de Densidad' },
-    ],
-  },
+// frontend/src/utils/vizOptions.ts
+
+export const modelOptions = [
+    { value: 'UNET', label: 'UNet' },
+    { value: 'SNN_UNET', label: 'SNN UNet' },
+    { value: 'DEEP_QCA', label: 'Deep QCA' },
+    { value: 'MLP', label: 'MLP' },
+    { value: 'UNET_UNITARY', label: 'UNet Unitary' },
 ];
 
-export default vizOptions;
+export const vizOptions = [
+    { value: 'density_map', label: 'Mapa de Densidad' },
+    { value: 'channels_map', label: 'Mapa de Canales RGB' },
+    { value: 'phase_map', label: 'Mapa de Fase' },
+    { value: 'change_map', label: 'Mapa de Cambio' },
+];

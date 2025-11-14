@@ -1,9 +1,10 @@
 // frontend/src/components/MainHeader.tsx
-import { Group, Title, Box, Badge, Button } from '@mantine/core';
+import { Group, Title, Box, Badge, Button, ActionIcon } from '@mantine/core';
+import { IconPlayerPlay, IconPlayerPause } from '@tabler/icons-react';
 import { useWebSocket } from '../context/WebSocketContext';
 
 export default function MainHeader() {
-    const { connectionStatus, connect } = useWebSocket();
+    const { connectionStatus, connect, sendCommand, inferenceStatus } = useWebSocket();
 
     const statusMap = {
         connected: { color: 'green', text: 'Conectado' },
@@ -14,13 +15,9 @@ export default function MainHeader() {
 
     const currentStatus = statusMap[connectionStatus];
 
-    // --- ¡¡MEJORA!! El botón de conectar ahora es explícito ---
-    const handleConnect = () => {
-        // El contexto ahora gestiona la lógica de conexión
-        // Esto es solo para que el usuario inicie la acción
-        // La lógica real está en el hook, pero aquí podemos llamarla
-        // Por ahora, asumimos que el contexto lo reintenta.
-        // En el siguiente paso, haremos que el hook exponga `connect`.
+    const toggleInference = () => {
+        const command = inferenceStatus === 'running' ? 'pause' : 'play';
+        sendCommand('inference', command);
     };
 
     return (
@@ -29,6 +26,11 @@ export default function MainHeader() {
                 <Title order={3} c="white">AETHERIA</Title>
                 
                 <Group>
+                    {/* --- ¡¡NUEVO!! Botón de Play/Pause --- */}
+                    <ActionIcon onClick={toggleInference} variant="default" size="lg" disabled={connectionStatus !== 'connected'}>
+                        {inferenceStatus === 'running' ? <IconPlayerPause size={18} /> : <IconPlayerPlay size={18} />}
+                    </ActionIcon>
+
                     <Badge color={currentStatus.color} variant="light">
                         {currentStatus.text}
                     </Badge>

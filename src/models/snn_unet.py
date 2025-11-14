@@ -2,9 +2,11 @@
 import torch
 import torch.nn as nn
 import snntorch as snn
+from torchvision.transforms import Resize
 from snntorch import surrogate
 
 class SNNUNet(nn.Module):
+    _compiles = False  # Desactivar torch.compile para este modelo
     """
     Una U-Net de Picos (Spiking U-Net) robusta con gestión manual de estado.
     """
@@ -42,17 +44,22 @@ class SNNUNet(nn.Module):
         mem_out = self.lif_out.init_leaky()
 
         cur1 = self.conv1(x)
-        spk1, mem1 = self.lif1(cur1, mem1)
+        spk1, mem1 = self.lif1(cur1, mem1.detach())
 
         cur_bottom = self.conv_bottom(spk1)
-        spk_bottom, mem_bottom = self.lif_bottom(cur_bottom, mem_bottom)
+        spk_bottom, mem_bottom = self.lif_bottom(cur_bottom, mem_bottom.detach())
 
         up = self.upconv(spk_bottom)
+        
+        # Redimensionar 'up' para que coincida con 'spk1'
+        resize = Resize(spk1.shape[2:])
+        up = resize(up)
+        
         cat = torch.cat([up, spk1], dim=1)
         cur2 = self.conv2(cat)
-        spk2, mem2 = self.lif2(cur2, mem2)
+        spk2, mem2 = self.lif2(cur2, mem2.detach())
 
         cur_out = self.conv_out(spk2)
-        spk_out, mem_out = self.lif_out(cur_out, mem_out)
+        spk_out, mem_out = self.lif_out(cur_out, mem_out.detach())
 
         return spk_out

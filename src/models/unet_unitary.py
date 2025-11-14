@@ -35,6 +35,10 @@ class ConvBlock(nn.Module):
 # --- El Operador U-Net ---
 
 class UNetUnitary(nn.Module):
+    _compiles = False  # Desactivar torch.compile para este modelo
+    """
+    Una arquitectura U-Net que intenta aprender una matriz de transición unitaria.
+    """
     def _initialize_weights(self):
         logging.info("Inicializando capa de salida (outc) con pesos pequeños.")
         nn.init.normal_(self.outc.weight, mean=0.0, std=1e-5)

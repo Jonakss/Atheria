@@ -68,9 +68,12 @@ class Aetheria_Motor:
 
     def propagate(self, psi_inicial, num_steps):
         """
-        Propaga un estado inicial a lo largo de un número de pasos.
+        Propaga un estado inicial a lo largo de un número de pasos, guardando el historial
+        para BPTT.
         """
+        psi_history = []
         psi_actual = psi_inicial
+        
         for _ in range(num_steps):
             # Calcular x_cat a partir del estado actual
             x_cat_real = psi_actual.real.permute(0, 3, 1, 2)
@@ -79,7 +82,9 @@ class Aetheria_Motor:
             
             # Usar evolve_step para obtener el siguiente estado
             psi_actual = self.evolve_step(is_training=True, x_cat=x_cat_total)
-        return psi_actual
+            psi_history.append(psi_actual)
+            
+        return psi_history, psi_actual
 
 
 
@@ -115,6 +120,9 @@ class Aetheria_Motor:
             delta_psi_decay = -self.cfg.GAMMA_DECAY * self.state.psi
             delta_psi_total = delta_psi_unitario + delta_psi_decay
             new_psi = self.state.psi + delta_psi_total
+            # --- ¡¡CORRECCIÓN CLAVE!! Re-normalizar siempre para mantener la estabilidad ---
+            norm = torch.sqrt(torch.sum(new_psi.abs().pow(2), dim=-1, keepdim=True))
+            new_psi = new_psi / norm
             if not is_training: self.state.psi = new_psi
         else:
             new_psi = self.state.psi + delta_psi_unitario

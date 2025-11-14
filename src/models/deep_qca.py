@@ -5,8 +5,9 @@ import torch.nn as nn
 
 
 class DeepQCA(nn.Module):
+    _compiles = False  # Desactivar torch.compile para este modelo
     """
-    La Ley M "Profunda" original. Es un MLP 1x1 aplicado a los vecinos.
+    Una red neuronal profunda que opera sobre cada celda de forma independiente.
     """
     def __init__(self, d_state, hidden_channels, **kwargs):
         super().__init__()

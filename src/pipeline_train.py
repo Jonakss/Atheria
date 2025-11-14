@@ -26,8 +26,11 @@ def run_training_pipeline(exp_cfg: SimpleNamespace):
     # 2. Inicializar el Motor Aetheria
     motor = Aetheria_Motor(ley_M, exp_cfg.GRID_SIZE_TRAINING, exp_cfg.MODEL_PARAMS.d_state, device)
 
-    # 3. Compilar el modelo si es posible
-    motor.compile_model()
+    # 3. Compilar el modelo si es compatible
+    if getattr(ley_M, '_compiles', True):
+        motor.compile_model()
+    else:
+        logging.info(f"El modelo '{exp_cfg.MODEL_ARCHITECTURE}' ha deshabilitado torch.compile(). Se ejecutará sin compilar.")
     
     num_params = sum(p.numel() for p in motor.operator.parameters() if p.requires_grad)
     print(f"Motor y Ley-M ({exp_cfg.MODEL_ARCHITECTURE}) inicializados. Cuadrícula: {exp_cfg.GRID_SIZE_TRAINING}x{exp_cfg.GRID_SIZE_TRAINING}.")
