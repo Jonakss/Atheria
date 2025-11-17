@@ -12,3 +12,5 @@ from .unet_unitary import UNetUnitary
 from .snn_unet import SNNUNet
 from .mlp import MLP
 from .deep_qca import DeepQCA
+from .unet_convlstm import UNetConvLSTM
+from .unet_unitary_rmsnorm import UNetUnitaryRMSNorm

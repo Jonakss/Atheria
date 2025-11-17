@@ -1,14 +1,18 @@
 // frontend/src/App.tsx
-import { AppShell, Burger, Group, NavLink, Box, Tabs } from '@mantine/core';
+import { AppShell, Burger, Group, MantineProvider, Alert } from '@mantine/core'; // Usamos MantineProvider para temas
 import { useDisclosure } from '@mantine/hooks';
-import { MainHeader } from './components/MainHeader';
 import { LabSider } from './components/LabSider';
-import { PanZoomCanvas } from './components/PanZoomCanvas';
-import { LogOverlay } from './components/LogOverlay';
-import { HistogramPanel } from './components/HistogramPanel';
-import { IconChartBar, IconFileText } from '@tabler/icons-react';
+import { MainHeader } from './components/MainHeader';
+import { MainTabs } from './components/MainTabs';
+import { Box } from '@mantine/core';
+import { IconAlertCircle } from '@tabler/icons-react';
+import { WebSocketProvider } from './context/WebSocketContext';
+import { useWebSocket } from './hooks/useWebSocket'; // <-- ¡LA IMPORTACIÓN CLAVE!
+import { ErrorBoundary } from './components/ErrorBoundary';
+import '@mantine/core/styles.css'; // Importa los estilos de Mantine
 
-function App() {
+function AppContent() {
+    const { connectionStatus } = useWebSocket();
     const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
     const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(true);
 
@@ -36,28 +40,37 @@ function App() {
             </AppShell.Navbar>
 
             <AppShell.Main>
-                <Tabs defaultValue="inference" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <Tabs.List>
-                        <Tabs.Tab value="inference" leftSection={<IconChartBar size={14} />}>
-                            Inferencia y Visualización
-                        </Tabs.Tab>
-                        <Tabs.Tab value="training" leftSection={<IconFileText size={14} />}>
-                            Log de Entrenamiento
-                        </Tabs.Tab>
-                    </Tabs.List>
-
-                    <Tabs.Panel value="inference" style={{ flex: 1, position: 'relative' }}>
-                        <PanZoomCanvas />
-                        <HistogramPanel />
-                    </Tabs.Panel>
-
-                    <Tabs.Panel value="training" style={{ flex: 1, position: 'relative', paddingTop: '1rem' }}>
-                        {/* El LogOverlay ahora es relativo a este panel */}
-                        <LogOverlay />
-                    </Tabs.Panel>
-                </Tabs>
+                {connectionStatus === 'server_unavailable' && (
+                    <Alert 
+                        icon={<IconAlertCircle size={16} />} 
+                        title="Servidor no disponible" 
+                        color="red" 
+                        mb="md"
+                    >
+                        No se puede conectar al servidor en <code>localhost:8000</code>. 
+                        Asegúrate de que el servidor esté ejecutándose con <code>python run_server.py</code>
+                    </Alert>
+                )}
+                <Box style={{ flex: 1, position: 'relative', height: '100%' }}>
+                    <MainTabs />
+                </Box>
             </AppShell.Main>
         </AppShell>
+    );
+}
+
+function App() {
+    return (
+        // Envolvemos todo en el Provider de Mantine para estilos consistentes
+        <MantineProvider defaultColorScheme="dark">
+            {/* Error Boundary para capturar errores y evitar pantalla gris */}
+            <ErrorBoundary>
+                {/* ¡AQUÍ ESTÁ LA MAGIA! Envolvemos la App en nuestro WebSocketProvider */}
+                <WebSocketProvider>
+                    <AppContent />
+                </WebSocketProvider>
+            </ErrorBoundary>
+        </MantineProvider>
     );
 }
 

@@ -49,8 +49,23 @@ MODEL_PARAMS = {
     'beta': 0.85,
 }
 
-# --- Física del Sistema ---
-# Poner a 0.0 para una simulación unitaria "perfecta" (sin decaimiento).
+# --- Física del Sistema (Ecuación Maestra de Lindblad) ---
+# GAMMA_DECAY implementa el término Lindbladian para sistemas cuánticos abiertos.
+# 
+# Ecuación completa: dρ/dt = -i[H, ρ] + Σ_i γ_i (L_i ρ L_i† - (1/2){L_i† L_i, ρ})
+# 
+# Nuestra implementación simplificada:
+#   - Parte 1 (Unitaria): dΨ/dt = A(Ψ) * Ψ (implementada por la Ley M / U-Net)
+#   - Parte 2 (Lindbladian): dΨ/dt = -γ * Ψ (decaimiento/disipación)
+# 
+# GAMMA_DECAY controla la "presión evolutiva" hacia el metabolismo:
+#   - 0.0 = Sistema cerrado perfecto (sin decaimiento, sin "hambre")
+#   - > 0.0 = Sistema abierto (con decaimiento, la Ley M debe "ganar" contra el decaimiento)
+# 
+# Valores típicos:
+#   - 0.0 - 0.001: Decaimiento muy lento (presión suave)
+#   - 0.01 - 0.1: Decaimiento moderado (presión estándar para A-Life)
+#   - > 0.1: Decaimiento rápido (presión fuerte, más difícil mantener estructuras)
 GAMMA_DECAY = 0.01
 
 # Hiperparámetros de Entrenamiento
@@ -58,7 +73,7 @@ TOTAL_EPISODES = 2000 # ¡¡CAMBIO!!
 STEPS_PER_EPISODE = 50
 LR_RATE_M = 1e-4
 GRADIENT_CLIP = 1.0
-GAMMA_DECAY = 0.01
+# Nota: GAMMA_DECAY está definido arriba en "Física del Sistema"
 SAVE_EVERY_EPISODES = 50
 BATCH_SIZE_TRAINING = 4
 QCA_STEPS_TRAINING = 16
@@ -73,3 +88,10 @@ GRID_SIZE_INFERENCE = 256
 SAVE_EVERY_EPISODES = 50
 BATCH_SIZE_TRAINING = 4
 QCA_STEPS_TRAINING = 16
+
+# --- Modo de Inicialización del Estado para Inferencia ---
+# Opciones: 'complex_noise', 'random', 'zeros'
+# - 'complex_noise': Ruido complejo normalizado (default, más estable)
+# - 'random': Estado aleatorio normalizado (más variado)
+# - 'zeros': Estado cero (requiere activación externa)
+INITIAL_STATE_MODE_INFERENCE = 'complex_noise'

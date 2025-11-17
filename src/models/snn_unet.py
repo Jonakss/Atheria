@@ -44,10 +44,10 @@ class SNNUNet(nn.Module):
         mem_out = self.lif_out.init_leaky()
 
         cur1 = self.conv1(x)
-        spk1, mem1 = self.lif1(cur1, mem1.detach())
+        spk1, mem1 = self.lif1(cur1, mem1)
 
         cur_bottom = self.conv_bottom(spk1)
-        spk_bottom, mem_bottom = self.lif_bottom(cur_bottom, mem_bottom.detach())
+        spk_bottom, mem_bottom = self.lif_bottom(cur_bottom, mem_bottom)
 
         up = self.upconv(spk_bottom)
         
@@ -57,9 +57,9 @@ class SNNUNet(nn.Module):
         
         cat = torch.cat([up, spk1], dim=1)
         cur2 = self.conv2(cat)
-        spk2, mem2 = self.lif2(cur2, mem2.detach())
+        spk2, mem2 = self.lif2(cur2, mem2)
 
         cur_out = self.conv_out(spk2)
-        spk_out, mem_out = self.lif_out(cur_out, mem_out.detach())
+        spk_out, mem_out = self.lif_out(cur_out, mem_out)
 
         return spk_out

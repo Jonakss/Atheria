@@ -1,90 +1,117 @@
 # src/trainer.py
-import torch
-import os
+import argparse
 import json
 import logging
 from types import SimpleNamespace
-from .qca_engine import Aetheria_Motor
-from .model_loader import load_model_for_training
-from .utils import load_experiment_config, save_checkpoint
 
-# Configuración del logging para el script de entrenamiento
+from . import config as global_cfg
+from .utils import check_and_create_dir, load_experiment_config, get_latest_checkpoint
+from .pipeline_train import run_training_pipeline
+
+# Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def compute_loss(motor, initial_psi, final_psi_real, config):
-    psi_history, _ = motor.propagate(initial_psi, config.QCA_STEPS_TRAINING)
-    final_psi_computed = psi_history[-1]
-    
-    loss_dist = torch.mean((final_psi_computed.abs() - final_psi_real.abs()).pow(2))
-    
-    laplacian = motor.laplacian_2d_psi(final_psi_computed)
-    loss_smooth = torch.mean(laplacian.abs().pow(2))
-    
-    loss = loss_dist + config.MODEL_PARAMS.get('beta', 0.1) * loss_smooth
-    return loss
+def sns_to_dict(obj):
+    """
+    Convierte recursivamente SimpleNamespace (y dicts anidados) a dict para serialización JSON.
+    """
+    if isinstance(obj, SimpleNamespace):
+        return {key: sns_to_dict(value) for key, value in vars(obj).items()}
+    elif isinstance(obj, dict):
+        return {key: sns_to_dict(value) for key, value in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [sns_to_dict(item) for item in obj]
+    else:
+        # Para tipos primitivos (int, float, str, bool, None) y objetos no serializables
+        # Intentar serializar, si falla devolver str
+        try:
+            json.dumps(obj)
+            return obj
+        except (TypeError, ValueError):
+            return str(obj)
 
-def run_training_loop(experiment_name):
-    try:
-        config, checkpoint_path, state = load_experiment_config(experiment_name)
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        motor = load_model_for_training(config, state, device)
-        
-        start_episode = state.get('episode', 0)
-        total_episodes = config.TOTAL_EPISODES
-
-        if start_episode >= total_episodes:
-            log_msg = {"type": "log", "payload": "El entrenamiento ya ha alcanzado el número total de episodios."}
-            print(json.dumps(log_msg), flush=True)
-            return
-
-        optimizer = torch.optim.Adam(motor.operator.parameters(), lr=config.LR_RATE_M)
-        if 'optimizer_state_dict' in state:
-            optimizer.load_state_dict(state['optimizer_state_dict'])
-
-        loss_history = []
-
-        # --- ¡¡CORRECCIÓN!! Bucle sin tqdm ---
-        for episode in range(start_episode, total_episodes):
-            initial_psi = motor.get_initial_state(batch_size=1)
-            final_psi_real = motor.get_initial_state(batch_size=1)
-            
-            optimizer.zero_grad()
-            loss = compute_loss(motor, initial_psi, final_psi_real, config)
-            loss.backward()
-            optimizer.step()
-
-            loss_history.append(loss.item())
-            
-            # --- ¡¡CORRECCIÓN!! Enviar progreso en CADA episodio ---
-            avg_loss = sum(loss_history) / len(loss_history)
-            progress_payload = {
-                "type": "progress",
-                "payload": {
-                    "current_episode": episode + 1,
-                    "total_episodes": total_episodes,
-                    "avg_loss": avg_loss
-                }
-            }
-            print(json.dumps(progress_payload), flush=True)
-
-            if (episode + 1) % 10 == 0:
-                loss_history = [] # Resetear historial de pérdida
-
-            if (episode + 1) % config.CHECKPOINT_INTERVAL == 0:
-                save_checkpoint(motor, optimizer, episode + 1, experiment_name)
-
-        save_checkpoint(motor, optimizer, total_episodes, experiment_name)
-        final_log = {"type": "log", "payload": f"Entrenamiento completado. Modelo guardado en el episodio {total_episodes}."}
-        print(json.dumps(final_log), flush=True)
-
-    except Exception as e:
-        error_log = {"type": "log", "payload": f"ERROR en el entrenamiento: {e}"}
-        print(json.dumps(error_log), flush=True)
-        logging.error("Error en el bucle de entrenamiento", exc_info=True)
-
-if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser()
+def main():
+    parser = argparse.ArgumentParser(description="Aetheria Experiment Trainer")
     parser.add_argument("--experiment_name", type=str, required=True)
+    parser.add_argument("--model_architecture", type=str, required=True, choices=["MLP", "UNET", "UNET_COSMOLOGICA", "UNET_UNITARIA", "UNET_UNITARY", "UNET_UNITARY_RMSNORM", "UNET_CONVLSTM", "SNN_UNET", "DEEP_QCA"])
+    parser.add_argument("--lr_rate_m", type=float, required=True)
+    parser.add_argument("--grid_size_training", type=int, required=True)
+    parser.add_argument("--qca_steps_training", type=int, required=True)
+    parser.add_argument("--total_episodes", type=int, required=True)
+    # --- LA CORRECCIÓN CLAVE ESTÁ AQUÍ ---
+    # Aceptamos un string JSON y lo cargamos como un diccionario
+    parser.add_argument("--model_params", type=str, required=True, help='JSON string of model parameters')
+    parser.add_argument("--continue_training", action="store_true")
+    
     args = parser.parse_args()
-    run_training_loop(args.experiment_name)
+    
+    # Decodificamos el string JSON a un diccionario de Python
+    try:
+        model_params_dict = json.loads(args.model_params)
+    except json.JSONDecodeError as e:
+        print(f"Error: No se pudo decodificar --model_params. Asegúrate de que es un JSON válido. Error: {e}")
+        return
+
+    # Construimos el objeto de configuración del experimento
+    # El model_loader ya maneja los nombres correctamente, así que usamos el valor tal cual
+    exp_config = {
+        "EXPERIMENT_NAME": args.experiment_name,
+        "MODEL_ARCHITECTURE": args.model_architecture,
+        "LR_RATE_M": args.lr_rate_m,
+        "GRID_SIZE_TRAINING": args.grid_size_training,
+        "QCA_STEPS_TRAINING": args.qca_steps_training,
+        "TOTAL_EPISODES": args.total_episodes,
+        "MODEL_PARAMS": model_params_dict,
+        "DEVICE": global_cfg.DEVICE,
+        "GAMMA_DECAY": getattr(global_cfg, 'GAMMA_DECAY', 0.01)  # Término Lindbladian (decaimiento)
+    }
+    
+    # Convertir MODEL_PARAMS a SimpleNamespace si es necesario para compatibilidad
+    if isinstance(exp_config["MODEL_PARAMS"], dict):
+        exp_config["MODEL_PARAMS"] = SimpleNamespace(**exp_config["MODEL_PARAMS"])
+    
+    # Agregar CONTINUE_TRAINING a la config
+    exp_config["CONTINUE_TRAINING"] = args.continue_training
+    
+    # Convertir toda la config a SimpleNamespace
+    exp_cfg = SimpleNamespace(**exp_config)
+
+    # Mostrar configuración (convertir a dict para JSON)
+    config_for_display = sns_to_dict(exp_config)
+    print(f"Iniciando entrenamiento con la siguiente configuración:\n{json.dumps(config_for_display, indent=2)}")
+
+    # check_and_create_dir acepta dict o SimpleNamespace, pero usa el dict original
+    check_and_create_dir(exp_config)
+    
+    # Si continuamos entrenamiento, cargar checkpoint
+    checkpoint_path = None
+    if args.continue_training:
+        checkpoint_path = get_latest_checkpoint(exp_config["EXPERIMENT_NAME"])
+        if checkpoint_path:
+            print(f"Continuando entrenamiento desde: {checkpoint_path}")
+            # Actualizar el episodio inicial si hay checkpoint
+            # START_EPISODE será el episodio del checkpoint + 1 (para continuar desde el siguiente)
+            try:
+                import torch
+                checkpoint = torch.load(checkpoint_path, map_location='cpu')
+                checkpoint_episode = checkpoint.get('episode', 0)
+                exp_cfg.START_EPISODE = checkpoint_episode + 1
+                logging.info(f"Checkpoint encontrado en episodio {checkpoint_episode}, continuando desde {exp_cfg.START_EPISODE}")
+            except Exception as e:
+                logging.warning(f"No se pudo leer el episodio del checkpoint: {e}")
+                exp_cfg.START_EPISODE = 0
+        else:
+            print("No se encontró checkpoint, iniciando desde cero.")
+            exp_cfg.START_EPISODE = 0
+    else:
+        exp_cfg.START_EPISODE = 0
+    
+    # Ejecutar el pipeline de entrenamiento
+    try:
+        run_training_pipeline(exp_cfg, checkpoint_path=checkpoint_path)
+    except Exception as e:
+        logging.error(f"Error en el pipeline de entrenamiento: {e}", exc_info=True)
+        raise
+
+if __name__ == "__main__":
+    main()

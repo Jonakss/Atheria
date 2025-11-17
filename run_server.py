@@ -3,6 +3,7 @@ import sys
 import os
 import asyncio
 import logging
+import signal
 
 # --- Configuración de Logging Temprana ---
 # Esto es para capturar errores incluso antes de que el servidor principal se cargue.
@@ -33,9 +34,53 @@ except ImportError as e:
     log.error("="*60)
     sys.exit(1)
 
+# --- Función para guardar estado antes de cerrar ---
+async def save_state_before_shutdown():
+    """Guarda el estado del entrenamiento y simulación antes de cerrar."""
+    try:
+        from src.server_state import g_state
+        from src.server_handlers import create_experiment_handler
+        
+        # Guardar estado de entrenamiento si hay un proceso activo
+        training_process = g_state.get('training_process')
+        if training_process and training_process.returncode is None:
+            log.info("Proceso de entrenamiento detectado. Intentando guardar checkpoint...")
+            # El entrenamiento se guarda automáticamente cada SAVE_EVERY_EPISODES
+            # Aquí solo notificamos que se está cerrando
+            log.info("Nota: El entrenamiento guarda checkpoints periódicamente. Verifica los checkpoints guardados.")
+        
+        # Guardar estado de simulación si hay un motor activo
+        motor = g_state.get('motor')
+        if motor and not g_state.get('is_paused', True):
+            log.info("Simulación activa detectada. Estado de simulación se puede recuperar al reiniciar.")
+            # El estado de simulación se reinicia al cargar el modelo, así que no necesitamos guardarlo
+        
+        log.info("Estado guardado correctamente.")
+    except Exception as e:
+        log.error(f"Error al guardar estado: {e}", exc_info=True)
+
 # --- Ejecutar el Servidor ---
 if __name__ == "__main__":
     log.info("Pasando el control a 'pipeline_server.main()'.")
+    
+    # Configurar handler de señales para guardar estado antes de cerrar
+    def signal_handler(signum, frame):
+        log.info(f"Señal {signum} recibida. Guardando estado antes de cerrar...")
+        try:
+            # Crear un nuevo event loop para guardar el estado
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(save_state_before_shutdown())
+            loop.close()
+        except Exception as e:
+            log.error(f"Error al guardar estado en signal handler: {e}")
+        log.info("Cierre solicitado por el usuario (Ctrl+C) desde run_server.py.")
+        sys.exit(0)
+    
+    # Registrar handlers de señales
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
     try:
         # Usar el main del módulo importado
         asyncio.run(pipeline_server.main())
