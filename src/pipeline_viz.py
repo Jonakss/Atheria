@@ -258,7 +258,7 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
     result = {
         "map_data": map_data.tolist(),
         "hist_data": hist_data,
-        "poincare_coords": poincare_coords.tolist()
+        "poincare_coords": poincare_coords.tolist() if isinstance(poincare_coords, np.ndarray) else poincare_coords
     }
     
     # Datos para visualización 3D compleja (real vs imag vs tiempo)

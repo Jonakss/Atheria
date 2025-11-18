@@ -212,6 +212,10 @@ async def simulation_loop():
                     
                     # Enviar a clientes
                     await broadcast({"type": "simulation_frame", "payload": frame_payload})
+                    
+                    # Limpiar cache de GPU después de generar visualización (evita acumulación de memoria)
+                    if current_step % 5 == 0:  # Cada 5 frames para no hacer overhead
+                        g_state['motor'].optimizer.empty_cache_if_needed()
 
 
                 except Exception as e:
