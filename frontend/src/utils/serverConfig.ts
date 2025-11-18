@@ -7,12 +7,14 @@ export interface ServerConfig {
     host: string;
     port: number;
     protocol: 'ws' | 'wss';
+    path?: string; // Path opcional para WebSocket (por defecto '/ws')
 }
 
 const DEFAULT_CONFIG: ServerConfig = {
     host: 'localhost',
     port: 8000,
-    protocol: 'ws'
+    protocol: 'ws',
+    path: '/ws' // Por defecto usa /ws para compatibilidad con servidor local
 };
 
 /**
@@ -28,7 +30,8 @@ export function getServerConfig(): ServerConfig {
                 return {
                     host: parsed.host,
                     port: parsed.port,
-                    protocol: parsed.protocol || 'ws'
+                    protocol: parsed.protocol || 'ws',
+                    path: parsed.path !== undefined ? parsed.path : '/ws' // Mantener compatibilidad
                 };
             }
         }
@@ -57,7 +60,9 @@ export function saveServerConfig(config: Partial<ServerConfig>): void {
 export function getWebSocketUrl(config?: Partial<ServerConfig>): string {
     const finalConfig = config ? { ...getServerConfig(), ...config } : getServerConfig();
     const protocol = finalConfig.protocol === 'wss' ? 'wss' : 'ws';
-    return `${protocol}://${finalConfig.host}:${finalConfig.port}/ws`;
+    // Usar el path configurado, o '/ws' por defecto, o cadena vacía si es undefined/null
+    const path = finalConfig.path !== undefined && finalConfig.path !== null ? finalConfig.path : '/ws';
+    return `${protocol}://${finalConfig.host}:${finalConfig.port}${path}`;
 }
 
 /**

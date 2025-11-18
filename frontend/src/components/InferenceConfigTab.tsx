@@ -47,6 +47,7 @@ export function InferenceConfigTab() {
     const [serverHost, setServerHost] = useState(serverConfig.host);
     const [serverPort, setServerPort] = useState(serverConfig.port);
     const [serverProtocol, setServerProtocol] = useState<'ws' | 'wss'>(serverConfig.protocol);
+    const [serverPath, setServerPath] = useState(serverConfig.path || '/ws');
     const [serverConfigChanged, setServerConfigChanged] = useState(false);
     
     // Sincronizar estados locales con la configuración cuando cambia
@@ -54,6 +55,7 @@ export function InferenceConfigTab() {
         setServerHost(serverConfig.host);
         setServerPort(serverConfig.port);
         setServerProtocol(serverConfig.protocol);
+        setServerPath(serverConfig.path || '/ws');
         setServerConfigChanged(false);
     }, [serverConfig]);
     
@@ -128,11 +130,13 @@ export function InferenceConfigTab() {
 
     // Detectar cambios en la configuración del servidor
     useEffect(() => {
+        const currentPath = serverConfig.path || '/ws';
         const changed = serverHost !== serverConfig.host || 
                        serverPort !== serverConfig.port || 
-                       serverProtocol !== serverConfig.protocol;
+                       serverProtocol !== serverConfig.protocol ||
+                       serverPath !== currentPath;
         setServerConfigChanged(changed);
-    }, [serverHost, serverPort, serverProtocol, serverConfig]);
+    }, [serverHost, serverPort, serverProtocol, serverPath, serverConfig]);
 
     // Detectar cambios
     useEffect(() => {
@@ -198,11 +202,18 @@ export function InferenceConfigTab() {
                             max={65535}
                             description="Puerto del servidor WebSocket"
                         />
+                        <TextInput
+                            label="Path (opcional)"
+                            value={serverPath}
+                            onChange={(e) => setServerPath(e.target.value || '/ws')}
+                            placeholder="/ws"
+                            description="Path del WebSocket (dejar vacío o '/' para Lightning AI)"
+                        />
                     </Group>
                     
                     <Group>
                         <Text size="xs" c="dimmed">
-                            URL actual: <strong>{serverProtocol}://{serverHost}:{serverPort}/ws</strong>
+                            URL actual: <strong>{serverProtocol}://{serverHost}:{serverPort}{serverPath || ''}</strong>
                         </Text>
                     </Group>
                     
@@ -212,7 +223,8 @@ export function InferenceConfigTab() {
                                 updateServerConfig({
                                     host: serverHost,
                                     port: serverPort,
-                                    protocol: serverProtocol
+                                    protocol: serverProtocol,
+                                    path: serverPath || '/ws'
                                 });
                                 setServerConfigChanged(false);
                                 setTimeout(() => connect(), 500);
@@ -226,11 +238,12 @@ export function InferenceConfigTab() {
                         <Button
                             onClick={() => {
                                 resetServerConfig();
-                                const defaultConfig = { host: 'localhost', port: 8000, protocol: 'ws' as const };
+                                const defaultConfig = { host: 'localhost', port: 8000, protocol: 'ws' as const, path: '/ws' };
                                 updateServerConfig(defaultConfig);
                                 setServerHost(defaultConfig.host);
                                 setServerPort(defaultConfig.port);
                                 setServerProtocol(defaultConfig.protocol);
+                                setServerPath(defaultConfig.path);
                                 setServerConfigChanged(false);
                                 setTimeout(() => connect(), 500);
                             }}
@@ -360,7 +373,6 @@ export function InferenceConfigTab() {
                         description="Término de decaimiento para sistemas abiertos (0.0 = cerrado, >0 = abierto)"
                         value={gammaDecay}
                         onChange={(val) => setGammaDecay(Number(val) || 0.01)}
-                        precision={4}
                         step={0.001}
                         min={0}
                         max={1}
