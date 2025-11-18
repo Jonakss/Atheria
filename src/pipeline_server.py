@@ -145,36 +145,21 @@ async def simulation_loop():
             
             if not is_paused and motor:
                 current_step = g_state.get('simulation_step', 0)
+                
+                # OPTIMIZACIÓN CRÍTICA: Si live_feed está desactivado, NO procesar nada
+                # Esto evita cálculos innecesarios y mejora el rendimiento
+                live_feed_enabled = g_state.get('live_feed_enabled', True)
+                
+                if not live_feed_enabled:
+                    # Si live_feed está desactivado, no hacer nada - solo esperar
+                    # La simulación se pausa efectivamente cuando no hay visualización
+                    await asyncio.sleep(0.1)
+                    continue
+                
                 try:
-                    # Evolucionar el estado (siempre, para mantener la física correcta)
+                    # Evolucionar el estado solo si live_feed está activo
                     g_state['motor'].evolve_internal_state()
                     g_state['simulation_step'] = current_step + 1
-                    
-                    # OPTIMIZACIÓN: Solo calcular y enviar visualizaciones si live_feed está activo
-                    # Esto libera recursos cuando el usuario no está visualizando
-                    live_feed_enabled = g_state.get('live_feed_enabled', True)
-                    
-                    # Si live_feed está desactivado, solo evolucionar el estado sin calcular visualizaciones
-                    if not live_feed_enabled:
-                        # Guardar en historial si está habilitado (solo step, sin visualización completa)
-                        if g_state.get('history_enabled', False):
-                            try:
-                                # Guardar frame mínimo para historial
-                                minimal_frame = {
-                                    "step": current_step,
-                                    "timestamp": asyncio.get_event_loop().time()
-                                }
-                                g_state['simulation_history'].add_frame(minimal_frame)
-                            except Exception as e:
-                                logging.debug(f"Error guardando frame mínimo en historial: {e}")
-                        
-                        # Enviar solo log ocasional (cada 100 pasos) para indicar que la simulación está corriendo
-                        if current_step % 100 == 0:
-                            await broadcast({
-                                "type": "simulation_log",
-                                "payload": f"[Simulación] Paso {current_step} (Live feed desactivado)"
-                            })
-                        continue
                     
                     # Validar que el motor tenga un estado válido
                     if g_state['motor'].state.psi is None:
@@ -186,20 +171,11 @@ async def simulation_loop():
                     # Optimización: Usar inference_mode para mejor rendimiento GPU
                     # Obtener delta_psi si está disponible para visualizaciones de flujo
                     delta_psi = g_state['motor'].last_delta_psi if hasattr(g_state['motor'], 'last_delta_psi') else None
-                    
-                    # OPTIMIZACIÓN: Calcular histogramas y Poincaré menos frecuentemente
-                    # Histogramas cada 5 frames, Poincaré cada 10 frames (ya optimizado en pipeline_viz)
-                    compute_histograms = (current_step % 5 == 0)  # Cada 5 frames
-                    compute_poincare = True  # Ya está optimizado internamente en pipeline_viz
-                    
                     viz_data = get_visualization_data(
                         g_state['motor'].state.psi, 
                         g_state.get('viz_type', 'density'),
                         delta_psi=delta_psi,
-                        motor=g_state['motor'],
-                        current_step=current_step,
-                        compute_histograms=compute_histograms,
-                        compute_poincare=compute_poincare
+                        motor=g_state['motor']
                     )
                     
                     # Validar que viz_data tenga los campos necesarios
@@ -208,9 +184,11 @@ async def simulation_loop():
                         await asyncio.sleep(0.1)
                         continue
                     
-                    # Construir frame_payload
+                    # Construir frame_payload con información completa del paso del tiempo
+                    current_time = asyncio.get_event_loop().time()
                     frame_payload_raw = {
                         "step": current_step,
+                        "timestamp": current_time,
                         "map_data": viz_data.get("map_data", []),
                         "hist_data": viz_data.get("hist_data", {}),
                         "poincare_coords": viz_data.get("poincare_coords", []),
@@ -218,7 +196,12 @@ async def simulation_loop():
                         "flow_data": viz_data.get("flow_data"),
                         "phase_hsv_data": viz_data.get("phase_hsv_data"),
                         "complex_3d_data": viz_data.get("complex_3d_data"),
-                        "timestamp": asyncio.get_event_loop().time()
+                        # Información adicional para la UI
+                        "simulation_info": {
+                            "step": current_step,
+                            "is_paused": False,
+                            "live_feed_enabled": live_feed_enabled
+                        }
                     }
                     
                     # Optimizar payload (ROI, compresión y downsampling)
@@ -626,7 +609,21 @@ async def handle_load_experiment(args):
         
         # Inicializar motor con configuración para acceso a GAMMA_DECAY (término Lindbladian)
         # Usar config como cfg para que el motor pueda acceder a GAMMA_DECAY
-        g_state['motor'] = Aetheria_Motor(model, inference_grid_size, d_state, global_cfg.DEVICE, cfg=config)
+        motor = Aetheria_Motor(model, inference_grid_size, d_state, global_cfg.DEVICE, cfg=config)
+        
+        # Compilar modelo para optimización de inferencia (si está habilitado)
+        try:
+            motor.compile_model()
+            if motor.is_compiled:
+                logging.info("✅ Modelo compilado con torch.compile() para inferencia optimizada")
+                if ws: await send_notification(ws, "✅ Modelo compilado con torch.compile() para mejor rendimiento", "info")
+            else:
+                model_name = model.__class__.__name__
+                logging.info(f"ℹ️ torch.compile() deshabilitado para {model_name} (configuración del modelo)")
+        except Exception as e:
+            logging.warning(f"⚠️ No se pudo compilar el modelo: {e}. Continuando sin compilación.")
+        
+        g_state['motor'] = motor
         g_state['simulation_step'] = 0
         
         # Actualizar ROI manager con el tamaño correcto del grid
@@ -684,8 +681,23 @@ async def handle_load_experiment(args):
                 logging.error(f"Error generando frame inicial: {e}", exc_info=True)
                 if ws: await send_notification(ws, f"⚠️ Error al generar visualización inicial: {str(e)}", "warning")
         
+        # Enviar información sobre el estado de compilación del modelo
+        compile_status = {
+            "is_compiled": motor.is_compiled,
+            "model_name": model.__class__.__name__,
+            "compiles_enabled": getattr(model, '_compiles', True)
+        }
+        
         if ws: await send_notification(ws, f"✅ Modelo '{exp_name}' cargado exitosamente. Presiona 'Iniciar' para comenzar la simulación.", "success")
-        await broadcast({"type": "inference_status_update", "payload": {"status": "paused"}})
+        await broadcast({
+            "type": "inference_status_update", 
+            "payload": {
+                "status": "paused",
+                "model_loaded": True,
+                "experiment_name": exp_name,
+                "compile_status": compile_status
+            }
+        })
         logging.info(f"Modelo '{exp_name}' cargado por [{args['ws_id']}]. Simulación en pausa, esperando inicio manual.")
 
     except Exception as e:

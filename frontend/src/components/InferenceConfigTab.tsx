@@ -389,9 +389,27 @@ export function InferenceConfigTab() {
 
             <Card withBorder p="md">
                 <Stack gap="md">
+                    {/* Información sobre torch.compile() */}
+                    {activeExperiment && (
+                        <Alert 
+                            icon={<IconBrain size={16} />} 
+                            color="blue" 
+                            variant="light"
+                            title="Optimización del Modelo"
+                        >
+                            <Text size="sm">
+                                El modelo se compila automáticamente con <code>torch.compile()</code> si está disponible y habilitado.
+                                Esto mejora significativamente el rendimiento de inferencia.
+                            </Text>
+                            <Text size="xs" c="dimmed" mt="xs">
+                                Nota: Algunos modelos (ConvLSTM, SNN) tienen torch.compile() deshabilitado por compatibilidad.
+                            </Text>
+                        </Alert>
+                    )}
+                    
                     <Switch
                         label="Live Feed"
-                        description="Enviar datos de visualización en tiempo real. Desactivar para ahorrar recursos."
+                        description="Enviar datos de visualización en tiempo real. Desactivar para ahorrar recursos (pausa la simulación efectivamente)."
                         checked={liveFeedEnabled}
                         onChange={(e) => setLiveFeedEnabled(e.currentTarget.checked)}
                         disabled={!activeExperiment}
