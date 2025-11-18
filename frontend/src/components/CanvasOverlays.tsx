@@ -140,53 +140,86 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config }: Canvas
             }
         }
         
-        // Quadtree overlay (visualización de estructura) - OPTIMIZADO
+        // Quadtree overlay (visualización de estructura) - OPTIMIZADO Y MEJORADO
         if (config.showQuadtree && mapData) {
             // OPTIMIZACIÓN: Deshabilitar quadtree automáticamente para grids muy grandes
             const totalCells = gridWidth * gridHeight;
-            const maxCellsForQuadtree = 128 * 128; // Solo mostrar quadtree para grids <= 128x128
+            const maxCellsForQuadtree = 256 * 256; // Aumentado a 256x256 para permitir más casos
             
             if (totalCells > maxCellsForQuadtree) {
-                // Para grids grandes, mostrar solo un mensaje o deshabilitar
-                ctx.fillStyle = 'rgba(255, 200, 0, 0.7)';
+                // Para grids muy grandes, mostrar solo un mensaje o deshabilitar
+                ctx.save();
+                ctx.resetTransform();
+                ctx.fillStyle = 'rgba(255, 200, 0, 0.8)';
                 ctx.font = '12px monospace';
-                ctx.fillText('Quadtree deshabilitado para grids grandes (>128x128)', 10, 20);
-                // No dibujar quadtree para evitar impacto en rendimiento
+                ctx.fillText('Quadtree deshabilitado para grids muy grandes (>256x256)', 10, 30);
+                ctx.restore();
             } else {
-                ctx.strokeStyle = 'rgba(0, 255, 255, 0.5)';
+                ctx.strokeStyle = 'rgba(0, 255, 255, 0.6)';
                 // Ajustar lineWidth según el zoom para que sea consistente visualmente
-                ctx.lineWidth = 1.5 / (baseScale * zoom);
-                
-                // OPTIMIZACIÓN: Usar muestreo para grids medianos
-                const sampleStep = totalCells > 64 * 64 ? 2 : 1; // Muestrear cada 2 píxeles para grids > 64x64
+                const baseLineWidth = 1.5;
+                ctx.lineWidth = Math.max(0.5, baseLineWidth / (baseScale * zoom));
                 
                 // Visualizar estructura quadtree (regiones con datos significativos)
-                const threshold = config.quadtreeThreshold;
-                const maxDepth = totalCells > 64 * 64 ? 4 : 6; // Reducir profundidad para grids grandes
+                const threshold = Math.max(0.0001, config.quadtreeThreshold); // Asegurar threshold mínimo
+                
+                // Calcular profundidad máxima según tamaño del grid
+                let maxDepth = 8; // Profundidad máxima por defecto
+                if (totalCells > 128 * 128) {
+                    maxDepth = 6; // Reducir para grids grandes
+                } else if (totalCells > 64 * 64) {
+                    maxDepth = 7;
+                }
+                
+                // Tamaño mínimo de región para subdividir (evitar subdivisiones innecesarias)
+                const minRegionSize = Math.max(2, Math.min(8, Math.floor(Math.sqrt(totalCells) / 32)));
                 
                 const drawQuadtree = (minX: number, minY: number, maxX: number, maxY: number, depth: number) => {
-                    if (depth > maxDepth) return; // Limitar profundidad según tamaño
+                    if (depth > maxDepth) return; // Limitar profundidad
                     
                     const width = maxX - minX;
                     const height = maxY - minY;
                     
-                    // OPTIMIZACIÓN: Calcular si hay datos significativos usando muestreo
+                    // Si la región es muy pequeña, no subdividir más
+                    if (width < minRegionSize || height < minRegionSize) {
+                        // Verificar si tiene datos significativos en esta región pequeña
+                        let hasData = false;
+                        for (let y = Math.floor(minY); y < Math.ceil(maxY) && y < gridHeight; y++) {
+                            for (let x = Math.floor(minX); x < Math.ceil(maxX) && x < gridWidth; x++) {
+                                const value = Math.abs(mapData[y]?.[x] || 0);
+                                if (value > threshold) {
+                                    hasData = true;
+                                    break;
+                                }
+                            }
+                            if (hasData) break;
+                        }
+                        
+                        if (hasData) {
+                            // Dibujar borde de región pequeña
+                            ctx.strokeRect(minX, minY, width, height);
+                        }
+                        return;
+                    }
+                    
+                    // Para regiones más grandes, usar muestreo inteligente
                     let hasData = false;
                     let maxValue = 0;
-                    let checked = 0;
-                    const maxChecks = 100; // Limitar número de celdas a verificar
+                    let sampleCount = 0;
+                    const maxSamples = Math.min(64, Math.floor(width * height / 4)); // Muestrear hasta 64 puntos
                     
-                    const stepY = Math.max(1, Math.floor((maxY - minY) / Math.sqrt(maxChecks)));
-                    const stepX = Math.max(1, Math.floor((maxX - minX) / Math.sqrt(maxChecks)));
+                    // Calcular paso de muestreo para cubrir la región eficientemente
+                    const sampleStepX = Math.max(1, Math.floor(width / Math.sqrt(maxSamples)));
+                    const sampleStepY = Math.max(1, Math.floor(height / Math.sqrt(maxSamples)));
                     
-                    for (let y = Math.floor(minY); y < Math.ceil(maxY) && y < gridHeight && checked < maxChecks; y += stepY * sampleStep) {
-                        for (let x = Math.floor(minX); x < Math.ceil(maxX) && x < gridWidth && checked < maxChecks; x += stepX * sampleStep) {
+                    for (let y = Math.floor(minY); y < Math.ceil(maxY) && y < gridHeight && sampleCount < maxSamples; y += sampleStepY) {
+                        for (let x = Math.floor(minX); x < Math.ceil(maxX) && x < gridWidth && sampleCount < maxSamples; x += sampleStepX) {
                             const value = Math.abs(mapData[y]?.[x] || 0);
                             if (value > threshold) {
                                 hasData = true;
                                 maxValue = Math.max(maxValue, value);
                             }
-                            checked++;
+                            sampleCount++;
                         }
                     }
                     
@@ -194,11 +227,12 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config }: Canvas
                         // Dibujar borde de región
                         ctx.strokeRect(minX, minY, width, height);
                         
-                        // Si la región es suficientemente grande, subdividir
-                        if (width > 4 && height > 4 && depth < maxDepth) {
+                        // Subdividir si la región es suficientemente grande y no hemos alcanzado la profundidad máxima
+                        if (width > minRegionSize * 2 && height > minRegionSize * 2 && depth < maxDepth) {
                             const midX = (minX + maxX) / 2;
                             const midY = (minY + maxY) / 2;
                             
+                            // Subdividir recursivamente en 4 cuadrantes
                             drawQuadtree(minX, minY, midX, midY, depth + 1);
                             drawQuadtree(midX, minY, maxX, midY, depth + 1);
                             drawQuadtree(minX, midY, midX, maxY, depth + 1);
@@ -207,6 +241,7 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config }: Canvas
                     }
                 };
                 
+                // Iniciar construcción del quadtree desde el grid completo
                 drawQuadtree(0, 0, gridWidth, gridHeight, 0);
             }
         }
