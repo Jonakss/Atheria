@@ -195,17 +195,31 @@ async def simulation_loop():
                         await asyncio.sleep(0.1)
                         continue
                     
-                    # Construir frame_payload_raw
+                    # Construir frame_payload_raw (solo incluir datos necesarios)
+                    viz_type_current = g_state.get('viz_type', 'density')
                     frame_payload_raw = {
                         "step": current_step,
                         "map_data": viz_data.get("map_data", []),
-                        "hist_data": viz_data.get("hist_data", {}),
-                        "poincare_coords": viz_data.get("poincare_coords", []),
-                        "phase_attractor": viz_data.get("phase_attractor"),
-                        "flow_data": viz_data.get("flow_data"),
-                        "phase_hsv_data": viz_data.get("phase_hsv_data"),
-                        "complex_3d_data": viz_data.get("complex_3d_data")
                     }
+                    
+                    # Solo incluir datos adicionales si se necesitan para la visualización actual
+                    if viz_type_current in ['histogram']:
+                        frame_payload_raw["hist_data"] = viz_data.get("hist_data", {})
+                    
+                    if viz_type_current in ['poincare', 'poincare_3d']:
+                        frame_payload_raw["poincare_coords"] = viz_data.get("poincare_coords", [])
+                    
+                    if viz_type_current == 'phase_attractor':
+                        frame_payload_raw["phase_attractor"] = viz_data.get("phase_attractor")
+                    
+                    if viz_type_current == 'flow':
+                        frame_payload_raw["flow_data"] = viz_data.get("flow_data")
+                    
+                    if viz_type_current == 'phase_hsv':
+                        frame_payload_raw["phase_hsv_data"] = viz_data.get("phase_hsv_data")
+                    
+                    if viz_type_current == 'complex_3d':
+                        frame_payload_raw["complex_3d_data"] = viz_data.get("complex_3d_data")
                     
                     # Optimizar payload (compresión, ROI, etc.)
                     frame_payload = await optimize_frame_payload(frame_payload_raw)
