@@ -1,23 +1,64 @@
 // frontend/src/components/LogOverlay.tsx
-import { Paper, ScrollArea, Text, Box, Title, Center, Stack, Tabs, Collapse, Button, Group } from '@mantine/core';
+import { Paper, ScrollArea, Text, Box, Title, Center, Stack, Tabs, Collapse, Button, Group, ActionIcon } from '@mantine/core';
 import { useWebSocket } from '../hooks/useWebSocket';
 import classes from './LogOverlay.module.css';
-import { useEffect, useRef, useState } from 'react';
-import { IconInfoCircle, IconChevronUp, IconChevronDown, IconFileText, IconChartBar } from '@tabler/icons-react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { IconInfoCircle, IconChevronUp, IconChevronDown, IconFileText, IconChartBar, IconMinus, IconGripVertical } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 
 export function LogOverlay() {
     const { allLogs, trainingStatus, inferenceStatus, trainingProgress, experimentsData, activeExperiment } = useWebSocket();
     const viewport = useRef<HTMLDivElement>(null);
     const [opened, { toggle }] = useDisclosure(false);
+    const [minimized, setMinimized] = useState(false);
     const [activeTab, setActiveTab] = useState<string | null>('logs');
+    const [height, setHeight] = useState(300);
+    const [isResizing, setIsResizing] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     // Scroll automático al final
     useEffect(() => {
-        if (viewport.current && opened) {
+        if (viewport.current && opened && !minimized) {
             viewport.current.scrollTo({ top: viewport.current.scrollHeight, behavior: 'smooth' });
         }
-    }, [allLogs, opened]);
+    }, [allLogs, opened, minimized]);
+
+    // Manejar redimensionamiento
+    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsResizing(true);
+    }, []);
+
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!isResizing) return;
+            const newHeight = window.innerHeight - e.clientY;
+            // Limitar altura entre 100px y 80% de la ventana
+            const minHeight = 100;
+            const maxHeight = window.innerHeight * 0.8;
+            setHeight(Math.max(minHeight, Math.min(maxHeight, newHeight)));
+        };
+
+        const handleMouseUp = () => {
+            setIsResizing(false);
+        };
+
+        if (isResizing) {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+            return () => {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+            };
+        }
+    }, [isResizing]);
+
+    // Si está minimizado, colapsar también
+    useEffect(() => {
+        if (minimized && opened) {
+            // No hacer nada, solo mantener minimizado
+        }
+    }, [minimized, opened]);
 
     const hasLogs = allLogs && allLogs.length > 0;
     
@@ -46,18 +87,39 @@ export function LogOverlay() {
 
     return (
         <Box 
+            ref={containerRef}
             style={{
                 position: 'fixed',
-                bottom: 0,
+                bottom: minimized ? 0 : 0,
                 left: 0,
                 right: 0,
                 zIndex: 1000,
                 backgroundColor: 'var(--mantine-color-dark-7)',
                 borderTop: '1px solid var(--mantine-color-dark-4)',
-                boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.3)'
+                boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.3)',
+                transition: minimized ? 'none' : 'height 0.2s ease'
             }}
         >
-            <Group justify="space-between" p="xs" style={{ borderBottom: opened ? '1px solid var(--mantine-color-dark-4)' : 'none' }}>
+            {/* Handle de redimensionamiento */}
+            {opened && !minimized && (
+                <Box
+                    onMouseDown={handleMouseDown}
+                    style={{
+                        height: '4px',
+                        cursor: 'ns-resize',
+                        backgroundColor: isResizing ? 'var(--mantine-color-blue-6)' : 'var(--mantine-color-dark-4)',
+                        position: 'relative',
+                        zIndex: 1001,
+                        transition: 'background-color 0.2s'
+                    }}
+                >
+                    <Center h="100%">
+                        <IconGripVertical size={12} style={{ opacity: 0.5 }} />
+                    </Center>
+                </Box>
+            )}
+            
+            <Group justify="space-between" p="xs" style={{ borderBottom: opened && !minimized ? '1px solid var(--mantine-color-dark-4)' : 'none' }}>
                 <Group gap="xs">
                     <Button
                         variant="subtle"
@@ -73,10 +135,28 @@ export function LogOverlay() {
                         </Text>
                     )}
                 </Group>
+                <Group gap="xs">
+                    {opened && (
+                        <ActionIcon
+                            variant="subtle"
+                            size="sm"
+                            onClick={() => {
+                                setMinimized(!minimized);
+                                if (minimized) {
+                                    // Al expandir, restaurar altura
+                                    setHeight(300);
+                                }
+                            }}
+                            title={minimized ? "Expandir" : "Minimizar completamente"}
+                        >
+                            {minimized ? <IconChevronUp size={16} /> : <IconMinus size={16} />}
+                        </ActionIcon>
+                    )}
+                </Group>
             </Group>
             
-            <Collapse in={opened}>
-                <Box style={{ height: '300px', display: 'flex', flexDirection: 'column' }}>
+            <Collapse in={opened && !minimized}>
+                <Box style={{ height: `${height}px`, display: 'flex', flexDirection: 'column', maxHeight: '80vh' }}>
                     <Tabs value={activeTab} onChange={setActiveTab} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                         <Tabs.List>
                             <Tabs.Tab value="logs" leftSection={<IconFileText size={14} />}>
