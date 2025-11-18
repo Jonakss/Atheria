@@ -224,6 +224,14 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         };
                         setSimData(decompressedPayload);
                         break;
+                    case 'simulation_step_update':
+                        // Actualización ligera del paso en modo turbo (sin visualización completa)
+                        setSimData(prev => ({
+                            ...prev,
+                            step: payload.step,
+                            turbo_mode: payload.turbo_mode
+                        }));
+                        break;
                     case 'training_log':
                         setTrainingLog(prev => [...prev, payload]);
                         setAllLogs(prev => [...prev, payload]);

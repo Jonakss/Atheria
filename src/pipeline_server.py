@@ -152,9 +152,17 @@ async def simulation_loop():
                     
                     # --- MODO TURBO (Visualización apagada) ---
                     if not live_feed_enabled:
-                        # Guardar historial mínimo si está habilitado (opcional)
-                        # ... (tu código de historial existente) ...
-
+                        # Enviar actualización ligera del paso cada 10 frames
+                        # Esto permite ver el progreso sin el costo de generar visualizaciones
+                        if current_step % 10 == 0:
+                            await broadcast({
+                                "type": "simulation_step_update",
+                                "payload": {
+                                    "step": current_step,
+                                    "turbo_mode": True
+                                }
+                            })
+                        
                         # Log ocasional para saber que sigue corriendo
                         if current_step % 100 == 0:
                             await broadcast({

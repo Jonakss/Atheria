@@ -217,42 +217,43 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
     else:
         map_data = np.zeros_like(map_data)
 
-    # --- Cálculo de datos para Poincaré ---
-    try:
-        psi_flat_real = psi.real.reshape(-1, psi.shape[-1]).cpu().numpy()
-        psi_flat_imag = psi.imag.reshape(-1, psi.shape[-1]).cpu().numpy()
-        psi_flat_for_pca = np.concatenate([psi_flat_real, psi_flat_imag], axis=1)
-        
-        # Validar que hay suficientes puntos para PCA
-        if psi_flat_for_pca.shape[0] < 2:
-            poincare_coords = [[0.0, 0.0]]  # Coordenada por defecto
-        else:
-            poincare_coords = pca.fit_transform(psi_flat_for_pca)
-            max_abs_val = np.max(np.abs(poincare_coords))
-            if max_abs_val > 0:
-                poincare_coords = poincare_coords / max_abs_val
-    except Exception as e:
-        import logging
-        logging.warning(f"Error al calcular coordenadas de Poincaré: {e}. Usando coordenadas por defecto.")
-        poincare_coords = [[0.0, 0.0]]
+    # --- Cálculo de datos para Poincaré (solo si se necesita) ---
+    poincare_coords = [[0.0, 0.0]]  # Default
+    if viz_type in ['poincare', 'poincare_3d']:
+        try:
+            psi_flat_real = psi.real.reshape(-1, psi.shape[-1]).cpu().numpy()
+            psi_flat_imag = psi.imag.reshape(-1, psi.shape[-1]).cpu().numpy()
+            psi_flat_for_pca = np.concatenate([psi_flat_real, psi_flat_imag], axis=1)
+            
+            # Validar que hay suficientes puntos para PCA
+            if psi_flat_for_pca.shape[0] >= 2:
+                poincare_coords = pca.fit_transform(psi_flat_for_pca)
+                max_abs_val = np.max(np.abs(poincare_coords))
+                if max_abs_val > 0:
+                    poincare_coords = poincare_coords / max_abs_val
+        except Exception as e:
+            import logging
+            logging.warning(f"Error al calcular coordenadas de Poincaré: {e}. Usando coordenadas por defecto.")
 
-    # --- ¡¡CORRECCIÓN!! Lógica de histogramas restaurada ---
-    density_flat = density.flatten()
-    phase_flat = phase.flatten()
-    real_flat = real_part.flatten()
-    imag_flat = imag_part.flatten()
+    # --- Histogramas (solo si se necesitan) ---
+    hist_data = {}
+    if viz_type == 'histogram':
+        density_flat = density.flatten()
+        phase_flat = phase.flatten()
+        real_flat = real_part.flatten()
+        imag_flat = imag_part.flatten()
 
-    density_hist, density_bins = np.histogram(density_flat, bins=30, range=(0, np.max(density_flat) if np.max(density_flat) > 0 else 1))
-    phase_hist, phase_bins = np.histogram(phase_flat, bins=30, range=(-np.pi, np.pi))
-    real_hist, real_bins = np.histogram(real_flat, bins=30, range=(-1, 1))
-    imag_hist, imag_bins = np.histogram(imag_flat, bins=30, range=(-1, 1))
+        density_hist, density_bins = np.histogram(density_flat, bins=30, range=(0, np.max(density_flat) if np.max(density_flat) > 0 else 1))
+        phase_hist, phase_bins = np.histogram(phase_flat, bins=30, range=(-np.pi, np.pi))
+        real_hist, real_bins = np.histogram(real_flat, bins=30, range=(-1, 1))
+        imag_hist, imag_bins = np.histogram(imag_flat, bins=30, range=(-1, 1))
 
-    hist_data = {
-        'density': [{"bin": f"{density_bins[i]:.2f}", "count": int(density_hist[i])} for i in range(len(density_hist))],
-        'phase': [{"bin": f"{phase_bins[i]:.2f}", "count": int(phase_hist[i])} for i in range(len(phase_hist))],
-        'real': [{"bin": f"{real_bins[i]:.2f}", "count": int(real_hist[i])} for i in range(len(real_hist))],
-        'imag': [{"bin": f"{imag_bins[i]:.2f}", "count": int(imag_hist[i])} for i in range(len(imag_hist))],
-    }
+        hist_data = {
+            'density': [{"bin": f"{density_bins[i]:.2f}", "count": int(density_hist[i])} for i in range(len(density_hist))],
+            'phase': [{"bin": f"{phase_bins[i]:.2f}", "count": int(phase_hist[i])} for i in range(len(phase_hist))],
+            'real': [{"bin": f"{real_bins[i]:.2f}", "count": int(real_hist[i])} for i in range(len(real_hist))],
+            'imag': [{"bin": f"{imag_bins[i]:.2f}", "count": int(imag_hist[i])} for i in range(len(imag_hist))],
+        }
 
     result = {
         "map_data": map_data.tolist(),
@@ -288,9 +289,8 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
     
     # --- NUEVAS VISUALIZACIONES ---
     
-    # 1. Phase Attractor: Scatter plot de canales 0 y 1 para célula central
-    # La célula central se selecciona siempre en el centro del grid, independientemente del tamaño
-    if psi.shape[-1] >= 2:
+    # 1. Phase Attractor: Solo calcular si se necesita
+    if viz_type == 'phase_attractor' and psi.shape[-1] >= 2:
         # Determinar dimensiones correctas
         if len(psi.shape) == 3:  # (H, W, d_state)
             h, w = psi.shape[0], psi.shape[1]
@@ -326,9 +326,8 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
     else:
         result["phase_attractor"] = None
     
-    # 2. Flow Viewer: Quiver plot con delta_psi
-    # Calcular siempre flow_data si delta_psi está disponible (no solo cuando viz_type == 'flow')
-    if delta_psi is not None:
+    # 2. Flow Viewer: Solo calcular si se necesita (viz_type == 'flow')
+    if delta_psi is not None and viz_type == 'flow':
         try:
             # Convertir delta_psi a numpy
             if isinstance(delta_psi, torch.Tensor):
