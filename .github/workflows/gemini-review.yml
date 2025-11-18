@@ -20,6 +20,9 @@ jobs:
   review:
     runs-on: 'ubuntu-latest'
     timeout-minutes: 7
+    # Skip this job if no authentication is configured
+    if: |-
+      ${{ secrets.GEMINI_API_KEY != '' || secrets.GOOGLE_API_KEY != '' || vars.GCP_WIF_PROVIDER != '' }}
     permissions:
       contents: 'read'
       id-token: 'write'
