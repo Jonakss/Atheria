@@ -134,6 +134,9 @@ class QC_Trainer_v3:
         psi_final = psi_initial
         for step in range(self.qca_steps):
             psi_final = self.motor.evolve_step(psi_final)
+            # Limpiar caché periódicamente durante la evolución (cada 5 pasos)
+            if torch.cuda.is_available() and step % 5 == 0 and step > 0:
+                torch.cuda.empty_cache()
         
         # IMPORTANTE: Resetear estados de memoria después de cada episodio de entrenamiento
         # para evitar problemas con backward a través de múltiples episodios
@@ -162,7 +165,22 @@ class QC_Trainer_v3:
         
         self.optimizer.step()
         
-        return loss.item(), total_reward.item(), reward_quietud.item(), reward_complejidad.item()
+        # Guardar valores antes de liberar memoria
+        loss_val = loss.item()
+        reward_val = total_reward.item()
+        reward_quietud_val = reward_quietud.item()
+        reward_complejidad_val = reward_complejidad.item()
+        
+        # Limpiar memoria GPU después de cada episodio
+        if torch.cuda.is_available():
+            # Liberar tensores intermedios
+            del psi_initial, psi_final, loss, total_reward, reward_quietud, reward_complejidad
+            # Limpiar caché de GPU
+            torch.cuda.empty_cache()
+            # Sincronizar para asegurar que la limpieza se complete
+            torch.cuda.synchronize()
+        
+        return loss_val, reward_val, reward_quietud_val, reward_complejidad_val
     
     def save_checkpoint(self, episode, loss, reward):
         """Guarda un checkpoint del entrenamiento."""
@@ -233,6 +251,11 @@ class QC_Trainer_v3:
                     last_loss = loss
                     last_reward = reward
                     last_episode = episode
+                    
+                    # Limpiar memoria GPU cada 10 episodios (limpieza adicional)
+                    if torch.cuda.is_available() and episode % 10 == 0:
+                        torch.cuda.empty_cache()
+                        torch.cuda.synchronize()
                     
                     # Log cada 10 episodios
                     if episode % 10 == 0:
