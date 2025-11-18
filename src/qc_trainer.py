@@ -30,8 +30,10 @@ class QC_Trainer_v3:
         self.exp_cfg = exp_cfg
         
         # Configurar optimizador
+        # Usar get_model_for_params() para acceder a parámetros correctamente
+        model_for_params = self.motor.get_model_for_params()
         self.optimizer = optim.Adam(
-            self.motor.operator.parameters(),
+            model_for_params.parameters(),
             lr=self.lr_rate
         )
         
@@ -123,7 +125,9 @@ class QC_Trainer_v3:
         Returns:
             (loss, reward, reward_quietud, reward_complejidad)
         """
-        self.motor.operator.train()
+        # Usar get_model_for_params() para acceder al modelo correctamente
+        model_for_params = self.motor.get_model_for_params()
+        model_for_params.train()
         self.optimizer.zero_grad()
         
         # Inicializar estados del batch
@@ -158,8 +162,10 @@ class QC_Trainer_v3:
         
         # Gradient clipping
         if self.gradient_clip > 0:
+            # Usar get_model_for_params() para acceder a parámetros correctamente
+            model_for_params = self.motor.get_model_for_params()
             torch.nn.utils.clip_grad_norm_(
-                self.motor.operator.parameters(),
+                model_for_params.parameters(),
                 self.gradient_clip
             )
         
@@ -207,7 +213,9 @@ class QC_Trainer_v3:
                     return str(obj)
         
         # Obtener el state_dict del modelo, manejando modelos compilados
-        model_state_dict = self.motor.operator.state_dict()
+        # Usar get_model_for_params() para acceder al modelo correctamente
+        model_for_params = self.motor.get_model_for_params()
+        model_state_dict = model_for_params.state_dict()
         
         # Si el modelo está compilado, las claves tienen prefijo "_orig_mod."
         # Remover el prefijo para guardar el modelo sin compilar

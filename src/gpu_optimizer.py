@@ -40,20 +40,15 @@ class GPUOptimizer:
         
         Args:
             model: Modelo a optimizar
+        
+        Nota: No compila el modelo aquí, eso se hace después con compile_model()
+        para mantener una referencia al modelo original.
         """
         # Poner en modo evaluación (desactiva dropout, batch norm en modo train, etc.)
         model.eval()
         
-        # Desactivar gradiientes globalmente si es CUDA
-        if self.is_cuda:
-            # Compilar con torch.compile si está disponible (PyTorch 2.0+)
-            try:
-                if hasattr(torch, 'compile') and not model.training:
-                    # Compilar para inferencia más rápida
-                    model = torch.compile(model, mode='reduce-overhead')
-                    logging.info("Modelo compilado con torch.compile para inferencia optimizada")
-            except Exception as e:
-                logging.debug(f"No se pudo compilar el modelo (puede no estar disponible): {e}")
+        # NO compilar aquí - la compilación se hace después en compile_model()
+        # para mantener una referencia al modelo original
         
         return model
     

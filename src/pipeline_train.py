@@ -24,7 +24,7 @@ def run_training_pipeline(exp_cfg: SimpleNamespace, checkpoint_path: str | None 
     if checkpoint_path:
         # Continuar entrenamiento: cargar modelo con checkpoint del mismo experimento
         ley_M, state_dict = load_model(exp_cfg, checkpoint_path)
-    if ley_M is None:
+        if ley_M is None:
             logging.error("No se pudo cargar el modelo desde el checkpoint. Abortando entrenamiento.")
             return
         # El modelo ya está en modo eval después de load_model, cambiar a train
@@ -71,9 +71,10 @@ def run_training_pipeline(exp_cfg: SimpleNamespace, checkpoint_path: str | None 
         try:
             ley_M = create_new_model(exp_cfg)
             logging.info("Nuevo modelo creado para entrenamiento desde cero.")
+            ley_M.train()
         except Exception as e:
             logging.error(f"Error al crear el modelo: {e}", exc_info=True)
-        return
+            return
 
     # 2. Inicializar el Motor Aetheria
     # Pasar exp_cfg para que el motor tenga acceso a GAMMA_DECAY (término Lindbladian)
@@ -85,7 +86,10 @@ def run_training_pipeline(exp_cfg: SimpleNamespace, checkpoint_path: str | None 
     else:
         logging.info(f"El modelo '{exp_cfg.MODEL_ARCHITECTURE}' ha deshabilitado torch.compile(). Se ejecutará sin compilar.")
     
-    num_params = sum(p.numel() for p in motor.operator.parameters() if p.requires_grad)
+    # Usar get_model_for_params() para acceder a los parámetros correctamente
+    # (maneja el caso cuando el modelo está compilado)
+    model_for_params = motor.get_model_for_params()
+    num_params = sum(p.numel() for p in model_for_params.parameters() if p.requires_grad)
     print(f"Motor y Ley-M ({exp_cfg.MODEL_ARCHITECTURE}) inicializados. Cuadrícula: {exp_cfg.GRID_SIZE_TRAINING}x{exp_cfg.GRID_SIZE_TRAINING}.")
     print(f"Parámetros Entrenables: {num_params}")
 

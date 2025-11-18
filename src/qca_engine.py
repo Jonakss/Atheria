@@ -79,10 +79,19 @@ class Aetheria_Motor:
         self.device = device
         self.grid_size = int(grid_size)
         self.d_state = int(d_state)
+        
+        # Guardar referencia al modelo original antes de cualquier optimización
+        self.original_model = model_operator
+        
+        # Optimizar modelo para inferencia
+        from .gpu_optimizer import get_optimizer
+        self.optimizer = get_optimizer(device)
+        model_operator = self.optimizer.optimize_model(model_operator)
+        
         self.operator = model_operator.to(self.device)
         
-        # Detectar si el modelo usa ConvLSTM
-        self.has_memory = hasattr(model_operator, 'convlstm') or 'ConvLSTM' in model_operator.__class__.__name__
+        # Detectar si el modelo usa ConvLSTM (usar modelo original para detección)
+        self.has_memory = hasattr(self.original_model, 'convlstm') or 'ConvLSTM' in self.original_model.__class__.__name__
         
         # Obtener modo de inicialización desde cfg o usar default
         initial_mode = 'complex_noise'
@@ -104,7 +113,13 @@ class Aetheria_Motor:
 
     def evolve_internal_state(self):
         if self.state.psi is None: return
-        with torch.no_grad():
+        
+        # Usar inference_mode en lugar de no_grad para mejor rendimiento
+        from .gpu_optimizer import GPUOptimizer
+        with GPUOptimizer.enable_inference_mode():
+            # Limpiar cache de GPU periódicamente
+            self.optimizer.empty_cache_if_needed()
+            
             self.state.psi = self._evolve_logic(self.state.psi)
 
     def evolve_step(self, current_psi):
@@ -375,7 +390,7 @@ class Aetheria_Motor:
         return laplacian_complex.permute(0, 2, 3, 1)
 
     def compile_model(self):
-        if not hasattr(self.operator, '_compiles') or self.operator._compiles:
+        if not hasattr(self.original_model, '_compiles') or self.original_model._compiles:
             if not self.is_compiled:
                 try:
                     logging.info("Aplicando torch.compile() al modelo...")
@@ -385,4 +400,19 @@ class Aetheria_Motor:
                 except Exception as e:
                     logging.warning(f"torch.compile() falló: {e}. El modelo se ejecutará sin compilar.")
         else:
-            logging.info(f"torch.compile() omitido para el modelo {self.operator.__class__.__name__} según su configuración.")
+            logging.info(f"torch.compile() omitido para el modelo {self.original_model.__class__.__name__} según su configuración.")
+    
+    def get_model_for_params(self):
+        """
+        Obtiene el modelo que se puede usar para acceder a parámetros.
+        Si el modelo está compilado, devuelve el modelo original.
+        """
+        # Si está compilado, intentar acceder al modelo original
+        if self.is_compiled:
+            # torch.compile puede envolver el modelo, intentar acceder a _orig_mod
+            if hasattr(self.operator, '_orig_mod'):
+                return self.operator._orig_mod
+            # Si no tiene _orig_mod, usar el modelo original guardado
+            return self.original_model
+        # Si no está compilado, devolver el operador directamente
+        return self.operator
