@@ -8,6 +8,7 @@ import { AdvancedControls } from './AdvancedControls';
 import { ExperimentManager } from './ExperimentManager';
 import { CheckpointManager } from './CheckpointManager';
 import { ExperimentInfo } from './ExperimentInfo';
+import { TransferLearningWizard } from './TransferLearningWizard';
 import classes from './LabSider.module.css';
 
 export function LabSider() {
@@ -28,6 +29,7 @@ export function LabSider() {
     const [transferFromExperiment, setTransferFromExperiment] = useState<string | null>(null);
     const [gammaDecay, setGammaDecay] = useState(0.01);  // Término Lindbladian (decaimiento)
     const [initialStateMode, setInitialStateMode] = useState('complex_noise');  // Modo de inicialización del estado
+    const [transferWizardOpened, setTransferWizardOpened] = useState(false);
 
     const handleCreateExperiment = () => {
         // Validaciones
@@ -298,11 +300,26 @@ export function LabSider() {
                         </Tooltip>
                         <Divider label="O crear uno nuevo" labelPosition="center" my="sm" />
                         
-                        {/* Selector de Transfer Learning con validación */}
+                        {/* Botón para Transfer Learning Wizard */}
+                        <Button
+                            variant="light"
+                            color="blue"
+                            leftSection={<IconTransfer size={16} />}
+                            onClick={() => setTransferWizardOpened(true)}
+                            fullWidth
+                            mb="xs"
+                        >
+                            Transfer Learning (Wizard)
+                        </Button>
+                        <Text size="xs" c="dimmed" ta="center" mb="md">
+                            Usa el wizard para crear experimentos con transfer learning de forma guiada
+                        </Text>
+                        
+                        {/* Selector de Transfer Learning con validación (método manual, opcional) */}
                         <Box>
                             <Select 
-                                label="Entrenamiento Progresivo (Opcional)" 
-                                placeholder="Seleccionar experimento base"
+                                label="Entrenamiento Progresivo (Manual, Opcional)" 
+                                placeholder="O selecciona manualmente..."
                                 data={experimentsData?.filter(exp => {
                                     // Solo mostrar experimentos que tienen checkpoint
                                     if (!exp.has_checkpoint) return false;
@@ -336,7 +353,7 @@ export function LabSider() {
                                 }}
                                 clearable
                                 leftSection={<IconTransfer size={16} />}
-                                description="Carga pesos de un experimento entrenado para acelerar el entrenamiento."
+                                description="Método manual: solo carga pesos, no ajusta configuración"
                             />
                             {transferFromExperiment && (
                                 <Alert 
@@ -371,20 +388,16 @@ export function LabSider() {
                             label="Learning Rate" 
                             value={learningRate} 
                             onChange={(val) => setLearningRate(Number(val) || 0)} 
-                            precision={5} 
                             step={0.00001} 
-                            format="decimal" 
                         />
                         <NumberInput 
                             label="Gamma Decay (Lindbladian)" 
                             description="Término de decaimiento para sistemas abiertos (0.0 = cerrado, >0 = abierto)"
                             value={gammaDecay} 
                             onChange={(val) => setGammaDecay(Number(val) || 0)} 
-                            precision={4} 
                             step={0.001} 
                             min={0} 
                             max={1}
-                            format="decimal"
                         />
                         <Select
                             label="Modo de Inicialización"
@@ -429,6 +442,12 @@ export function LabSider() {
                     </Stack>
                 </Stack>
             </ScrollArea>
+            
+            {/* Transfer Learning Wizard */}
+            <TransferLearningWizard 
+                opened={transferWizardOpened}
+                onClose={() => setTransferWizardOpened(false)}
+            />
         </Box>
     );
 }
