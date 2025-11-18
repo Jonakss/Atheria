@@ -1673,13 +1673,36 @@ async def main(shutdown_event=None):
     
     logging.info(f"Servidor Aetheria listo y escuchando en http://{global_cfg.LAB_SERVER_HOST}:{global_cfg.LAB_SERVER_PORT}")
     logging.info("Nota: Si estás usando Lightning AI o un proxy reverso, asegúrate de que el puerto esté correctamente exportado.")
+    
+    # Iniciar el sitio en una tarea separada para poder detenerlo cuando sea necesario
     await site.start()
     
     # Mantiene el servidor corriendo hasta que se solicite el shutdown
     if shutdown_event:
-        await shutdown_event.wait()
-        logging.info("Shutdown solicitado. Cerrando servidor...")
-        await runner.cleanup()
+        try:
+            await shutdown_event.wait()
+            logging.info("Shutdown solicitado. Cerrando servidor...")
+        except asyncio.CancelledError:
+            logging.info("Shutdown cancelado.")
+        finally:
+            # Detener el sitio y limpiar el runner con timeout
+            try:
+                logging.info("Deteniendo sitio...")
+                await asyncio.wait_for(site.stop(), timeout=5.0)
+                logging.info("Sitio detenido correctamente.")
+            except asyncio.TimeoutError:
+                logging.warning("Timeout al detener el sitio. Continuando con limpieza...")
+            except Exception as e:
+                logging.warning(f"Error al detener el sitio: {e}")
+            
+            try:
+                logging.info("Limpiando runner...")
+                await asyncio.wait_for(runner.cleanup(), timeout=5.0)
+                logging.info("Runner limpiado. Servidor cerrado correctamente.")
+            except asyncio.TimeoutError:
+                logging.warning("Timeout al limpiar el runner. El servidor puede no haberse cerrado completamente.")
+            except Exception as e:
+                logging.warning(f"Error al limpiar el runner: {e}")
     else:
         # Fallback: mantener el servidor corriendo indefinidamente
         await asyncio.Event().wait()

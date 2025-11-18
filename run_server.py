@@ -66,23 +66,46 @@ if __name__ == "__main__":
     # Variables globales para almacenar el event loop y el shutdown event
     shutdown_event = None
     main_loop = None
+    shutdown_in_progress = False
     
     # Configurar handler de señales para guardar estado antes de cerrar
     def signal_handler(signum, frame):
+        global shutdown_in_progress
+        if shutdown_in_progress:
+            log.warning(f"Señal {signum} recibida durante shutdown. Forzando salida...")
+            # Si ya estamos en proceso de shutdown y recibimos otra señal, salir inmediatamente
+            import sys
+            sys.exit(1)
+        
         log.info(f"Señal {signum} recibida. Iniciando shutdown graceful...")
+        shutdown_in_progress = True
+        
         # Configurar el evento en el event loop actual
         if shutdown_event and main_loop:
             main_loop.call_soon_threadsafe(shutdown_event.set)
+        else:
+            log.warning("Shutdown event o main loop no están disponibles. Forzando salida...")
+            import sys
+            sys.exit(1)
     
     # Registrar handlers de señales
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
     async def run_with_shutdown():
-        global shutdown_event, main_loop
+        global shutdown_event, main_loop, shutdown_in_progress
         shutdown_event = asyncio.Event()
         main_loop = asyncio.get_running_loop()
-        await pipeline_server.main(shutdown_event)
+        
+        try:
+            await pipeline_server.main(shutdown_event)
+        except asyncio.CancelledError:
+            log.info("Tareas canceladas durante shutdown.")
+        except Exception as e:
+            log.error(f"Error durante ejecución del servidor: {e}", exc_info=True)
+        finally:
+            shutdown_in_progress = False
+            log.info("Servidor cerrado completamente.")
     
     try:
         # Usar el main del módulo importado pasando el evento de shutdown
