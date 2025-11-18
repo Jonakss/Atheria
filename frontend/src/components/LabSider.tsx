@@ -1,6 +1,6 @@
 // frontend/src/components/LabSider.tsx
 import { useState } from 'react';
-import { Box, Button, NavLink, ScrollArea, Select, Stack, Text, Group, NumberInput, Progress, Collapse, Divider, Badge, Tooltip, Alert, Paper } from '@mantine/core';
+import { Box, Button, NavLink, ScrollArea, Select, Stack, Text, Group, NumberInput, Progress, Divider, Badge, Tooltip, Alert, Paper } from '@mantine/core';
 import { IconPlayerPlay, IconPlayerPause, IconRefresh, IconUpload, IconPlug, IconCheck, IconX, IconAlertCircle, IconInfoCircle, IconTransfer } from '@tabler/icons-react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { modelOptions, vizOptions } from '../utils/vizOptions';
@@ -169,21 +169,23 @@ export function LabSider() {
 
             <ScrollArea style={{ flex: 1, marginTop: 'var(--mantine-spacing-md)' }}>
                 <Stack gap="xl">
-                    <Collapse in={trainingStatus === 'running'}>
-                        <Stack gap="xs">
-                            <Text size="xs" fw={700} className={classes.sectionTitle}>PROGRESO DEL ENTRENAMIENTO</Text>
-                            <Progress value={progressPercent} animated />
-                            {trainingProgress && (
-                                <Text size="xs" c="dimmed">
-                                    Episodio {trainingProgress.current_episode}/{trainingProgress.total_episodes} | 
-                                    Pérdida: {trainingProgress.avg_loss.toFixed(6)}
-                                </Text>
-                            )}
-                            <Button color="red" variant="outline" size="xs" onClick={() => sendCommand('experiment', 'stop')}>
-                                Detener Entrenamiento
-                            </Button>
-                        </Stack>
-                    </Collapse>
+                    {trainingStatus === 'running' && (
+                        <Box style={{ display: 'block' }}>
+                            <Stack gap="xs">
+                                <Text size="xs" fw={700} className={classes.sectionTitle}>PROGRESO DEL ENTRENAMIENTO</Text>
+                                <Progress value={progressPercent} animated />
+                                {trainingProgress && (
+                                    <Text size="xs" c="dimmed">
+                                        Episodio {trainingProgress.current_episode}/{trainingProgress.total_episodes} | 
+                                        Pérdida: {trainingProgress.avg_loss.toFixed(6)}
+                                    </Text>
+                                )}
+                                <Button color="red" variant="outline" size="xs" onClick={() => sendCommand('experiment', 'stop')}>
+                                    Detener Entrenamiento
+                                </Button>
+                            </Stack>
+                        </Box>
+                    )}
 
                     <Stack gap="sm">
                         <Text size="xs" fw={700} className={classes.sectionTitle}>INFERENCIA</Text>
