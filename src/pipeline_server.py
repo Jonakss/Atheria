@@ -9,7 +9,7 @@ from pathlib import Path
 
 # Asumimos la existencia y correcto funcionamiento de estos módulos locales
 from . import config as global_cfg
-from .server_state import g_state, broadcast, send_notification, send_to_websocket
+from .server_state import g_state, broadcast, send_notification, send_to_websocket, optimize_frame_payload, get_payload_size, apply_roi_to_payload
 from .utils import get_experiment_list, load_experiment_config, get_latest_checkpoint
 from .server_handlers import create_experiment_handler
 from .pipeline_viz import get_visualization_data
@@ -24,7 +24,19 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%
 async def websocket_handler(request):
     """Maneja las conexiones WebSocket entrantes."""
     ws = web.WebSocketResponse()
-    await ws.prepare(request)
+    
+    # Manejar errores durante la preparación de la conexión (reconexiones rápidas, etc.)
+    try:
+        await ws.prepare(request)
+    except (ConnectionResetError, ConnectionError, OSError) as e:
+        # El cliente se desconectó antes de establecer la conexión - esto es normal
+        # No loguear como error, solo como debug
+        logging.debug(f"Conexión WebSocket cancelada durante preparación: {type(e).__name__}")
+        return ws
+    except Exception as e:
+        # Otros errores inesperados
+        logging.error(f"Error preparando conexión WebSocket: {e}", exc_info=True)
+        return ws
     
     ws_id = str(uuid.uuid4())
     g_state['websockets'][ws_id] = ws
@@ -40,7 +52,17 @@ async def websocket_handler(request):
             "inference_status": "running" if not g_state.get('is_paused', True) else "paused"
         }
     }
-    await ws.send_json(initial_state)
+    # Enviar estado inicial - manejar errores de conexión
+    try:
+        await ws.send_json(initial_state)
+    except (ConnectionResetError, ConnectionError, OSError) as e:
+        # Cliente ya se desconectó - limpiar y retornar
+        if ws_id in g_state['websockets']:
+            del g_state['websockets'][ws_id]
+        logging.debug(f"Conexión WebSocket cerrada antes de enviar estado inicial: {type(e).__name__}")
+        return ws
+    except Exception as e:
+        logging.warning(f"Error enviando estado inicial a WebSocket {ws_id}: {e}")
     
     try:
         async for msg in ws:
@@ -67,9 +89,27 @@ async def websocket_handler(request):
                     await send_notification(ws, "Error al procesar el comando.", "error")
                 except Exception as e:
                     logging.error(f"Error procesando comando: {e}", exc_info=True)
-                    await send_notification(ws, f"Error al ejecutar comando: {str(e)}", "error")
+                    try:
+                        await send_notification(ws, f"Error al ejecutar comando: {str(e)}", "error")
+                    except (ConnectionResetError, ConnectionError, OSError):
+                        # Cliente ya se desconectó
+                        break
             elif msg.type == web.WSMsgType.ERROR:
-                logging.error(f"Error en WebSocket: {ws.exception()}")
+                exception = ws.exception()
+                if exception:
+                    # Solo loguear errores reales, no desconexiones normales
+                    if isinstance(exception, (ConnectionResetError, ConnectionError, OSError)):
+                        logging.debug(f"WebSocket {ws_id} desconectado: {type(exception).__name__}")
+                    else:
+                        logging.error(f"Error en WebSocket {ws_id}: {exception}")
+            elif msg.type == web.WSMsgType.CLOSE:
+                # Desconexión limpia
+                logging.debug(f"WebSocket {ws_id} cerrado normalmente")
+    except (ConnectionResetError, ConnectionError, OSError) as e:
+        # Desconexión durante el loop - normal durante reconexiones
+        logging.debug(f"Conexión WebSocket {ws_id} interrumpida: {type(e).__name__}")
+    except Exception as e:
+        logging.error(f"Error inesperado en WebSocket {ws_id}: {e}", exc_info=True)
     finally:
         # Limpiar la conexión
         if ws_id in g_state['websockets']:
@@ -138,6 +178,7 @@ async def simulation_loop():
                         continue
                     
                     # --- CALCULAR VISUALIZACIONES SOLO SI LIVE_FEED ESTÁ ACTIVO ---
+                    # Optimización: Usar inference_mode para mejor rendimiento GPU
                     # Obtener delta_psi si está disponible para visualizaciones de flujo
                     delta_psi = g_state['motor'].last_delta_psi if hasattr(g_state['motor'], 'last_delta_psi') else None
                     viz_data = get_visualization_data(
@@ -153,7 +194,8 @@ async def simulation_loop():
                         await asyncio.sleep(0.1)
                         continue
                     
-                    frame_payload = {
+                    # Construir frame_payload
+                    frame_payload_raw = {
                         "step": current_step,
                         "map_data": viz_data.get("map_data", []),
                         "hist_data": viz_data.get("hist_data", {}),
@@ -164,6 +206,41 @@ async def simulation_loop():
                         "complex_3d_data": viz_data.get("complex_3d_data"),
                         "timestamp": asyncio.get_event_loop().time()
                     }
+                    
+                    # Optimizar payload (ROI, compresión y downsampling)
+                    # 1. Aplicar ROI primero (reduce el tamaño de los datos)
+                    roi_manager = g_state.get('roi_manager')
+                    if roi_manager and roi_manager.roi_enabled:
+                        from .roi_manager import apply_roi_to_payload
+                        frame_payload_roi = apply_roi_to_payload(frame_payload_raw, roi_manager)
+                    else:
+                        frame_payload_roi = frame_payload_raw
+                    
+                    # 2. Aplicar compresión y downsampling
+                    compression_enabled = g_state.get('data_compression_enabled', True)
+                    downsample_factor = g_state.get('downsample_factor', 1)
+                    viz_type = g_state.get('viz_type', 'density')
+                    
+                    # Por ahora, solo aplicar optimización si está habilitada explícitamente
+                    # y el payload es grande (para no afectar rendimiento con payloads pequeños)
+                    if compression_enabled or downsample_factor > 1:
+                        frame_payload = await optimize_frame_payload(
+                            frame_payload_roi,
+                            enable_compression=compression_enabled,
+                            downsample_factor=downsample_factor,
+                            viz_type=viz_type
+                        )
+                        
+                        # Logging ocasional del tamaño del payload (cada 100 frames)
+                        if current_step % 100 == 0:
+                            original_size = get_payload_size(frame_payload_raw)
+                            optimized_size = get_payload_size(frame_payload)
+                            compression_ratio = (1 - optimized_size / original_size) * 100 if original_size > 0 else 0
+                            roi_info = frame_payload.get('roi_info', {})
+                            roi_msg = f" (ROI: {roi_info.get('reduction_ratio', 1.0):.1f}x reducción)" if roi_info.get('enabled') else ""
+                            logging.debug(f"Payload size: {original_size/1024:.1f}KB → {optimized_size/1024:.1f}KB ({compression_ratio:.1f}% reducción){roi_msg}")
+                    else:
+                        frame_payload = frame_payload_roi
                     
                     # Guardar en historial si está habilitado
                     if g_state.get('history_enabled', False):
@@ -373,7 +450,9 @@ async def handle_set_viz(args):
     if (ws := g_state['websockets'].get(args.get('ws_id'))):
         await send_notification(ws, f"Visualización cambiada a: {viz_type}", "info")
     # Si hay un motor activo, enviar un frame actualizado inmediatamente
-    if g_state.get('motor'):
+    # SOLO si live_feed está habilitado
+    live_feed_enabled = g_state.get('live_feed_enabled', True)
+    if g_state.get('motor') and live_feed_enabled:
         try:
             motor = g_state['motor']
             if motor.state.psi is None:
@@ -532,48 +611,60 @@ async def handle_load_experiment(args):
         g_state['motor'] = Aetheria_Motor(model, inference_grid_size, d_state, global_cfg.DEVICE, cfg=config)
         g_state['simulation_step'] = 0
         
+        # Actualizar ROI manager con el tamaño correcto del grid
+        from .roi_manager import ROIManager
+        roi_manager = g_state.get('roi_manager')
+        if roi_manager:
+            roi_manager.grid_size = inference_grid_size
+            roi_manager.clear_roi()  # Resetear ROI al cambiar de tamaño
+        else:
+            g_state['roi_manager'] = ROIManager(grid_size=inference_grid_size)
+        
         # --- CORRECCIÓN: La simulación queda en pausa, el usuario debe iniciarla manualmente ---
         g_state['is_paused'] = True
         
         # Enviar frame inicial inmediatamente para mostrar el estado inicial
-        try:
-            motor = g_state['motor']
-            if motor and motor.state and motor.state.psi is not None:
-                delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
-                viz_data = get_visualization_data(
-                    motor.state.psi, 
-                    g_state.get('viz_type', 'density'),
-                    delta_psi=delta_psi,
-                    motor=motor
-                )
-                if viz_data and isinstance(viz_data, dict):
-                    # Validar que los datos sean válidos antes de enviar
-                    map_data = viz_data.get("map_data", [])
-                    if map_data and len(map_data) > 0:
-                        frame_payload = {
-                            "step": 0,
-                            "map_data": map_data,
-                            "hist_data": viz_data.get("hist_data", {}),
-                            "poincare_coords": viz_data.get("poincare_coords", []),
-                            "phase_attractor": viz_data.get("phase_attractor"),
-                            "flow_data": viz_data.get("flow_data"),
-                            "phase_hsv_data": viz_data.get("phase_hsv_data"),
-                            "complex_3d_data": viz_data.get("complex_3d_data")
-                        }
-                        await broadcast({"type": "simulation_frame", "payload": frame_payload})
-                        logging.info(f"Frame inicial enviado exitosamente para '{exp_name}'")
+        # SOLO si live_feed está habilitado
+        live_feed_enabled = g_state.get('live_feed_enabled', True)
+        if live_feed_enabled:
+            try:
+                motor = g_state['motor']
+                if motor and motor.state and motor.state.psi is not None:
+                    delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
+                    viz_data = get_visualization_data(
+                        motor.state.psi, 
+                        g_state.get('viz_type', 'density'),
+                        delta_psi=delta_psi,
+                        motor=motor
+                    )
+                    if viz_data and isinstance(viz_data, dict):
+                        # Validar que los datos sean válidos antes de enviar
+                        map_data = viz_data.get("map_data", [])
+                        if map_data and len(map_data) > 0:
+                            frame_payload = {
+                                "step": 0,
+                                "map_data": map_data,
+                                "hist_data": viz_data.get("hist_data", {}),
+                                "poincare_coords": viz_data.get("poincare_coords", []),
+                                "phase_attractor": viz_data.get("phase_attractor"),
+                                "flow_data": viz_data.get("flow_data"),
+                                "phase_hsv_data": viz_data.get("phase_hsv_data"),
+                                "complex_3d_data": viz_data.get("complex_3d_data")
+                            }
+                            await broadcast({"type": "simulation_frame", "payload": frame_payload})
+                            logging.info(f"Frame inicial enviado exitosamente para '{exp_name}'")
+                        else:
+                            logging.warning("get_visualization_data retornó map_data vacío.")
+                            if ws: await send_notification(ws, "⚠️ Modelo cargado pero sin datos de visualización iniciales.", "warning")
                     else:
-                        logging.warning("get_visualization_data retornó map_data vacío.")
-                        if ws: await send_notification(ws, "⚠️ Modelo cargado pero sin datos de visualización iniciales.", "warning")
+                        logging.warning("get_visualization_data retornó datos inválidos para frame inicial.")
+                        if ws: await send_notification(ws, "⚠️ Error generando datos de visualización iniciales.", "warning")
                 else:
-                    logging.warning("get_visualization_data retornó datos inválidos para frame inicial.")
-                    if ws: await send_notification(ws, "⚠️ Error generando datos de visualización iniciales.", "warning")
-            else:
-                logging.warning("Motor cargado pero sin estado psi inicial.")
-                if ws: await send_notification(ws, "⚠️ Modelo cargado pero el estado cuántico no se inicializó correctamente.", "warning")
-        except Exception as e:
-            logging.error(f"Error generando frame inicial: {e}", exc_info=True)
-            if ws: await send_notification(ws, f"⚠️ Error al generar visualización inicial: {str(e)}", "warning")
+                    logging.warning("Motor cargado pero sin estado psi inicial.")
+                    if ws: await send_notification(ws, "⚠️ Modelo cargado pero el estado cuántico no se inicializó correctamente.", "warning")
+            except Exception as e:
+                logging.error(f"Error generando frame inicial: {e}", exc_info=True)
+                if ws: await send_notification(ws, f"⚠️ Error al generar visualización inicial: {str(e)}", "warning")
         
         if ws: await send_notification(ws, f"✅ Modelo '{exp_name}' cargado exitosamente. Presiona 'Iniciar' para comenzar la simulación.", "success")
         await broadcast({"type": "inference_status_update", "payload": {"status": "paused"}})
@@ -938,6 +1029,101 @@ async def handle_set_live_feed(args):
         "payload": {"enabled": g_state['live_feed_enabled']}
     })
 
+async def handle_set_compression(args):
+    """Habilita o deshabilita la compresión de datos WebSocket."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    enabled = args.get('enabled', True)
+    g_state['data_compression_enabled'] = bool(enabled)
+    
+    status_msg = "activada" if enabled else "desactivada"
+    logging.info(f"Compresión de datos {status_msg}.")
+    
+    if ws:
+        await send_notification(ws, f"Compresión {status_msg}. {'Datos optimizados para transferencia.' if enabled else 'Datos sin comprimir.'}", "info")
+    
+    await broadcast({
+        "type": "compression_status_update",
+        "payload": {"enabled": g_state['data_compression_enabled']}
+    })
+
+async def handle_set_downsample(args):
+    """Configura el factor de downsampling para transferencia de datos."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    factor = args.get("factor", 1)
+    if factor < 1:
+        factor = 1
+    elif factor > 8:
+        factor = 8
+    g_state['downsample_factor'] = int(factor)
+    
+    logging.info(f"Downsampling ajustado a: {factor}x ({'sin downsampling' if factor == 1 else f'{factor}x reducción'})")
+    
+    if ws:
+        if factor == 1:
+            await send_notification(ws, "Downsampling desactivado. Enviando datos a resolución completa.", "info")
+        else:
+            grid_size = g_state.get('roi_manager', None)
+            grid_size = grid_size.grid_size if grid_size else 256
+            await send_notification(ws, f"Downsampling activado: {factor}x reducción (resolución {grid_size//factor}x{grid_size//factor})", "info")
+    
+    await broadcast({
+        "type": "downsample_status_update",
+        "payload": {"factor": g_state['downsample_factor']}
+    })
+
+async def handle_set_roi(args):
+    """Configura la región de interés (ROI) para visualización."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    roi_manager = g_state.get('roi_manager')
+    
+    if not roi_manager:
+        # Crear ROI manager si no existe
+        from .roi_manager import ROIManager
+        grid_size = g_state.get('grid_size', 256)
+        roi_manager = ROIManager(grid_size=grid_size)
+        g_state['roi_manager'] = roi_manager
+    
+    action = args.get("action", "set")  # 'set', 'clear', 'get'
+    
+    if action == "clear":
+        roi_manager.clear_roi()
+        logging.info("ROI desactivada")
+        if ws:
+            await send_notification(ws, "ROI desactivada. Mostrando grid completo.", "info")
+    elif action == "get":
+        # Retornar información de ROI actual
+        roi_info = roi_manager.get_roi_info()
+        if ws:
+            await send_to_websocket(ws, "roi_info", roi_info)
+        return
+    else:  # action == "set"
+        x = args.get("x", 0)
+        y = args.get("y", 0)
+        width = args.get("width", 128)
+        height = args.get("height", 128)
+        
+        success = roi_manager.set_roi(x, y, width, height)
+        
+        if success:
+            roi_info = roi_manager.get_roi_info()
+            reduction_msg = f" ({roi_info['reduction_ratio']:.1f}x reducción de datos)"
+            logging.info(f"ROI configurada: ({x}, {y}) tamaño {width}x{height}{reduction_msg}")
+            if ws:
+                await send_notification(ws, f"ROI configurada: región {width}x{height} en ({x}, {y}){reduction_msg}", "info")
+        else:
+            error_msg = f"ROI inválida: ({x}, {y}) tamaño {width}x{height} excede el grid {roi_manager.grid_size}x{roi_manager.grid_size}"
+            logging.warning(error_msg)
+            if ws:
+                await send_notification(ws, error_msg, "error")
+            return
+    
+    # Enviar actualización a todos los clientes
+    roi_info = roi_manager.get_roi_info()
+    await broadcast({
+        "type": "roi_status_update",
+        "payload": roi_info
+    })
+
 async def handle_enable_history(args):
     """Habilita o deshabilita el guardado de historia de simulación."""
     ws = g_state['websockets'].get(args.get('ws_id'))
@@ -1168,6 +1354,9 @@ HANDLERS = {
         "set_fps": handle_set_fps,
         "set_frame_skip": handle_set_frame_skip,
         "set_live_feed": handle_set_live_feed,
+        "set_compression": handle_set_compression,
+        "set_downsample": handle_set_downsample,
+        "set_roi": handle_set_roi,
         "set_snapshot_interval": handle_set_snapshot_interval,
         "enable_snapshots": handle_enable_snapshots,
         "capture_snapshot": handle_capture_snapshot,
