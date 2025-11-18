@@ -22,7 +22,8 @@ class GPUOptimizer:
         if self.is_cuda:
             import os
             # Configurar expandable_segments para mejor gestión de memoria
-            os.environ.setdefault('PYTORCH_CUDA_ALLOC_CONF', 'expandable_segments:True')
+            # Usar PYTORCH_ALLOC_CONF (PYTORCH_CUDA_ALLOC_CONF está deprecado)
+            os.environ.setdefault('PYTORCH_ALLOC_CONF', 'expandable_segments:True')
         
         # Configurar optimizaciones iniciales
         if self.is_cuda:
