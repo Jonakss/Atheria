@@ -1527,11 +1527,41 @@ def setup_routes(app):
         return
 
     logging.info(f"Sirviendo archivos estáticos desde: {STATIC_FILES_ROOT}")
-    app.router.add_get("/ws", websocket_handler)
-    app.router.add_static('/', path=STATIC_FILES_ROOT)
     
-    # Ruta "catch-all" que sirve index.html. Esencial para Single Page Applications (SPA) como React.
-    app.router.add_get('/{tail:.*}', lambda req: web.FileResponse(STATIC_FILES_ROOT / 'index.html'))
+    # Primero agregar la ruta WebSocket (debe tener prioridad absoluta)
+    app.router.add_get("/ws", websocket_handler)
+    
+    # Servir index.html en la raíz
+    async def serve_index(request):
+        return web.FileResponse(STATIC_FILES_ROOT / 'index.html')
+    app.router.add_get('/', serve_index)
+    
+    # Ruta "catch-all" que maneja tanto archivos estáticos como rutas del SPA
+    # Esencial para Single Page Applications (SPA) como React que usan routing del lado del cliente.
+    async def serve_static_or_spa(request):
+        path = request.match_info.get('path', '')
+        # Limpiar el path (remover barras iniciales y prevenir path traversal)
+        path = path.lstrip('/')
+        if not path:
+            return web.FileResponse(STATIC_FILES_ROOT / 'index.html')
+        
+        file_path = STATIC_FILES_ROOT / path
+        
+        # Verificar que el archivo esté dentro del directorio estático (seguridad)
+        try:
+            file_path.resolve().relative_to(STATIC_FILES_ROOT.resolve())
+        except ValueError:
+            # Path traversal attempt, servir index.html
+            return web.FileResponse(STATIC_FILES_ROOT / 'index.html')
+        
+        # Si es un archivo que existe, servirlo
+        if file_path.is_file() and file_path.exists():
+            return web.FileResponse(file_path)
+        
+        # Si no existe, servir index.html (para rutas del SPA como /experiments, /training, etc.)
+        return web.FileResponse(STATIC_FILES_ROOT / 'index.html')
+    
+    app.router.add_get('/{path:.*}', serve_static_or_spa)
 
 
 async def on_startup(app):
