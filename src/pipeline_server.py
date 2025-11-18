@@ -316,15 +316,19 @@ async def simulation_loop():
                         pass
             
             await asyncio.sleep(sleep_time)
-        except Exception as e:
-            logging.error(f"Error crítico en el bucle de simulación: {e}", exc_info=True)
-            await broadcast({
-                "type": "simulation_log",
-                "payload": f"[Error] Error en simulación: {str(e)}"
-            })
-            g_state['is_paused'] = True
-            await broadcast({"type": "inference_status_update", "payload": {"status": "paused"}})
-            await asyncio.sleep(2)
+    except (SystemExit, asyncio.CancelledError):
+        # Shutdown graceful - no loguear como error
+        logging.info("Bucle de simulación detenido (shutdown graceful)")
+        raise
+    except Exception as e:
+        logging.error(f"Error crítico en el bucle de simulación: {e}", exc_info=True)
+        await broadcast({
+            "type": "simulation_log",
+            "payload": f"[Error] Error en simulación: {str(e)}"
+        })
+        g_state['is_paused'] = True
+        await broadcast({"type": "inference_status_update", "payload": {"status": "paused"}})
+        await asyncio.sleep(2)
 
 # --- Definición de Handlers para los Comandos ---
 
