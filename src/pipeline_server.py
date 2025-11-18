@@ -23,6 +23,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%
 # --- WEBSOCKET HANDLER ---
 async def websocket_handler(request):
     """Maneja las conexiones WebSocket entrantes."""
+    # Logging para debugging en entornos con proxy
+    client_ip = request.headers.get('X-Forwarded-For', request.remote)
+    logging.info(f"Intento de conexión WebSocket desde {client_ip}")
+    
     ws = web.WebSocketResponse()
     
     # Manejar errores durante la preparación de la conexión (reconexiones rápidas, etc.)
@@ -36,6 +40,7 @@ async def websocket_handler(request):
     except Exception as e:
         # Otros errores inesperados
         logging.error(f"Error preparando conexión WebSocket: {e}", exc_info=True)
+        logging.error(f"Headers de la solicitud: {dict(request.headers)}")
         return ws
     
     ws_id = str(uuid.uuid4())
@@ -1644,6 +1649,19 @@ async def main(shutdown_event=None):
     """Función principal para configurar e iniciar el servidor web."""
     app = web.Application()
     
+    # Configurar middleware para manejar proxies reversos (como Lightning AI)
+    # Esto permite que el servidor funcione correctamente detrás de un proxy
+    @web.middleware
+    async def proxy_middleware(request, handler):
+        # Logging útil para debugging en entornos con proxy
+        if request.path == '/ws':
+            forwarded_for = request.headers.get('X-Forwarded-For', 'N/A')
+            forwarded_proto = request.headers.get('X-Forwarded-Proto', 'N/A')
+            logging.debug(f"WebSocket connection attempt - X-Forwarded-For: {forwarded_for}, X-Forwarded-Proto: {forwarded_proto}")
+        return await handler(request)
+    
+    app.middlewares.append(proxy_middleware)
+    
     setup_routes(app)
     
     app.on_startup.append(on_startup)
@@ -1654,6 +1672,7 @@ async def main(shutdown_event=None):
     site = web.TCPSite(runner, global_cfg.LAB_SERVER_HOST, global_cfg.LAB_SERVER_PORT)
     
     logging.info(f"Servidor Aetheria listo y escuchando en http://{global_cfg.LAB_SERVER_HOST}:{global_cfg.LAB_SERVER_PORT}")
+    logging.info("Nota: Si estás usando Lightning AI o un proxy reverso, asegúrate de que el puerto esté correctamente exportado.")
     await site.start()
     
     # Mantiene el servidor corriendo hasta que se solicite el shutdown
