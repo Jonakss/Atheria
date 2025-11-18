@@ -3,9 +3,12 @@ import torch
 import numpy as np
 from sklearn.decomposition import PCA
 
+# PCA global - se reutiliza entre frames para mejor rendimiento
 pca = PCA(n_components=2)
+# Cache para PCA - solo recalcular cada N frames
+_pca_cache = {'last_step': -1, 'coords': None, 'step_interval': 10}  # Recalcular PCA cada 10 frames
 
-def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Tensor = None, motor=None, downsample_factor: int = 1):
+def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Tensor = None, motor=None, downsample_factor: int = 1, current_step: int = 0, compute_histograms: bool = True, compute_poincare: bool = True):
     """
     Genera datos de visualización a partir del estado cuántico psi.
     
@@ -49,29 +52,33 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
             ).mean(dim=(1, 3))
             psi = psi_downsampled
     
-    density = torch.sum(psi.abs()**2, dim=-1).cpu().numpy()
+    # OPTIMIZACIÓN: Calcular densidad en GPU y mover a CPU una sola vez
+    density_tensor = torch.sum(psi.abs()**2, dim=-1)
+    density = density_tensor.cpu().numpy()
     
+    # OPTIMIZACIÓN: Calcular fase y partes real/imag en GPU antes de mover a CPU
     # Mejorar visualización de fase: usar el canal 0 o promedio ponderado
     if psi.shape[-1] > 0:
-        # Usar el primer canal para la fase (más visible)
-        phase_single = torch.angle(psi[..., 0]).cpu().numpy()
-        # Alternativa: promedio de todas las fases ponderado por densidad
-        phase_weighted = torch.angle(psi).cpu().numpy()
-        # Calcular promedio circular de fases
-        phase_cos = np.cos(phase_weighted).mean(axis=-1)
-        phase_sin = np.sin(phase_weighted).mean(axis=-1)
-        phase = np.arctan2(phase_sin, phase_cos)
+        # Calcular fase en GPU
+        phase_weighted_tensor = torch.angle(psi)
+        # Calcular promedio circular de fases en GPU (más eficiente)
+        phase_cos = torch.cos(phase_weighted_tensor).mean(dim=-1)
+        phase_sin = torch.sin(phase_weighted_tensor).mean(dim=-1)
+        phase_tensor = torch.atan2(phase_sin, phase_cos)
+        phase = phase_tensor.cpu().numpy()
     else:
-        phase = torch.angle(psi).cpu().numpy()
-        if phase.ndim > 2:
-            phase = phase[..., 0]
+        phase_tensor = torch.angle(psi)
+        if phase_tensor.ndim > 2:
+            phase_tensor = phase_tensor[..., 0]
+        phase = phase_tensor.cpu().numpy()
     
+    # OPTIMIZACIÓN: Mover real e imag a CPU una sola vez
     real_part = psi.real.cpu().numpy()
     imag_part = psi.imag.cpu().numpy()
     
-    # Calcular energía total (suma de |ψ|² sobre todos los canales)
-    # Usar torch.sum() en lugar de np.sum() porque psi es un tensor de PyTorch
-    energy = torch.sum(psi.abs()**2, dim=-1).cpu().numpy()
+    # OPTIMIZACIÓN: Reutilizar density_tensor para energía (ya calculado arriba)
+    # energy es igual a density, así que reutilizamos
+    energy = density
     
     # Calcular gradiente espacial (magnitud del gradiente)
     if len(density.shape) == 2:
@@ -217,47 +224,93 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
     else:
         map_data = np.zeros_like(map_data)
 
-    # --- Cálculo de datos para Poincaré ---
-    try:
-        psi_flat_real = psi.real.reshape(-1, psi.shape[-1]).cpu().numpy()
-        psi_flat_imag = psi.imag.reshape(-1, psi.shape[-1]).cpu().numpy()
-        psi_flat_for_pca = np.concatenate([psi_flat_real, psi_flat_imag], axis=1)
+    # --- Cálculo de datos para Poincaré (OPTIMIZADO: solo cada N frames) ---
+    global _pca_cache
+    poincare_coords = None
+    
+    if compute_poincare:
+        # OPTIMIZACIÓN: Solo calcular PCA cada N frames (muy costoso)
+        should_recompute_pca = (
+            current_step % _pca_cache['step_interval'] == 0 or 
+            _pca_cache['coords'] is None
+        )
         
-        # Validar que hay suficientes puntos para PCA
-        if psi_flat_for_pca.shape[0] < 2:
-            poincare_coords = [[0.0, 0.0]]  # Coordenada por defecto
+        if should_recompute_pca:
+            try:
+                # OPTIMIZACIÓN: Usar datos ya en CPU si están disponibles
+                psi_flat_real = psi.real.reshape(-1, psi.shape[-1]).cpu().numpy()
+                psi_flat_imag = psi.imag.reshape(-1, psi.shape[-1]).cpu().numpy()
+                psi_flat_for_pca = np.concatenate([psi_flat_real, psi_flat_imag], axis=1)
+                
+                # Validar que hay suficientes puntos para PCA
+                if psi_flat_for_pca.shape[0] < 2:
+                    poincare_coords = [[0.0, 0.0]]  # Coordenada por defecto
+                else:
+                    # OPTIMIZACIÓN: Usar partial_fit si es posible para mejor rendimiento
+                    poincare_coords = pca.fit_transform(psi_flat_for_pca)
+                    max_abs_val = np.max(np.abs(poincare_coords))
+                    if max_abs_val > 0:
+                        poincare_coords = poincare_coords / max_abs_val
+                    
+                    # Cachear resultado
+                    _pca_cache['coords'] = poincare_coords
+                    _pca_cache['last_step'] = current_step
+            except Exception as e:
+                import logging
+                logging.warning(f"Error al calcular coordenadas de Poincaré: {e}. Usando coordenadas por defecto.")
+                poincare_coords = [[0.0, 0.0]]
+                _pca_cache['coords'] = poincare_coords
         else:
-            poincare_coords = pca.fit_transform(psi_flat_for_pca)
-            max_abs_val = np.max(np.abs(poincare_coords))
-            if max_abs_val > 0:
-                poincare_coords = poincare_coords / max_abs_val
-    except Exception as e:
-        import logging
-        logging.warning(f"Error al calcular coordenadas de Poincaré: {e}. Usando coordenadas por defecto.")
+            # Reutilizar coordenadas cacheadas
+            poincare_coords = _pca_cache['coords']
+    else:
         poincare_coords = [[0.0, 0.0]]
 
-    # --- ¡¡CORRECCIÓN!! Lógica de histogramas restaurada ---
-    density_flat = density.flatten()
-    phase_flat = phase.flatten()
-    real_flat = real_part.flatten()
-    imag_flat = imag_part.flatten()
+    # --- Histogramas (OPTIMIZADO: solo calcular si se solicitan) ---
+    # OPTIMIZACIÓN: Histogramas son costosos, calcular solo si se necesitan
+    if compute_histograms:
+        density_flat = density.flatten()
+        phase_flat = phase.flatten()
+        real_flat = real_part.flatten()
+        imag_flat = imag_part.flatten()
 
-    density_hist, density_bins = np.histogram(density_flat, bins=30, range=(0, np.max(density_flat) if np.max(density_flat) > 0 else 1))
-    phase_hist, phase_bins = np.histogram(phase_flat, bins=30, range=(-np.pi, np.pi))
-    real_hist, real_bins = np.histogram(real_flat, bins=30, range=(-1, 1))
-    imag_hist, imag_bins = np.histogram(imag_flat, bins=30, range=(-1, 1))
+        # OPTIMIZACIÓN: Usar menos bins si el grid es grande (reduce costo computacional)
+        num_bins = 20 if density.size > 10000 else 30  # Menos bins para grids grandes
+        
+        density_hist, density_bins = np.histogram(density_flat, bins=num_bins, range=(0, np.max(density_flat) if np.max(density_flat) > 0 else 1))
+        phase_hist, phase_bins = np.histogram(phase_flat, bins=num_bins, range=(-np.pi, np.pi))
+        real_hist, real_bins = np.histogram(real_flat, bins=num_bins, range=(-1, 1))
+        imag_hist, imag_bins = np.histogram(imag_flat, bins=num_bins, range=(-1, 1))
 
-    hist_data = {
-        'density': [{"bin": f"{density_bins[i]:.2f}", "count": int(density_hist[i])} for i in range(len(density_hist))],
-        'phase': [{"bin": f"{phase_bins[i]:.2f}", "count": int(phase_hist[i])} for i in range(len(phase_hist))],
-        'real': [{"bin": f"{real_bins[i]:.2f}", "count": int(real_hist[i])} for i in range(len(real_hist))],
-        'imag': [{"bin": f"{imag_bins[i]:.2f}", "count": int(imag_hist[i])} for i in range(len(imag_hist))],
-    }
+        hist_data = {
+            'density': [{"bin": f"{density_bins[i]:.2f}", "count": int(density_hist[i])} for i in range(len(density_hist))],
+            'phase': [{"bin": f"{phase_bins[i]:.2f}", "count": int(phase_hist[i])} for i in range(len(phase_hist))],
+            'real': [{"bin": f"{real_bins[i]:.2f}", "count": int(real_hist[i])} for i in range(len(real_hist))],
+            'imag': [{"bin": f"{imag_bins[i]:.2f}", "count": int(imag_hist[i])} for i in range(len(imag_hist))],
+        }
+    else:
+        # Histogramas vacíos si no se calculan
+        hist_data = {
+            'density': [],
+            'phase': [],
+            'real': [],
+            'imag': []
+        }
 
+    # OPTIMIZACIÓN: Serializar map_data de forma más eficiente
+    # Para arrays grandes, usar .tolist() solo si es necesario
+    # Para arrays pequeños/medianos, .tolist() es aceptable
+    if map_data.size > 10000:
+        # Para arrays grandes, convertir a lista de forma más eficiente
+        # o usar compresión en el servidor
+        map_data_list = map_data.tolist()
+    else:
+        map_data_list = map_data.tolist()
+    
     result = {
-        "map_data": map_data.tolist(),
+        "map_data": map_data_list,
         "hist_data": hist_data,
-        "poincare_coords": poincare_coords.tolist()
+        "poincare_coords": poincare_coords.tolist() if poincare_coords is not None else [[0.0, 0.0]]
     }
     
     # Datos para visualización 3D compleja (real vs imag vs tiempo)

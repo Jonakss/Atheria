@@ -186,11 +186,20 @@ async def simulation_loop():
                     # Optimización: Usar inference_mode para mejor rendimiento GPU
                     # Obtener delta_psi si está disponible para visualizaciones de flujo
                     delta_psi = g_state['motor'].last_delta_psi if hasattr(g_state['motor'], 'last_delta_psi') else None
+                    
+                    # OPTIMIZACIÓN: Calcular histogramas y Poincaré menos frecuentemente
+                    # Histogramas cada 5 frames, Poincaré cada 10 frames (ya optimizado en pipeline_viz)
+                    compute_histograms = (current_step % 5 == 0)  # Cada 5 frames
+                    compute_poincare = True  # Ya está optimizado internamente en pipeline_viz
+                    
                     viz_data = get_visualization_data(
                         g_state['motor'].state.psi, 
                         g_state.get('viz_type', 'density'),
                         delta_psi=delta_psi,
-                        motor=g_state['motor']
+                        motor=g_state['motor'],
+                        current_step=current_step,
+                        compute_histograms=compute_histograms,
+                        compute_poincare=compute_poincare
                     )
                     
                     # Validar que viz_data tenga los campos necesarios
