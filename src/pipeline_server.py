@@ -1598,7 +1598,7 @@ async def on_shutdown(app):
     
     logging.info("Cierre ordenado completado.")
 
-async def main():
+async def main(shutdown_event=None):
     """Función principal para configurar e iniciar el servidor web."""
     app = web.Application()
     
@@ -1614,5 +1614,11 @@ async def main():
     logging.info(f"Servidor Aetheria listo y escuchando en http://{global_cfg.LAB_SERVER_HOST}:{global_cfg.LAB_SERVER_PORT}")
     await site.start()
     
-    # Mantiene el servidor corriendo indefinidamente
-    await asyncio.Event().wait()
+    # Mantiene el servidor corriendo hasta que se solicite el shutdown
+    if shutdown_event:
+        await shutdown_event.wait()
+        logging.info("Shutdown solicitado. Cerrando servidor...")
+        await runner.cleanup()
+    else:
+        # Fallback: mantener el servidor corriendo indefinidamente
+        await asyncio.Event().wait()

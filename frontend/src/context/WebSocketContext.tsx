@@ -2,6 +2,7 @@
 import { createContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { notifications } from '@mantine/notifications';
 import { decompressIfNeeded } from '../utils/dataDecompression';
+import { getServerConfig, getWebSocketUrl, saveServerConfig, type ServerConfig } from '../utils/serverConfig';
 
 interface SimData {
     complex_3d_data?: {
@@ -38,6 +39,8 @@ interface WebSocketContextType {
     setActiveExperiment: (name: string | null) => void;
     ws: WebSocket | null; // Exponer WebSocket para escuchar mensajes personalizados
     snapshotCount: number; // Contador de snapshots capturados
+    serverConfig: ServerConfig; // Configuración del servidor
+    updateServerConfig: (config: Partial<ServerConfig>) => void; // Actualizar configuración
 }
 
 export const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
@@ -48,6 +51,10 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     const effectRan = useRef(false);
     const reconnectAttempts = useRef(0);
     const lastErrorLog = useRef(0);
+    const isManualClose = useRef(false); // Flag para indicar si el cierre fue manual
+    const [serverConfig, setServerConfigState] = useState<ServerConfig>(getServerConfig());
+    // Usar una referencia para acceder al valor actual de serverConfig en callbacks
+    const serverConfigRef = useRef<ServerConfig>(serverConfig);
 
     // --- Hooks de Estado para manejar la lógica de la aplicación ---
     const [experimentsData, setExperimentsData] = useState<any[] | null>(null);
@@ -63,10 +70,27 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     // Usar una referencia para acceder al valor actual de activeExperiment en callbacks
     const activeExperimentRef = useRef<string | null>(null);
     
-    // Mantener la referencia actualizada
+    // Mantener las referencias actualizadas
     useEffect(() => {
         activeExperimentRef.current = activeExperiment;
     }, [activeExperiment]);
+    
+    useEffect(() => {
+        serverConfigRef.current = serverConfig;
+    }, [serverConfig]);
+
+    // Función para actualizar la configuración del servidor
+    const updateServerConfig = useCallback((config: Partial<ServerConfig>) => {
+        const currentConfig = serverConfigRef.current;
+        const newConfig = { ...currentConfig, ...config };
+        setServerConfigState(newConfig);
+        saveServerConfig(newConfig);
+        // Cerrar conexión actual para reconectar con la nueva configuración
+        if (ws.current) {
+            isManualClose.current = true; // Marcar como cierre manual
+            ws.current.close(1000); // Código 1000 = cierre normal
+        }
+    }, []);
 
     const connect = useCallback(() => {
         if (ws.current?.readyState === WebSocket.OPEN) return;
@@ -79,7 +103,10 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         }
         
         setConnectionStatus('connecting');
-        const socket = new WebSocket(`ws://localhost:8000/ws`);
+        // Usar la referencia para obtener siempre la configuración más reciente
+        const currentConfig = serverConfigRef.current;
+        const wsUrl = getWebSocketUrl(currentConfig);
+        const socket = new WebSocket(wsUrl);
 
         socket.onopen = () => {
             reconnectAttempts.current = 0;
@@ -91,6 +118,13 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         };
         
         socket.onclose = (event) => {
+            // Si fue un cierre manual (cambio de configuración), no reconectar automáticamente
+            if (isManualClose.current) {
+                isManualClose.current = false; // Resetear el flag
+                setConnectionStatus('disconnected');
+                return;
+            }
+            
             // No loguear si fue un cierre limpio (código 1000)
             if (event.code !== 1000) {
                 reconnectAttempts.current += 1;
@@ -111,7 +145,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                     setConnectionStatus('disconnected');
                 }
                 
-                // Reintentar conexión
+                // Reintentar conexión usando la configuración más reciente
                 setTimeout(connect, 3000);
             } else {
                 setConnectionStatus('disconnected');
@@ -229,7 +263,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
             }
         };
         ws.current = socket;
-    }, []);
+    }, []); // No depender de serverConfig, usar la referencia en su lugar
 
     useEffect(() => {
         if (effectRan.current === false) {
@@ -272,6 +306,8 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         setActiveExperiment,
         ws: ws.current, // Exponer WebSocket para mensajes personalizados
         snapshotCount,
+        serverConfig,
+        updateServerConfig,
     };
 
     return (

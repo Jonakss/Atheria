@@ -63,24 +63,31 @@ async def save_state_before_shutdown():
 if __name__ == "__main__":
     log.info("Pasando el control a 'pipeline_server.main()'.")
     
-    # Variable global para controlar el shutdown
-    shutdown_requested = False
+    # Variables globales para almacenar el event loop y el shutdown event
+    shutdown_event = None
+    main_loop = None
     
     # Configurar handler de señales para guardar estado antes de cerrar
     def signal_handler(signum, frame):
-        global shutdown_requested
         log.info(f"Señal {signum} recibida. Iniciando shutdown graceful...")
-        shutdown_requested = True
-        # NO usar sys.exit aquí - dejar que el event loop maneje el shutdown
+        # Configurar el evento en el event loop actual
+        if shutdown_event and main_loop:
+            main_loop.call_soon_threadsafe(shutdown_event.set)
     
     # Registrar handlers de señales
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
+    async def run_with_shutdown():
+        global shutdown_event, main_loop
+        shutdown_event = asyncio.Event()
+        main_loop = asyncio.get_running_loop()
+        await pipeline_server.main(shutdown_event)
+    
     try:
-        # Usar el main del módulo importado
+        # Usar el main del módulo importado pasando el evento de shutdown
         # El main debe manejar el shutdown graceful
-        asyncio.run(pipeline_server.main())
+        asyncio.run(run_with_shutdown())
     except KeyboardInterrupt:
         log.info("Cierre solicitado por el usuario (Ctrl+C).")
     except Exception as e:

@@ -2,13 +2,14 @@
 import { useState, useEffect } from 'react';
 import {
     Paper, Stack, Group, Text, NumberInput, Select, Button, Alert, Divider,
-    Badge, Tooltip, Switch, ActionIcon, Card, Title, Box
+    Badge, Tooltip, Switch, ActionIcon, Card, Title, Box, TextInput
 } from '@mantine/core';
 import {
     IconSettings, IconInfoCircle, IconCheck, IconX, IconRefresh,
     IconBrain, IconBox, IconTrendingDown, IconAtom, IconServer, IconArrowsMaximize
 } from '@tabler/icons-react';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { resetServerConfig } from '../utils/serverConfig';
 
 interface InferenceConfig {
     grid_size: number;
@@ -20,7 +21,7 @@ interface InferenceConfig {
 }
 
 export function InferenceConfigTab() {
-    const { sendCommand, activeExperiment, simData } = useWebSocket();
+    const { sendCommand, activeExperiment, simData, serverConfig, updateServerConfig, connectionStatus, connect } = useWebSocket();
     
     // Estados de configuración de inferencia
     const [gridSize, setGridSize] = useState(256);
@@ -42,9 +43,19 @@ export function InferenceConfigTab() {
     const [hasChanges, setHasChanges] = useState(false);
     const [isApplying, setIsApplying] = useState(false);
     
-    // Configuración del servidor (solo lectura/información por ahora)
-    const [serverHost, setServerHost] = useState('localhost');
-    const [serverPort, setServerPort] = useState(8000);
+    // Estados para configuración del servidor (editables)
+    const [serverHost, setServerHost] = useState(serverConfig.host);
+    const [serverPort, setServerPort] = useState(serverConfig.port);
+    const [serverProtocol, setServerProtocol] = useState<'ws' | 'wss'>(serverConfig.protocol);
+    const [serverConfigChanged, setServerConfigChanged] = useState(false);
+    
+    // Sincronizar estados locales con la configuración cuando cambia
+    useEffect(() => {
+        setServerHost(serverConfig.host);
+        setServerPort(serverConfig.port);
+        setServerProtocol(serverConfig.protocol);
+        setServerConfigChanged(false);
+    }, [serverConfig]);
     
     // Información del experimento activo para escalado
     const { experimentsData } = useWebSocket();
@@ -115,6 +126,14 @@ export function InferenceConfigTab() {
         setHasChanges(true);
     };
 
+    // Detectar cambios en la configuración del servidor
+    useEffect(() => {
+        const changed = serverHost !== serverConfig.host || 
+                       serverPort !== serverConfig.port || 
+                       serverProtocol !== serverConfig.protocol;
+        setServerConfigChanged(changed);
+    }, [serverHost, serverPort, serverProtocol, serverConfig]);
+
     // Detectar cambios
     useEffect(() => {
         // Marcar cambios cuando se modifica cualquier parámetro
@@ -134,6 +153,102 @@ export function InferenceConfigTab() {
                     <Badge color="orange" variant="light">Cambios pendientes</Badge>
                 )}
             </Group>
+
+            {/* Sección de Configuración del Servidor */}
+            <Card withBorder p="md">
+                <Stack gap="sm">
+                    <Group justify="space-between" align="center">
+                        <Group gap="xs">
+                            <IconServer size={18} />
+                            <Text fw={600} size="sm">Configuración del Servidor</Text>
+                        </Group>
+                        <Badge 
+                            color={connectionStatus === 'connected' ? 'green' : connectionStatus === 'connecting' ? 'yellow' : 'red'}
+                            variant="light"
+                        >
+                            {connectionStatus === 'connected' ? 'Conectado' : 
+                             connectionStatus === 'connecting' ? 'Conectando...' : 
+                             'Desconectado'}
+                        </Badge>
+                    </Group>
+                    
+                    <Group grow>
+                        <Select
+                            label="Protocolo"
+                            value={serverProtocol}
+                            onChange={(val) => val && setServerProtocol(val as 'ws' | 'wss')}
+                            data={[
+                                { value: 'ws', label: 'WS (No seguro)' },
+                                { value: 'wss', label: 'WSS (Seguro/TLS)' }
+                            ]}
+                            description="ws para desarrollo local, wss para producción"
+                        />
+                        <TextInput
+                            label="Host"
+                            value={serverHost}
+                            onChange={(e) => setServerHost(e.target.value)}
+                            placeholder="localhost o IP del servidor"
+                            description="Dirección del servidor"
+                        />
+                        <NumberInput
+                            label="Puerto"
+                            value={serverPort}
+                            onChange={(val) => setServerPort(Number(val) || 8000)}
+                            min={1}
+                            max={65535}
+                            description="Puerto del servidor WebSocket"
+                        />
+                    </Group>
+                    
+                    <Group>
+                        <Text size="xs" c="dimmed">
+                            URL actual: <strong>{serverProtocol}://{serverHost}:{serverPort}/ws</strong>
+                        </Text>
+                    </Group>
+                    
+                    <Group>
+                        <Button
+                            onClick={() => {
+                                updateServerConfig({
+                                    host: serverHost,
+                                    port: serverPort,
+                                    protocol: serverProtocol
+                                });
+                                setServerConfigChanged(false);
+                                setTimeout(() => connect(), 500);
+                            }}
+                            disabled={!serverConfigChanged}
+                            leftSection={<IconCheck size={16} />}
+                            color="blue"
+                        >
+                            Aplicar y Reconectar
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                resetServerConfig();
+                                const defaultConfig = { host: 'localhost', port: 8000, protocol: 'ws' as const };
+                                updateServerConfig(defaultConfig);
+                                setServerHost(defaultConfig.host);
+                                setServerPort(defaultConfig.port);
+                                setServerProtocol(defaultConfig.protocol);
+                                setServerConfigChanged(false);
+                                setTimeout(() => connect(), 500);
+                            }}
+                            variant="light"
+                            leftSection={<IconRefresh size={16} />}
+                        >
+                            Restaurar por Defecto
+                        </Button>
+                    </Group>
+                    
+                    <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light" p="xs">
+                        <Text size="xs">
+                            La configuración se guarda automáticamente en el navegador. 
+                            Útil para conectar a servidores remotos (ej: Lightning AI).
+                        </Text>
+                    </Alert>
+                </Stack>
+            </Card>
 
             <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light">
                 <Text size="sm">
