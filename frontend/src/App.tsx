@@ -9,10 +9,11 @@ import { IconAlertCircle } from '@tabler/icons-react';
 import { WebSocketProvider } from './context/WebSocketContext';
 import { useWebSocket } from './hooks/useWebSocket'; // <-- ¡LA IMPORTACIÓN CLAVE!
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { getWebSocketUrl } from './utils/serverConfig';
 import '@mantine/core/styles.css'; // Importa los estilos de Mantine
 
 function AppContent() {
-    const { connectionStatus } = useWebSocket();
+    const { connectionStatus, serverConfig } = useWebSocket();
     const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
     const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(true);
 
@@ -47,8 +48,12 @@ function AppContent() {
                         color="red" 
                         mb="md"
                     >
-                        No se puede conectar al servidor en <code>localhost:8000</code>. 
-                        Asegúrate de que el servidor esté ejecutándose con <code>python run_server.py</code>
+                        No se puede conectar al servidor en <code>{getWebSocketUrl(serverConfig)}</code>. 
+                        {serverConfig.host === 'localhost' ? (
+                            <> Asegúrate de que el servidor esté ejecutándose con <code>python run_server.py</code></>
+                        ) : (
+                            <> Verifica que el servidor esté ejecutándose y que la configuración sea correcta.</>
+                        )}
                     </Alert>
                 )}
                 <Box style={{ flex: 1, position: 'relative', height: '100%' }}>
