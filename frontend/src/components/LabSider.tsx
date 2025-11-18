@@ -171,19 +171,19 @@ export function LabSider() {
                 <Stack gap="xl">
                     {trainingStatus === 'running' && (
                         <Box style={{ display: 'block' }}>
-                            <Stack gap="xs">
-                                <Text size="xs" fw={700} className={classes.sectionTitle}>PROGRESO DEL ENTRENAMIENTO</Text>
-                                <Progress value={progressPercent} animated />
-                                {trainingProgress && (
-                                    <Text size="xs" c="dimmed">
-                                        Episodio {trainingProgress.current_episode}/{trainingProgress.total_episodes} | 
-                                        Pérdida: {trainingProgress.avg_loss.toFixed(6)}
-                                    </Text>
-                                )}
-                                <Button color="red" variant="outline" size="xs" onClick={() => sendCommand('experiment', 'stop')}>
-                                    Detener Entrenamiento
-                                </Button>
-                            </Stack>
+                        <Stack gap="xs">
+                            <Text size="xs" fw={700} className={classes.sectionTitle}>PROGRESO DEL ENTRENAMIENTO</Text>
+                            <Progress value={progressPercent} animated />
+                            {trainingProgress && (
+                                <Text size="xs" c="dimmed">
+                                    Episodio {trainingProgress.current_episode}/{trainingProgress.total_episodes} | 
+                                    Pérdida: {trainingProgress.avg_loss.toFixed(6)}
+                                </Text>
+                            )}
+                            <Button color="red" variant="outline" size="xs" onClick={() => sendCommand('experiment', 'stop')}>
+                                Detener Entrenamiento
+                            </Button>
+                        </Stack>
                         </Box>
                     )}
 

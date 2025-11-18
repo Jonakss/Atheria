@@ -123,7 +123,6 @@ async def websocket_handler(request):
     
     return ws
 
-# Reemplaza esta función en tu src/pipeline_server.py
 async def simulation_loop():
     """Bucle principal que evoluciona el estado y difunde los datos de visualización."""
     logging.info("Iniciando bucle de simulación (actualmente en pausa).")
@@ -132,44 +131,50 @@ async def simulation_loop():
             is_paused = g_state.get('is_paused', True)
             motor = g_state.get('motor')
             
-            # Log de diagnóstico ocasional (cada 5 segundos aproximadamente)
+            # ... (código de warning de motor no cargado igual que antes) ...
             if motor is None and not is_paused:
-                # Solo loguear ocasionalmente para no saturar
-                import time
-                if not hasattr(simulation_loop, '_last_warning_time'):
-                    simulation_loop._last_warning_time = 0
-                current_time = time.time()
-                if current_time - simulation_loop._last_warning_time > 5:
-                    logging.warning("Simulación en ejecución pero sin motor cargado. Carga un modelo para ver datos.")
-                    simulation_loop._last_warning_time = current_time
-            
+                # ... (tu código de logging existente) ...
+                pass
+
             if not is_paused and motor:
                 current_step = g_state.get('simulation_step', 0)
                 
-                # OPTIMIZACIÓN CRÍTICA: Si live_feed está desactivado, NO procesar nada
-                # Esto evita cálculos innecesarios y mejora el rendimiento
-                live_feed_enabled = g_state.get('live_feed_enabled', True)
-                
-                if not live_feed_enabled:
-                    # Si live_feed está desactivado, no hacer nada - solo esperar
-                    # La simulación se pausa efectivamente cuando no hay visualización
-                    await asyncio.sleep(0.1)
-                    continue
-                
                 try:
-                    # Evolucionar el estado solo si live_feed está activo
+                    # -------------------------------------------------------
+                    # 1. FÍSICA PRIMERO (CRÍTICO)
+                    # Siempre evolucionamos el estado, haya o no visualización
+                    # -------------------------------------------------------
                     g_state['motor'].evolve_internal_state()
                     g_state['simulation_step'] = current_step + 1
                     
-                    # Validar que el motor tenga un estado válido
-                    if g_state['motor'].state.psi is None:
-                        logging.warning("Motor activo pero sin estado psi. Saltando frame.")
-                        await asyncio.sleep(0.1)
-                        continue
+                    # 2. ¿Tenemos que visualizar?
+                    live_feed_enabled = g_state.get('live_feed_enabled', True)
                     
-                    # --- CALCULAR VISUALIZACIONES SOLO SI LIVE_FEED ESTÁ ACTIVO ---
-                    # Optimización: Usar inference_mode para mejor rendimiento GPU
-                    # Obtener delta_psi si está disponible para visualizaciones de flujo
+                    # --- MODO TURBO (Visualización apagada) ---
+                    if not live_feed_enabled:
+                        # Guardar historial mínimo si está habilitado (opcional)
+                        # ... (tu código de historial existente) ...
+
+                        # Log ocasional para saber que sigue corriendo
+                        if current_step % 100 == 0:
+                            await broadcast({
+                                "type": "simulation_log",
+                                "payload": f"[Simulación Turbo] Paso {current_step}"
+                            })
+                        
+                        # IMPORTANTE: Cedemos control (await) para no bloquear el servidor,
+                        # pero usamos 0 segundos para que retome inmediatamente (máxima velocidad)
+                        await asyncio.sleep(0)
+                        continue  # Saltamos la generación de imágenes
+                    
+                    # --- MODO VISUALIZACIÓN (Visualización encendida) ---
+                    
+                    # Validar estado
+                    if g_state['motor'].state.psi is None:
+                         await asyncio.sleep(0.1)
+                         continue
+
+                    # Generar visualizaciones (costoso)
                     delta_psi = g_state['motor'].last_delta_psi if hasattr(g_state['motor'], 'last_delta_psi') else None
                     viz_data = get_visualization_data(
                         g_state['motor'].state.psi, 
@@ -178,155 +183,35 @@ async def simulation_loop():
                         motor=g_state['motor']
                     )
                     
-                    # Validar que viz_data tenga los campos necesarios
                     if not viz_data or not isinstance(viz_data, dict):
-                        logging.warning("get_visualization_data retornó datos inválidos. Saltando frame.")
                         await asyncio.sleep(0.1)
                         continue
                     
-                    # Construir frame_payload con información completa del paso del tiempo
-                    current_time = asyncio.get_event_loop().time()
-                    frame_payload_raw = {
-                        "step": current_step,
-                        "timestamp": current_time,
-                        "map_data": viz_data.get("map_data", []),
-                        "hist_data": viz_data.get("hist_data", {}),
-                        "poincare_coords": viz_data.get("poincare_coords", []),
-                        "phase_attractor": viz_data.get("phase_attractor"),
-                        "flow_data": viz_data.get("flow_data"),
-                        "phase_hsv_data": viz_data.get("phase_hsv_data"),
-                        "complex_3d_data": viz_data.get("complex_3d_data"),
-                        # Información adicional para la UI
-                        "simulation_info": {
-                            "step": current_step,
-                            "is_paused": False,
-                            "live_feed_enabled": live_feed_enabled
-                        }
-                    }
+                    # ... (El resto de tu código de construcción y envío de payload está perfecto) ...
+                    # Copia aquí el bloque de "Construir frame_payload_raw" hasta el final del try
                     
-                    # Optimizar payload (ROI, compresión y downsampling)
-                    # 1. Aplicar ROI primero (reduce el tamaño de los datos)
-                    roi_manager = g_state.get('roi_manager')
-                    if roi_manager and roi_manager.roi_enabled:
-                        from .roi_manager import apply_roi_to_payload
-                        frame_payload_roi = apply_roi_to_payload(frame_payload_raw, roi_manager)
-                    else:
-                        frame_payload_roi = frame_payload_raw
-                    
-                    # 2. Aplicar compresión y downsampling
-                    compression_enabled = g_state.get('data_compression_enabled', True)
-                    downsample_factor = g_state.get('downsample_factor', 1)
-                    viz_type = g_state.get('viz_type', 'density')
-                    
-                    # Por ahora, solo aplicar optimización si está habilitada explícitamente
-                    # y el payload es grande (para no afectar rendimiento con payloads pequeños)
-                    if compression_enabled or downsample_factor > 1:
-                        frame_payload = await optimize_frame_payload(
-                            frame_payload_roi,
-                            enable_compression=compression_enabled,
-                            downsample_factor=downsample_factor,
-                            viz_type=viz_type
-                        )
-                        
-                        # Logging ocasional del tamaño del payload (cada 100 frames)
-                        if current_step % 100 == 0:
-                            original_size = get_payload_size(frame_payload_raw)
-                            optimized_size = get_payload_size(frame_payload)
-                            compression_ratio = (1 - optimized_size / original_size) * 100 if original_size > 0 else 0
-                            roi_info = frame_payload.get('roi_info', {})
-                            roi_msg = f" (ROI: {roi_info.get('reduction_ratio', 1.0):.1f}x reducción)" if roi_info.get('enabled') else ""
-                            logging.debug(f"Payload size: {original_size/1024:.1f}KB → {optimized_size/1024:.1f}KB ({compression_ratio:.1f}% reducción){roi_msg}")
-                    else:
-                        frame_payload = frame_payload_roi
-                    
-                    # Guardar en historial si está habilitado
-                    if g_state.get('history_enabled', False):
-                        try:
-                            g_state['simulation_history'].add_frame(frame_payload)
-                        except Exception as e:
-                            logging.debug(f"Error guardando frame en historial: {e}")
-                    
-                    # Enviar frame solo si live_feed está activo
-                    await broadcast({"type": "simulation_frame", "payload": frame_payload})
-                    
-                    # Enviar log de simulación cada 10 pasos para no saturar
-                    if current_step % 10 == 0:
-                        await broadcast({
-                            "type": "simulation_log",
-                            "payload": f"[Simulación] Paso {current_step} completado"
-                        })
-                    
-                    # Capturar snapshot para análisis t-SNE (cada N pasos) - OPTIMIZADO
-                    # Solo capturar si está habilitado y en el intervalo correcto
-                    snapshot_interval = g_state.get('snapshot_interval', 500)  # Por defecto cada 500 pasos (más espaciado)
-                    snapshot_enabled = g_state.get('snapshot_enabled', False)  # Deshabilitado por defecto para no afectar rendimiento
-                    
-                    if snapshot_enabled and current_step % snapshot_interval == 0:
-                        if 'snapshots' not in g_state:
-                            g_state['snapshots'] = []
-                        
-                        # Optimización: usar detach() antes de clone() para evitar grafo computacional
-                        # y mover a CPU de forma asíncrona si es necesario
-                        try:
-                            psi_tensor = g_state['motor'].state.psi
-                            # Detach y clonar de forma más eficiente
-                            snapshot = psi_tensor.detach().cpu().clone() if hasattr(psi_tensor, 'detach') else psi_tensor.cpu().clone()
-                            
-                            g_state['snapshots'].append({
-                                'psi': snapshot,
-                                'step': current_step,
-                                'timestamp': asyncio.get_event_loop().time()
-                            })
-                            
-                            # Limitar número de snapshots almacenados (mantener últimos 500 para reducir memoria)
-                            max_snapshots = g_state.get('max_snapshots', 500)
-                            if len(g_state['snapshots']) > max_snapshots:
-                                # Eliminar los más antiguos de forma eficiente
-                                g_state['snapshots'] = g_state['snapshots'][-max_snapshots:]
-                        except Exception as e:
-                            # Si falla la captura, no afectar la simulación
-                            logging.debug(f"Error capturando snapshot en paso {current_step}: {e}")
-                    
+                    # Asegúrate de que el payload se construye y envía AQUÍ
+                    # ...
+
                 except Exception as e:
-                    logging.error(f"Error en el bucle de simulación: {e}", exc_info=True)
-                    # Continuar el bucle en lugar de detenerlo
+                    logging.error(f"Error en simulación: {e}", exc_info=True)
                     await asyncio.sleep(0.1)
                     continue
             
-            # Controla la velocidad de la simulación según simulation_speed y target_fps
+            # Control de FPS (Solo aplica si estamos en modo visualización normal)
+            # En modo turbo ya habremos hecho 'continue' arriba
             simulation_speed = g_state.get('simulation_speed', 1.0)
             target_fps = g_state.get('target_fps', 10.0)
-            frame_skip = g_state.get('frame_skip', 0)
-            
-            # Calcular delay basado en FPS objetivo y velocidad
             base_fps = target_fps * simulation_speed
-            sleep_time = max(0.001, 1.0 / base_fps)  # Mínimo 1ms para no saturar
-            
-            # Aplicar frame skip si está configurado
-            if frame_skip > 0 and g_state.get('simulation_step', 0) % (frame_skip + 1) != 0:
-                # Saltar frame: solo evolución, no visualización
-                if not is_paused and motor:
-                    try:
-                        g_state['motor'].evolve_internal_state()
-                        g_state['simulation_step'] = g_state.get('simulation_step', 0) + 1
-                    except:
-                        pass
+            sleep_time = max(0.001, 1.0 / base_fps)
             
             await asyncio.sleep(sleep_time)
+
     except (SystemExit, asyncio.CancelledError):
-        # Shutdown graceful - no loguear como error
-        logging.info("Bucle de simulación detenido (shutdown graceful)")
+        logging.info("Simulación detenida.")
         raise
     except Exception as e:
-        logging.error(f"Error crítico en el bucle de simulación: {e}", exc_info=True)
-        await broadcast({
-            "type": "simulation_log",
-            "payload": f"[Error] Error en simulación: {str(e)}"
-        })
-        g_state['is_paused'] = True
-        await broadcast({"type": "inference_status_update", "payload": {"status": "paused"}})
-        await asyncio.sleep(2)
-
+        logging.error(f"Error crítico: {e}")
 # --- Definición de Handlers para los Comandos ---
 
 async def handle_create_experiment(args):

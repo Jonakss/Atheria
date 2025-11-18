@@ -3,8 +3,5 @@ snntorch
 numpy
 aiohttp
 types-aiobotocore[aiohttp]
-# Añadido para las transformaciones de redimensionado en SNN_UNET
 torchvision
-# Añadido para PCA en la visualización de Poincaré
 scikit-learn
-# Nota: zlib y base64 son parte de la biblioteca estándar de Python, no necesitan instalación

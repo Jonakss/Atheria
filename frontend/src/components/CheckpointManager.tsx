@@ -280,7 +280,7 @@ export function CheckpointManager() {
                                         <Group gap="md">
                                             <Text size="xs" c="dimmed">
                                                 <strong>Arquitectura:</strong> {currentExperiment.config?.MODEL_ARCHITECTURE || 'N/A'}
-                                            </Text>
+                                    </Text>
                                         </Group>
                                     </Stack>
                                 </Card>
@@ -377,7 +377,7 @@ export function CheckpointManager() {
 
                             {!loading && filteredCheckpoints.length > 0 && (
                                 <ScrollArea h={450}>
-                                    <Table highlightOnHover>
+                                        <Table highlightOnHover>
                                         <Table.Thead>
                                             <Table.Tr>
                                                 <Table.Th style={{ width: 100 }}>Estado</Table.Th>
@@ -391,55 +391,55 @@ export function CheckpointManager() {
                                         <Table.Tbody>
                                             {filteredCheckpoints
                                                 .sort((a, b) => b.episode - a.episode)
-                                                .map((ckpt) => (
-                                                <Table.Tr 
-                                                    key={ckpt.filename}
-                                                    style={{ 
+                                                    .map((ckpt) => (
+                                                    <Table.Tr 
+                                                        key={ckpt.filename}
+                                                        style={{ 
                                                         backgroundColor: ckpt.is_best 
                                                             ? 'var(--mantine-color-green-9)' 
                                                             : undefined,
                                                         opacity: ckpt.is_best ? 0.15 : 1
-                                                    }}
-                                                >
+                                                        }}
+                                                    >
                                                     <Table.Td>
-                                                        {ckpt.is_best ? (
+                                                                {ckpt.is_best ? (
                                                             <Badge 
                                                                 size="sm" 
                                                                 color="green" 
                                                                 leftSection={<IconStar size={12} />}
                                                                 variant="filled"
                                                             >
-                                                                Mejor
-                                                            </Badge>
-                                                        ) : (
-                                                            <Badge size="sm" color="gray" variant="light">
-                                                                Normal
-                                                            </Badge>
-                                                        )}
+                                                                        Mejor
+                                                                    </Badge>
+                                                                ) : (
+                                                                    <Badge size="sm" color="gray" variant="light">
+                                                                        Normal
+                                                                    </Badge>
+                                                            )}
                                                     </Table.Td>
                                                     <Table.Td>
                                                         <Text size="sm" fw={ckpt.is_best ? 700 : 500}>
-                                                            {ckpt.episode}
-                                                        </Text>
-                                                    </Table.Td>
-                                                    <Table.Td>
-                                                        <Group gap="xs" wrap="nowrap">
-                                                            <IconFile size={14} />
+                                                                {ckpt.episode}
+                                                            </Text>
+                                                        </Table.Td>
+                                                        <Table.Td>
+                                                            <Group gap="xs" wrap="nowrap">
+                                                                <IconFile size={14} />
                                                             <Tooltip label={ckpt.filename}>
                                                                 <Text size="sm" style={{ maxWidth: 250 }} truncate="end">
                                                                     {ckpt.filename}
                                                                 </Text>
                                                             </Tooltip>
-                                                        </Group>
+                                                            </Group>
                                                     </Table.Td>
                                                     <Table.Td>
                                                         <Text size="sm">{formatFileSize(ckpt.size)}</Text>
                                                     </Table.Td>
                                                     <Table.Td>
                                                         <Group gap={4} wrap="nowrap">
-                                                            <IconClock size={12} />
-                                                            <Text size="xs" c="dimmed">{formatDate(ckpt.modified)}</Text>
-                                                        </Group>
+                                                                <IconClock size={12} />
+                                                        <Text size="xs" c="dimmed">{formatDate(ckpt.modified)}</Text>
+                                                            </Group>
                                                     </Table.Td>
                                                     <Table.Td>
                                                         <Group gap={4}>
@@ -469,19 +469,19 @@ export function CheckpointManager() {
                                                                     </Menu.Item>
                                                                     <Menu.Item
                                                                         leftSection={<IconEdit size={14} />}
-                                                                        onClick={() => {
-                                                                            setSelectedCheckpoint(ckpt.filename);
+                                                                    onClick={() => {
+                                                                        setSelectedCheckpoint(ckpt.filename);
                                                                             setActiveTab('notes');
-                                                                        }}
-                                                                    >
+                                                                    }}
+                                                                >
                                                                         Agregar nota
                                                                     </Menu.Item>
                                                                     <Menu.Divider />
                                                                     <Menu.Item
                                                                         leftSection={<IconTrash size={14} />}
-                                                                        color="red"
-                                                                        onClick={() => deleteCheckpoint(ckpt.filename)}
-                                                                    >
+                                                                    color="red"
+                                                                    onClick={() => deleteCheckpoint(ckpt.filename)}
+                                                                >
                                                                         Eliminar
                                                                     </Menu.Item>
                                                                 </Menu.Dropdown>
@@ -514,22 +514,22 @@ export function CheckpointManager() {
                                     withCloseButton
                                     onClose={() => setSelectedCheckpoint(null)}
                                 >
-                                    <Group justify="space-between">
-                                        <Text size="sm">
-                                            <strong>Checkpoint seleccionado:</strong> {selectedCheckpoint}
-                                        </Text>
+                            <Group justify="space-between">
+                                    <Text size="sm">
+                                        <strong>Checkpoint seleccionado:</strong> {selectedCheckpoint}
+                                            </Text>
                                     </Group>
-                                </Alert>
-                            )}
+                                        </Alert>
+                                    )}
                             
                             <Group>
-                                <Textarea
+                                    <Textarea
                                     placeholder="Escribe una nota sobre este checkpoint o experimento..."
-                                    value={newNote}
+                                        value={newNote}
                                     onChange={(e) => setNewNote(e.target.value)}
                                     minRows={3}
                                     style={{ flex: 1 }}
-                                />
+                                    />
                             </Group>
                             
                             <Group>
@@ -538,8 +538,8 @@ export function CheckpointManager() {
                                     disabled={!newNote.trim()}
                                     leftSection={<IconEdit size={14} />}
                                 >
-                                    Agregar Nota
-                                </Button>
+                                            Agregar Nota
+                                        </Button>
                                 {selectedCheckpoint && (
                                     <Button
                                         variant="light"
@@ -549,7 +549,7 @@ export function CheckpointManager() {
                                         Limpiar Selección
                                     </Button>
                                 )}
-                            </Group>
+                                    </Group>
 
                             <Divider label="Notas guardadas" labelPosition="center" />
 
@@ -577,8 +577,8 @@ export function CheckpointManager() {
                                                         <Group gap="xs">
                                                             <IconClock size={14} />
                                                             <Text size="xs" c="dimmed">
-                                                                {new Date(note.timestamp).toLocaleString()}
-                                                            </Text>
+                                                            {new Date(note.timestamp).toLocaleString()}
+                                                        </Text>
                                                             {note.checkpoint && (
                                                                 <Badge size="xs" variant="light" color="blue" leftSection={<IconFile size={10} />}>
                                                                     {note.checkpoint}
