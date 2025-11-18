@@ -119,10 +119,12 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         };
         
         socket.onerror = (error) => {
-            // Solo loguear errores ocasionalmente para no saturar la consola
+            // Solo loguear errores persistentes, no durante la conexión inicial
             const now = Date.now();
-            if (now - lastErrorLog.current > 10000) {
-                // No loguear el objeto Event completo, solo un mensaje simple
+            if (now - lastErrorLog.current > 10000 && connectionStatus !== 'connecting') {
+                if (process.env.NODE_ENV === 'development') {
+                    console.debug("Error de WebSocket (ignorado durante conexión inicial)");
+                }
                 lastErrorLog.current = now;
             }
         };
@@ -130,9 +132,11 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         socket.onmessage = (event) => {
             try {
                 const message = JSON.parse(event.data);
-                // Solo loguear en desarrollo y no para cada frame
-                if (process.env.NODE_ENV === 'development' && message.type !== 'simulation_frame') {
-                    console.log("Mensaje recibido:", message.type);
+                // Solo loguear en desarrollo y no para cada frame o log
+                if (process.env.NODE_ENV === 'development' && 
+                    message.type !== 'simulation_frame' && 
+                    message.type !== 'simulation_log') {
+                    console.debug("Mensaje recibido:", message.type);
                 }
                 const { type, payload } = message;
                 switch (type) {
@@ -241,9 +245,12 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         if (ws.current?.readyState === WebSocket.OPEN) {
             ws.current.send(JSON.stringify({ scope, command, args }));
         } else {
-            // Solo loguear si no es un estado esperado (servidor no disponible)
-            if (connectionStatus !== 'server_unavailable' && connectionStatus !== 'connecting') {
-                console.warn("No se puede enviar comando: WebSocket no conectado");
+            // Solo loguear en desarrollo y si no es un estado esperado
+            if (process.env.NODE_ENV === 'development' && 
+                connectionStatus === 'disconnected' && 
+                ws.current?.readyState !== WebSocket.CONNECTING) {
+                // Solo loguear si realmente hay un problema, no durante la conexión inicial
+                console.debug("No se puede enviar comando: WebSocket no conectado", { scope, command });
             }
         }
     }, [connectionStatus]);

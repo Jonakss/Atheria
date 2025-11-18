@@ -6,7 +6,7 @@ import {
 } from '@mantine/core';
 import {
     IconSettings, IconInfoCircle, IconCheck, IconX, IconRefresh,
-    IconBrain, IconGrid, IconWave, IconAtom
+    IconBrain, IconBox, IconTrendingDown, IconAtom, IconServer, IconArrowsMaximize
 } from '@tabler/icons-react';
 import { useWebSocket } from '../hooks/useWebSocket';
 
@@ -41,6 +41,17 @@ export function InferenceConfigTab() {
     
     const [hasChanges, setHasChanges] = useState(false);
     const [isApplying, setIsApplying] = useState(false);
+    
+    // Configuración del servidor (solo lectura/información por ahora)
+    const [serverHost, setServerHost] = useState('localhost');
+    const [serverPort, setServerPort] = useState(8000);
+    
+    // Información del experimento activo para escalado
+    const { experimentsData } = useWebSocket();
+    const currentExperiment = activeExperiment 
+        ? experimentsData?.find(exp => exp.name === activeExperiment) 
+        : null;
+    const trainingGridSize = currentExperiment?.config?.GRID_SIZE_TRAINING || 64;
 
     // Cargar configuración actual cuando cambia el experimento activo
     useEffect(() => {
@@ -137,25 +148,81 @@ export function InferenceConfigTab() {
                 </Alert>
             )}
 
-            <Divider label="Parámetros de Simulación" labelPosition="center" />
+            <Divider label="Escalado del Mundo (Reutilización de Entrenamiento)" labelPosition="center" />
+
+            <Alert icon={<IconArrowsMaximize size={16} />} color="blue" variant="light">
+                <Text size="sm" mb="xs">
+                    <strong>Escalado de Inferencia:</strong> Los modelos convolucionales (UNet, etc.) pueden inferir en grids más grandes que los de entrenamiento.
+                </Text>
+                <Text size="xs" c="dimmed">
+                    Entrenas en un grid pequeño (ej: 64x64) para eficiencia, y luego escalas a grids grandes (ej: 256x256, 512x512) para visualización detallada.
+                </Text>
+            </Alert>
 
             <Card withBorder p="md">
                 <Stack gap="md">
+                    {currentExperiment && (
+                        <Paper p="xs" withBorder style={{ backgroundColor: 'var(--mantine-color-blue-0)' }}>
+                            <Group justify="space-between">
+                                <Box>
+                                    <Text size="xs" fw={600}>Grid de Entrenamiento:</Text>
+                                    <Text size="sm" c="blue">{trainingGridSize}x{trainingGridSize}</Text>
+                                </Box>
+                                <Box>
+                                    <Text size="xs" fw={600}>Grid de Inferencia:</Text>
+                                    <Text size="sm" c="green">{gridSize}x{gridSize}</Text>
+                                </Box>
+                                <Box>
+                                    <Text size="xs" fw={600}>Factor de Escala:</Text>
+                                    <Text size="sm" c="orange">{(gridSize / trainingGridSize).toFixed(2)}x</Text>
+                                </Box>
+                            </Group>
+                        </Paper>
+                    )}
+                    
                     <NumberInput
-                        label="Tamaño de Grid"
-                        description={`Tamaño de la cuadrícula para inferencia (actual: ${currentGridSize}x${currentGridSize})`}
+                        label="Tamaño de Grid de Inferencia"
+                        description={
+                            currentExperiment 
+                                ? `Escalar desde ${trainingGridSize}x${trainingGridSize} (entrenamiento) a ${gridSize}x${gridSize} (inferencia)`
+                                : `Tamaño de la cuadrícula para inferencia (actual: ${currentGridSize}x${currentGridSize})`
+                        }
                         value={gridSize}
                         onChange={(val) => setGridSize(Number(val) || 256)}
                         min={32}
                         max={1024}
                         step={32}
-                        leftSection={<IconGrid size={16} />}
+                        leftSection={<IconBox size={16} />}
                         disabled={!activeExperiment}
                     />
+                    
+                    {currentExperiment && gridSize !== trainingGridSize && (
+                        <Alert icon={<IconInfoCircle size={16} />} color="green" variant="light">
+                            <Text size="xs">
+                                ✅ El modelo entrenado en {trainingGridSize}x{trainingGridSize} se escalará automáticamente a {gridSize}x{gridSize}.
+                                Esto permite reutilizar el entrenamiento en grids más grandes sin reentrenar.
+                            </Text>
+                        </Alert>
+                    )}
+                    
+                    {currentExperiment && gridSize === trainingGridSize && (
+                        <Alert icon={<IconInfoCircle size={16} />} color="yellow" variant="light">
+                            <Text size="xs">
+                                ℹ️ Grid de inferencia igual al de entrenamiento. Puedes aumentar el tamaño para ver más detalle.
+                            </Text>
+                        </Alert>
+                    )}
+                    
                     <Tooltip label="Nota: Cambiar el tamaño de grid requiere recargar el experimento">
                         <Text size="xs" c="dimmed">⚠️ Requiere recargar el experimento para aplicar</Text>
                     </Tooltip>
+                </Stack>
+            </Card>
 
+            <Divider label="Parámetros de Simulación" labelPosition="center" />
+
+            <Card withBorder p="md">
+                <Stack gap="md">
                     <Select
                         label="Modo de Inicialización"
                         description="Cómo se inicializa el estado cuántico al comenzar la simulación"
@@ -182,7 +249,7 @@ export function InferenceConfigTab() {
                         step={0.001}
                         min={0}
                         max={1}
-                        leftSection={<IconWave size={16} />}
+                        leftSection={<IconTrendingDown size={16} />}
                         disabled={!activeExperiment}
                     />
                     <Tooltip label="Nota: Cambiar Gamma Decay requiere recargar el experimento">
@@ -293,6 +360,53 @@ export function InferenceConfigTab() {
                     Aplicar Configuración
                 </Button>
             </Group>
+
+            <Divider label="Configuración del Servidor" labelPosition="center" />
+
+            <Card withBorder p="md">
+                <Stack gap="md">
+                    <Group>
+                        <IconServer size={18} />
+                        <Text size="sm" fw={600}>Información del Servidor</Text>
+                    </Group>
+                    
+                    <Group grow>
+                        <Box>
+                            <Text size="xs" c="dimmed" mb={4}>Host</Text>
+                            <Text size="sm" fw={500}>{serverHost}</Text>
+                        </Box>
+                        <Box>
+                            <Text size="xs" c="dimmed" mb={4}>Puerto</Text>
+                            <Text size="sm" fw={500}>{serverPort}</Text>
+                        </Box>
+                    </Group>
+                    
+                    <Alert icon={<IconInfoCircle size={16} />} color="gray" variant="light">
+                        <Text size="xs">
+                            La configuración del servidor (host, puerto) se establece en <code>src/config.py</code>.
+                            Para cambiar estos valores, edita el archivo de configuración y reinicia el servidor.
+                        </Text>
+                    </Alert>
+                    
+                    <Paper p="xs" withBorder style={{ backgroundColor: 'var(--mantine-color-dark-6)' }}>
+                        <Text size="xs" fw={600} mb="xs">Variables de Configuración:</Text>
+                        <Stack gap={4}>
+                            <Text size="xs" c="dimmed">
+                                <strong>LAB_SERVER_HOST:</strong> {serverHost}
+                            </Text>
+                            <Text size="xs" c="dimmed">
+                                <strong>LAB_SERVER_PORT:</strong> {serverPort}
+                            </Text>
+                            <Text size="xs" c="dimmed">
+                                <strong>GRID_SIZE_TRAINING:</strong> {trainingGridSize} (del experimento activo)
+                            </Text>
+                            <Text size="xs" c="dimmed">
+                                <strong>GRID_SIZE_INFERENCE:</strong> {gridSize} (configurado)
+                            </Text>
+                        </Stack>
+                    </Paper>
+                </Stack>
+            </Card>
 
             {activeExperiment && (
                 <Alert icon={<IconBrain size={16} />} color="green" variant="light">

@@ -122,8 +122,8 @@ async def websocket_handler(request):
 async def simulation_loop():
     """Bucle principal que evoluciona el estado y difunde los datos de visualización."""
     logging.info("Iniciando bucle de simulación (actualmente en pausa).")
-    while True:
-        try:
+    try:
+        while True:
             is_paused = g_state.get('is_paused', True)
             motor = g_state.get('motor')
             
@@ -675,11 +675,76 @@ async def handle_load_experiment(args):
         if ws: await send_notification(ws, f"Error al cargar '{exp_name}': {str(e)}", "error")
 
 async def handle_reset(args):
-    ws = g_state['websockets'].get(args['ws_id'])
-    if g_state.get('motor'):
-        g_state['motor'].state = QuantumState(g_state['motor'].grid_size, g_state['motor'].d_state, g_state['motor'].device)
+    """Reinicia el estado de la simulación al estado inicial."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    motor = g_state.get('motor')
+    
+    if not motor:
+        msg = "⚠️ No hay modelo cargado. Carga un experimento primero."
+        logging.warning(msg)
+        if ws: await send_notification(ws, msg, "warning")
+        return
+    
+    try:
+        # Obtener el modo de inicialización de la configuración
+        from .utils import load_experiment_config
+        from . import config as global_cfg
+        
+        # Intentar obtener el modo de inicialización del experimento activo o usar el global
+        initial_mode = getattr(global_cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')
+        
+        # Reiniciar el estado cuántico con el modo de inicialización correcto
+        motor.state = QuantumState(
+            motor.grid_size, 
+            motor.d_state, 
+            motor.device,
+            initial_mode=initial_mode
+        )
         g_state['simulation_step'] = 0
-        if ws: await send_notification(ws, "Estado de simulación reiniciado.", "info")
+        
+        # Enviar frame actualizado si live_feed está habilitado
+        live_feed_enabled = g_state.get('live_feed_enabled', True)
+        if live_feed_enabled:
+            try:
+                delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
+                viz_type = g_state.get('viz_type', 'density')
+                viz_data = get_visualization_data(
+                    motor.state.psi, 
+                    viz_type,
+                    delta_psi=delta_psi,
+                    motor=motor
+                )
+                
+                if viz_data and isinstance(viz_data, dict):
+                    map_data = viz_data.get("map_data", [])
+                    if map_data and len(map_data) > 0:
+                        frame_payload = {
+                            "step": 0,
+                            "map_data": map_data,
+                            "hist_data": viz_data.get("hist_data", {}),
+                            "poincare_coords": viz_data.get("poincare_coords", []),
+                            "phase_attractor": viz_data.get("phase_attractor"),
+                            "flow_data": viz_data.get("flow_data"),
+                            "phase_hsv_data": viz_data.get("phase_hsv_data"),
+                            "complex_3d_data": viz_data.get("complex_3d_data")
+                        }
+                        await broadcast({"type": "simulation_frame", "payload": frame_payload})
+                        logging.info("Frame de reinicio enviado exitosamente")
+                    else:
+                        logging.warning("get_visualization_data retornó map_data vacío al reiniciar")
+                else:
+                    logging.warning("get_visualization_data retornó datos inválidos al reiniciar")
+            except Exception as e:
+                logging.error(f"Error generando frame de reinicio: {e}", exc_info=True)
+        
+        msg = f"✅ Estado de simulación reiniciado (modo: {initial_mode})."
+        if ws: await send_notification(ws, msg, "success")
+        logging.info(f"Simulación reiniciada por [{args.get('ws_id')}]")
+        
+    except Exception as e:
+        logging.error(f"Error al reiniciar simulación: {e}", exc_info=True)
+        msg = f"❌ Error al reiniciar: {str(e)}"
+        if ws: await send_notification(ws, msg, "error")
 
 async def handle_refresh_experiments(args):
     """Refresca la lista de experimentos y la envía a todos los clientes conectados."""

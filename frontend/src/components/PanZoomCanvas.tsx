@@ -303,22 +303,41 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 }
             } else {
                 // Visualización normal con colormap
-                // Calcular min/max para normalización dinámica (permite ver valores rojos cuando hay datos altos)
-                let minVal = Infinity;
-                let maxVal = -Infinity;
+                // Calcular estadísticas para normalización robusta (usa percentiles para evitar outliers)
+                const values: number[] = [];
                 for (let y = 0; y < gridHeight; y++) {
                     for (let x = 0; x < gridWidth; x++) {
                         if (!mapData[y] || typeof mapData[y][x] === 'undefined') continue;
                         const val = mapData[y][x];
                         if (typeof val === 'number' && !isNaN(val) && isFinite(val)) {
-                            minVal = Math.min(minVal, val);
-                            maxVal = Math.max(maxVal, val);
+                            values.push(val);
                         }
                     }
                 }
                 
-                // Si todos los valores son iguales, evitar división por cero
-                const range = maxVal - minVal || 1;
+                if (values.length === 0) {
+                    ctx.clearRect(0, 0, gridWidth, gridHeight);
+                    return;
+                }
+                
+                // Ordenar valores para calcular percentiles
+                values.sort((a, b) => a - b);
+                const minVal = values[0];
+                const maxVal = values[values.length - 1];
+                
+                // Usar percentiles para normalización robusta (evita que un outlier comprima todo)
+                // Percentil 1% como mínimo y 99% como máximo para visualizaciones con outliers
+                const p1Index = Math.floor(values.length * 0.01);
+                const p99Index = Math.floor(values.length * 0.99);
+                const robustMin = values[p1Index] || minVal;
+                const robustMax = values[p99Index] || maxVal;
+                
+                // Si hay mucha diferencia entre min/max y los percentiles, usar percentiles
+                // Esto es especialmente útil para FFT/spectral que tiene picos extremos
+                const useRobust = (maxVal - minVal) > (robustMax - robustMin) * 2;
+                const rangeMin = useRobust ? robustMin : minVal;
+                const rangeMax = useRobust ? robustMax : maxVal;
+                const range = rangeMax - rangeMin || 1;
                 
                 for (let y = 0; y < gridHeight; y++) {
                     for (let x = 0; x < gridWidth; x++) {
@@ -331,8 +350,10 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                         if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) {
                             continue;
                         }
-                        // Normalizar usando min/max real de los datos
-                        const normalizedValue = (value - minVal) / range;
+                        // Normalizar usando rango robusto (percentiles)
+                        let normalizedValue = (value - rangeMin) / range;
+                        // Clipear valores fuera del rango robusto (saturar en los extremos)
+                        normalizedValue = Math.max(0, Math.min(1, normalizedValue));
                         ctx.fillStyle = getColor(normalizedValue);
                         ctx.fillRect(x, y, 1, 1);
                     }

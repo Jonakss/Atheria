@@ -28,24 +28,53 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config }: Canvas
         const overlayCanvas = overlayCanvasRef.current;
         if (!canvas || !overlayCanvas) return;
         
-        // Obtener dimensiones y posición del canvas principal
-        const rect = canvas.getBoundingClientRect();
+        // Función para sincronizar posición y tamaño
+        const syncPosition = () => {
+            const rect = canvas.getBoundingClientRect();
+            const parent = canvas.parentElement;
+            if (!parent) return;
+            
+            // Sincronizar tamaño del canvas overlay con el principal
+            overlayCanvas.width = canvas.width;
+            overlayCanvas.height = canvas.height;
+            
+            // Sincronizar estilos CSS (posición y tamaño)
+            overlayCanvas.style.width = `${rect.width}px`;
+            overlayCanvas.style.height = `${rect.height}px`;
+            
+            // Posicionar overlay exactamente sobre el canvas principal
+            const parentRect = parent.getBoundingClientRect();
+            overlayCanvas.style.position = 'absolute';
+            overlayCanvas.style.top = `${rect.top - parentRect.top}px`;
+            overlayCanvas.style.left = `${rect.left - parentRect.left}px`;
+            overlayCanvas.style.pointerEvents = 'none'; // Permitir que los eventos pasen al canvas principal
+            overlayCanvas.style.transform = 'none'; // NO usar transform CSS, aplicar directamente en canvas
+        };
+        
+        // Sincronizar inicialmente
+        syncPosition();
+        
+        // Usar ResizeObserver para sincronizar cuando cambia el tamaño del canvas
+        const resizeObserver = new ResizeObserver(() => {
+            syncPosition();
+        });
+        resizeObserver.observe(canvas);
+        
+        // También observar cambios en el parent
         const parent = canvas.parentElement;
-        if (!parent) return;
+        if (parent) {
+            resizeObserver.observe(parent);
+        }
         
-        // Sincronizar tamaño del canvas overlay con el principal
-        overlayCanvas.width = canvas.width;
-        overlayCanvas.height = canvas.height;
-        
-        // Sincronizar estilos CSS (posición y tamaño, pero NO transform)
-        overlayCanvas.style.width = `${rect.width}px`;
-        overlayCanvas.style.height = `${rect.height}px`;
-        
-        // Posicionar overlay exactamente sobre el canvas principal (sin transform CSS)
-        const parentRect = parent.getBoundingClientRect();
-        overlayCanvas.style.top = `${rect.top - parentRect.top}px`;
-        overlayCanvas.style.left = `${rect.left - parentRect.left}px`;
-        overlayCanvas.style.transform = 'none'; // NO usar transform CSS, aplicar directamente en canvas
+        return () => {
+            resizeObserver.disconnect();
+        };
+    }, [canvasRef]);
+    
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        const overlayCanvas = overlayCanvasRef.current;
+        if (!canvas || !overlayCanvas) return;
         
         const ctx = overlayCanvas.getContext('2d');
         if (!ctx) return;
@@ -111,52 +140,75 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config }: Canvas
             }
         }
         
-        // Quadtree overlay (visualización de estructura)
+        // Quadtree overlay (visualización de estructura) - OPTIMIZADO
         if (config.showQuadtree && mapData) {
-            ctx.strokeStyle = 'rgba(0, 255, 255, 0.5)';
-            // Ajustar lineWidth según el zoom para que sea consistente visualmente
-            ctx.lineWidth = 1.5 / (baseScale * zoom);
+            // OPTIMIZACIÓN: Deshabilitar quadtree automáticamente para grids muy grandes
+            const totalCells = gridWidth * gridHeight;
+            const maxCellsForQuadtree = 128 * 128; // Solo mostrar quadtree para grids <= 128x128
             
-            // Visualizar estructura quadtree (regiones con datos significativos)
-            const threshold = config.quadtreeThreshold;
-            const drawQuadtree = (minX: number, minY: number, maxX: number, maxY: number, depth: number) => {
-                if (depth > 6) return; // Limitar profundidad
+            if (totalCells > maxCellsForQuadtree) {
+                // Para grids grandes, mostrar solo un mensaje o deshabilitar
+                ctx.fillStyle = 'rgba(255, 200, 0, 0.7)';
+                ctx.font = '12px monospace';
+                ctx.fillText('Quadtree deshabilitado para grids grandes (>128x128)', 10, 20);
+                // No dibujar quadtree para evitar impacto en rendimiento
+            } else {
+                ctx.strokeStyle = 'rgba(0, 255, 255, 0.5)';
+                // Ajustar lineWidth según el zoom para que sea consistente visualmente
+                ctx.lineWidth = 1.5 / (baseScale * zoom);
                 
-                const width = maxX - minX;
-                const height = maxY - minY;
+                // OPTIMIZACIÓN: Usar muestreo para grids medianos
+                const sampleStep = totalCells > 64 * 64 ? 2 : 1; // Muestrear cada 2 píxeles para grids > 64x64
                 
-                // Calcular si hay datos significativos en esta región
-                let hasData = false;
-                let maxValue = 0;
+                // Visualizar estructura quadtree (regiones con datos significativos)
+                const threshold = config.quadtreeThreshold;
+                const maxDepth = totalCells > 64 * 64 ? 4 : 6; // Reducir profundidad para grids grandes
                 
-                for (let y = Math.floor(minY); y < Math.ceil(maxY) && y < gridHeight; y++) {
-                    for (let x = Math.floor(minX); x < Math.ceil(maxX) && x < gridWidth; x++) {
-                        const value = Math.abs(mapData[y]?.[x] || 0);
-                        if (value > threshold) {
-                            hasData = true;
-                            maxValue = Math.max(maxValue, value);
+                const drawQuadtree = (minX: number, minY: number, maxX: number, maxY: number, depth: number) => {
+                    if (depth > maxDepth) return; // Limitar profundidad según tamaño
+                    
+                    const width = maxX - minX;
+                    const height = maxY - minY;
+                    
+                    // OPTIMIZACIÓN: Calcular si hay datos significativos usando muestreo
+                    let hasData = false;
+                    let maxValue = 0;
+                    let checked = 0;
+                    const maxChecks = 100; // Limitar número de celdas a verificar
+                    
+                    const stepY = Math.max(1, Math.floor((maxY - minY) / Math.sqrt(maxChecks)));
+                    const stepX = Math.max(1, Math.floor((maxX - minX) / Math.sqrt(maxChecks)));
+                    
+                    for (let y = Math.floor(minY); y < Math.ceil(maxY) && y < gridHeight && checked < maxChecks; y += stepY * sampleStep) {
+                        for (let x = Math.floor(minX); x < Math.ceil(maxX) && x < gridWidth && checked < maxChecks; x += stepX * sampleStep) {
+                            const value = Math.abs(mapData[y]?.[x] || 0);
+                            if (value > threshold) {
+                                hasData = true;
+                                maxValue = Math.max(maxValue, value);
+                            }
+                            checked++;
                         }
                     }
-                }
-                
-                if (hasData) {
-                    // Dibujar borde de región
-                    ctx.strokeRect(minX, minY, width, height);
                     
-                    // Si la región es suficientemente grande, subdividir
-                    if (width > 4 && height > 4) {
-                        const midX = (minX + maxX) / 2;
-                        const midY = (minY + maxY) / 2;
+                    if (hasData) {
+                        // Dibujar borde de región
+                        ctx.strokeRect(minX, minY, width, height);
                         
-                        drawQuadtree(minX, minY, midX, midY, depth + 1);
-                        drawQuadtree(midX, minY, maxX, midY, depth + 1);
-                        drawQuadtree(minX, midY, midX, maxY, depth + 1);
-                        drawQuadtree(midX, midY, maxX, maxY, depth + 1);
+                        // Si la región es suficientemente grande, subdividir
+                        if (width > 4 && height > 4 && depth < maxDepth) {
+                            const midX = (minX + maxX) / 2;
+                            const midY = (minY + maxY) / 2;
+                            
+                            drawQuadtree(minX, minY, midX, midY, depth + 1);
+                            drawQuadtree(midX, minY, maxX, midY, depth + 1);
+                            drawQuadtree(minX, midY, midX, maxY, depth + 1);
+                            drawQuadtree(midX, midY, maxX, maxY, depth + 1);
+                        }
                     }
-                }
-            };
-            
-            drawQuadtree(0, 0, gridWidth, gridHeight, 0);
+                };
+                
+                drawQuadtree(0, 0, gridWidth, gridHeight, 0);
+            }
         }
         
         // Coordenadas overlay

@@ -186,9 +186,13 @@ export function LabSider() {
                     <Stack gap="sm">
                         <Text size="xs" fw={700} className={classes.sectionTitle}>INFERENCIA</Text>
                         <Tooltip 
-                            label={!simData && inferenceStatus !== 'running' ? 
-                                   "Carga un modelo entrenado primero para iniciar la simulación" : 
-                                   inferenceStatus === 'running' ? "Pausar simulación" : "Iniciar simulación"}
+                            label={
+                                !activeExperiment && inferenceStatus !== 'running' ? 
+                                    "Selecciona y carga un experimento primero" :
+                                    !currentExperiment?.has_checkpoint && inferenceStatus !== 'running' ?
+                                    "Este experimento no tiene checkpoints. Entrénalo primero." :
+                                    inferenceStatus === 'running' ? "Pausar simulación" : "Iniciar simulación"
+                            }
                             position="top"
                         >
                             <Group grow>
@@ -196,7 +200,10 @@ export function LabSider() {
                                     onClick={togglePlayPause} 
                                     leftSection={inferenceStatus === 'running' ? <IconPlayerPause size={16} /> : <IconPlayerPlay size={16} />} 
                                     color={inferenceStatus === 'running' ? 'yellow' : 'green'}
-                                    disabled={!simData && inferenceStatus !== 'running'}
+                                    disabled={
+                                        (inferenceStatus !== 'running') && 
+                                        (!activeExperiment || !currentExperiment?.has_checkpoint)
+                                    }
                                 >
                                     {inferenceStatus === 'running' ? 'Pausar' : 'Iniciar'}
                                 </Button>
@@ -204,7 +211,7 @@ export function LabSider() {
                                     leftSection={<IconRefresh size={14} />} 
                                     variant="default" 
                                     onClick={handleResetSimulation}
-                                    disabled={!simData}
+                                    disabled={!activeExperiment || !currentExperiment?.has_checkpoint}
                                 >
                                     Reiniciar
                                 </Button>

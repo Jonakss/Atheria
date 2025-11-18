@@ -57,7 +57,7 @@ export function DataTab() {
             resizeObserver.disconnect();
             clearTimeout(timer);
         };
-    }, [simulationHistory.length]);
+    }, []); // Removed simulationHistory.length dependency to prevent infinite loops
 
     // Calcular estadísticas del estado actual
     const currentStats = useMemo(() => {
