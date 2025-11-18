@@ -1,11 +1,11 @@
 // frontend/src/App.tsx
-import { AppShell, Burger, Group, MantineProvider, Alert } from '@mantine/core'; // Usamos MantineProvider para temas
+import { AppShell, Burger, Group, MantineProvider, Alert, Button } from '@mantine/core'; // Usamos MantineProvider para temas
 import { useDisclosure } from '@mantine/hooks';
 import { LabSider } from './components/LabSider';
 import { MainHeader } from './components/MainHeader';
 import { MainTabs } from './components/MainTabs';
 import { Box } from '@mantine/core';
-import { IconAlertCircle } from '@tabler/icons-react';
+import { IconAlertCircle, IconRefresh } from '@tabler/icons-react';
 import { WebSocketProvider } from './context/WebSocketContext';
 import { useWebSocket } from './hooks/useWebSocket'; // <-- ¡LA IMPORTACIÓN CLAVE!
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -13,7 +13,7 @@ import { getWebSocketUrl } from './utils/serverConfig';
 import '@mantine/core/styles.css'; // Importa los estilos de Mantine
 
 function AppContent() {
-    const { connectionStatus, serverConfig } = useWebSocket();
+    const { connectionStatus, serverConfig, reconnect } = useWebSocket();
     const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
     const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(true);
 
@@ -54,6 +54,15 @@ function AppContent() {
                         ) : (
                             <> Verifica que el servidor esté ejecutándose y que la configuración sea correcta.</>
                         )}
+                        <Button
+                            leftSection={<IconRefresh size={16} />}
+                            onClick={reconnect}
+                            mt="sm"
+                            variant="light"
+                            color="blue"
+                        >
+                            Intentar Reconectar
+                        </Button>
                     </Alert>
                 )}
                 <Box style={{ flex: 1, position: 'relative', height: '100%' }}>

@@ -31,6 +31,7 @@ interface WebSocketContextType {
     selectedViz: string;
     setSelectedViz: (viz: string) => void;
     connect: () => void;
+    reconnect: () => void; // Función para reconexión manual
     simData: SimData | null;
     trainingLog: string[];
     allLogs: string[]; // Logs unificados
@@ -92,8 +93,13 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         }
     }, []);
 
-    const connect = useCallback(() => {
+    const connect = useCallback((isManual = false) => {
         if (ws.current?.readyState === WebSocket.OPEN) return;
+        
+        // Si es una reconexión manual, resetear los intentos
+        if (isManual) {
+            reconnectAttempts.current = 0;
+        }
         
         // Limpiar conexión anterior si existe
         if (ws.current) {
@@ -122,6 +128,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
             if (isManualClose.current) {
                 isManualClose.current = false; // Resetear el flag
                 setConnectionStatus('disconnected');
+                reconnectAttempts.current = 0; // Resetear intentos
                 return;
             }
             
@@ -138,15 +145,15 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                     lastErrorLog.current = now;
                 }
                 
-                // Después de varios intentos, marcar como servidor no disponible
-                if (reconnectAttempts.current > 3) {
+                // Después de 3 intentos, marcar como servidor no disponible y detener reconexión automática
+                if (reconnectAttempts.current >= 3) {
                     setConnectionStatus('server_unavailable');
+                    console.warn("⚠ Se agotaron los intentos de reconexión automática. Usa el botón de reconexión para intentar nuevamente.");
                 } else {
                     setConnectionStatus('disconnected');
+                    // Reintentar conexión automáticamente solo si no hemos alcanzado el límite
+                    setTimeout(connect, 3000);
                 }
-                
-                // Reintentar conexión usando la configuración más reciente
-                setTimeout(connect, 3000);
             } else {
                 setConnectionStatus('disconnected');
             }
@@ -267,12 +274,17 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         if (effectRan.current === false) {
-            connect();
+            connect(false); // Conexión inicial automática
             return () => {
                 effectRan.current = true;
                 ws.current?.close();
             };
         }
+    }, [connect]);
+    
+    // Función para reconexión manual
+    const reconnect = useCallback(() => {
+        connect(true); // Reconexión manual, resetea los intentos
     }, [connect]);
     
     const sendCommand = useCallback((scope: string, command: string, args: Record<string, any> = {}) => {
@@ -298,6 +310,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         selectedViz,
         setSelectedViz,
         connect,
+        reconnect, // Función para reconexión manual
         simData,
         trainingLog,
         allLogs,
