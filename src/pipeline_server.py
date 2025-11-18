@@ -1522,14 +1522,26 @@ def setup_routes(app):
     PROJECT_ROOT = Path(__file__).parent.parent.resolve()
     STATIC_FILES_ROOT = PROJECT_ROOT / 'frontend' / 'dist'
     
+    # Siempre agregar la ruta WebSocket (debe tener prioridad absoluta)
+    # Esto permite que el servidor funcione aunque no tenga el frontend construido
+    app.router.add_get("/ws", websocket_handler)
+    
+    # Verificar si el frontend existe
     if not STATIC_FILES_ROOT.exists() or not (STATIC_FILES_ROOT / 'index.html').exists():
-        logging.critical(f"Directorio de frontend '{STATIC_FILES_ROOT}' no encontrado o incompleto. Asegúrate de haber ejecutado 'npm run build' en la carpeta 'frontend'.")
+        logging.warning(f"Directorio de frontend '{STATIC_FILES_ROOT}' no encontrado o incompleto.")
+        logging.warning("El servidor funcionará solo con WebSocket. Para servir el frontend, ejecuta 'npm run build' en la carpeta 'frontend'.")
+        
+        # Servir una respuesta simple en la raíz para indicar que el servidor está funcionando
+        async def serve_info(request):
+            return web.Response(
+                text="Aetheria Server está funcionando. WebSocket disponible en /ws\n\n"
+                     "Para servir el frontend, construye los archivos estáticos con 'npm run build' en la carpeta 'frontend'.",
+                content_type='text/plain'
+            )
+        app.router.add_get('/', serve_info)
         return
 
     logging.info(f"Sirviendo archivos estáticos desde: {STATIC_FILES_ROOT}")
-    
-    # Primero agregar la ruta WebSocket (debe tener prioridad absoluta)
-    app.router.add_get("/ws", websocket_handler)
     
     # Servir index.html en la raíz
     async def serve_index(request):
