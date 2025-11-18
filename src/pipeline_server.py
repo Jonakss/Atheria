@@ -187,11 +187,24 @@ async def simulation_loop():
                         await asyncio.sleep(0.1)
                         continue
                     
-                    # ... (El resto de tu código de construcción y envío de payload está perfecto) ...
-                    # Copia aquí el bloque de "Construir frame_payload_raw" hasta el final del try
+                    # Construir frame_payload_raw
+                    frame_payload_raw = {
+                        "step": current_step,
+                        "map_data": viz_data.get("map_data", []),
+                        "hist_data": viz_data.get("hist_data", {}),
+                        "poincare_coords": viz_data.get("poincare_coords", []),
+                        "phase_attractor": viz_data.get("phase_attractor"),
+                        "flow_data": viz_data.get("flow_data"),
+                        "phase_hsv_data": viz_data.get("phase_hsv_data"),
+                        "complex_3d_data": viz_data.get("complex_3d_data")
+                    }
                     
-                    # Asegúrate de que el payload se construye y envía AQUÍ
-                    # ...
+                    # Optimizar payload (compresión, ROI, etc.)
+                    frame_payload = await optimize_frame_payload(frame_payload_raw)
+                    
+                    # Enviar a clientes
+                    await broadcast({"type": "simulation_frame", "payload": frame_payload})
+
 
                 except Exception as e:
                     logging.error(f"Error en simulación: {e}", exc_info=True)

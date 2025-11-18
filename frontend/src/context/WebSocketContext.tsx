@@ -32,6 +32,7 @@ interface WebSocketContextType {
     setSelectedViz: (viz: string) => void;
     connect: () => void;
     reconnect: () => void; // Función para reconexión manual
+    disconnect: () => void; // Función para desconexión manual
     simData: SimData | null;
     trainingLog: string[];
     allLogs: string[]; // Logs unificados
@@ -70,12 +71,12 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     const [snapshotCount, setSnapshotCount] = useState<number>(0);
     // Usar una referencia para acceder al valor actual de activeExperiment en callbacks
     const activeExperimentRef = useRef<string | null>(null);
-    
+
     // Mantener las referencias actualizadas
     useEffect(() => {
         activeExperimentRef.current = activeExperiment;
     }, [activeExperiment]);
-    
+
     useEffect(() => {
         serverConfigRef.current = serverConfig;
     }, [serverConfig]);
@@ -95,19 +96,19 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
 
     const connect = useCallback((isManual = false) => {
         if (ws.current?.readyState === WebSocket.OPEN) return;
-        
+
         // Si es una reconexión manual, resetear los intentos
         if (isManual) {
             reconnectAttempts.current = 0;
         }
-        
+
         // Limpiar conexión anterior si existe
         if (ws.current) {
             ws.current.onerror = null;
             ws.current.onclose = null;
             ws.current.close();
         }
-        
+
         setConnectionStatus('connecting');
         // Usar la referencia para obtener siempre la configuración más reciente
         const currentConfig = serverConfigRef.current;
@@ -122,7 +123,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                 console.log("✓ WebSocket conectado");
             }
         };
-        
+
         socket.onclose = (event) => {
             // Si fue un cierre manual (cambio de configuración), no reconectar automáticamente
             if (isManualClose.current) {
@@ -131,11 +132,11 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                 reconnectAttempts.current = 0; // Resetear intentos
                 return;
             }
-            
+
             // No loguear si fue un cierre limpio (código 1000)
             if (event.code !== 1000) {
                 reconnectAttempts.current += 1;
-                
+
                 // Solo loguear errores ocasionalmente (cada 10 segundos)
                 const now = Date.now();
                 if (now - lastErrorLog.current > 10000) {
@@ -144,7 +145,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                     }
                     lastErrorLog.current = now;
                 }
-                
+
                 // Después de 3 intentos, marcar como servidor no disponible y detener reconexión automática
                 if (reconnectAttempts.current >= 3) {
                     setConnectionStatus('server_unavailable');
@@ -158,7 +159,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                 setConnectionStatus('disconnected');
             }
         };
-        
+
         socket.onerror = (error) => {
             // Solo loguear errores persistentes, no durante la conexión inicial
             const now = Date.now();
@@ -174,8 +175,8 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
             try {
                 const message = JSON.parse(event.data);
                 // Solo loguear en desarrollo y no para cada frame o log
-                if (process.env.NODE_ENV === 'development' && 
-                    message.type !== 'simulation_frame' && 
+                if (process.env.NODE_ENV === 'development' &&
+                    message.type !== 'simulation_frame' &&
                     message.type !== 'simulation_log') {
                     console.debug("Mensaje recibido:", message.type);
                 }
@@ -281,19 +282,28 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
             };
         }
     }, [connect]);
-    
+
     // Función para reconexión manual
     const reconnect = useCallback(() => {
         connect(true); // Reconexión manual, resetea los intentos
     }, [connect]);
-    
+
+    // Función para desconexión manual
+    const disconnect = useCallback(() => {
+        if (ws.current) {
+            isManualClose.current = true; // Marcar como cierre manual
+            ws.current.close(1000); // Código 1000 = cierre normal
+            setConnectionStatus('disconnected');
+        }
+    }, []);
+
     const sendCommand = useCallback((scope: string, command: string, args: Record<string, any> = {}) => {
         if (ws.current?.readyState === WebSocket.OPEN) {
             ws.current.send(JSON.stringify({ scope, command, args }));
         } else {
             // Solo loguear en desarrollo y si no es un estado esperado
-            if (process.env.NODE_ENV === 'development' && 
-                connectionStatus === 'disconnected' && 
+            if (process.env.NODE_ENV === 'development' &&
+                connectionStatus === 'disconnected' &&
                 ws.current?.readyState !== WebSocket.CONNECTING) {
                 // Solo loguear si realmente hay un problema, no durante la conexión inicial
                 console.debug("No se puede enviar comando: WebSocket no conectado", { scope, command });
@@ -311,6 +321,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         setSelectedViz,
         connect,
         reconnect, // Función para reconexión manual
+        disconnect, // Función para desconexión manual
         simData,
         trainingLog,
         allLogs,
