@@ -30,8 +30,36 @@ export function LabSider() {
     const [initialStateMode, setInitialStateMode] = useState('complex_noise');  // Modo de inicialización del estado
 
     const handleCreateExperiment = () => {
-        if (!selectedModel) return;
+        // Validaciones
+        if (!selectedModel) {
+            alert('⚠️ Por favor selecciona una arquitectura de modelo.');
+            return;
+        }
+        
+        if (gridSize < 16 || gridSize > 512) {
+            alert('⚠️ El tamaño de grid debe estar entre 16 y 512.');
+            return;
+        }
+        
+        if (learningRate <= 0 || learningRate > 1) {
+            alert('⚠️ El learning rate debe estar entre 0 y 1.');
+            return;
+        }
+        
+        if (episodesToAdd < 1) {
+            alert('⚠️ Debes especificar al menos 1 episodio.');
+            return;
+        }
+        
+        // Verificar si el nombre del experimento ya existe
         const expName = `${selectedModel}-d${dState}-h${hiddenChannels}-g${gridSize}-lr${learningRate.toExponential(0)}`;
+        const existingExp = experimentsData?.find(e => e.name === expName);
+        if (existingExp) {
+            if (!confirm(`⚠️ El experimento "${expName}" ya existe. ¿Deseas continuar de todas formas?`)) {
+                return;
+            }
+        }
+        
         const args: Record<string, any> = { 
             EXPERIMENT_NAME: expName, 
             MODEL_ARCHITECTURE: selectedModel, 
@@ -53,7 +81,32 @@ export function LabSider() {
     };
 
     const handleContinueExperiment = () => {
-        if (activeExperiment) sendCommand('experiment', 'continue', { 
+        if (!activeExperiment) {
+            alert('⚠️ Por favor selecciona un experimento primero.');
+            return;
+        }
+        
+        if (episodesToAdd < 1) {
+            alert('⚠️ Debes especificar al menos 1 episodio para añadir.');
+            return;
+        }
+        
+        if (trainingStatus === 'running') {
+            alert('⚠️ Ya hay un entrenamiento en curso. Espera a que termine.');
+            return;
+        }
+        
+        const exp = experimentsData?.find(e => e.name === activeExperiment);
+        if (exp && !exp.has_checkpoint) {
+            alert('⚠️ Este experimento no tiene checkpoints. Debes entrenarlo primero antes de continuar.');
+            return;
+        }
+        
+        if (!confirm(`¿Continuar entrenamiento de "${activeExperiment}" añadiendo ${episodesToAdd} episodios más?`)) {
+            return;
+        }
+        
+        sendCommand('experiment', 'continue', { 
             EXPERIMENT_NAME: activeExperiment,
             EPISODES_TO_ADD: episodesToAdd
         });
@@ -337,9 +390,35 @@ export function LabSider() {
                                 { value: 'zeros', label: 'Ceros (requiere activación externa)' }
                             ]}
                         />
-                        <Button onClick={handleCreateExperiment} loading={trainingStatus === 'running'} disabled={!selectedModel}>
+                        <Button 
+                            onClick={handleCreateExperiment} 
+                            loading={trainingStatus === 'running'} 
+                            disabled={!selectedModel}
+                            fullWidth
+                        >
                             {transferFromExperiment ? 'Crear con Transfer Learning' : 'Crear Nuevo Experimento'}
                         </Button>
+                        
+                        {/* Preview de configuración */}
+                        <Paper p="xs" withBorder style={{ backgroundColor: 'var(--mantine-color-dark-6)' }}>
+                            <Text size="xs" fw={600} mb="xs">Vista Previa:</Text>
+                            <Stack gap={4}>
+                                <Text size="xs" c="dimmed">
+                                    <strong>Nombre:</strong> {selectedModel ? `${selectedModel}-d${dState}-h${hiddenChannels}-g${gridSize}-lr${learningRate.toExponential(0)}` : 'N/A'}
+                                </Text>
+                                <Text size="xs" c="dimmed">
+                                    <strong>Grid:</strong> {gridSize}x{gridSize} | <strong>QCA Steps:</strong> {qcaSteps}
+                                </Text>
+                                <Text size="xs" c="dimmed">
+                                    <strong>Episodios:</strong> {episodesToAdd} | <strong>LR:</strong> {learningRate.toExponential(2)}
+                                </Text>
+                                {transferFromExperiment && (
+                                    <Text size="xs" c="blue">
+                                        <strong>Transfer desde:</strong> {transferFromExperiment}
+                                    </Text>
+                                )}
+                            </Stack>
+                        </Paper>
                     </Stack>
                 </Stack>
             </ScrollArea>

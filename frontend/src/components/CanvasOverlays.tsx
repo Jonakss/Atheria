@@ -28,13 +28,29 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config }: Canvas
         const overlayCanvas = overlayCanvasRef.current;
         if (!canvas || !overlayCanvas) return;
         
-        // Sincronizar tamaño
+        // Obtener dimensiones y posición del canvas principal
+        const rect = canvas.getBoundingClientRect();
+        const parent = canvas.parentElement;
+        if (!parent) return;
+        
+        // Sincronizar tamaño del canvas overlay con el principal
         overlayCanvas.width = canvas.width;
         overlayCanvas.height = canvas.height;
+        
+        // Sincronizar estilos CSS (posición y tamaño, pero NO transform)
+        overlayCanvas.style.width = `${rect.width}px`;
+        overlayCanvas.style.height = `${rect.height}px`;
+        
+        // Posicionar overlay exactamente sobre el canvas principal (sin transform CSS)
+        const parentRect = parent.getBoundingClientRect();
+        overlayCanvas.style.top = `${rect.top - parentRect.top}px`;
+        overlayCanvas.style.left = `${rect.left - parentRect.left}px`;
+        overlayCanvas.style.transform = 'none'; // NO usar transform CSS, aplicar directamente en canvas
         
         const ctx = overlayCanvas.getContext('2d');
         if (!ctx) return;
         
+        // Limpiar canvas
         ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
         
         if (!mapData || mapData.length === 0) return;
@@ -44,31 +60,49 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config }: Canvas
         
         if (gridWidth === 0 || gridHeight === 0) return;
         
-        // Aplicar transformación de pan/zoom
-        ctx.save();
-        ctx.translate(overlayCanvas.width / 2, overlayCanvas.height / 2);
-        ctx.scale(zoom, zoom);
-        ctx.translate(pan.x, pan.y);
-        
-        // Escalar para que la grilla ocupe el canvas
+        // Calcular escala base (igual que PanZoomCanvas)
         const scaleX = overlayCanvas.width / gridWidth;
         const scaleY = overlayCanvas.height / gridHeight;
-        const scale = Math.min(scaleX, scaleY);
-        ctx.scale(scale, scale);
-        ctx.translate(-gridWidth / 2, -gridHeight / 2);
+        const baseScale = Math.min(scaleX, scaleY);
+        
+        // Aplicar transformaciones directamente en el canvas (no CSS)
+        ctx.save();
+        
+        // 1. Mover al centro del canvas
+        const centerX = overlayCanvas.width / 2;
+        const centerY = overlayCanvas.height / 2;
+        ctx.translate(centerX, centerY);
+        
+        // 2. Aplicar zoom (igual que el canvas principal)
+        ctx.scale(zoom, zoom);
+        
+        // 3. Aplicar pan (igual que el canvas principal)
+        ctx.translate(pan.x, pan.y);
+        
+        // 4. Aplicar escala base y centrar la grilla
+        const scaledGridWidth = gridWidth * baseScale;
+        const scaledGridHeight = gridHeight * baseScale;
+        const offsetX = -scaledGridWidth / 2;
+        const offsetY = -scaledGridHeight / 2;
+        
+        ctx.translate(offsetX, offsetY);
+        ctx.scale(baseScale, baseScale);
         
         // Grid overlay
         if (config.showGrid) {
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.lineWidth = 0.5 / (zoom * scale);
+            ctx.strokeStyle = 'rgba(100, 150, 255, 0.2)';
+            // Ajustar lineWidth según el zoom para que sea consistente visualmente
+            ctx.lineWidth = 0.5 / (baseScale * zoom);
             
             const step = config.gridSize;
+            // Dibujar líneas verticales
             for (let x = 0; x <= gridWidth; x += step) {
                 ctx.beginPath();
                 ctx.moveTo(x, 0);
                 ctx.lineTo(x, gridHeight);
                 ctx.stroke();
             }
+            // Dibujar líneas horizontales
             for (let y = 0; y <= gridHeight; y += step) {
                 ctx.beginPath();
                 ctx.moveTo(0, y);
@@ -79,8 +113,9 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config }: Canvas
         
         // Quadtree overlay (visualización de estructura)
         if (config.showQuadtree && mapData) {
-            ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
-            ctx.lineWidth = 1 / (zoom * scale);
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.5)';
+            // Ajustar lineWidth según el zoom para que sea consistente visualmente
+            ctx.lineWidth = 1.5 / (baseScale * zoom);
             
             // Visualizar estructura quadtree (regiones con datos significativos)
             const threshold = config.quadtreeThreshold;
@@ -126,8 +161,11 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config }: Canvas
         
         // Coordenadas overlay
         if (config.showCoordinates) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-            ctx.font = `${12 / (zoom * scale)}px monospace`;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+            // Ajustar fontSize según el zoom para que sea legible
+            const fontSize = Math.max(8, 12 / (baseScale * zoom));
+            ctx.font = `${fontSize}px monospace`;
+            ctx.textBaseline = 'top';
             
             // Mostrar coordenadas en las esquinas
             const corners = [
@@ -138,7 +176,8 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config }: Canvas
             ];
             
             corners.forEach(corner => {
-                ctx.fillText(corner.label, corner.x + 2, corner.y + 12 / (zoom * scale));
+                const padding = Math.max(1, 2 / (baseScale * zoom));
+                ctx.fillText(corner.label, corner.x + padding, corner.y + padding);
             });
         }
         
@@ -182,17 +221,56 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config }: Canvas
             
             ctx.restore();
         }
-    }, [mapData, pan, zoom, config]);
+    }, [mapData, pan, zoom, config, canvasRef]);
+    
+    // Sincronizar posición y tamaño del overlay cuando cambia el canvas principal
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        const overlayCanvas = overlayCanvasRef.current;
+        if (!canvas || !overlayCanvas) return;
+        
+        const updatePosition = () => {
+            const rect = canvas.getBoundingClientRect();
+            const parent = canvas.parentElement;
+            if (!parent) return;
+            
+            const parentRect = parent.getBoundingClientRect();
+            
+            // Sincronizar posición absoluta
+            overlayCanvas.style.top = `${rect.top - parentRect.top}px`;
+            overlayCanvas.style.left = `${rect.left - parentRect.left}px`;
+            
+            // Sincronizar tamaño
+            overlayCanvas.style.width = `${rect.width}px`;
+            overlayCanvas.style.height = `${rect.height}px`;
+        };
+        
+        // Actualizar inmediatamente
+        updatePosition();
+        
+        // Observar cambios de tamaño/posición del canvas principal
+        const resizeObserver = new ResizeObserver(updatePosition);
+        resizeObserver.observe(canvas);
+        
+        // También observar el parent para cambios de layout
+        if (canvas.parentElement) {
+            resizeObserver.observe(canvas.parentElement);
+        }
+        
+        return () => {
+            resizeObserver.disconnect();
+        };
+    }, [canvasRef]);
     
     return (
         <canvas
             ref={overlayCanvasRef}
             style={{
                 position: 'absolute',
-                top: 0,
-                left: 0,
                 pointerEvents: 'none',
-                zIndex: 10
+                zIndex: 10,
+                imageRendering: 'crisp-edges', // Cambiar de pixelated a crisp-edges para overlays más suaves
+                mixBlendMode: 'screen' // Mejorar visibilidad sobre el canvas principal
             }}
         />
     );

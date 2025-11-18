@@ -1083,9 +1083,24 @@ async def handle_set_roi(args):
         roi_manager = ROIManager(grid_size=grid_size)
         g_state['roi_manager'] = roi_manager
     
+    # Soporte para formato nuevo (enabled) y formato antiguo (action)
+    enabled = args.get("enabled", None)
+    if enabled is not None:
+        if not enabled:
+            roi_manager.clear_roi()
+            logging.info("ROI desactivada")
+            if ws:
+                await send_notification(ws, "ROI desactivada. Mostrando grid completo.", "info")
+            await broadcast({
+                "type": "roi_status_update",
+                "payload": {"enabled": False}
+            })
+            return
+        # Si enabled=True, continuar con set_roi
+    
     action = args.get("action", "set")  # 'set', 'clear', 'get'
     
-    if action == "clear":
+    if action == "clear" or (enabled is not None and not enabled):
         roi_manager.clear_roi()
         logging.info("ROI desactivada")
         if ws:
@@ -1096,7 +1111,7 @@ async def handle_set_roi(args):
         if ws:
             await send_to_websocket(ws, "roi_info", roi_info)
         return
-    else:  # action == "set"
+    else:  # action == "set" o enabled == True
         x = args.get("x", 0)
         y = args.get("y", 0)
         width = args.get("width", 128)
@@ -1123,6 +1138,55 @@ async def handle_set_roi(args):
         "type": "roi_status_update",
         "payload": roi_info
     })
+
+async def handle_set_inference_config(args):
+    """Configura parámetros de inferencia (requiere recargar experimento para algunos)."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    
+    # Parámetros que requieren recargar el experimento
+    grid_size = args.get("grid_size")
+    initial_state_mode = args.get("initial_state_mode")
+    gamma_decay = args.get("gamma_decay")
+    
+    changes = []
+    
+    if grid_size is not None:
+        from . import config as global_cfg
+        old_size = global_cfg.GRID_SIZE_INFERENCE
+        global_cfg.GRID_SIZE_INFERENCE = int(grid_size)
+        changes.append(f"Grid size: {old_size} → {grid_size}")
+        logging.info(f"Grid size de inferencia configurado a: {grid_size} (requiere recargar experimento)")
+    
+    if initial_state_mode is not None:
+        from . import config as global_cfg
+        old_mode = getattr(global_cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')
+        global_cfg.INITIAL_STATE_MODE_INFERENCE = str(initial_state_mode)
+        changes.append(f"Inicialización: {old_mode} → {initial_state_mode}")
+        logging.info(f"Modo de inicialización configurado a: {initial_state_mode} (requiere recargar experimento)")
+    
+    if gamma_decay is not None:
+        from . import config as global_cfg
+        old_gamma = getattr(global_cfg, 'GAMMA_DECAY', 0.01)
+        global_cfg.GAMMA_DECAY = float(gamma_decay)
+        changes.append(f"Gamma Decay: {old_gamma} → {gamma_decay}")
+        logging.info(f"Gamma Decay configurado a: {gamma_decay} (requiere recargar experimento)")
+    
+    if changes:
+        msg = f"⚠️ Configuración actualizada: {', '.join(changes)}. Recarga el experimento para aplicar los cambios."
+        if ws:
+            await send_notification(ws, msg, "warning")
+        
+        await broadcast({
+            "type": "inference_config_update",
+            "payload": {
+                "grid_size": global_cfg.GRID_SIZE_INFERENCE,
+                "initial_state_mode": global_cfg.INITIAL_STATE_MODE_INFERENCE,
+                "gamma_decay": global_cfg.GAMMA_DECAY
+            }
+        })
+    else:
+        if ws:
+            await send_notification(ws, "No se especificaron cambios en la configuración.", "info")
 
 async def handle_enable_history(args):
     """Habilita o deshabilita el guardado de historia de simulación."""
@@ -1375,7 +1439,8 @@ HANDLERS = {
         "play": handle_play, 
         "pause": handle_pause, 
         "load_experiment": handle_load_experiment, 
-        "reset": handle_reset
+        "reset": handle_reset,
+        "set_config": handle_set_inference_config
     },
     "system": {
         "refresh_experiments": handle_refresh_experiments

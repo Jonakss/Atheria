@@ -21,7 +21,7 @@ export function MainHeader({ mobileOpened, desktopOpened, toggleMobile, toggleDe
                 <Burger opened={mobileOpened} onClick={toggleMobile} hiddenFrom="sm" size="sm" />
                 <Burger opened={desktopOpened} onClick={toggleDesktop} visibleFrom="sm" size="sm" />
                 <Group gap="xs">
-                    <Text fw={500}>Aetheria Simulation Lab</Text>
+                <Text fw={500}>Aetheria Simulation Lab</Text>
                     {activeExperiment && (
                         <Badge variant="dot" color="blue" size="sm">
                             {activeExperiment}
@@ -50,7 +50,7 @@ export function MainHeader({ mobileOpened, desktopOpened, toggleMobile, toggleDe
                             }
                         >
                             Paso: {currentStep.toLocaleString()}
-                        </Badge>
+                    </Badge>
                     </Tooltip>
                 )}
                 <Tooltip label={`Simulación ${inferenceStatus === 'running' ? 'en ejecución' : 'pausada'}`}>
@@ -64,8 +64,8 @@ export function MainHeader({ mobileOpened, desktopOpened, toggleMobile, toggleDe
                                 <IconPlayerPause size={12} />
                         }
                     >
-                        {inferenceStatus === 'running' ? 'Ejecutando' : 'Pausado'}
-                    </Badge>
+                    {inferenceStatus === 'running' ? 'Ejecutando' : 'Pausado'}
+                </Badge>
                 </Tooltip>
             </Group>
         </Group>

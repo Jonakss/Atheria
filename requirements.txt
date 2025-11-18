@@ -7,3 +7,4 @@ types-aiobotocore[aiohttp]
 torchvision
 # Añadido para PCA en la visualización de Poincaré
 scikit-learn
+# Nota: zlib y base64 son parte de la biblioteca estándar de Python, no necesitan instalación

@@ -69,7 +69,7 @@ def main():
     # Convertir MODEL_PARAMS a SimpleNamespace si es necesario para compatibilidad
     if isinstance(exp_config["MODEL_PARAMS"], dict):
         exp_config["MODEL_PARAMS"] = SimpleNamespace(**exp_config["MODEL_PARAMS"])
-    
+
     # Agregar CONTINUE_TRAINING a la config
     exp_config["CONTINUE_TRAINING"] = args.continue_training
     

@@ -276,6 +276,125 @@ export function AdvancedControls() {
 
                     <Divider />
 
+                    {/* Controles de Optimización de Datos */}
+                    <div>
+                        <Text size="sm" fw={500} mb="xs">Optimización de Transferencia</Text>
+                        <Stack gap="sm">
+                            <Switch
+                                label="Compresión de datos"
+                                description="Comprime datos antes de enviar (reduce tamaño, puede aumentar CPU)"
+                                defaultChecked={true}
+                                onChange={(e) => {
+                                    sendCommand('simulation', 'set_compression', { enabled: e.currentTarget.checked });
+                                }}
+                            />
+                            <NumberInput
+                                label="Downsampling"
+                                description="Factor de reducción de resolución (1 = sin reducción, 2 = mitad, etc.)"
+                                value={1}
+                                onChange={(val) => {
+                                    sendCommand('simulation', 'set_downsample', { factor: Number(val) || 1 });
+                                }}
+                                min={1}
+                                max={8}
+                                step={1}
+                            />
+                        </Stack>
+                    </div>
+
+                    <Divider />
+
+                    {/* Controles de Region of Interest (ROI) */}
+                    <div>
+                        <Text size="sm" fw={500} mb="xs">Región de Interés (ROI)</Text>
+                        <Text size="xs" c="dimmed" mb="xs">
+                            Visualiza solo una parte del grid sin enviar todos los datos
+                        </Text>
+                        <Stack gap="sm">
+                            <Switch
+                                label="Activar ROI"
+                                description="Solo enviar datos de la región seleccionada"
+                                onChange={(e) => {
+                                    if (!e.currentTarget.checked) {
+                                        sendCommand('simulation', 'set_roi', { action: 'clear' });
+                                    }
+                                }}
+                            />
+                            <Group grow>
+                                <NumberInput
+                                    label="X"
+                                    description="Coordenada X inicial"
+                                    value={0}
+                                    onChange={(val) => {
+                                        // Necesitaremos actualizar cuando se implemente el selector visual
+                                    }}
+                                    min={0}
+                                    max={256}
+                                    disabled
+                                />
+                                <NumberInput
+                                    label="Y"
+                                    description="Coordenada Y inicial"
+                                    value={0}
+                                    onChange={(val) => {}}
+                                    min={0}
+                                    max={256}
+                                    disabled
+                                />
+                            </Group>
+                            <Group grow>
+                                <NumberInput
+                                    label="Ancho"
+                                    description="Ancho de la región"
+                                    value={128}
+                                    onChange={(val) => {
+                                        // Necesitaremos actualizar cuando se implemente el selector visual
+                                    }}
+                                    min={32}
+                                    max={256}
+                                    disabled
+                                />
+                                <NumberInput
+                                    label="Alto"
+                                    description="Alto de la región"
+                                    value={128}
+                                    onChange={(val) => {}}
+                                    min={32}
+                                    max={256}
+                                    disabled
+                                />
+                            </Group>
+                            <Button
+                                variant="light"
+                                size="sm"
+                                onClick={() => {
+                                    // Ejemplo: establecer ROI central de 128x128
+                                    sendCommand('simulation', 'set_roi', {
+                                        action: 'set',
+                                        x: 64,
+                                        y: 64,
+                                        width: 128,
+                                        height: 128
+                                    });
+                                }}
+                            >
+                                ROI Central 128x128
+                            </Button>
+                            <Button
+                                variant="light"
+                                size="sm"
+                                color="red"
+                                onClick={() => {
+                                    sendCommand('simulation', 'set_roi', { action: 'clear' });
+                                }}
+                            >
+                                Limpiar ROI
+                            </Button>
+                        </Stack>
+                    </div>
+
+                    <Divider />
+
                     {/* Controles de Sistema */}
                     <div>
                         <Text size="sm" fw={500} mb="xs">Sistema</Text>

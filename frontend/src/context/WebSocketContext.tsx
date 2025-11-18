@@ -1,6 +1,7 @@
 // frontend/src/context/WebSocketContext.tsx
 import { createContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { notifications } from '@mantine/notifications';
+import { decompressIfNeeded } from '../utils/dataDecompression';
 
 interface SimData {
     complex_3d_data?: {
@@ -156,7 +157,26 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         setInferenceStatus(payload.status);
                         break;
                     case 'simulation_frame':
-                        setSimData(payload);
+                        // Descomprimir datos si están comprimidos
+                        const decompressedPayload = {
+                            ...payload,
+                            map_data: payload.map_data ? decompressIfNeeded(payload.map_data) : undefined,
+                            complex_3d_data: payload.complex_3d_data ? {
+                                real: decompressIfNeeded(payload.complex_3d_data.real),
+                                imag: decompressIfNeeded(payload.complex_3d_data.imag)
+                            } : undefined,
+                            flow_data: payload.flow_data ? {
+                                dx: decompressIfNeeded(payload.flow_data.dx),
+                                dy: decompressIfNeeded(payload.flow_data.dy),
+                                magnitude: decompressIfNeeded(payload.flow_data.magnitude)
+                            } : undefined,
+                            phase_hsv_data: payload.phase_hsv_data ? {
+                                hue: decompressIfNeeded(payload.phase_hsv_data.hue),
+                                saturation: decompressIfNeeded(payload.phase_hsv_data.saturation),
+                                value: decompressIfNeeded(payload.phase_hsv_data.value)
+                            } : undefined
+                        };
+                        setSimData(decompressedPayload);
                         break;
                     case 'training_log':
                         setTrainingLog(prev => [...prev, payload]);

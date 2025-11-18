@@ -1,11 +1,12 @@
 // frontend/src/components/MainTabs.tsx
 import { Tabs, Box } from '@mantine/core';
-import { IconChartBar, IconDatabase, IconBook, IconChartScatter, IconHistory } from '@tabler/icons-react';
+import { IconChartBar, IconDatabase, IconBook, IconChartScatter, IconHistory, IconSettings } from '@tabler/icons-react';
 import { VisualizationTab } from './VisualizationTab';
 import { DataTab } from './DataTab';
 import { LogbookTab } from './LogbookTab';
 import { AnalysisTab } from './AnalysisTab';
 import { HistoryViewer } from './HistoryViewer';
+import { InferenceConfigTab } from './InferenceConfigTab';
 
 export function MainTabs() {
     return (
@@ -25,6 +26,9 @@ export function MainTabs() {
                 </Tabs.Tab>
                 <Tabs.Tab value="history" leftSection={<IconHistory size={16} />}>
                     Historia
+                </Tabs.Tab>
+                <Tabs.Tab value="inference" leftSection={<IconSettings size={16} />}>
+                    Configuración
                 </Tabs.Tab>
             </Tabs.List>
 
@@ -46,6 +50,10 @@ export function MainTabs() {
 
             <Tabs.Panel value="history" style={{ flex: 1, position: 'relative', overflow: 'auto' }}>
                 <HistoryViewer />
+            </Tabs.Panel>
+
+            <Tabs.Panel value="inference" style={{ flex: 1, position: 'relative', overflow: 'auto' }}>
+                <InferenceConfigTab />
             </Tabs.Panel>
         </Tabs>
     );

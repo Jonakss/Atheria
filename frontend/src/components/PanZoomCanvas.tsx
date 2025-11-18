@@ -16,7 +16,8 @@ function getColor(value: number) {
     const colors = [
         [68, 1, 84], [72, 40, 120], [62, 74, 137], [49, 104, 142],
         [38, 130, 142], [31, 158, 137], [53, 183, 121], [109, 205, 89],
-        [180, 222, 44], [253, 231, 37]
+        [180, 222, 44], [253, 231, 37], [255, 200, 0], [255, 150, 0],
+        [255, 100, 0], [255, 50, 0], [255, 0, 0]
     ];
     
     // Asegurar que value esté en el rango [0, 1]
@@ -302,6 +303,23 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 }
             } else {
                 // Visualización normal con colormap
+                // Calcular min/max para normalización dinámica (permite ver valores rojos cuando hay datos altos)
+                let minVal = Infinity;
+                let maxVal = -Infinity;
+                for (let y = 0; y < gridHeight; y++) {
+                    for (let x = 0; x < gridWidth; x++) {
+                        if (!mapData[y] || typeof mapData[y][x] === 'undefined') continue;
+                        const val = mapData[y][x];
+                        if (typeof val === 'number' && !isNaN(val) && isFinite(val)) {
+                            minVal = Math.min(minVal, val);
+                            maxVal = Math.max(maxVal, val);
+                        }
+                    }
+                }
+                
+                // Si todos los valores son iguales, evitar división por cero
+                const range = maxVal - minVal || 1;
+                
                 for (let y = 0; y < gridHeight; y++) {
                     for (let x = 0; x < gridWidth; x++) {
                         // Validar que mapData[y] existe y tiene el elemento x
@@ -310,10 +328,12 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                         }
                         const value = mapData[y][x];
                         // Validar que value sea un número válido
-                        if (typeof value !== 'number' || isNaN(value)) {
+                        if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) {
                             continue;
                         }
-                        ctx.fillStyle = getColor(value);
+                        // Normalizar usando min/max real de los datos
+                        const normalizedValue = (value - minVal) / range;
+                        ctx.fillStyle = getColor(normalizedValue);
                         ctx.fillRect(x, y, 1, 1);
                     }
                 }

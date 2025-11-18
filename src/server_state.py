@@ -3,6 +3,8 @@ import asyncio
 import json
 import logging
 from .history_manager import SimulationHistory
+from .data_compression import optimize_frame_payload, get_payload_size
+from .roi_manager import ROIManager, apply_roi_to_payload
 
 # Estado global de la aplicación
 g_state = {
@@ -20,6 +22,9 @@ g_state = {
     "simulation_history": SimulationHistory(max_frames=1000),  # Historial de simulación
     "history_enabled": False,  # Habilitar/deshabilitar guardado de historia
     "live_feed_enabled": True,  # Habilitar/deshabilitar envío de datos en tiempo real (optimización)
+    "data_compression_enabled": True,  # Habilitar compresión de datos WebSocket
+    "downsample_factor": 1,  # Factor de downsampling para transferencia (1 = sin downsampling)
+    "roi_manager": ROIManager(grid_size=256),  # Gestor de Region of Interest (ROI)
 }
 
 # --- INICIO DE LA CORRECCIÓN ---

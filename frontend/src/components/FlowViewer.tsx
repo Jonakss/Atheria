@@ -298,7 +298,7 @@ export function FlowViewer() {
                             </Badge>
                         </Group>
                         <Text size="xs" c="dimmed">
-                            Vectores con magnitud > {magnitudeThreshold.toExponential(2)}
+                            Vectores con magnitud {'>'} {magnitudeThreshold.toExponential(2)}
                         </Text>
                     </Stack>
                 </Group>
