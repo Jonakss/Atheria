@@ -11,10 +11,14 @@
             "id": "f5faded8563f6b03",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "type": "markdown",
+              "state": {
+                "file": "30_Components/ARCHITECTURE_V3.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "ARCHITECTURE_V3"
             }
           }
         ]
@@ -90,6 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
+                "file": "30_Components/ARCHITECTURE_V3.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -99,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks"
+              "title": "Backlinks for ARCHITECTURE_V3"
             }
           },
           {
@@ -108,11 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
+                "file": "30_Components/ARCHITECTURE_V3.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links"
+              "title": "Outgoing links from ARCHITECTURE_V3"
             }
           },
           {
@@ -136,12 +142,13 @@
             "state": {
               "type": "outline",
               "state": {
+                "file": "30_Components/ARCHITECTURE_V3.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline"
+              "title": "Outline of ARCHITECTURE_V3"
             }
           }
         ]
@@ -164,6 +171,8 @@
   },
   "active": "f5faded8563f6b03",
   "lastOpenFiles": [
+    "README.md",
+    "30_Components/Models.md",
     "OBSIDIAN_SETUP.md",
     "30_Components/VOXEL_ENGINE_SUGGESTIONS.md",
     "30_Components/FRONTEND_IMPROVEMENTS.md",

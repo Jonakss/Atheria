@@ -432,7 +432,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
 
     return (
         <div className={classes.canvasContainer} style={{ position: 'relative' }}>
-            {!dataToRender && !simData && (
+            {(!dataToRender?.map_data && !simData?.map_data) && (
                 <div style={{
                     position: 'absolute',
                     top: '50%',
@@ -440,7 +440,8 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                     transform: 'translate(-50%, -50%)',
                     textAlign: 'center',
                     color: '#999',
-                    zIndex: 1
+                    zIndex: 1,
+                    pointerEvents: 'none'
                 }}>
                     <p style={{ margin: 0, fontSize: '1.1rem' }}>Esperando datos de simulación...</p>
                     <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem' }}>
@@ -546,8 +547,12 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
                 style={{ 
-                    transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
-                    visibility: (dataToRender || simData) ? 'visible' : 'hidden'
+                    transform: `translate(calc(50% + ${pan.x}px), calc(50% + ${pan.y}px)) scale(${zoom})`,
+                    transformOrigin: 'center center',
+                    visibility: (dataToRender?.map_data || simData?.map_data) ? 'visible' : 'hidden',
+                    position: 'absolute',
+                    left: gridWidth > 0 ? `calc(50% - ${gridWidth / 2}px)` : '50%',
+                    top: gridHeight > 0 ? `calc(50% - ${gridHeight / 2}px)` : '50%'
                 }}
             />
             

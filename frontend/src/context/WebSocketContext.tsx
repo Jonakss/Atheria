@@ -1,7 +1,61 @@
 // frontend/src/context/WebSocketContext.tsx
 import { createContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { notifications } from '@mantine/notifications';
-import { decompressIfNeeded } from '../utils/dataDecompression';
+import { decompressIfNeeded, decodeBinaryFrame, processDecodedPayload } from '../utils/dataDecompression';
+
+/**
+ * Descomprime arrays comprimidos dentro de un payload (formato antiguo o nuevo).
+ */
+function decompressPayloadArrays(payload: any): any {
+    if (!payload || typeof payload !== 'object') {
+        return payload;
+    }
+    
+    const result: any = { ...payload };
+    
+    // Descomprimir map_data si existe
+    if (result.map_data) {
+        result.map_data = decompressIfNeeded(result.map_data);
+    }
+    
+    // Descomprimir complex_3d_data si existe
+    if (result.complex_3d_data && typeof result.complex_3d_data === 'object') {
+        if (result.complex_3d_data.real) {
+            result.complex_3d_data.real = decompressIfNeeded(result.complex_3d_data.real);
+        }
+        if (result.complex_3d_data.imag) {
+            result.complex_3d_data.imag = decompressIfNeeded(result.complex_3d_data.imag);
+        }
+    }
+    
+    // Descomprimir flow_data si existe
+    if (result.flow_data && typeof result.flow_data === 'object') {
+        if (result.flow_data.dx) {
+            result.flow_data.dx = decompressIfNeeded(result.flow_data.dx);
+        }
+        if (result.flow_data.dy) {
+            result.flow_data.dy = decompressIfNeeded(result.flow_data.dy);
+        }
+        if (result.flow_data.magnitude) {
+            result.flow_data.magnitude = decompressIfNeeded(result.flow_data.magnitude);
+        }
+    }
+    
+    // Descomprimir phase_hsv_data si existe
+    if (result.phase_hsv_data && typeof result.phase_hsv_data === 'object') {
+        if (result.phase_hsv_data.hue) {
+            result.phase_hsv_data.hue = decompressIfNeeded(result.phase_hsv_data.hue);
+        }
+        if (result.phase_hsv_data.saturation) {
+            result.phase_hsv_data.saturation = decompressIfNeeded(result.phase_hsv_data.saturation);
+        }
+        if (result.phase_hsv_data.value) {
+            result.phase_hsv_data.value = decompressIfNeeded(result.phase_hsv_data.value);
+        }
+    }
+    
+    return result;
+}
 import { getServerConfig, getWebSocketUrl, saveServerConfig, type ServerConfig } from '../utils/serverConfig';
 
 interface SimData {
@@ -204,15 +258,75 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
             }
         };
 
-        socket.onmessage = (event) => {
+        socket.onmessage = async (event) => {
             try {
-                const message = JSON.parse(event.data);
+                let message: any;
+                
+                // Detectar si es un frame binario (ArrayBuffer/Blob) o texto (JSON)
+                if (event.data instanceof ArrayBuffer || event.data instanceof Blob) {
+                    // Frame binario (formato optimizado)
+                    const arrayBuffer = event.data instanceof Blob 
+                        ? await event.data.arrayBuffer() 
+                        : event.data;
+                    
+                    try {
+                        // Decodificar frame binario (CBOR o JSON con datos binarios)
+                        const frameData = await decodeBinaryFrame(new Uint8Array(arrayBuffer));
+                        
+                        // Si tiene estructura de frame optimizado (metadata + arrays)
+                        if (frameData.metadata && frameData.arrays) {
+                            // Procesar arrays binarios y reconstruir payload
+                            // Capturar simData actual para differential compression
+                            const currentSimData = simData;
+                            message = {
+                                type: frameData.metadata.type || 'simulation_frame',
+                                payload: processDecodedPayload(frameData, currentSimData)
+                            };
+                        } else if (frameData.type) {
+                            // Estructura simple con type y payload
+                            // Descomprimir arrays dentro del payload si existen
+                            message = {
+                                type: frameData.type,
+                                payload: decompressPayloadArrays(frameData.payload || frameData)
+                            };
+                        } else {
+                            // Frame sin estructura conocida, intentar procesar directamente
+                            message = {
+                                type: 'simulation_frame',
+                                payload: decompressPayloadArrays(frameData)
+                            };
+                        }
+                    } catch (error) {
+                        console.error('Error decodificando frame binario:', error);
+                        // Fallback: intentar como JSON string
+                        const text = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(arrayBuffer));
+                        if (text) {
+                            message = JSON.parse(text);
+                        } else {
+                            throw error;
+                        }
+                    }
+                } else if (typeof event.data === 'string') {
+                    // Mensaje JSON (formato antiguo o fallback)
+                    message = JSON.parse(event.data);
+                    
+                    // Descomprimir arrays en el payload si existen
+                    if (message.payload) {
+                        message.payload = decompressPayloadArrays(message.payload);
+                    }
+                } else {
+                    // Datos desconocidos
+                    console.warn('Tipo de dato WebSocket desconocido:', typeof event.data);
+                    return;
+                }
+                
                 // Solo loguear en desarrollo y no para cada frame o log
                 if (process.env.NODE_ENV === 'development' && 
                     message.type !== 'simulation_frame' && 
                     message.type !== 'simulation_log') {
                     console.debug("Mensaje recibido:", message.type);
                 }
+                
                 const { type, payload } = message;
                 switch (type) {
                     case 'initial_state':
@@ -240,39 +354,26 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         }
                         break;
                     case 'simulation_frame':
-                        // Descomprimir datos si están comprimidos
+                    case 'simulation_frame_binary':
+                        // Payload ya está descomprimido por decompressPayloadArrays o processDecodedPayload
                         // IMPORTANTE: Preservar step, timestamp y simulation_info
                         // Usar función de actualización para evitar condiciones de carrera
                         try {
-                        const decompressedPayload = {
-                            ...payload,
-                                step: payload.step ?? payload.simulation_info?.step ?? null, // Asegurar que step esté presente
+                            const finalPayload = {
+                                ...payload,
+                                step: payload.step ?? payload.simulation_info?.step ?? null,
                                 timestamp: payload.timestamp ?? Date.now(),
-                                simulation_info: payload.simulation_info,
-                            map_data: payload.map_data ? decompressIfNeeded(payload.map_data) : undefined,
-                            complex_3d_data: payload.complex_3d_data ? {
-                                real: decompressIfNeeded(payload.complex_3d_data.real),
-                                imag: decompressIfNeeded(payload.complex_3d_data.imag)
-                            } : undefined,
-                            flow_data: payload.flow_data ? {
-                                dx: decompressIfNeeded(payload.flow_data.dx),
-                                dy: decompressIfNeeded(payload.flow_data.dy),
-                                magnitude: decompressIfNeeded(payload.flow_data.magnitude)
-                            } : undefined,
-                            phase_hsv_data: payload.phase_hsv_data ? {
-                                hue: decompressIfNeeded(payload.phase_hsv_data.hue),
-                                saturation: decompressIfNeeded(payload.phase_hsv_data.saturation),
-                                value: decompressIfNeeded(payload.phase_hsv_data.value)
-                            } : undefined
-                        };
+                                simulation_info: payload.simulation_info
+                            };
+                            
                             // Usar función de actualización para evitar sobrescribir actualizaciones más recientes
                             setSimData(prev => {
                                 // Si hay un timestamp y el payload nuevo es más antiguo, ignorarlo
-                                if (prev?.timestamp && decompressedPayload.timestamp && 
-                                    decompressedPayload.timestamp < prev.timestamp) {
+                                if (prev?.timestamp && finalPayload.timestamp && 
+                                    finalPayload.timestamp < prev.timestamp) {
                                     return prev;
                                 }
-                                return decompressedPayload;
+                                return finalPayload;
                             });
                         } catch (error) {
                             console.error("Error procesando simulation_frame:", error);

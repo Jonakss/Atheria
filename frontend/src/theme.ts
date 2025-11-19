@@ -135,7 +135,7 @@ export const theme = createTheme({
             backgroundColor: theme.colors.blue[8],
             transform: 'translateX(4px)',
           },
-          '&[data-active="true"]': {
+          '&[data-active]': {
             backgroundColor: theme.colors.blue[7],
             borderLeft: `3px solid ${theme.colors.blue[4]}`,
           },
@@ -163,7 +163,7 @@ export const theme = createTheme({
             backgroundColor: theme.colors.blue[8],
             color: theme.colors.blue[2],
           },
-          '&[data-active="true"]': {
+          '&[data-active]': {
             borderColor: theme.colors.blue[6],
             backgroundColor: hexToRgba(theme.colors.blue[6], 0.1),
           },
