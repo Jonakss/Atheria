@@ -1,3 +1,13 @@
+---
+title: Atheria 4 - Documentación Completa
+type: index
+status: active
+tags: [core, documentation, index]
+created: 2024-11-19
+updated: 2024-11-19
+aliases: [Documentation Index, Main Documentation]
+---
+
 # Atheria 4 - Documentación Completa
 
 > **Vault de Obsidian** | Documentación técnica y conceptual del simulador de cosmogénesis
@@ -6,60 +16,61 @@
 
 ## 🗺️ Mapa de Contenidos (MOC)
 
-### 📘 [📋 Core Documentation](10_core/00_CORE_MOC.md)
-- **[Brief Maestro](10_core/ATHERIA_4_MASTER_BRIEF.md)** - Visión y objetivos del proyecto
-- **[Arquitectura Técnica V4](10_core/TECHNICAL_ARCHITECTURE_V4.md)** - Arquitectura del sistema
-- **[Glosario](10_core/ATHERIA_GLOSSARY.md)** - Terminología y conceptos clave
-- **[Roadmap Fase 1](10_core/ROADMAP_PHASE_1.md)** - Plan de desarrollo inicial
-- **[Roadmap Fase 2](10_core/ROADMAP_PHASE_2.md)** - Plan de desarrollo avanzado
-- **[Aprendizaje Progresivo](10_core/PROGRESSIVE_LEARNING.md)** - Guía de aprendizaje estructurada
-- **[Arquitectura de Inferencia Masiva](10_core/MASSIVE_INFERENCE_ARCHITECTURE.md)** - Escalabilidad horizontal
+### 📘 [[10_core/00_CORE_MOC|Core Documentation]]
+- [[10_core/ATHERIA_4_MASTER_BRIEF|Brief Maestro]] - Visión y objetivos del proyecto
+- [[10_core/TECHNICAL_ARCHITECTURE_V4|Arquitectura Técnica V4]] - Arquitectura del sistema
+- [[10_core/ATHERIA_GLOSSARY|Glosario]] - Terminología y conceptos clave
+- [[10_core/ROADMAP_PHASE_1|Roadmap Fase 1]] - Plan de desarrollo inicial
+- [[10_core/ROADMAP_PHASE_2|Roadmap Fase 2]] - Plan de desarrollo avanzado
+- [[10_core/PROGRESSIVE_LEARNING|Aprendizaje Progresivo]] - Guía de aprendizaje estructurada
+- [[10_core/MASSIVE_INFERENCE_ARCHITECTURE|Arquitectura de Inferencia Masiva]] - Escalabilidad horizontal
 
-### 🧩 [🔧 Componentes Técnicos](30_Components/00_COMPONENTS_MOC.md)
-- **[Modelos](30_Components/Models.md)** - Arquitecturas de modelos
-- **[UNet](30_Components/UNET.md)** - Documentación específica de UNet
-- **[Arquitectura V3](30_Components/ARCHITECTURE_V3.md)** - Sistema V3
-- **[Motor Nativo C++](30_Components/NATIVE_ENGINE_COMMUNICATION.md)** - Comunicación motor nativo
-- **[Sistema de Historia](30_Components/HISTORY_SYSTEM.md)** - Gestión de historia
-- **[Optimización GPU](30_Components/GPU_OPTIMIZATION.md)** - Optimizaciones GPU
-- **[Optimización de Transferencia](30_Components/WORLD_DATA_TRANSFER_OPTIMIZATION.md)** - Transferencia optimizada
-- **[Recomendaciones de Visualización](30_Components/VISUALIZATION_RECOMMENDATIONS.md)** - Guía de visualizaciones
+### 🧩 [[30_Components/00_COMPONENTS_MOC|Componentes Técnicos]]
+- [[30_Components/Models|Modelos]] - Arquitecturas de modelos
+- [[30_Components/UNET|UNet]] - Documentación específica de UNet
+- [[30_Components/ARCHITECTURE_V3|Arquitectura V3]] - Sistema V3
+- [[30_Components/NATIVE_ENGINE_COMMUNICATION|Motor Nativo C++]] - Comunicación motor nativo
+- [[30_Components/HISTORY_SYSTEM|Sistema de Historia]] - Gestión de historia
+- [[30_Components/GPU_OPTIMIZATION|Optimización GPU]] - Optimizaciones GPU
+- [[30_Components/WORLD_DATA_TRANSFER_OPTIMIZATION|Optimización de Transferencia]] - Transferencia optimizada
+- [[30_Components/SPATIAL_INDEXING|Optimización Espacial]] - Índices espaciales con Morton Codes
+- [[30_Components/VISUALIZATION_RECOMMENDATIONS|Recomendaciones de Visualización]] - Guía de visualizaciones
 - Y más componentes técnicos...
 
-### 🧪 [📊 Experimentos y Resultados](40_Experiments/00_EXPERIMENTS_MOC.md)
-- **[Log de Desarrollo AI](40_Experiments/AI_DEV_LOG.md)** - Bitácora de desarrollo
-- **[Guía de Experimentación](40_Experiments/EXPERIMENTATION_GUIDE.md)** - Cómo experimentar
-- **[Guía de Pruebas de Visualización](40_Experiments/VISUALIZATION_TESTING.md)** - Tests de visualizaciones
-- **[Cómo Ejecutar](40_Experiments/HOW_TO_RUN.md)** - Instrucciones de ejecución
-- **[Benchmarks de Rendimiento](40_Experiments/)** - Resultados de benchmarks
+### 🧪 [[40_Experiments/00_EXPERIMENTS_MOC|Experimentos y Resultados]]
+- [[40_Experiments/AI_DEV_LOG|Log de Desarrollo AI]] - Bitácora de desarrollo
+- [[40_Experiments/EXPERIMENTATION_GUIDE|Guía de Experimentación]] - Cómo experimentar
+- [[40_Experiments/VISUALIZATION_TESTING|Guía de Pruebas de Visualización]] - Tests de visualizaciones
+- [[40_Experiments/HOW_TO_RUN|Cómo Ejecutar]] - Instrucciones de ejecución
+- [[40_Experiments/BENCHMARK_TENSOR_STORAGE|Benchmarks de Rendimiento]] - Resultados de benchmarks
 - Y más experimentos...
 
-### 💡 [🔬 Conceptos](20_Concepts/00_CONCEPTS_MOC.md)
-- **[Vacío Armónico](20_Concepts/HARMONIC_VACUUM_CONCEPT.md)** - Concepto físico fundamental
+### 💡 [[20_Concepts/00_CONCEPTS_MOC|Conceptos]]
+- [[20_Concepts/HARMONIC_VACUUM_CONCEPT|Vacío Armónico]] - Concepto físico fundamental
 
-### 📝 [📋 Plantillas](99_Templates/AGENT_TOOLKIT.md)
-- **[Toolkit de Agente](99_Templates/AGENT_TOOLKIT.md)** - Comandos para agentes
-- **[Guía de Agente](99_Templates/AGENT_GUIDELINES.md)** - Directrices para agentes IA
-- **[Plantilla de Componente](99_Templates/Component_Template.md)** - Template para documentar componentes
+### 📝 [[99_Templates/AGENT_TOOLKIT|Plantillas]]
+- [[99_Templates/AGENT_TOOLKIT|Toolkit de Agente]] - Comandos para agentes
+- [[99_Templates/AGENT_GUIDELINES|Guía de Agente]] - Directrices para agentes IA
+- [[99_Templates/Component_Template|Plantilla de Componente]] - Template para documentar componentes
 
 ---
 
 ## 🚀 Inicio Rápido
 
 ### Para Principiantes
-1. Lee [Brief Maestro](10_core/ATHERIA_4_MASTER_BRIEF.md) para entender la visión
-2. Sigue [Aprendizaje Progresivo](10_core/PROGRESSIVE_LEARNING.md) - Nivel 1
-3. Prueba [Guía de Pruebas de Visualización](40_Experiments/VISUALIZATION_TESTING.md)
+1. Lee [[10_core/ATHERIA_4_MASTER_BRIEF|Brief Maestro]] para entender la visión
+2. Sigue [[10_core/PROGRESSIVE_LEARNING|Aprendizaje Progresivo]] - Nivel 1
+3. Prueba [[40_Experiments/VISUALIZATION_TESTING|Guía de Pruebas de Visualización]]
 
 ### Para Desarrolladores
-1. Estudia [Arquitectura Técnica V4](10_core/TECHNICAL_ARCHITECTURE_V4.md)
-2. Revisa [Motor Nativo C++](30_Components/NATIVE_ENGINE_COMMUNICATION.md)
-3. Consulta [Guía de Agente](99_Templates/AGENT_GUIDELINES.md)
+1. Estudia [[10_core/TECHNICAL_ARCHITECTURE_V4|Arquitectura Técnica V4]]
+2. Revisa [[30_Components/NATIVE_ENGINE_COMMUNICATION|Motor Nativo C++]]
+3. Consulta [[99_Templates/AGENT_GUIDELINES|Guía de Agente]]
 
 ### Para Experimentadores
-1. Consulta [Guía de Experimentación](40_Experiments/EXPERIMENTATION_GUIDE.md)
-2. Revisa [Cómo Ejecutar](40_Experiments/HOW_TO_RUN.md)
-3. Estudia [Log de Desarrollo AI](40_Experiments/AI_DEV_LOG.md)
+1. Consulta [[40_Experiments/EXPERIMENTATION_GUIDE|Guía de Experimentación]]
+2. Revisa [[40_Experiments/HOW_TO_RUN|Cómo Ejecutar]]
+3. Estudia [[40_Experiments/AI_DEV_LOG|Log de Desarrollo AI]]
 
 ---
 
@@ -68,6 +79,7 @@
 ```
 docs/
 ├── README.md (este archivo)
+├── OBSIDIAN_SETUP.md        # 🔗 Guía de configuración de Obsidian
 ├── 00_Inbox/                    # Notas pendientes de clasificar
 │   └── notes_riscv.md
 ├── 10_core/                     # Documentación core
@@ -91,6 +103,7 @@ docs/
 │   ├── HISTORY_SYSTEM.md
 │   ├── GPU_OPTIMIZATION.md
 │   ├── WORLD_DATA_TRANSFER_OPTIMIZATION.md
+│   ├── SPATIAL_INDEXING.md
 │   └── ... (más componentes)
 ├── 40_Experiments/              # Experimentos y resultados
 │   ├── 00_EXPERIMENTS_MOC.md
@@ -112,13 +125,28 @@ docs/
 - **Archivos:** `UPPERCASE_WITH_UNDERSCORES.md`
 - **Carpetas:** `NN_Name/` (prefijo numérico para orden)
 - **MOCs:** `00_CATEGORY_MOC.md` (Map of Content por categoría)
-- **Enlaces:** Usar rutas relativas con nombres de archivo exactos
+- **Enlaces:** Usar formato Obsidian `[[archivo]]` o `[[carpeta/archivo]]`
+
+---
+
+## 📋 Configuración de Obsidian
+
+Para usar este vault como sistema RAG y aprovechar todas las características de Obsidian:
+
+👉 **Ver [[OBSIDIAN_SETUP|Guía de Configuración de Obsidian]]**
+
+Incluye:
+- ✅ Configuración de enlaces y backlinks
+- ✅ Frontmatter YAML para metadatos
+- ✅ Sistema de tags
+- ✅ Uso de Graph View
+- ✅ Configuración de plugins para RAG
 
 ---
 
 ## 📋 Responsabilidades
 
-Consulta **[Responsabilidades de Cada Carpeta](00_RESPONSIBILITIES.md)** para entender qué tipo de documentación va en cada carpeta.
+Consulta [[00_RESPONSIBILITIES|Responsabilidades de Cada Carpeta]] para entender qué tipo de documentación va en cada carpeta.
 
 ---
 

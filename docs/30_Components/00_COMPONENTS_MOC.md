@@ -1,3 +1,14 @@
+---
+title: Components - Map of Content
+type: moc
+status: active
+tags: [component, moc, technical, system]
+created: 2024-11-19
+updated: 2024-11-19
+aliases: [Components MOC, Technical Components Index]
+related: [[10_core/00_CORE_MOC]], [[40_Experiments/00_EXPERIMENTS_MOC]]
+---
+
 # 🔧 Components - Map of Content
 
 > Mapa de contenido para componentes técnicos de Atheria 4
@@ -6,53 +17,55 @@
 
 ## 🤖 Modelos y Arquitecturas
 
-- **[Modelos](../30_Components/Models.md)** - Arquitecturas de modelos disponibles
-- **[UNet](../30_Components/UNET.md)** - Documentación específica de UNet
-- **[Arquitectura V3](../30_Components/ARCHITECTURE_V3.md)** - Sistema V3 completo
+- [[Models]] - Arquitecturas de modelos disponibles
+- [[UNET]] - Documentación específica de UNet
+- [[ARCHITECTURE_V3]] - Sistema V3 completo
 
 ---
 
 ## ⚙️ Motores y Sistemas
 
-- **[Motor Nativo C++](../30_Components/NATIVE_ENGINE_COMMUNICATION.md)** - Comunicación del motor nativo
-- **[Sistema de Historia](../30_Components/HISTORY_SYSTEM.md)** - Gestión de historia de simulación
-- **[Optimización GPU](../30_Components/GPU_OPTIMIZATION.md)** - Optimizaciones de GPU
+- [[NATIVE_ENGINE_COMMUNICATION]] - Comunicación del motor nativo
+- [[HISTORY_SYSTEM]] - Gestión de historia de simulación
+- [[GPU_OPTIMIZATION]] - Optimizaciones de GPU
 
 ---
 
 ## 📡 Transferencia de Datos
 
-- **[Optimización de Transferencia](../30_Components/WORLD_DATA_TRANSFER_OPTIMIZATION.md)** - Optimizaciones de transferencia
-- **[Zoom y Transferencia](../30_Components/ZOOM_AND_DATA_TRANSFER.md)** - Sistema de zoom
-- **[Quick Start Optimización](../30_Components/QUICK_START_OPTIMIZATION.md)** - Guía rápida de optimización
+- [[WORLD_DATA_TRANSFER_OPTIMIZATION]] - Optimizaciones de transferencia
+- [[ZOOM_AND_DATA_TRANSFER]] - Sistema de zoom
+- [[QUICK_START_OPTIMIZATION]] - Guía rápida de optimización
 
 ---
 
 ## 📊 Visualización
 
-- **[Recomendaciones de Visualización](../30_Components/VISUALIZATION_RECOMMENDATIONS.md)** - Guía de visualizaciones
+- [[VISUALIZATION_RECOMMENDATIONS]] - Guía de visualizaciones
+- [[FRONTEND_IMPROVEMENTS]] - Mejoras del frontend
 
 ---
 
 ## 🗂️ Estructuras de Datos
 
-- **[Sistema de Árbol de Tiempo](../30_Components/TIME_TREE_SYSTEM.md)** - Estructura de árbol temporal
-- **[Quadtree Binario](../30_Components/QUADTREE_BINARY.md)** - Implementación de quadtree
-- **[Octree Binario](../30_Components/OCTREE_BINARY.md)** - Implementación de octree
+- [[TIME_TREE_SYSTEM]] - Estructura de árbol temporal
+- [[QUADTREE_BINARY]] - Implementación de quadtree
+- [[OCTREE_BINARY]] - Implementación de octree
+- [[SPATIAL_INDEXING]] - Índices espaciales con Morton Codes
 
 ---
 
 ## 🔬 Análisis y Optimización
 
-- **[Análisis de Técnicas](../30_Components/TECHNIQUES_ANALYSIS.md)** - RMSNorm, SwiGLU, RoPE
-- **[Análisis de Precisión](../30_Components/PRECISION_ANALYSIS.md)** - Estudios de precisión
-- **[Sugerencias de Motor Voxel](../30_Components/VOXEL_ENGINE_SUGGESTIONS.md)** - Propuestas de motor voxel
+- [[TECHNIQUES_ANALYSIS]] - RMSNorm, SwiGLU, RoPE
+- [[PRECISION_ANALYSIS]] - Estudios de precisión
+- [[VOXEL_ENGINE_SUGGESTIONS]] - Propuestas de motor voxel
 
 ---
 
 ## 🛠️ Herramientas
 
-- **[Logger de Experimentos](../30_Components/EXPERIMENT_LOGGER_BRIEF.md)** - Sistema de logging
+- [[EXPERIMENT_LOGGER_BRIEF]] - Sistema de logging
 
 ---
 
@@ -60,10 +73,10 @@
 
 - [[10_core/00_CORE_MOC]] - Documentación core
 - [[40_Experiments/00_EXPERIMENTS_MOC]] - Experimentos y resultados
+- [[README|Documentación Principal]]
 
 ---
 
 ## 📌 Tags
 
 #component #moc #technical #system
-

@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "097f6e31e4ca8c33",
+        "id": "f4e621f0c37fcfe1",
         "type": "tabs",
         "children": [
           {
-            "id": "b48e974e6789b391",
+            "id": "f5faded8563f6b03",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -162,8 +162,13 @@
       "bases:Create new base": false
     }
   },
-  "active": "b48e974e6789b391",
+  "active": "f5faded8563f6b03",
   "lastOpenFiles": [
+    "OBSIDIAN_SETUP.md",
+    "30_Components/VOXEL_ENGINE_SUGGESTIONS.md",
+    "30_Components/FRONTEND_IMPROVEMENTS.md",
+    "40_Experiments/EXP_007_SPATIAL_INDEXING_VERIFICATION.md",
+    "30_Components/SPATIAL_INDEXING.md",
     "00_RESPONSIBILITIES.md",
     "40_Experiments/EXP_006_DATA_TRANSFER_OPTIMIZATION.md",
     "20_Concepts/00_CONCEPTS_MOC.md",
