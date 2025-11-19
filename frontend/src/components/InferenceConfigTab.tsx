@@ -143,28 +143,6 @@ export function InferenceConfigTab() {
         // Marcar cambios cuando se modifica cualquier parámetro
         setHasChanges(true);
     }, [gridSize, initialStateMode, gammaDecay, liveFeedEnabled, compressionEnabled, downsampleFactor, roiEnabled, roiX, roiY, roiWidth, roiHeight]);
-    
-    // Ajustar ROI cuando cambia el grid size
-    useEffect(() => {
-        if (roiEnabled) {
-            // Ajustar ROI para que no exceda el nuevo grid size
-            const newRoiWidth = Math.min(roiWidth, gridSize);
-            const newRoiHeight = Math.min(roiHeight, gridSize);
-            const newRoiX = Math.min(roiX, gridSize - newRoiWidth);
-            const newRoiY = Math.min(roiY, gridSize - newRoiHeight);
-            
-            if (newRoiWidth !== roiWidth || newRoiHeight !== roiHeight || newRoiX !== roiX || newRoiY !== roiY) {
-                setRoiWidth(newRoiWidth);
-                setRoiHeight(newRoiHeight);
-                setRoiX(newRoiX);
-                setRoiY(newRoiY);
-            }
-        } else {
-            // Si ROI está deshabilitada, actualizar valores por defecto
-            setRoiWidth(gridSize);
-            setRoiHeight(gridSize);
-        }
-    }, [gridSize]); // Solo cuando cambia gridSize, no cuando cambian los valores de ROI
 
     const currentGridSize = simData?.map_data?.length || gridSize;
 

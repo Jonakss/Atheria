@@ -19,12 +19,12 @@ interface CanvasOverlaysProps {
     zoom: number;
     config: OverlayConfig;
     roiInfo?: {
-        enabled?: boolean;
-        x?: number;
-        y?: number;
-        width?: number;
-        height?: number;
-    };
+        enabled: boolean;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    } | null;
 }
 
 export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config, roiInfo }: CanvasOverlaysProps) {
@@ -96,12 +96,7 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config, roiInfo 
         
         if (gridWidth === 0 || gridHeight === 0) return;
         
-        // Si hay ROI activa, el mapData ya está recortado, pero necesitamos las coordenadas originales
-        // para dibujar el quadtree correctamente. Usar roiInfo para ajustar coordenadas.
-        const roiOffsetX = roiInfo?.enabled ? (roiInfo.x || 0) : 0;
-        const roiOffsetY = roiInfo?.enabled ? (roiInfo.y || 0) : 0;
-        const originalGridWidth = roiInfo?.enabled ? (roiInfo.width || gridWidth) : gridWidth;
-        const originalGridHeight = roiInfo?.enabled ? (roiInfo.height || gridHeight) : gridHeight;
+        // Actualizar dependencias del efecto para incluir roiInfo
         
         // Calcular escala base (igual que PanZoomCanvas)
         const scaleX = overlayCanvas.width / gridWidth;
@@ -188,8 +183,30 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config, roiInfo 
                 // Tamaño mínimo de región para subdividir (evitar subdivisiones innecesarias)
                 const minRegionSize = Math.max(2, Math.min(8, Math.floor(Math.sqrt(totalCells) / 32)));
                 
+                // Si hay ROI activa, solo procesar la región visible
+                const roiBounds = roiInfo?.enabled ? {
+                    minX: roiInfo.x,
+                    minY: roiInfo.y,
+                    maxX: roiInfo.x + roiInfo.width,
+                    maxY: roiInfo.y + roiInfo.height
+                } : null;
+                
                 const drawQuadtree = (minX: number, minY: number, maxX: number, maxY: number, depth: number) => {
                     if (depth > maxDepth) return; // Limitar profundidad
+                    
+                    // Si hay ROI activa, solo procesar regiones que intersecten con la ROI
+                    if (roiBounds) {
+                        // Verificar si la región intersecta con la ROI
+                        if (maxX < roiBounds.minX || minX > roiBounds.maxX || 
+                            maxY < roiBounds.minY || minY > roiBounds.maxY) {
+                            return; // Región fuera de la ROI, ignorar
+                        }
+                        // Clamp a la ROI
+                        minX = Math.max(minX, roiBounds.minX);
+                        minY = Math.max(minY, roiBounds.minY);
+                        maxX = Math.min(maxX, roiBounds.maxX);
+                        maxY = Math.min(maxY, roiBounds.maxY);
+                    }
                     
                     const width = maxX - minX;
                     const height = maxY - minY;
@@ -255,10 +272,12 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config, roiInfo 
                     }
                 };
                 
-                // Iniciar construcción del quadtree desde la región visible (ROI o grid completo)
-                // Si hay ROI, el mapData ya está recortado, así que dibujamos desde (0,0) hasta (gridWidth, gridHeight)
-                // pero las coordenadas reales del grid completo están en roiOffsetX, roiOffsetY
-                drawQuadtree(0, 0, gridWidth, gridHeight, 0);
+                // Iniciar quadtree desde el grid completo o desde la ROI si está activa
+                if (roiBounds) {
+                    drawQuadtree(roiBounds.minX, roiBounds.minY, roiBounds.maxX, roiBounds.maxY, 0);
+                } else {
+                    drawQuadtree(0, 0, gridWidth, gridHeight, 0);
+                }
             }
         }
         
@@ -324,7 +343,7 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config, roiInfo 
             
             ctx.restore();
         }
-    }, [mapData, pan, zoom, config, canvasRef]);
+    }, [mapData, pan, zoom, config, canvasRef, roiInfo]);
     
     // Sincronizar posición y tamaño del overlay cuando cambia el canvas principal
     useEffect(() => {

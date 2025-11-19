@@ -3,7 +3,7 @@ import { useRef, useEffect, useState } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { usePanZoom } from '../hooks/usePanZoom';
 import { CanvasOverlays, OverlayControls, OverlayConfig } from './CanvasOverlays';
-import { Button, Group, ActionIcon, Tooltip } from '@mantine/core';
+import { Button, Group, ActionIcon, Tooltip, Switch, Paper, Stack, Text } from '@mantine/core';
 import { IconZoomReset, IconSettings } from '@tabler/icons-react';
 import classes from './PanZoomCanvas.module.css';
 
@@ -43,7 +43,7 @@ interface PanZoomCanvasProps {
 
 export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const { simData, selectedViz, inferenceStatus } = useWebSocket();
+    const { simData, selectedViz, inferenceStatus, sendCommand } = useWebSocket();
     
     // Usar historyFrame si está disponible, sino usar simData actual
     const dataToRender = historyFrame ? historyFrame : simData;
@@ -65,6 +65,67 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
         quadtreeThreshold: 0.01
     });
     const [showOverlayControls, setShowOverlayControls] = useState(false);
+    const [autoROIEnabled, setAutoROIEnabled] = useState(false);
+    const lastROIUpdate = useRef<number>(0);
+    const ROIUpdateThrottle = 500; // Actualizar ROI máximo cada 500ms
+
+    // Sincronizar ROI automáticamente con la vista visible del canvas
+    useEffect(() => {
+        if (!autoROIEnabled || !canvasRef.current || !mapData || gridWidth === 0 || gridHeight === 0) return;
+        
+        const now = Date.now();
+        if (now - lastROIUpdate.current < ROIUpdateThrottle) return;
+        
+        const canvas = canvasRef.current;
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        
+        // Calcular escala base
+        const scaleX = canvasWidth / gridWidth;
+        const scaleY = canvasHeight / gridHeight;
+        const baseScale = Math.min(scaleX, scaleY);
+        
+        // Calcular región visible en coordenadas del grid
+        // El canvas está centrado y escalado, luego se aplica pan y zoom
+        const centerX = canvasWidth / 2;
+        const centerY = canvasHeight / 2;
+        
+        // Calcular el tamaño visible del grid en píxeles del canvas
+        const visibleGridWidth = canvasWidth / (baseScale * zoom);
+        const visibleGridHeight = canvasHeight / (baseScale * zoom);
+        
+        // Convertir pan (en píxeles del canvas) a coordenadas del grid
+        // El pan está en coordenadas del canvas transformado
+        const gridCenterX = gridWidth / 2;
+        const gridCenterY = gridHeight / 2;
+        
+        // Calcular offset del grid desde el centro
+        const offsetX = -pan.x / (baseScale * zoom);
+        const offsetY = -pan.y / (baseScale * zoom);
+        
+        // Calcular región visible en coordenadas del grid
+        const visibleX = Math.max(0, Math.floor(gridCenterX + offsetX - visibleGridWidth / 2));
+        const visibleY = Math.max(0, Math.floor(gridCenterY + offsetY - visibleGridHeight / 2));
+        const visibleWidth = Math.min(gridWidth - visibleX, Math.ceil(visibleGridWidth));
+        const visibleHeight = Math.min(gridHeight - visibleY, Math.ceil(visibleGridHeight));
+        
+        // Solo actualizar ROI si la región visible es significativamente diferente del grid completo
+        // y si el zoom es > 1 (estamos haciendo zoom in)
+        if (zoom > 1.1 && (visibleWidth < gridWidth * 0.9 || visibleHeight < gridHeight * 0.9)) {
+            lastROIUpdate.current = now;
+            sendCommand('simulation', 'set_roi', {
+                enabled: true,
+                x: visibleX,
+                y: visibleY,
+                width: visibleWidth,
+                height: visibleHeight
+            });
+        } else if (zoom <= 1.1) {
+            // Si estamos en zoom out, desactivar ROI
+            lastROIUpdate.current = now;
+            sendCommand('simulation', 'set_roi', { enabled: false });
+        }
+    }, [pan, zoom, gridWidth, gridHeight, mapData, autoROIEnabled, sendCommand]);
 
     // Manejar wheel event con listener no pasivo para prevenir el comportamiento por defecto
     useEffect(() => {
@@ -423,10 +484,28 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                         right: 0,
                         zIndex: 21
                     }}>
-                        <OverlayControls
-                            config={overlayConfig}
-                            onConfigChange={setOverlayConfig}
-                        />
+                        <Paper p="sm" withBorder style={{ backgroundColor: 'var(--mantine-color-dark-7)' }}>
+                            <Stack gap="xs">
+                                <OverlayControls
+                                    config={overlayConfig}
+                                    onConfigChange={setOverlayConfig}
+                                />
+                                <div style={{ borderTop: '1px solid var(--mantine-color-dark-4)', paddingTop: '8px', marginTop: '4px' }}>
+                                    <Switch
+                                        label="ROI Automático"
+                                        description="Sincronizar ROI con la vista visible (solo procesar lo que ves)"
+                                        checked={autoROIEnabled}
+                                        onChange={(e) => setAutoROIEnabled(e.currentTarget.checked)}
+                                        size="sm"
+                                    />
+                                    {autoROIEnabled && (
+                                        <Text size="xs" c="dimmed" mt={4}>
+                                            El ROI se actualiza automáticamente según el zoom y pan. Solo se procesa la región visible.
+                                        </Text>
+                                    )}
+                                </div>
+                            </Stack>
+                        </Paper>
                     </div>
                 )}
             </div>
@@ -452,7 +531,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                     pan={pan}
                     zoom={zoom}
                     config={overlayConfig}
-                    roiInfo={dataToRender?.roi_info}
+                    roiInfo={simData?.roi_info || null}
                 />
             )}
         </div>

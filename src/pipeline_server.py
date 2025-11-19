@@ -1579,16 +1579,19 @@ async def handle_set_inference_config(args):
         old_size = global_cfg.GRID_SIZE_INFERENCE
         new_size = int(grid_size)
         global_cfg.GRID_SIZE_INFERENCE = new_size
+        changes.append(f"Grid size: {old_size} → {new_size}")
+        logging.info(f"Grid size de inferencia configurado a: {new_size} (requiere recargar experimento)")
         
         # Actualizar ROI manager con el nuevo tamaño
         roi_manager = g_state.get('roi_manager')
         if roi_manager:
             roi_manager.grid_size = new_size
             roi_manager.clear_roi()  # Resetear ROI al cambiar de tamaño
-            logging.info(f"ROI manager actualizado con nuevo grid size: {new_size}")
-        
-        changes.append(f"Grid size: {old_size} → {grid_size}")
-        logging.info(f"Grid size de inferencia configurado a: {grid_size} (requiere recargar experimento)")
+            logging.info(f"ROI manager actualizado con nuevo grid_size: {new_size}")
+        else:
+            from .roi_manager import ROIManager
+            g_state['roi_manager'] = ROIManager(grid_size=new_size)
+            logging.info(f"ROI manager creado con grid_size: {new_size}")
     
     if initial_state_mode is not None:
         from . import config as global_cfg

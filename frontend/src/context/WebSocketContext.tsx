@@ -213,7 +213,6 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                             step: payload.step ?? payload.simulation_info?.step ?? null, // Asegurar que step esté presente
                             timestamp: payload.timestamp,
                             simulation_info: payload.simulation_info,
-                            roi_info: payload.roi_info, // Preservar información de ROI
                             map_data: payload.map_data ? decompressIfNeeded(payload.map_data) : undefined,
                             complex_3d_data: payload.complex_3d_data ? {
                                 real: decompressIfNeeded(payload.complex_3d_data.real),
