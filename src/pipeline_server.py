@@ -130,6 +130,9 @@ async def simulation_loop():
     import time
     last_diagnostic_log = 0
     frame_count = 0
+    # Throttle para actualizaciones de estado cuando live_feed está desactivado
+    last_state_update_time = 0
+    STATE_UPDATE_INTERVAL = 0.5  # Enviar actualización máximo cada 0.5 segundos (2 FPS para estado)
     
     try:
         while True:
@@ -164,22 +167,28 @@ async def simulation_loop():
                         updated_step = current_step + 1
                         g_state['simulation_step'] = updated_step
                         
-                        # Enviar actualización de estado (sin datos de visualización pesados)
-                        # Esto permite que el frontend muestre el progreso aunque no haya visualización
-                        state_update = {
-                            "step": updated_step,
-                            "timestamp": asyncio.get_event_loop().time(),
-                            "simulation_info": {
-                                "step": updated_step,
-                                "is_paused": False,
-                                "live_feed_enabled": False
-                            }
-                            # No incluir map_data, hist_data, etc. para ahorrar ancho de banda
-                        }
+                        # THROTTLE: Solo enviar actualización de estado cada STATE_UPDATE_INTERVAL segundos
+                        # para evitar saturar el WebSocket con demasiados mensajes
+                        current_time = time.time()
+                        time_since_last_update = current_time - last_state_update_time
                         
-                        # Enviar actualización de estado cada paso para mantener el frontend actualizado
-                        # Esto es ligero (solo step y simulation_info) así que no satura
-                        await broadcast({"type": "simulation_state_update", "payload": state_update})
+                        if time_since_last_update >= STATE_UPDATE_INTERVAL:
+                            # Enviar actualización de estado (sin datos de visualización pesados)
+                            # Esto permite que el frontend muestre el progreso aunque no haya visualización
+                            state_update = {
+                                "step": updated_step,
+                                "timestamp": asyncio.get_event_loop().time(),
+                                "simulation_info": {
+                                    "step": updated_step,
+                                    "is_paused": False,
+                                    "live_feed_enabled": False
+                                }
+                                # No incluir map_data, hist_data, etc. para ahorrar ancho de banda
+                            }
+                            
+                            # Enviar actualización de estado (throttled para evitar saturación)
+                            await broadcast({"type": "simulation_state_update", "payload": state_update})
+                            last_state_update_time = current_time
                         
                         # Enviar log de simulación cada 100 pasos para no saturar los logs
                         if updated_step % 100 == 0:
