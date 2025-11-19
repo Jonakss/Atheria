@@ -252,39 +252,39 @@ export function DataTab() {
                                 <Title order={5} mb="md">Evolución Temporal de la Simulación</Title>
                                 <Box style={{ minWidth: 300, minHeight: 300, width: '100%', display: 'block' }}>
                                     {chartsReady && lineChartData.length > 0 ? (
-                                        <LineChart
-                                            h={300}
-                                            w="100%"
+                                <LineChart
+                                    h={300}
+                                                        w="100%"
                                             data={lineChartData}
-                                            dataKey="step"
-                                            series={[
-                                                { 
-                                                    name: 'Densidad Media', 
-                                                    color: 'blue.6',
-                                                    label: 'Densidad Media'
-                                                },
-                                                { 
-                                                    name: 'Desviación Estándar', 
-                                                    color: 'orange.6',
-                                                    label: 'Desviación Estándar'
-                                                },
-                                                { 
-                                                    name: 'Mínimo', 
-                                                    color: 'red.6',
-                                                    label: 'Mínimo'
-                                                },
-                                                { 
-                                                    name: 'Máximo', 
-                                                    color: 'green.6',
-                                                    label: 'Máximo'
-                                                }
-                                            ]}
-                                            curveType="natural"
-                                            withDots={false}
-                                            withLegend={true}
-                                            gridAxis="xy"
-                                            style={{ minWidth: 0, minHeight: 0 }}
-                                        />
+                                    dataKey="step"
+                                    series={[
+                                        { 
+                                            name: 'Densidad Media', 
+                                            color: 'blue.6',
+                                            label: 'Densidad Media'
+                                        },
+                                        { 
+                                            name: 'Desviación Estándar', 
+                                            color: 'orange.6',
+                                            label: 'Desviación Estándar'
+                                        },
+                                        { 
+                                            name: 'Mínimo', 
+                                            color: 'red.6',
+                                            label: 'Mínimo'
+                                        },
+                                        { 
+                                            name: 'Máximo', 
+                                            color: 'green.6',
+                                            label: 'Máximo'
+                                        }
+                                    ]}
+                                    curveType="natural"
+                                    withDots={false}
+                                    withLegend={true}
+                                    gridAxis="xy"
+                                                        style={{ minWidth: 0, minHeight: 0 }}
+                                                    />
                                     ) : (
                                         <Center h={300}>
                                             <Text c="dimmed" size="sm">Cargando gráfico...</Text>
@@ -298,24 +298,24 @@ export function DataTab() {
                                 <Title order={5} mb="md">Distribución de Valores</Title>
                                 <Box style={{ minWidth: 300, minHeight: 250, width: '100%', display: 'block' }}>
                                     {chartsReady && areaChartData.length > 0 ? (
-                                        <AreaChart
-                                            h={250}
-                                            w="100%"
+                                <AreaChart
+                                    h={250}
+                                                        w="100%"
                                             data={areaChartData}
-                                            dataKey="step"
-                                            series={[
-                                                { 
-                                                    name: 'Varianza', 
-                                                    color: 'purple.6',
-                                                    label: 'Varianza'
-                                                }
-                                            ]}
-                                            curveType="natural"
-                                            withDots={false}
-                                            withLegend={true}
-                                            gridAxis="xy"
-                                            style={{ minWidth: 0, minHeight: 0 }}
-                                        />
+                                    dataKey="step"
+                                    series={[
+                                        { 
+                                            name: 'Varianza', 
+                                            color: 'purple.6',
+                                            label: 'Varianza'
+                                        }
+                                    ]}
+                                    curveType="natural"
+                                    withDots={false}
+                                    withLegend={true}
+                                    gridAxis="xy"
+                                                        style={{ minWidth: 0, minHeight: 0 }}
+                                                    />
                                     ) : (
                                         <Center h={250}>
                                             <Text c="dimmed" size="sm">Cargando gráfico...</Text>

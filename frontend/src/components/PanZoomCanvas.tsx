@@ -326,9 +326,9 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
 
             if (canvas.width !== gridWidth || canvas.height !== gridHeight) {
                 if (gridWidth > 0 && gridHeight > 0) {
-                    canvas.width = gridWidth;
-                    canvas.height = gridHeight;
-                }
+                canvas.width = gridWidth;
+                canvas.height = gridHeight;
+            }
             }
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -514,10 +514,10 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                     }}>
                         <Paper p="sm" withBorder style={{ backgroundColor: 'var(--mantine-color-dark-7)' }}>
                             <Stack gap="xs">
-                                <OverlayControls
-                                    config={overlayConfig}
-                                    onConfigChange={setOverlayConfig}
-                                />
+                        <OverlayControls
+                            config={overlayConfig}
+                            onConfigChange={setOverlayConfig}
+                        />
                                 <div style={{ borderTop: '1px solid var(--mantine-color-dark-4)', paddingTop: '8px', marginTop: '4px' }}>
                                     <Switch
                                         label="ROI Automático"

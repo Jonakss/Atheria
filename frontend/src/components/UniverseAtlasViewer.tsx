@@ -229,15 +229,15 @@ export function UniverseAtlasViewer() {
                 </Stack>
 
                 <Group gap="xs">
-                    <Button
+                <Button
                         flex={1}
-                        onClick={handleAnalyze}
-                        loading={isAnalyzing}
+                    onClick={handleAnalyze}
+                    loading={isAnalyzing}
                         disabled={isAnalyzing}
-                        leftSection={<IconChartScatter size={16} />}
-                    >
-                        {isAnalyzing ? 'Analizando...' : 'Analizar Evolución Temporal'}
-                    </Button>
+                    leftSection={<IconChartScatter size={16} />}
+                >
+                    {isAnalyzing ? 'Analizando...' : 'Analizar Evolución Temporal'}
+                </Button>
                     {isAnalyzing && (
                         <Button
                             color="red"

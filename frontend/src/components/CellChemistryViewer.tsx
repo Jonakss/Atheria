@@ -191,15 +191,15 @@ export function CellChemistryViewer() {
                 </Stack>
 
                 <Group gap="xs">
-                    <Button
+                <Button
                         flex={1}
-                        onClick={handleAnalyze}
-                        loading={isAnalyzing}
+                    onClick={handleAnalyze}
+                    loading={isAnalyzing}
                         disabled={isAnalyzing}
-                        leftSection={<IconAtom size={16} />}
-                    >
-                        {isAnalyzing ? 'Analizando...' : 'Analizar Tipos de Células'}
-                    </Button>
+                    leftSection={<IconAtom size={16} />}
+                >
+                    {isAnalyzing ? 'Analizando...' : 'Analizar Tipos de Células'}
+                </Button>
                     {isAnalyzing && (
                         <Button
                             color="red"

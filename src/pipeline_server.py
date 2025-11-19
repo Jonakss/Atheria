@@ -163,7 +163,7 @@ async def simulation_loop():
                     # Si live_feed está desactivado, evolucionar el estado sin calcular visualizaciones
                     # pero SÍ enviar actualizaciones de estado para que el frontend sepa el progreso
                     try:
-                        g_state['motor'].evolve_internal_state()
+                    g_state['motor'].evolve_internal_state()
                         updated_step = current_step + 1
                         g_state['simulation_step'] = updated_step
                         
@@ -206,7 +206,7 @@ async def simulation_loop():
                     base_fps = target_fps * simulation_speed
                     sleep_time = max(0.001, 1.0 / base_fps)
                     await asyncio.sleep(sleep_time)
-                    continue
+                        continue
                 
                 try:
                     # Evolucionar el estado solo si live_feed está activo
@@ -308,7 +308,7 @@ async def simulation_loop():
                             # Por defecto, guardar cada 10 frames (reducción de 10x en memoria)
                             history_interval = g_state.get('history_save_interval', 10)
                             if updated_step % history_interval == 0:
-                                g_state['simulation_history'].add_frame(frame_payload)
+                            g_state['simulation_history'].add_frame(frame_payload)
                         except Exception as e:
                             logging.debug(f"Error guardando frame en historial: {e}")
                     
@@ -1219,16 +1219,16 @@ async def handle_analyze_universe_atlas(args):
         # Crear tarea de análisis
         async def run_analysis():
             try:
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    result = await loop.run_in_executor(
-                        executor,
-                        analyze_universe_atlas,
-                        psi_snapshots,
-                        compression_dim,
-                        perplexity,
-                        n_iter
-                    )
-                
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            result = await loop.run_in_executor(
+                executor,
+                analyze_universe_atlas,
+                psi_snapshots,
+                compression_dim,
+                perplexity,
+                n_iter
+            )
+        
                 # Verificar si fue cancelado
                 if g_state.get('analysis_cancel_event') and g_state['analysis_cancel_event'].is_set():
                     logging.info("Análisis cancelado por el usuario")
@@ -1240,11 +1240,11 @@ async def handle_analyze_universe_atlas(args):
                     })
                     return
                 
-                # Calcular métricas
-                metrics = calculate_phase_map_metrics(result['coords'])
-                result['metrics'] = metrics
-                
-                logging.info(f"Análisis Atlas del Universo completado: {len(result['coords'])} puntos, spread={metrics['spread']:.2f}")
+        # Calcular métricas
+        metrics = calculate_phase_map_metrics(result['coords'])
+        result['metrics'] = metrics
+        
+        logging.info(f"Análisis Atlas del Universo completado: {len(result['coords'])} puntos, spread={metrics['spread']:.2f}")
                 
                 g_state['analysis_status'] = 'idle'
                 g_state['analysis_type'] = None
@@ -1252,10 +1252,10 @@ async def handle_analyze_universe_atlas(args):
                     "type": "analysis_status_update",
                     "payload": {"status": "completed", "type": None}
                 })
-                
-                if ws:
-                    await send_notification(ws, f"✅ Atlas del Universo completado ({len(result['coords'])} puntos)", "success")
-                    await send_to_websocket(ws, "analysis_universe_atlas", result)
+        
+        if ws:
+            await send_notification(ws, f"✅ Atlas del Universo completado ({len(result['coords'])} puntos)", "success")
+            await send_to_websocket(ws, "analysis_universe_atlas", result)
             except asyncio.CancelledError:
                 logging.info("Análisis cancelado")
                 g_state['analysis_status'] = 'idle'
@@ -1365,16 +1365,16 @@ async def handle_analyze_cell_chemistry(args):
         # Crear tarea de análisis
         async def run_analysis():
             try:
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    result = await loop.run_in_executor(
-                        executor,
-                        analyze_cell_chemistry,
-                        psi,
-                        n_samples,
-                        perplexity,
-                        n_iter
-                    )
-                
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            result = await loop.run_in_executor(
+                executor,
+                analyze_cell_chemistry,
+                psi,
+                n_samples,
+                perplexity,
+                n_iter
+            )
+        
                 # Verificar si fue cancelado
                 if g_state.get('analysis_cancel_event') and g_state['analysis_cancel_event'].is_set():
                     logging.info("Análisis cancelado por el usuario")
@@ -1386,7 +1386,7 @@ async def handle_analyze_cell_chemistry(args):
                     })
                     return
                 
-                logging.info(f"Análisis Mapa Químico completado: {len(result['coords'])} células")
+        logging.info(f"Análisis Mapa Químico completado: {len(result['coords'])} células")
                 
                 g_state['analysis_status'] = 'idle'
                 g_state['analysis_type'] = None
@@ -1394,10 +1394,10 @@ async def handle_analyze_cell_chemistry(args):
                     "type": "analysis_status_update",
                     "payload": {"status": "completed", "type": None}
                 })
-                
-                if ws:
-                    await send_notification(ws, f"✅ Mapa Químico completado ({len(result['coords'])} células)", "success")
-                    await send_to_websocket(ws, "analysis_cell_chemistry", result)
+        
+        if ws:
+            await send_notification(ws, f"✅ Mapa Químico completado ({len(result['coords'])} células)", "success")
+            await send_to_websocket(ws, "analysis_cell_chemistry", result)
             except asyncio.CancelledError:
                 logging.info("Análisis cancelado")
                 g_state['analysis_status'] = 'idle'
@@ -2170,4 +2170,4 @@ async def main(shutdown_event=None):
                 logging.warning(f"Error al limpiar el runner: {e}")
     else:
         # Fallback: mantener el servidor corriendo indefinidamente
-        await asyncio.Event().wait()
+    await asyncio.Event().wait()

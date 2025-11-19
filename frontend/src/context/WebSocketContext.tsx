@@ -15,7 +15,7 @@ interface SimData {
     step?: number | null;
     timestamp?: number;
     simulation_info?: {
-        step?: number;
+    step?: number;
         is_paused?: boolean;
         live_feed_enabled?: boolean;
     };
@@ -228,27 +228,27 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         // IMPORTANTE: Preservar step, timestamp y simulation_info
                         // Usar función de actualización para evitar condiciones de carrera
                         try {
-                            const decompressedPayload = {
-                                ...payload,
+                        const decompressedPayload = {
+                            ...payload,
                                 step: payload.step ?? payload.simulation_info?.step ?? null, // Asegurar que step esté presente
                                 timestamp: payload.timestamp ?? Date.now(),
                                 simulation_info: payload.simulation_info,
-                                map_data: payload.map_data ? decompressIfNeeded(payload.map_data) : undefined,
-                                complex_3d_data: payload.complex_3d_data ? {
-                                    real: decompressIfNeeded(payload.complex_3d_data.real),
-                                    imag: decompressIfNeeded(payload.complex_3d_data.imag)
-                                } : undefined,
-                                flow_data: payload.flow_data ? {
-                                    dx: decompressIfNeeded(payload.flow_data.dx),
-                                    dy: decompressIfNeeded(payload.flow_data.dy),
-                                    magnitude: decompressIfNeeded(payload.flow_data.magnitude)
-                                } : undefined,
-                                phase_hsv_data: payload.phase_hsv_data ? {
-                                    hue: decompressIfNeeded(payload.phase_hsv_data.hue),
-                                    saturation: decompressIfNeeded(payload.phase_hsv_data.saturation),
-                                    value: decompressIfNeeded(payload.phase_hsv_data.value)
-                                } : undefined
-                            };
+                            map_data: payload.map_data ? decompressIfNeeded(payload.map_data) : undefined,
+                            complex_3d_data: payload.complex_3d_data ? {
+                                real: decompressIfNeeded(payload.complex_3d_data.real),
+                                imag: decompressIfNeeded(payload.complex_3d_data.imag)
+                            } : undefined,
+                            flow_data: payload.flow_data ? {
+                                dx: decompressIfNeeded(payload.flow_data.dx),
+                                dy: decompressIfNeeded(payload.flow_data.dy),
+                                magnitude: decompressIfNeeded(payload.flow_data.magnitude)
+                            } : undefined,
+                            phase_hsv_data: payload.phase_hsv_data ? {
+                                hue: decompressIfNeeded(payload.phase_hsv_data.hue),
+                                saturation: decompressIfNeeded(payload.phase_hsv_data.saturation),
+                                value: decompressIfNeeded(payload.phase_hsv_data.value)
+                            } : undefined
+                        };
                             // Usar función de actualización para evitar sobrescribir actualizaciones más recientes
                             setSimData(prev => {
                                 // Si hay un timestamp y el payload nuevo es más antiguo, ignorarlo

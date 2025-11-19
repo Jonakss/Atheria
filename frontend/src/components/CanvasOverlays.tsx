@@ -280,7 +280,7 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config, roiInfo 
                 if (roiBounds) {
                     drawQuadtree(roiBounds.minX, roiBounds.minY, roiBounds.maxX, roiBounds.maxY, 0);
                 } else {
-                    drawQuadtree(0, 0, gridWidth, gridHeight, 0);
+                drawQuadtree(0, 0, gridWidth, gridHeight, 0);
                 }
             }
         }

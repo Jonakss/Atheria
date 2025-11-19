@@ -7,9 +7,9 @@ import logging
 from torch.utils.tensorboard import SummaryWriter
 
 # Importamos componentes del sistema
-from .qca_engine import Aetheria_Motor
-from .physics.noise import QuantumNoiseInjector
-from . import config as global_cfg
+from ..qca_engine import Aetheria_Motor
+from ..physics.noise import QuantumNoiseInjector
+from .. import config as global_cfg
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -22,9 +22,22 @@ class QC_Trainer_v4:
     2. Función de pérdida multi-objetivo: Estabilidad + Simetría + Complejidad.
     3. Curriculum Learning: El ruido aumenta con los episodios.
     """
-    def __init__(self, experiment_name, model_class, model_params, device, 
-                 lr=1e-4, grid_size=64, qca_steps=100, gamma_decay=0.01):
+    def __init__(self, experiment_name, model_class=None, model_params=None, device=None, 
+                 lr=1e-4, grid_size=64, qca_steps=100, gamma_decay=0.01, model=None):
+        """
+        Inicializa QC_Trainer_v4.
         
+        Args:
+            experiment_name: Nombre del experimento
+            model_class: Clase del modelo (requerido si model no se proporciona)
+            model_params: Parámetros del modelo como dict (requerido si model no se proporciona)
+            device: Dispositivo (CPU/GPU)
+            lr: Learning rate
+            grid_size: Tamaño del grid
+            qca_steps: Número de pasos QCA
+            gamma_decay: Término Lindbladian (decaimiento)
+            model: Modelo ya instanciado (opcional, para checkpoints/transfer learning)
+        """
         self.experiment_name = experiment_name
         self.device = device
         self.grid_size = grid_size
@@ -32,7 +45,21 @@ class QC_Trainer_v4:
         self.gamma_decay = gamma_decay
         
         # 1. Motor de Física (Ley M)
-        self.motor = Aetheria_Motor(model_class(**model_params), grid_size, model_params['d_state'], device)
+        # Si se proporciona un modelo ya instanciado, usarlo; sino, crear uno nuevo
+        if model is not None:
+            # Usar modelo ya instanciado (para checkpoints/transfer learning)
+            d_state = model_params.get('d_state', 2) if isinstance(model_params, dict) else getattr(model_params, 'd_state', 2)
+            self.motor = Aetheria_Motor(model, grid_size, d_state, device)
+        elif model_class is not None and model_params is not None:
+            # Crear nuevo modelo
+            if isinstance(model_params, dict):
+                self.motor = Aetheria_Motor(model_class(**model_params), grid_size, model_params['d_state'], device)
+            else:
+                # Si model_params es SimpleNamespace o similar
+                params_dict = vars(model_params) if hasattr(model_params, '__dict__') else model_params
+                self.motor = Aetheria_Motor(model_class(**params_dict), grid_size, params_dict['d_state'], device)
+        else:
+            raise ValueError("Debe proporcionarse 'model' o ('model_class' y 'model_params')")
         
         # 2. Inyector de Ruido (El "Enemigo" Evolutivo)
         self.noise_injector = QuantumNoiseInjector(device)

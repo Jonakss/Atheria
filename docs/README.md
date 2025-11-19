@@ -70,7 +70,24 @@ Bienvenido a la documentación completa de Aetheria Simulation Lab.
 ```
 docs/
 ├── README.md (este archivo)
-├── PROGRESSIVE_LEARNING.md      # Aprendizaje paso a paso
+├── 00_Inbox/                    # Notas y documentos pendientes de clasificar
+├── 10_core/                     # Documentación core del proyecto
+│   ├── ATHERIA_4_MASTER_BRIEF.md
+│   ├── ATHERIA_GLOSSARY.md
+│   ├── ROADMAP_PHASE_1.md
+│   ├── TECHNICAL_ARCHITECTURE_V4.md
+│   └── PROGRESSIVE_LEARNING.md
+├── 20_Concepts/                 # Conceptos y teorías
+│   └── Concepto_Vacio_Armonico.md
+├── 30_Components/               # Documentación de componentes técnicos
+│   ├── Models.md                # Arquitecturas de modelos
+│   ├── ArchitectureV3.md        # Arquitectura del sistema (V3)
+│   └── HISTORY_SYSTEM.md        # Sistema de historia
+├── 40_Experiments/              # Experimentos y resultados
+│   ├── AI_DEV_LOG.md
+│   └── Progressive_Training.md
+├── 99_Templates/                # Plantillas para documentación
+│   └── Component_Template.md
 ├── EXPERIMENTATION_GUIDE.md     # Cómo experimentar
 ├── VISUALIZATION_TESTING.md     # Pruebas por visualización
 ├── VISUALIZATION_RECOMMENDATIONS.md  # Análisis de visualizaciones

@@ -1,4 +1,4 @@
-# src/qc_trainer.py
+# src/trainers/qc_trainer_v3.py
 import torch
 import torch.optim as optim
 import logging
@@ -7,8 +7,8 @@ import time
 from types import SimpleNamespace
 from datetime import datetime
 
-from . import config as global_cfg
-from .utils import get_latest_checkpoint, save_experiment_config
+from .. import config as global_cfg
+from ..utils import get_latest_checkpoint, save_experiment_config
 
 class QC_Trainer_v3:
     """
@@ -241,7 +241,7 @@ class QC_Trainer_v3:
         
         torch.save(checkpoint, checkpoint_path)
         logging.info(f"Checkpoint guardado: {checkpoint_path}")
-        
+    
         # Limpieza de checkpoints antiguos
         # Obtener lista de checkpoints
         try:
@@ -355,7 +355,7 @@ class QC_Trainer_v3:
             
             # Actualizar config con tiempo de entrenamiento
             try:
-                from .utils import load_experiment_config
+                from ..utils import load_experiment_config
                 exp_config = load_experiment_config(self.exp_cfg.EXPERIMENT_NAME)
                 if exp_config:
                     config_dict = {}
@@ -390,7 +390,7 @@ class QC_Trainer_v3:
             
             # Actualizar tiempo parcial de entrenamiento
             try:
-                from .utils import load_experiment_config
+                from ..utils import load_experiment_config
                 exp_config = load_experiment_config(self.exp_cfg.EXPERIMENT_NAME)
                 if exp_config:
                     config_dict = {}
