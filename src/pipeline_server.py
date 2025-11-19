@@ -1004,6 +1004,67 @@ async def handle_list_checkpoints(args):
         logging.error(f"Error al listar checkpoints: {e}", exc_info=True)
         if ws: await send_notification(ws, f"Error al listar checkpoints: {str(e)}", "error")
 
+async def handle_cleanup_checkpoints(args):
+    """Limpia checkpoints antiguos de un experimento, manteniendo los N más recientes y el mejor."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    exp_name = args.get('EXPERIMENT_NAME')
+    
+    if not exp_name:
+        if ws: await send_notification(ws, "Nombre de experimento no proporcionado.", "error")
+        return
+        
+    try:
+        checkpoint_dir = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, exp_name)
+        if not os.path.exists(checkpoint_dir):
+            if ws: await send_notification(ws, f"Directorio de checkpoints no encontrado para {exp_name}", "warning")
+            return
+            
+        checkpoints = []
+        for f in os.listdir(checkpoint_dir):
+            if f.startswith("checkpoint_ep") and f.endswith(".pth"):
+                full_path = os.path.join(checkpoint_dir, f)
+                try:
+                    # Extraer número de episodio del nombre
+                    ep_num = int(f.replace("checkpoint_ep", "").replace(".pth", ""))
+                    checkpoints.append((ep_num, full_path))
+                except ValueError:
+                    continue
+        
+        # Ordenar por episodio (descendente)
+        checkpoints.sort(key=lambda x: x[0], reverse=True)
+        
+        # Verificar si hay un checkpoint "best"
+        best_checkpoint = None
+        best_path = os.path.join(checkpoint_dir, "best_checkpoint.pth")
+        if os.path.exists(best_path):
+            best_checkpoint = best_path
+        
+        # Mantener los últimos 5 checkpoints + el mejor
+        max_keep = 5
+        deleted_count = 0
+        
+        if len(checkpoints) > max_keep:
+            to_delete = checkpoints[max_keep:]
+            
+            for ep, path in to_delete:
+                if path != best_checkpoint:
+                    try:
+                        os.remove(path)
+                        deleted_count += 1
+                        logging.info(f"Checkpoint eliminado: {path}")
+                    except Exception as e:
+                        logging.warning(f"Error eliminando {path}: {e}")
+        
+        msg = f"✅ Limpieza completada. {deleted_count} checkpoints eliminados."
+        if ws: await send_notification(ws, msg, "success")
+        
+        # Actualizar lista de checkpoints
+        await handle_list_checkpoints({'ws_id': args.get('ws_id'), 'EXPERIMENT_NAME': exp_name})
+        
+    except Exception as e:
+        logging.error(f"Error en limpieza de checkpoints: {e}", exc_info=True)
+        if ws: await send_notification(ws, f"Error al limpiar checkpoints: {str(e)}", "error")
+
 async def handle_delete_checkpoint(args):
     """Elimina un checkpoint específico."""
     ws = g_state['websockets'].get(args.get('ws_id'))
@@ -1886,7 +1947,8 @@ HANDLERS = {
         "stop": handle_stop_training,
         "delete": handle_delete_experiment,
         "list_checkpoints": handle_list_checkpoints,
-        "delete_checkpoint": handle_delete_checkpoint
+        "delete_checkpoint": handle_delete_checkpoint,
+        "cleanup_checkpoints": handle_cleanup_checkpoints
     },
     "simulation": {
         "set_viz": handle_set_viz,

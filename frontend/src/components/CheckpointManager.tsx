@@ -204,6 +204,15 @@ export function CheckpointManager() {
         : null;
     const totalSize = checkpoints.reduce((sum, c) => sum + c.size, 0);
 
+    const handleCleanup = () => {
+        if (!activeExperiment) return;
+        if (window.confirm(`¿Estás seguro de eliminar los checkpoints antiguos de "${activeExperiment}"? Se mantendrán los 5 más recientes y el mejor.`)) {
+             sendCommand('experiment', 'cleanup_checkpoints', { EXPERIMENT_NAME: activeExperiment });
+             // Recargar después de un breve delay
+             setTimeout(() => loadCheckpoints(), 1000);
+        }
+    };
+
     return (
         <>
             <Button
@@ -234,6 +243,31 @@ export function CheckpointManager() {
                 size="xl"
                 styles={{ body: { padding: 'var(--mantine-spacing-md)' } }}
             >
+                {activeExperiment && checkpoints.length > 0 && (
+                     <Alert 
+                        variant="light" 
+                        color="blue" 
+                        title="Estado del Almacenamiento" 
+                        icon={<IconInfoCircle size={16} />}
+                        style={{ marginBottom: '1rem' }}
+                    >
+                        <Group justify="space-between" align="center">
+                            <Text size="sm">
+                                Total ocupado: <b>{formatFileSize(totalSize)}</b> en {checkpoints.length} checkpoints.
+                            </Text>
+                            <Button 
+                                size="xs" 
+                                variant="subtle" 
+                                color="red" 
+                                leftSection={<IconTrash size={14} />}
+                                onClick={handleCleanup}
+                            >
+                                Limpiar antiguos
+                            </Button>
+                        </Group>
+                    </Alert>
+                )}
+
                 <Tabs value={activeTab} onChange={(value) => value && setActiveTab(value)}>
                     <Tabs.List>
                         <Tabs.Tab 

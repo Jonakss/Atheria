@@ -241,6 +241,47 @@ class QC_Trainer_v3:
         
         torch.save(checkpoint, checkpoint_path)
         logging.info(f"Checkpoint guardado: {checkpoint_path}")
+        
+        # Limpieza de checkpoints antiguos
+        # Obtener lista de checkpoints
+        try:
+            checkpoints = []
+            for f in os.listdir(self.checkpoint_dir):
+                if f.startswith("checkpoint_ep") and f.endswith(".pth"):
+                    full_path = os.path.join(self.checkpoint_dir, f)
+                    try:
+                        # Extraer número de episodio del nombre
+                        ep_num = int(f.replace("checkpoint_ep", "").replace(".pth", ""))
+                        checkpoints.append((ep_num, full_path))
+                    except ValueError:
+                        continue
+            
+            # Ordenar por episodio (descendente)
+            checkpoints.sort(key=lambda x: x[0], reverse=True)
+            
+            # Verificar si hay un checkpoint "best"
+            best_checkpoint = None
+            best_path = os.path.join(self.checkpoint_dir, "best_checkpoint.pth")
+            if os.path.exists(best_path):
+                best_checkpoint = best_path
+            
+            # Mantener los últimos N checkpoints + el mejor
+            max_keep = getattr(self.exp_cfg, 'MAX_CHECKPOINTS_TO_KEEP', 5)
+            
+            if len(checkpoints) > max_keep:
+                # Los primeros max_keep son los más recientes (porque ordenamos descendente)
+                to_delete = checkpoints[max_keep:]
+                
+                for ep, path in to_delete:
+                    # No borrar si es el mismo archivo que el best (aunque best suele tener otro nombre)
+                    if path != best_checkpoint:
+                        try:
+                            os.remove(path)
+                            logging.info(f"Checkpoint antiguo eliminado: {path} (Manteniendo últimos {max_keep})")
+                        except Exception as e:
+                            logging.warning(f"Error eliminando checkpoint antiguo {path}: {e}")
+        except Exception as e:
+            logging.warning(f"Error en limpieza de checkpoints: {e}")
     
     def run_training_loop(self):
         """Ejecuta el bucle principal de entrenamiento."""
