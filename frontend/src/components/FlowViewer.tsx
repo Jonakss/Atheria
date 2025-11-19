@@ -80,10 +80,14 @@ export function FlowViewer() {
         });
         const avgDirection = directions.length > 0 ? Math.atan2(avgDirY / directions.length, avgDirX / directions.length) : 0;
         
+        // Usar reduce en lugar de spread operator para evitar stack overflow con arrays grandes
+        const maxMagnitude = magnitudes.reduce((a, b) => Math.max(a, b), -Infinity);
+        const minMagnitude = magnitudes.reduce((a, b) => Math.min(a, b), Infinity);
+        
         return {
             avgMagnitude: avg,
-            maxMagnitude: Math.max(...magnitudes),
-            minMagnitude: Math.min(...magnitudes),
+            maxMagnitude,
+            minMagnitude,
             totalVectors: gridHeight * gridWidth,
             significantVectors: significantCount,
             avgDirection,

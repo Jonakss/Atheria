@@ -131,8 +131,9 @@ export function HistoryViewer() {
     const fileStats = frames.length > 0 && currentFrame ? {
         totalFrames: frames.length,
         currentStep: currentFrame.step,
-        minStep: Math.min(...frames.map(f => f.step)),
-        maxStep: Math.max(...frames.map(f => f.step)),
+        // Usar reduce en lugar de spread operator para evitar stack overflow con arrays grandes
+        minStep: frames.reduce((min, f) => Math.min(min, f.step), Infinity),
+        maxStep: frames.reduce((max, f) => Math.max(max, f.step), -Infinity),
         gridSize: `${currentFrame.map_data?.[0]?.length || 0}x${currentFrame.map_data?.length || 0}`,
         timeSpan: frames.length > 1 ? frames[frames.length - 1].step - frames[0].step : 0
     } : null;

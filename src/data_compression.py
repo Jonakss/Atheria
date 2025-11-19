@@ -179,6 +179,13 @@ async def optimize_frame_payload(payload: Dict[str, Any], enable_compression: bo
     
     # No optimizar poincare_coords (pequeño), hist_data (ya pequeño), phase_attractor (ya pequeño)
     
+    # IMPORTANTE: Preservar campos críticos como step, timestamp, simulation_info
+    # Estos campos no deben ser modificados por la optimización
+    critical_fields = ['step', 'timestamp', 'simulation_info', 'roi_info']
+    for field in critical_fields:
+        if field in payload:
+            optimized[field] = payload[field]
+    
     return optimized
 
 def get_payload_size(payload: Dict[str, Any]) -> int:

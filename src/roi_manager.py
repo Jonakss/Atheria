@@ -199,5 +199,12 @@ def apply_roi_to_payload(payload: Dict[str, Any], roi_manager: ROIManager) -> Di
     # Añadir información de ROI al payload
     optimized['roi_info'] = roi_manager.get_roi_info()
     
+    # IMPORTANTE: Preservar campos críticos como step, timestamp, simulation_info
+    # Estos campos no deben ser modificados por la aplicación de ROI
+    critical_fields = ['step', 'timestamp', 'simulation_info']
+    for field in critical_fields:
+        if field in payload:
+            optimized[field] = payload[field]
+    
     return optimized
 

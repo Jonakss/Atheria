@@ -25,6 +25,10 @@ g_state = {
     "data_compression_enabled": True,  # Habilitar compresión de datos WebSocket
     "downsample_factor": 1,  # Factor de downsampling para transferencia (1 = sin downsampling)
     "roi_manager": ROIManager(grid_size=256),  # Gestor de Region of Interest (ROI)
+    "analysis_status": "idle",  # Estado del análisis: 'idle', 'running', 'paused'
+    "analysis_type": None,  # Tipo de análisis: 'universe_atlas', 'cell_chemistry', None
+    "analysis_task": None,  # Tarea de análisis actual (para cancelación)
+    "analysis_cancel_event": None,  # Evento para cancelar análisis
 }
 
 # --- INICIO DE LA CORRECCIÓN ---

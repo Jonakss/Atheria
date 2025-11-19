@@ -1,7 +1,7 @@
 // frontend/src/components/CellChemistryViewer.tsx
 import { useEffect, useRef, useState } from 'react';
 import { Box, Paper, Text, Button, NumberInput, Group, Stack, Badge } from '@mantine/core';
-import { IconAtom, IconRefresh } from '@tabler/icons-react';
+import { IconAtom, IconRefresh, IconX } from '@tabler/icons-react';
 import { useWebSocket } from '../hooks/useWebSocket';
 
 interface CellChemistryData {
@@ -12,12 +12,14 @@ interface CellChemistryData {
 
 export function CellChemistryViewer() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const { sendCommand } = useWebSocket();
+    const { sendCommand, analysisStatus, analysisType } = useWebSocket();
     const [data, setData] = useState<CellChemistryData | null>(null);
     const [nSamples, setNSamples] = useState(10000);
     const [perplexity, setPerplexity] = useState(30);
     const [nIter, setNIter] = useState(1000);
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    
+    // Usar el estado global de análisis
+    const isAnalyzing = analysisStatus === 'running' && analysisType === 'cell_chemistry';
 
     // Escuchar mensajes de análisis
     const { ws } = useWebSocket();
@@ -30,7 +32,6 @@ export function CellChemistryViewer() {
                 const message = JSON.parse(event.data);
                 if (message.type === 'analysis_cell_chemistry') {
                     setData(message.payload);
-                    setIsAnalyzing(false);
                 }
             } catch (e) {
                 // Ignorar mensajes que no son del análisis
@@ -62,10 +63,11 @@ export function CellChemistryViewer() {
 
         const xs = coords.map(c => c[0]);
         const ys = coords.map(c => c[1]);
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
-        const minY = Math.min(...ys);
-        const maxY = Math.max(...ys);
+        // Usar reduce en lugar de spread operator para evitar stack overflow con arrays grandes
+        const minX = xs.reduce((a, b) => Math.min(a, b), Infinity);
+        const maxX = xs.reduce((a, b) => Math.max(a, b), -Infinity);
+        const minY = ys.reduce((a, b) => Math.min(a, b), Infinity);
+        const maxY = ys.reduce((a, b) => Math.max(a, b), -Infinity);
 
         const rangeX = maxX - minX || 1;
         const rangeY = maxY - minY || 1;
@@ -132,13 +134,16 @@ export function CellChemistryViewer() {
     }, [data]);
 
     const handleAnalyze = () => {
-        setIsAnalyzing(true);
         setData(null);
         sendCommand('analysis', 'cell_chemistry', {
             n_samples: nSamples,
             perplexity: perplexity,
             n_iter: nIter
         });
+    };
+
+    const handleCancel = () => {
+        sendCommand('analysis', 'cancel', {});
     };
 
     return (
@@ -185,14 +190,27 @@ export function CellChemistryViewer() {
                     />
                 </Stack>
 
-                <Button
-                    fullWidth
-                    onClick={handleAnalyze}
-                    loading={isAnalyzing}
-                    leftSection={<IconAtom size={16} />}
-                >
-                    {isAnalyzing ? 'Analizando...' : 'Analizar Tipos de Células'}
-                </Button>
+                <Group gap="xs">
+                    <Button
+                        flex={1}
+                        onClick={handleAnalyze}
+                        loading={isAnalyzing}
+                        disabled={isAnalyzing}
+                        leftSection={<IconAtom size={16} />}
+                    >
+                        {isAnalyzing ? 'Analizando...' : 'Analizar Tipos de Células'}
+                    </Button>
+                    {isAnalyzing && (
+                        <Button
+                            color="red"
+                            variant="light"
+                            onClick={handleCancel}
+                            leftSection={<IconX size={16} />}
+                        >
+                            Cancelar
+                        </Button>
+                    )}
+                </Group>
 
                 {data?.error && (
                     <Paper p="sm" bg="red.1" withBorder>

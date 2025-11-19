@@ -64,10 +64,11 @@ export function PhaseAttractorViewer() {
         // Encontrar el rango de datos para escalar
         const allX = attractorHistory.map(p => p.x);
         const allY = attractorHistory.map(p => p.y);
-        const minX = Math.min(...allX);
-        const maxX = Math.max(...allX);
-        const minY = Math.min(...allY);
-        const maxY = Math.max(...allY);
+        // Usar reduce en lugar de spread operator para evitar stack overflow con arrays grandes
+        const minX = allX.reduce((a, b) => Math.min(a, b), Infinity);
+        const maxX = allX.reduce((a, b) => Math.max(a, b), -Infinity);
+        const minY = allY.reduce((a, b) => Math.min(a, b), Infinity);
+        const maxY = allY.reduce((a, b) => Math.max(a, b), -Infinity);
         
         const rangeX = maxX - minX || 1;
         const rangeY = maxY - minY || 1;

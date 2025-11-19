@@ -1,5 +1,5 @@
 // frontend/src/components/DataTab.tsx
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { 
     Grid, Paper, Title, Text, Group, Badge, Stack, Box, 
     Card, Progress, RingProgress, Center, Table, ScrollArea 
@@ -60,8 +60,22 @@ export function DataTab() {
     }, []); // Removed simulationHistory.length dependency to prevent infinite loops
 
     // Calcular estadísticas del estado actual
+    // Usar useRef para almacenar el último valor calculado y evitar recálculos innecesarios
+    const statsCacheRef = useRef<{ step: number | null; stats: { mean: number; std: number; min: number; max: number; variance: number } | null }>({ step: null, stats: null });
+    
     const currentStats = useMemo(() => {
-        if (!simData?.map_data || !Array.isArray(simData.map_data)) return null;
+        const currentStep = simData?.step ?? null;
+        
+        // Si el step no ha cambiado, retornar el valor en caché
+        if (currentStep === statsCacheRef.current.step && statsCacheRef.current.stats !== null) {
+            return statsCacheRef.current.stats;
+        }
+        
+        // Calcular nuevas estadísticas solo cuando el step cambia
+        if (!simData?.map_data || !Array.isArray(simData.map_data)) {
+            statsCacheRef.current = { step: currentStep, stats: null };
+            return null;
+        }
 
         const mapData = simData.map_data;
         // Aplanar el array 2D
@@ -72,29 +86,47 @@ export function DataTab() {
             }
         }
         
-        if (flatData.length === 0) return null;
+        if (flatData.length === 0) {
+            statsCacheRef.current = { step: currentStep, stats: null };
+            return null;
+        }
         
         const mean = flatData.reduce((a, b) => a + b, 0) / flatData.length;
         const variance = flatData.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / flatData.length;
         const std = Math.sqrt(variance);
-        const min = Math.min(...flatData);
-        const max = Math.max(...flatData);
+        // Usar reduce en lugar de spread operator para evitar stack overflow con arrays grandes
+        const min = flatData.reduce((a, b) => Math.min(a, b), Infinity);
+        const max = flatData.reduce((a, b) => Math.max(a, b), -Infinity);
 
-        return {
+        const newStats = {
             mean: mean || 0,
             std: std || 0,
             min: min || 0,
             max: max || 0,
             variance: variance || 0
         };
-    }, [simData]);
+        
+        // Actualizar caché
+        statsCacheRef.current = { step: currentStep, stats: newStats };
+        
+        return newStats;
+    }, [simData?.step]); // Solo depender del step, no de map_data directamente
+
+    // Usar useRef para rastrear el último step procesado y evitar bucles infinitos
+    const lastProcessedStep = useRef<number | null>(null);
 
     // Actualizar historial de simulación
+    // Solo ejecutar cuando el step cambie, no cuando currentStats cambie
     useEffect(() => {
-        if (simData && currentStats) {
+        const currentStep = simData?.step ?? null;
+        
+        // Solo procesar si tenemos datos, stats y el step ha cambiado
+        if (simData && currentStats && currentStep !== null && currentStep !== lastProcessedStep.current) {
+            lastProcessedStep.current = currentStep;
+            
             setSimulationHistory(prev => {
                 const newPoint: SimulationStats = {
-                    step: simData.step || 0,
+                    step: currentStep,
                     density: currentStats,
                     phase: { mean: 0, std: 0, min: 0, max: 0 }, // TODO: calcular de hist_data
                     timestamp: Date.now()
@@ -105,12 +137,34 @@ export function DataTab() {
                 return [...filtered, newPoint].slice(-200); // Mantener últimos 200 puntos
             });
         }
-    }, [simData, currentStats]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [simData?.step]); // Solo depender del step para evitar bucles infinitos
 
     // Encontrar experimento activo
-    const currentExperiment = activeExperiment 
-        ? experimentsData?.find(exp => exp.name === activeExperiment) 
-        : null;
+    const currentExperiment = useMemo(() => {
+        if (!activeExperiment || !experimentsData) return null;
+        return experimentsData.find(exp => exp.name === activeExperiment) || null;
+    }, [activeExperiment, experimentsData]);
+
+    // Memoizar datos de gráficos para evitar re-renders infinitos
+    const lineChartData = useMemo(() => {
+        if (simulationHistory.length === 0) return [];
+        return simulationHistory.map(s => ({
+            step: s.step,
+            'Densidad Media': s.density.mean,
+            'Desviación Estándar': s.density.std,
+            'Mínimo': s.density.min,
+            'Máximo': s.density.max
+        }));
+    }, [simulationHistory]);
+
+    const areaChartData = useMemo(() => {
+        if (simulationHistory.length === 0) return [];
+        return simulationHistory.map(s => ({
+            step: s.step,
+            'Varianza': s.density.variance
+        }));
+    }, [simulationHistory]);
 
     return (
         <ScrollArea h="100%" p="md">
@@ -197,54 +251,40 @@ export function DataTab() {
                             <Paper p="md" withBorder>
                                 <Title order={5} mb="md">Evolución Temporal de la Simulación</Title>
                                 <Box style={{ minWidth: 300, minHeight: 300, width: '100%', display: 'block' }}>
-                                    {chartsReady && simulationHistory.length > 0 && chartContainerRef.current ? (
-                                        (() => {
-                                            const rect = chartContainerRef.current?.getBoundingClientRect();
-                                            if (rect && rect.width > 0 && rect.height > 0) {
-                                                return (
-                                <LineChart
-                                    h={300}
-                                                        w="100%"
-                                    data={simulationHistory.map(s => ({
-                                        step: s.step,
-                                        'Densidad Media': s.density.mean,
-                                        'Desviación Estándar': s.density.std,
-                                        'Mínimo': s.density.min,
-                                        'Máximo': s.density.max
-                                    }))}
-                                    dataKey="step"
-                                    series={[
-                                        { 
-                                            name: 'Densidad Media', 
-                                            color: 'blue.6',
-                                            label: 'Densidad Media'
-                                        },
-                                        { 
-                                            name: 'Desviación Estándar', 
-                                            color: 'orange.6',
-                                            label: 'Desviación Estándar'
-                                        },
-                                        { 
-                                            name: 'Mínimo', 
-                                            color: 'red.6',
-                                            label: 'Mínimo'
-                                        },
-                                        { 
-                                            name: 'Máximo', 
-                                            color: 'green.6',
-                                            label: 'Máximo'
-                                        }
-                                    ]}
-                                    curveType="natural"
-                                    withDots={false}
-                                    withLegend={true}
-                                    gridAxis="xy"
-                                                        style={{ minWidth: 0, minHeight: 0 }}
-                                                    />
-                                                );
-                                            }
-                                            return null;
-                                        })()
+                                    {chartsReady && lineChartData.length > 0 ? (
+                                        <LineChart
+                                            h={300}
+                                            w="100%"
+                                            data={lineChartData}
+                                            dataKey="step"
+                                            series={[
+                                                { 
+                                                    name: 'Densidad Media', 
+                                                    color: 'blue.6',
+                                                    label: 'Densidad Media'
+                                                },
+                                                { 
+                                                    name: 'Desviación Estándar', 
+                                                    color: 'orange.6',
+                                                    label: 'Desviación Estándar'
+                                                },
+                                                { 
+                                                    name: 'Mínimo', 
+                                                    color: 'red.6',
+                                                    label: 'Mínimo'
+                                                },
+                                                { 
+                                                    name: 'Máximo', 
+                                                    color: 'green.6',
+                                                    label: 'Máximo'
+                                                }
+                                            ]}
+                                            curveType="natural"
+                                            withDots={false}
+                                            withLegend={true}
+                                            gridAxis="xy"
+                                            style={{ minWidth: 0, minHeight: 0 }}
+                                        />
                                     ) : (
                                         <Center h={300}>
                                             <Text c="dimmed" size="sm">Cargando gráfico...</Text>
@@ -257,36 +297,25 @@ export function DataTab() {
                             <Paper p="md" withBorder>
                                 <Title order={5} mb="md">Distribución de Valores</Title>
                                 <Box style={{ minWidth: 300, minHeight: 250, width: '100%', display: 'block' }}>
-                                    {chartsReady && simulationHistory.length > 0 && chartContainerRef.current ? (
-                                        (() => {
-                                            const rect = chartContainerRef.current?.getBoundingClientRect();
-                                            if (rect && rect.width > 0 && rect.height > 0) {
-                                                return (
-                                <AreaChart
-                                    h={250}
-                                                        w="100%"
-                                    data={simulationHistory.map(s => ({
-                                        step: s.step,
-                                        'Varianza': s.density.variance
-                                    }))}
-                                    dataKey="step"
-                                    series={[
-                                        { 
-                                            name: 'Varianza', 
-                                            color: 'purple.6',
-                                            label: 'Varianza'
-                                        }
-                                    ]}
-                                    curveType="natural"
-                                    withDots={false}
-                                    withLegend={true}
-                                    gridAxis="xy"
-                                                        style={{ minWidth: 0, minHeight: 0 }}
-                                                    />
-                                                );
-                                            }
-                                            return null;
-                                        })()
+                                    {chartsReady && areaChartData.length > 0 ? (
+                                        <AreaChart
+                                            h={250}
+                                            w="100%"
+                                            data={areaChartData}
+                                            dataKey="step"
+                                            series={[
+                                                { 
+                                                    name: 'Varianza', 
+                                                    color: 'purple.6',
+                                                    label: 'Varianza'
+                                                }
+                                            ]}
+                                            curveType="natural"
+                                            withDots={false}
+                                            withLegend={true}
+                                            gridAxis="xy"
+                                            style={{ minWidth: 0, minHeight: 0 }}
+                                        />
                                     ) : (
                                         <Center h={250}>
                                             <Text c="dimmed" size="sm">Cargando gráfico...</Text>

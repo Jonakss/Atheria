@@ -1,7 +1,7 @@
 // frontend/src/components/UniverseAtlasViewer.tsx
 import { useEffect, useRef, useState } from 'react';
 import { Box, Paper, Text, Button, NumberInput, Group, Stack, Badge, Tooltip } from '@mantine/core';
-import { IconChartScatter, IconTrash, IconSettings } from '@tabler/icons-react';
+import { IconChartScatter, IconTrash, IconSettings, IconX } from '@tabler/icons-react';
 import { useWebSocket } from '../hooks/useWebSocket';
 
 interface UniverseAtlasData {
@@ -18,12 +18,14 @@ interface UniverseAtlasData {
 
 export function UniverseAtlasViewer() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const { sendCommand } = useWebSocket();
+    const { sendCommand, analysisStatus, analysisType } = useWebSocket();
     const [data, setData] = useState<UniverseAtlasData | null>(null);
     const [compressionDim, setCompressionDim] = useState(64);
     const [perplexity, setPerplexity] = useState(30);
     const [nIter, setNIter] = useState(1000);
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    
+    // Usar el estado global de análisis
+    const isAnalyzing = analysisStatus === 'running' && analysisType === 'universe_atlas';
 
     // Escuchar mensajes de análisis
     const { ws } = useWebSocket();
@@ -36,7 +38,6 @@ export function UniverseAtlasViewer() {
                 const message = JSON.parse(event.data);
                 if (message.type === 'analysis_universe_atlas') {
                     setData(message.payload);
-                    setIsAnalyzing(false);
                 }
             } catch (e) {
                 // Ignorar mensajes que no son del análisis
@@ -68,10 +69,11 @@ export function UniverseAtlasViewer() {
 
         const xs = coords.map(c => c[0]);
         const ys = coords.map(c => c[1]);
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
-        const minY = Math.min(...ys);
-        const maxY = Math.max(...ys);
+        // Usar reduce en lugar de spread operator para evitar stack overflow con arrays grandes
+        const minX = xs.reduce((a, b) => Math.min(a, b), Infinity);
+        const maxX = xs.reduce((a, b) => Math.max(a, b), -Infinity);
+        const minY = ys.reduce((a, b) => Math.min(a, b), Infinity);
+        const maxY = ys.reduce((a, b) => Math.max(a, b), -Infinity);
 
         const rangeX = maxX - minX || 1;
         const rangeY = maxY - minY || 1;
@@ -155,13 +157,16 @@ export function UniverseAtlasViewer() {
     }, [data]);
 
     const handleAnalyze = () => {
-        setIsAnalyzing(true);
         setData(null);
         sendCommand('analysis', 'universe_atlas', {
             compression_dim: compressionDim,
             perplexity: perplexity,
             n_iter: nIter
         });
+    };
+
+    const handleCancel = () => {
+        sendCommand('analysis', 'cancel', {});
     };
 
     const handleClearSnapshots = () => {
@@ -223,14 +228,27 @@ export function UniverseAtlasViewer() {
                     />
                 </Stack>
 
-                <Button
-                    fullWidth
-                    onClick={handleAnalyze}
-                    loading={isAnalyzing}
-                    leftSection={<IconChartScatter size={16} />}
-                >
-                    {isAnalyzing ? 'Analizando...' : 'Analizar Evolución Temporal'}
-                </Button>
+                <Group gap="xs">
+                    <Button
+                        flex={1}
+                        onClick={handleAnalyze}
+                        loading={isAnalyzing}
+                        disabled={isAnalyzing}
+                        leftSection={<IconChartScatter size={16} />}
+                    >
+                        {isAnalyzing ? 'Analizando...' : 'Analizar Evolución Temporal'}
+                    </Button>
+                    {isAnalyzing && (
+                        <Button
+                            color="red"
+                            variant="light"
+                            onClick={handleCancel}
+                            leftSection={<IconX size={16} />}
+                        >
+                            Cancelar
+                        </Button>
+                    )}
+                </Group>
 
                 {data?.error && (
                     <Paper p="sm" bg="red.1" withBorder>
