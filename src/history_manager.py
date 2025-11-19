@@ -34,19 +34,52 @@ class SimulationHistory:
         Args:
             frame_data: Dict con datos del frame (step, map_data, hist_data, etc.)
         """
-        # Optimizar: solo guardar datos esenciales
+        # Optimizar: solo guardar datos esenciales y reducir tamaño
+        map_data = frame_data.get('map_data')
+        
+        # Aplicar downsampling al map_data si es muy grande para reducir memoria
+        # Guardar cada 2x2 píxeles como 1 píxel (reducción de 4x en memoria)
+        if map_data is not None:
+            try:
+                if isinstance(map_data, np.ndarray):
+                    # Downsample si el array es mayor a 128x128
+                    if map_data.shape[0] > 128 or (len(map_data.shape) > 1 and map_data.shape[1] > 128):
+                        # Downsample tomando cada 2x2 bloque y promediando
+                        if len(map_data.shape) == 2:
+                            # Array 2D: [height, width]
+                            h, w = map_data.shape
+                            downsampled = map_data[::2, ::2]  # Tomar cada 2 píxeles
+                            map_data = downsampled.tolist() if not isinstance(map_data, list) else downsampled
+                        elif isinstance(map_data, list) and len(map_data) > 0:
+                            # Lista de listas: [[row1], [row2], ...]
+                            if len(map_data) > 128 or (len(map_data[0]) if map_data else 0) > 128:
+                                # Downsample manualmente
+                                downsampled = []
+                                for i in range(0, len(map_data), 2):
+                                    row = map_data[i]
+                                    if isinstance(row, list):
+                                        downsampled_row = [row[j] for j in range(0, len(row), 2)]
+                                        downsampled.append(downsampled_row)
+                                    else:
+                                        downsampled.append(row)
+                                map_data = downsampled
+            except Exception as e:
+                logging.debug(f"Error aplicando downsampling al historial: {e}")
+                # Si falla el downsampling, usar los datos originales
+        
         optimized_frame = {
             'step': frame_data.get('step', 0),
             'timestamp': frame_data.get('timestamp', datetime.now().isoformat()),
-            'map_data': frame_data.get('map_data'),  # Ya es numpy array/list
+            'map_data': map_data,  # Ya optimizado con downsampling si es necesario
             'hist_data': frame_data.get('hist_data', {}),
             # No guardar poincare_coords, phase_attractor, flow_data (se pueden recalcular)
         }
         
         self.frames.append(optimized_frame)
         
-        # Limitar tamaño
+        # Limitar tamaño - eliminar los más antiguos si excede el límite
         if len(self.frames) > self.max_frames:
+            # Eliminar los frames más antiguos (mantener solo los últimos max_frames)
             self.frames = self.frames[-self.max_frames:]
     
     def save_to_file(self, filename: Optional[str] = None) -> Path:

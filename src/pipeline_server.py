@@ -301,9 +301,14 @@ async def simulation_loop():
                         frame_payload = frame_payload_roi
                     
                     # Guardar en historial si está habilitado
-                    if g_state.get('history_enabled', False):
+                    # IMPORTANTE: Solo guardar si live_feed está activo para evitar guardar frames vacíos
+                    if g_state.get('history_enabled', False) and live_feed_enabled:
                         try:
-                            g_state['simulation_history'].add_frame(frame_payload)
+                            # Solo guardar cada N frames para reducir uso de memoria
+                            # Por defecto, guardar cada 10 frames (reducción de 10x en memoria)
+                            history_interval = g_state.get('history_save_interval', 10)
+                            if updated_step % history_interval == 0:
+                                g_state['simulation_history'].add_frame(frame_payload)
                         except Exception as e:
                             logging.debug(f"Error guardando frame en historial: {e}")
                     

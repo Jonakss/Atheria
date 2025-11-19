@@ -12,7 +12,25 @@ interface SimData {
     map_data?: number[][];
     hist_data?: Record<string, Array<{ bin: string; count: number }>>;
     poincare_coords?: number[][];
-    step?: number;
+    step?: number | null;
+    timestamp?: number;
+    simulation_info?: {
+        step?: number;
+        is_paused?: boolean;
+        live_feed_enabled?: boolean;
+    };
+    phase_attractor?: any;
+    flow_data?: {
+        dx: number[][];
+        dy: number[][];
+        magnitude?: number[][];
+    };
+    phase_hsv_data?: {
+        hue: number[][];
+        saturation: number[][];
+        value: number[][];
+    };
+    roi_info?: any;
 }
 
 interface TrainingProgress {
@@ -298,6 +316,30 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         // Actualizar estado de análisis
                         setAnalysisStatus(payload.status || 'idle');
                         setAnalysisType(payload.type || null);
+                        break;
+                    case 'live_feed_status_update':
+                        // Cuando se desactiva el live feed, limpiar datos de visualización
+                        // para evitar mostrar datos antiguos
+                        if (!payload.enabled) {
+                            setSimData(prev => {
+                                if (!prev) return prev;
+                                // Mantener solo step, timestamp y simulation_info
+                                // Limpiar todos los datos de visualización
+                                return {
+                                    step: prev.step,
+                                    timestamp: prev.timestamp,
+                                    simulation_info: prev.simulation_info,
+                                    // Limpiar datos de visualización
+                                    map_data: undefined,
+                                    hist_data: undefined,
+                                    poincare_coords: undefined,
+                                    phase_attractor: undefined,
+                                    flow_data: undefined,
+                                    phase_hsv_data: undefined,
+                                    complex_3d_data: undefined
+                                };
+                            });
+                        }
                         break;
                     case 'history_files_list':
                         // Lista de archivos de historia recibida
