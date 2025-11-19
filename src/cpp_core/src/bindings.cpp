@@ -9,6 +9,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 #include "../include/sparse_map.h"
+#include "../include/sparse_engine.h"
 
 namespace py = pybind11;
 using namespace atheria;
@@ -111,5 +112,32 @@ PYBIND11_MODULE(atheria_core, m) {
              py::arg("coord"))
         .def("coord_keys", &SparseMap::coord_keys,
              "Retorna una lista con todas las coordenadas 3D que tienen tensores");
+    
+    // Clase Engine (Motor de alto rendimiento nativo)
+    py::class_<Engine>(m, "Engine")
+        .def(py::init<int64_t, const std::string&>(),
+             "Constructor del motor de simulación",
+             py::arg("d_state"), py::arg("device") = "cpu")
+        .def("load_model", &Engine::load_model,
+             "Carga un modelo TorchScript desde un archivo .pt",
+             py::arg("model_path"))
+        .def("add_particle", &Engine::add_particle,
+             "Agrega una partícula en las coordenadas dadas",
+             py::arg("coord"), py::arg("state"))
+        .def("get_state_at", &Engine::get_state_at,
+             "Obtiene el estado en una coordenada (materia o vacío)",
+             py::arg("coord"))
+        .def("step_native", &Engine::step_native,
+             "Ejecuta un paso completo de simulación en C++ (todo el trabajo pesado)",
+             "Retorna el número de partículas activas")
+        .def("get_matter_count", &Engine::get_matter_count,
+             "Retorna el número de partículas de materia")
+        .def("get_step_count", &Engine::get_step_count,
+             "Retorna el número de pasos ejecutados")
+        .def("clear", &Engine::clear,
+             "Limpia toda la materia del universo")
+        .def("activate_neighborhood", &Engine::activate_neighborhood,
+             "Activa el vecindario de una coordenada",
+             py::arg("coord"), py::arg("radius") = 1);
 #endif
 }
