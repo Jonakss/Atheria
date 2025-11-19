@@ -231,6 +231,17 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         };
                         setSimData(decompressedPayload);
                         break;
+                    case 'simulation_state_update':
+                        // Actualización de estado sin datos de visualización (cuando live feed está desactivado)
+                        // Actualizar solo step y simulation_info, preservando otros datos existentes
+                        setSimData(prev => ({
+                            ...prev,
+                            step: payload.step ?? payload.simulation_info?.step ?? prev?.step ?? null,
+                            timestamp: payload.timestamp ?? prev?.timestamp,
+                            simulation_info: payload.simulation_info ?? prev?.simulation_info
+                            // No actualizar map_data, hist_data, etc. - estos solo vienen con simulation_frame
+                        }));
+                        break;
                     case 'training_log':
                         setTrainingLog(prev => [...prev, payload]);
                         setAllLogs(prev => [...prev, payload]);

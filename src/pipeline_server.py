@@ -155,13 +155,39 @@ async def simulation_loop():
                 current_step = g_state.get('simulation_step', 0)
                 
                 # OPTIMIZACIÓN CRÍTICA: Si live_feed está desactivado, NO procesar visualizaciones
-                # pero SÍ evolucionar el estado para que la simulación continúe
+                # pero SÍ evolucionar el estado y enviar actualizaciones de estado (step, estadísticas)
                 if not live_feed_enabled:
-                    # Si live_feed está desactivado, solo evolucionar el estado sin calcular visualizaciones
-                    # Esto permite que la simulación continúe pero sin enviar datos
+                    # Si live_feed está desactivado, evolucionar el estado sin calcular visualizaciones
+                    # pero SÍ enviar actualizaciones de estado para que el frontend sepa el progreso
                     try:
                         g_state['motor'].evolve_internal_state()
-                        g_state['simulation_step'] = current_step + 1
+                        updated_step = current_step + 1
+                        g_state['simulation_step'] = updated_step
+                        
+                        # Enviar actualización de estado (sin datos de visualización pesados)
+                        # Esto permite que el frontend muestre el progreso aunque no haya visualización
+                        state_update = {
+                            "step": updated_step,
+                            "timestamp": asyncio.get_event_loop().time(),
+                            "simulation_info": {
+                                "step": updated_step,
+                                "is_paused": False,
+                                "live_feed_enabled": False
+                            }
+                            # No incluir map_data, hist_data, etc. para ahorrar ancho de banda
+                        }
+                        
+                        # Enviar actualización de estado cada paso para mantener el frontend actualizado
+                        # Esto es ligero (solo step y simulation_info) así que no satura
+                        await broadcast({"type": "simulation_state_update", "payload": state_update})
+                        
+                        # Enviar log de simulación cada 100 pasos para no saturar los logs
+                        if updated_step % 100 == 0:
+                            await broadcast({
+                                "type": "simulation_log",
+                                "payload": f"[Simulación] Paso {updated_step} completado (live feed desactivado)"
+                            })
+                            
                     except Exception as e:
                         logging.error(f"Error evolucionando estado (live_feed desactivado): {e}", exc_info=True)
                     
