@@ -5,7 +5,7 @@ import {
     Switch, Slider, Button, Select, Divider, Badge, Tooltip, Box
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { 
     IconSettings, IconChevronDown, IconChevronUp,
     IconPlayerPlay, IconPlayerPause, IconRefresh,

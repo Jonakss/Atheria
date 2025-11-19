@@ -4,7 +4,7 @@ import {
     Paper, Stack, Text, Group, Tooltip, ActionIcon, 
     Switch, NumberInput, Badge, RingProgress, Table
 } from '@mantine/core';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { IconArrowsMaximize, IconHelpCircle, IconChartBar } from '@tabler/icons-react';
 
 interface FlowStats {

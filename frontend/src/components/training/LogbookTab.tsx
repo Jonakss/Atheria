@@ -4,7 +4,7 @@ import {
     Paper, Text, ScrollArea, Group, Badge, Stack, Box, 
     Tabs, Button, TextInput, ActionIcon, Select 
 } from '@mantine/core';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { 
     IconSearch, IconX, IconFilter, IconDownload,
     IconClock, IconInfoCircle, IconAlertTriangle, IconCheck,

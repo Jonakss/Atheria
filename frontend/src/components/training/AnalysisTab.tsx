@@ -1,7 +1,7 @@
 // frontend/src/components/AnalysisTab.tsx
 import { Box, Stack, Grid } from '@mantine/core';
-import { UniverseAtlasViewer } from './UniverseAtlasViewer';
-import { CellChemistryViewer } from './CellChemistryViewer';
+import { UniverseAtlasViewer } from '../visualization/UniverseAtlasViewer';
+import { CellChemistryViewer } from '../visualization/CellChemistryViewer';
 
 export function AnalysisTab() {
     return (

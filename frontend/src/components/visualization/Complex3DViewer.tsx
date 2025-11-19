@@ -1,7 +1,7 @@
 // frontend/src/components/Complex3DViewer.tsx
 import { useRef, useEffect, useState } from 'react';
 import { Paper, Stack, Text, Group, Tooltip, ActionIcon, Slider, Button, Badge, Box, Select, NumberInput, Collapse } from '@mantine/core';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { IconCube, IconHelpCircle, IconPlayerPlay, IconPlayerPause, IconInfoCircle } from '@tabler/icons-react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';

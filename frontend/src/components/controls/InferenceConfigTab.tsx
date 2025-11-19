@@ -8,8 +8,8 @@ import {
     IconSettings, IconInfoCircle, IconCheck, IconX, IconRefresh,
     IconBrain, IconBox, IconTrendingDown, IconAtom, IconServer, IconArrowsMaximize
 } from '@tabler/icons-react';
-import { useWebSocket } from '../hooks/useWebSocket';
-import { resetServerConfig } from '../utils/serverConfig';
+import { useWebSocket } from '../../hooks/useWebSocket';
+import { resetServerConfig } from '../../utils/serverConfig';
 
 interface InferenceConfig {
     grid_size: number;
@@ -21,7 +21,7 @@ interface InferenceConfig {
 }
 
 export function InferenceConfigTab() {
-    const { sendCommand, activeExperiment, simData, serverConfig, updateServerConfig, connectionStatus, connect } = useWebSocket();
+    const { sendCommand, activeExperiment, simData, serverConfig, updateServerConfig, connectionStatus, connect, liveFeedEnabled, setLiveFeedEnabled } = useWebSocket();
     
     // Estados de configuración de inferencia
     const [gridSize, setGridSize] = useState(256);
@@ -29,7 +29,6 @@ export function InferenceConfigTab() {
     const [gammaDecay, setGammaDecay] = useState(0.01);
     
     // Estados de optimización
-    const [liveFeedEnabled, setLiveFeedEnabled] = useState(true);
     const [compressionEnabled, setCompressionEnabled] = useState(true);
     const [downsampleFactor, setDownsampleFactor] = useState(1);
     

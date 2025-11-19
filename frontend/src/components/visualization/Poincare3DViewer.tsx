@@ -1,7 +1,7 @@
 // frontend/src/components/Poincare3DViewer.tsx
 import { useRef, useEffect, useState } from 'react';
 import { Paper, Stack, Text, Group, Tooltip, ActionIcon, Slider, Button, Badge, Box } from '@mantine/core';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { IconCube, IconHelpCircle, IconPlayerPlay, IconPlayerPause } from '@tabler/icons-react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';

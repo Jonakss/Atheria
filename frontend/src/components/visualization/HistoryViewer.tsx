@@ -5,7 +5,7 @@ import {
     Table, ScrollArea, Tooltip, ActionIcon, Divider,
     Card, Alert, Select, Box, Slider, Title, Center
 } from '@mantine/core';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { 
     IconDownload, IconTrash, IconInfoCircle, IconFile,
     IconClock, IconPlayerPlay, IconPlayerPause, IconRefresh,

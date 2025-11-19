@@ -7,7 +7,7 @@ import {
     Tabs, Progress, Center, Menu
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { 
     IconDownload, IconTrash, IconInfoCircle, IconFile,
     IconClock, IconX, IconEdit, IconBook,

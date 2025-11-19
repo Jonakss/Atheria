@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Box, Paper, Text, Button, NumberInput, Group, Stack, Badge, Tooltip } from '@mantine/core';
 import { IconChartScatter, IconTrash, IconSettings, IconX } from '@tabler/icons-react';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
 
 interface UniverseAtlasData {
     coords: number[][];

@@ -1,7 +1,7 @@
 // frontend/src/components/PhaseAttractorViewer.tsx
 import { useRef, useEffect, useState } from 'react';
 import { Paper, Stack, Text, Group, Badge, Tooltip, ActionIcon } from '@mantine/core';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { IconChartLine, IconHelpCircle } from '@tabler/icons-react';
 
 interface PhasePoint {

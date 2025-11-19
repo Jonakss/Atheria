@@ -5,7 +5,7 @@ import {
     Select, NumberInput, TextInput, Alert, Divider, Table,
     Paper, Tooltip, ActionIcon
 } from '@mantine/core';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import {
     IconCheck, IconX, IconInfoCircle, IconArrowRight,
     IconTransfer, IconSettings, IconFile, IconStar

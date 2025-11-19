@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Box, Paper, Text, Button, NumberInput, Group, Stack, Badge } from '@mantine/core';
 import { IconAtom, IconRefresh, IconX } from '@tabler/icons-react';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
 
 interface CellChemistryData {
     coords: number[][];

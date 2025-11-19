@@ -6,7 +6,7 @@ import {
     Card, Timeline, Alert, Select, Box
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { 
     IconInfoCircle, IconTransfer, IconTrash, IconDownload,
     IconChartLine, IconDatabase, IconX, IconCheck, IconClock

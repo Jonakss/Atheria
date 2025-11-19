@@ -70,6 +70,8 @@ interface WebSocketContextType {
     serverConfig: ServerConfig; // Configuración del servidor
     updateServerConfig: (config: Partial<ServerConfig>) => void; // Actualizar configuración
     compileStatus: CompileStatus | null; // Estado de compilación/motor
+    liveFeedEnabled: boolean; // Estado del live feed (sincronizado con backend)
+    setLiveFeedEnabled: (enabled: boolean) => void; // Función para cambiar live feed
 }
 
 export const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
@@ -78,6 +80,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'server_unavailable'>('disconnected');
     const ws = useRef<WebSocket | null>(null);
     const effectRan = useRef(false);
+    const [liveFeedEnabled, setLiveFeedEnabledState] = useState<boolean>(true); // Por defecto habilitado
     const reconnectAttempts = useRef(0);
     const lastErrorLog = useRef(0);
     const isManualClose = useRef(false); // Flag para indicar si el cierre fue manual
@@ -289,11 +292,22 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                                     return prev;
                                 }
                                 
+                                // Sincronizar estado del live feed desde simulation_info
+                                const newLiveFeedEnabled = payload.simulation_info?.live_feed_enabled !== undefined 
+                                    ? payload.simulation_info.live_feed_enabled 
+                                    : (prev?.simulation_info?.live_feed_enabled ?? true);
+                                if (newLiveFeedEnabled !== (prev?.simulation_info?.live_feed_enabled ?? true)) {
+                                    setLiveFeedEnabledState(newLiveFeedEnabled);
+                                }
+                                
                                 return {
                                     ...prev,
                                     step: newStep,
                                     timestamp: newTimestamp,
-                                    simulation_info: payload.simulation_info ?? prev?.simulation_info
+                                    simulation_info: {
+                                        ...(payload.simulation_info ?? prev?.simulation_info ?? {}),
+                                        live_feed_enabled: newLiveFeedEnabled
+                                    }
                                     // No actualizar map_data, hist_data, etc. - estos solo vienen con simulation_frame
                                 };
                             });
@@ -407,6 +421,12 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
             }
         }
     }, [connectionStatus]);
+    
+    // Función para cambiar el estado del live feed
+    const setLiveFeedEnabled = useCallback((enabled: boolean) => {
+        setLiveFeedEnabledState(enabled);
+        sendCommand('simulation', 'set_live_feed', { enabled });
+    }, [sendCommand]);
 
     const value = {
         sendCommand,
@@ -431,6 +451,8 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         serverConfig,
         updateServerConfig,
         compileStatus, // Estado de compilación/motor (indica si es nativo)
+        liveFeedEnabled, // Estado del live feed (sincronizado con backend)
+        setLiveFeedEnabled, // Función para cambiar live feed
     };
 
     return (

@@ -5,7 +5,7 @@ import {
     Card, Progress, RingProgress, Center, Table, ScrollArea 
 } from '@mantine/core';
 import { LineChart, AreaChart, BarChart } from '@mantine/charts';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { 
     IconTrendingUp, IconTrendingDown, IconActivity, 
     IconChartLine, IconDatabase, IconInfoCircle 
