@@ -1,9 +1,11 @@
 # src/engines/sparse_engine_cpp.py
 """
-Motor de simulación disperso usando el núcleo C++ atheria_core.
+Motor de simulación disperso usando el núcleo C++ atheria_core con tensores nativos.
 
-Esta es una versión mejorada del SparseQuantumEngine que usa SparseMap de C++
-en lugar de diccionarios Python para mayor rendimiento.
+Esta versión usa SparseMap de C++ con almacenamiento directo de torch::Tensor,
+eliminando completamente la necesidad de diccionarios auxiliares en Python.
+
+VERSIÓN ACTUAL: Usa tensores nativos de LibTorch almacenados directamente en C++.
 """
 import torch
 import numpy as np
@@ -12,8 +14,10 @@ import math
 try:
     import atheria_core
     CPP_AVAILABLE = True
+    TORCH_SUPPORT = atheria_core.has_torch_support()
 except ImportError:
     CPP_AVAILABLE = False
+    TORCH_SUPPORT = False
     import warnings
     warnings.warn("atheria_core no está disponible. Usando implementación Python pura.")
 
@@ -47,11 +51,19 @@ class QuantumVacuum:
 
 class SparseQuantumEngineCpp:
     """
-    Motor de simulación para un universo potencialmente infinito usando C++.
-    Maneja la dualidad Materia (almacenada) vs Vacío (generado).
+    Motor de simulación para un universo potencialmente infinito usando C++ con tensores nativos.
     
-    Esta versión usa atheria_core.SparseMap para almacenar materia, lo que proporciona
-    mejor rendimiento que diccionarios Python puros.
+    Esta versión usa atheria_core.SparseMap con almacenamiento directo de torch::Tensor
+    en C++, eliminando completamente los diccionarios auxiliares de Python.
+    
+    VENTAJAS:
+    - Almacenamiento nativo de tensores en C++ (torch::Tensor)
+    - Sin diccionarios espejo en Python
+    - Mejor gestión de memoria para grandes cantidades de datos
+    - Preparado para operaciones vectorizadas futuras en C++
+    
+    NOTA: Para operaciones pequeñas puede ser más lento que Python dict debido a
+    overhead de bindings, pero tiene mejor arquitectura para optimizaciones futuras.
     """
     def __init__(self, model, d_state, device='cpu', vacuum_mode='active'):
         self.model = model
@@ -59,15 +71,23 @@ class SparseQuantumEngineCpp:
         self.device = device
         self.vacuum = QuantumVacuum(d_state, device)
         
-        # El Universo: SparseMap C++ {(x, y, z) -> estado}
-        # Usamos un hash de coordenadas como clave
-        if CPP_AVAILABLE:
+        # El Universo: SparseMap C++ con tensores nativos
+        if CPP_AVAILABLE and TORCH_SUPPORT:
             self.matter_map = atheria_core.SparseMap()
-            self._use_cpp = True
+            self._use_cpp_native = True
+        elif CPP_AVAILABLE:
+            # Fallback a SparseMap sin tensores (usar dict auxiliar)
+            self.matter_map = atheria_core.SparseMap()
+            self._state_tensors = {}  # Diccionario auxiliar
+            self._use_cpp_native = False
+            import warnings
+            warnings.warn("LibTorch no disponible. Usando SparseMap con diccionario auxiliar.")
         else:
-            # Fallback a Python si C++ no está disponible
+            # Fallback completo a Python
             self.matter = {}
-            self._use_cpp = False
+            self._use_cpp_native = False
+            import warnings
+            warnings.warn("atheria_core no disponible. Usando implementación Python pura.")
         
         # Conjunto de celdas que necesitan actualización en el siguiente paso
         # (Incluye materia y su vecindario inmediato)
@@ -76,50 +96,32 @@ class SparseQuantumEngineCpp:
         self.step_count = 0
     
     def _coord_to_key(self, coords):
-        """Convierte coordenadas (x, y, z) a una clave numérica para SparseMap"""
+        """Convierte coordenadas (x, y, z) a Coord3D"""
         x, y = coords[0], coords[1]
         z = coords[2] if len(coords) > 2 else 0
-        # Codificar coordenadas en una clave única
-        # Usamos 20 bits para x, 20 bits para y, 24 bits para z
-        return (x << 44) | (y << 24) | z
-    
-    def _key_to_coord(self, key):
-        """Convierte una clave numérica de SparseMap a coordenadas (x, y, z)"""
-        z = key & 0xFFFFFF  # Últimos 24 bits
-        y = (key >> 24) & 0xFFFFF  # Siguientes 20 bits
-        x = (key >> 44) & 0xFFFFF  # Primeros 20 bits
-        return (x, y, z)
-    
-    def _store_state(self, coords, state_vector):
-        """Almacena un estado en el mapa (compatible con C++ y Python)"""
-        if self._use_cpp:
-            key = self._coord_to_key(coords)
-            # Para almacenar tensores complejos, necesitamos serializar
-            # Por ahora, almacenamos solo la magnitud como placeholder
-            # TODO: Implementar serialización completa de tensores
+        return atheria_core.Coord3D(x, y, z)
+
+    def add_particle(self, coords, state_vector):
+        """Inyecta una excitación (partícula) en el campo."""
+        if self._use_cpp_native:
+            # Almacenamiento nativo en C++ (versión optimizada)
+            coord = self._coord_to_key(coords)
+            self.matter_map.insert_tensor(coord, state_vector)
+        elif hasattr(self, 'matter_map'):
+            # Fallback: SparseMap sin soporte de tensores
+            coord = self._coord_to_key(coords)
+            # Almacenar magnitud en SparseMap y tensor en dict auxiliar
             magnitude = torch.sum(state_vector.abs().pow(2)).item()
-            self.matter_map[key] = magnitude
-            # Almacenar referencia al tensor en un diccionario auxiliar
+            # Usar hash de coordenadas como clave numérica
+            key = (coord.x << 44) | (coord.y << 24) | coord.z
+            self.matter_map.insert(key, magnitude)
             if not hasattr(self, '_state_tensors'):
                 self._state_tensors = {}
             self._state_tensors[key] = state_vector.to(self.device)
         else:
+            # Fallback completo a Python
             self.matter[coords] = state_vector.to(self.device)
-    
-    def _get_state(self, coords):
-        """Obtiene un estado del mapa (compatible con C++ y Python)"""
-        if self._use_cpp:
-            key = self._coord_to_key(coords)
-            if key in self.matter_map:
-                # Recuperar tensor del diccionario auxiliar
-                return self._state_tensors.get(key, None)
-            return None
-        else:
-            return self.matter.get(coords, None)
-
-    def add_particle(self, coords, state_vector):
-        """Inyecta una excitación (partícula) en el campo."""
-        self._store_state(coords, state_vector)
+        
         self.activate_neighborhood(coords)
 
     def get_state_at(self, coords):
@@ -127,12 +129,26 @@ class SparseQuantumEngineCpp:
         Obtiene el estado cuántico en una coordenada.
         Si no hay materia, devuelve el Estado de Vacío (QED).
         """
-        state = self._get_state(coords)
-        if state is not None:
-            return state
+        if self._use_cpp_native:
+            # Recuperar tensor directamente de C++
+            coord = self._coord_to_key(coords)
+            if self.matter_map.contains_coord(coord):
+                tensor = self.matter_map.get_tensor(coord)
+                if tensor.numel() > 0:
+                    return tensor
+        elif hasattr(self, 'matter_map'):
+            # Fallback: Recuperar de dict auxiliar
+            coord = self._coord_to_key(coords)
+            key = (coord.x << 44) | (coord.y << 24) | coord.z
+            if key in self._state_tensors:
+                return self._state_tensors[key]
         else:
-            # Aquí está la magia: El vacío devuelve energía, no ceros.
-            return self.vacuum.get_fluctuation(coords, self.step_count)
+            # Fallback completo a Python
+            if coords in self.matter:
+                return self.matter[coords]
+        
+        # Si no hay materia, devolver el estado del vacío
+        return self.vacuum.get_fluctuation(coords, self.step_count)
 
     def activate_neighborhood(self, coords, radius=1):
         """Marca el vecindario espacial para ser procesado."""
@@ -153,8 +169,11 @@ class SparseQuantumEngineCpp:
         Avanza la simulación. 
         Solo procesa la 'Región Activa', pero teniendo en cuenta el vacío circundante.
         """
-        if self._use_cpp:
-            # Limpiar diccionario auxiliar al inicio del step
+        if self._use_cpp_native:
+            # Versión optimizada con tensores nativos
+            # Usar una nueva instancia de SparseMap para el siguiente estado
+            next_matter_map = atheria_core.SparseMap()
+        elif hasattr(self, 'matter_map'):
             next_state_tensors = {}
         else:
             next_matter = {}
@@ -176,12 +195,15 @@ class SparseQuantumEngineCpp:
             # Si la energía es alta, la conservamos
             energy = torch.sum(current_state.abs().pow(2))
             if energy > 0.01: # Umbral de existencia
-                if self._use_cpp:
-                    key = self._coord_to_key(coord)
-                    # Almacenar en el siguiente estado
-                    magnitude = torch.sum(current_state.abs().pow(2)).item()
+                if self._use_cpp_native:
+                    # Almacenar directamente en C++ (tensor nativo)
+                    coord_key = self._coord_to_key(coord)
                     # Aquí usaríamos el modelo para obtener el nuevo estado
                     # Por ahora, conservamos el estado actual
+                    next_matter_map.insert_tensor(coord_key, current_state)
+                elif hasattr(self, 'matter_map'):
+                    coord_key = self._coord_to_key(coord)
+                    key = (coord_key.x << 44) | (coord_key.y << 24) | coord_key.z
                     next_state_tensors[key] = current_state
                 else:
                     next_matter[coord] = current_state
@@ -190,19 +212,32 @@ class SparseQuantumEngineCpp:
                 self._activate_neighborhood_for_next(coord, next_active_region)
         
         # Actualizar estado
-        if self._use_cpp:
-            # Limpiar mapa y reconstruir
+        if self._use_cpp_native:
+            self.matter_map = next_matter_map
+            return self.matter_map.size()
+        elif hasattr(self, 'matter_map'):
+            # Reconstruir SparseMap y diccionario auxiliar
             self.matter_map.clear()
+            if hasattr(self, '_state_tensors'):
+                self._state_tensors.clear()
             self._state_tensors = {}
             for key, tensor in next_state_tensors.items():
+                coord = self._coord_to_key_from_key(key)
                 magnitude = torch.sum(tensor.abs().pow(2)).item()
-                self.matter_map[key] = magnitude
+                self.matter_map.insert(key, magnitude)
                 self._state_tensors[key] = tensor
             return len(self._state_tensors)
         else:
             self.matter = next_matter
             self.active_region = next_active_region
             return len(self.matter)
+    
+    def _coord_to_key_from_key(self, key):
+        """Helper: convierte clave numérica a Coord3D"""
+        z = key & 0xFFFFFF
+        y = (key >> 24) & 0xFFFFF
+        x = (key >> 44) & 0xFFFFF
+        return atheria_core.Coord3D(x, y, z)
     
     def _activate_neighborhood_for_next(self, coords, next_active_region, radius=1):
         """Helper para activar vecindario en el siguiente frame"""
@@ -219,18 +254,45 @@ class SparseQuantumEngineCpp:
     
     def get_matter_count(self):
         """Retorna el número de partículas de materia almacenadas"""
-        if self._use_cpp:
-            return len(self.matter_map)
+        if self._use_cpp_native:
+            return self.matter_map.size()
+        elif hasattr(self, 'matter_map'):
+            return len(self._state_tensors) if hasattr(self, '_state_tensors') else 0
         else:
             return len(self.matter)
     
     def clear(self):
         """Limpia toda la materia del universo"""
-        if self._use_cpp:
+        if self._use_cpp_native:
+            self.matter_map.clear()
+        elif hasattr(self, 'matter_map'):
             self.matter_map.clear()
             if hasattr(self, '_state_tensors'):
                 self._state_tensors.clear()
         else:
             self.matter.clear()
         self.active_region.clear()
-
+    
+    def get_storage_info(self):
+        """Retorna información sobre el método de almacenamiento"""
+        if self._use_cpp_native:
+            return {
+                'method': 'C++ Native Tensors',
+                'cpp_available': True,
+                'torch_support': True,
+                'auxiliary_dict': False
+            }
+        elif hasattr(self, 'matter_map'):
+            return {
+                'method': 'C++ SparseMap (auxiliary dict)',
+                'cpp_available': True,
+                'torch_support': False,
+                'auxiliary_dict': True
+            }
+        else:
+            return {
+                'method': 'Python Dict',
+                'cpp_available': False,
+                'torch_support': False,
+                'auxiliary_dict': False
+            }
