@@ -64,10 +64,9 @@ torch::Tensor Engine::get_state_at(const Coord3D& coord) {
 int64_t Engine::step_native() {
     if (!model_loaded_) {
         // Sin modelo, solo conservar las partículas existentes
-        std::vector<Coord3D> coords_to_process(matter_map_.coord_keys().begin(), 
-                                               matter_map_.coord_keys().end());
+        auto coord_keys = matter_map_.coord_keys();
         active_region_.clear();
-        for (const auto& coord : coords_to_process) {
+        for (const auto& coord : coord_keys) {
             activate_neighborhood(coord);
         }
         step_count_++;
