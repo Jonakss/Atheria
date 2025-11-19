@@ -394,7 +394,12 @@ class Aetheria_Motor:
             if not self.is_compiled:
                 try:
                     logging.info("Aplicando torch.compile() al modelo...")
-                    self.operator = torch.compile(self.operator, mode="reduce-overhead")
+                    # Silenciar temporalmente los mensajes de CUDA graph durante la compilación
+                    import warnings
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings('ignore', message='.*cudagraph.*')
+                        warnings.filterwarnings('ignore', message='.*CUDA graph.*')
+                        self.operator = torch.compile(self.operator, mode="reduce-overhead")
                     self.is_compiled = True
                     logging.info("¡torch.compile() aplicado exitosamente!")
                 except Exception as e:

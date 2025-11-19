@@ -10,17 +10,24 @@ FRONTEND_DIST_PATH = os.path.join(PROJECT_ROOT, "frontend", "dist")
 # --- Silenciar warnings de CUDA graph de PyTorch ---
 # Estos warnings son informativos y no afectan la funcionalidad
 # PyTorch intenta optimizar con CUDA graphs pero algunas operaciones no son capturables
+import torch
+
+# Configurar logging de PyTorch para reducir mensajes de CUDA graph
+# Los mensajes de "cudagraph partition" son informativos y esperados cuando
+# torch.compile encuentra operaciones no capturables (como torch.cat dinámico)
+try:
+    # Silenciar mensajes de partición de CUDA graph vía variables de entorno
+    import os
+    # PYTORCH_CUDA_ALLOC_CONF no silencia estos mensajes, pero podemos usar logging
+    # Los mensajes vienen directamente del backend de C++ y no se pueden silenciar fácilmente
+    # Sin embargo, son informativos y no afectan el rendimiento o funcionalidad
+    pass
+except Exception:
+    pass
+
+# Configurar filtros de warnings para Python warnings relacionados
 warnings.filterwarnings('ignore', message='.*cudagraph.*', category=UserWarning)
 warnings.filterwarnings('ignore', message='.*CUDA graph.*', category=UserWarning)
-
-# También configurar el nivel de logging de PyTorch para CUDA graphs
-import torch
-if hasattr(torch, '_C') and hasattr(torch._C, '_set_print_stack_traces'):
-    # Silenciar mensajes de CUDA graph en stdout/stderr
-    import sys
-    import io
-    # Esto reduce el ruido de los mensajes de partición de CUDA graph
-    torch._C._set_print_stack_traces(False)
 
 # --- Setup y Constantes de Control ---
 _DEVICE = None
