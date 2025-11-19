@@ -24,7 +24,10 @@ class CMakeBuildExt(build_ext):
         build_temp = Path(self.build_temp).resolve()
         build_temp.mkdir(parents=True, exist_ok=True)
         
-        ext_dir = Path(self.get_ext_fullpath("atheria_core")).resolve().parent
+        # Obtener el directorio donde debe estar el módulo compilado
+        # ext_dir será donde setuptools espera encontrar el módulo
+        ext_fullpath = Path(self.get_ext_fullpath("atheria_core")).resolve()
+        ext_dir = ext_fullpath.parent
         ext_dir.mkdir(parents=True, exist_ok=True)
         
         # Configuración de CMake
@@ -85,46 +88,64 @@ class CMakeBuildExt(build_ext):
         )
     
     def _move_built_module(self, build_temp, ext_dir):
-        """Mueve el módulo compilado a la ubicación correcta."""
+        """Verifica que el módulo compilado esté en la ubicación correcta."""
         import shutil
         
-        # Buscar el módulo compilado en build_temp
+        # El módulo ya debería estar en ext_dir porque CMake lo configuramos así
+        # Buscar el módulo compilado en ext_dir (donde CMake lo colocó)
         module_exts = [".so", ".pyd", ".dylib"]
         module_name = None
         src = None
         
+        # Buscar en ext_dir (donde CMake debería haberlo colocado)
         for ext in module_exts:
-            for file in build_temp.glob(f"*atheria_core*{ext}"):
+            for file in ext_dir.glob(f"*atheria_core*{ext}"):
                 module_name = file.name
                 src = file
                 break
             if module_name:
                 break
         
+        # Si no se encuentra en ext_dir, buscar en build_temp
+        if not src or not src.exists():
+            for ext in module_exts:
+                for file in build_temp.glob(f"*atheria_core*{ext}"):
+                    module_name = file.name
+                    src = file
+                    break
+                if module_name:
+                    break
+        
+        # Si se encuentra, crear symlink con nombre que setuptools espera (si es necesario)
         if module_name and src and src.exists():
-            # ext_dir es donde setuptools espera encontrar el módulo
-            # El módulo debe estar directamente en ext_dir con su nombre completo
-            dst = ext_dir / module_name
+            # PyBind11 genera el nombre como: atheria_corecpython-...
+            # Pero setuptools espera: atheria_core.cpython-...
+            # Crear un symlink o copia con el nombre correcto si es necesario
+            expected_name = module_name.replace("atheria_corec", "atheria_core.c", 1) if "atheria_corec" in module_name else module_name
             
-            # Crear directorio de destino si no existe
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            
-            # Copiar el módulo
-            shutil.copy2(str(src), str(dst))
-            print(f"✅ Module installed to {dst}")
-            
-            # También crear un symlink con nombre simple si es posible (opcional)
-            if not platform.system() == "Windows":
-                simple_name = f"atheria_core{module_exts[0]}"
-                simple_dst = ext_dir / simple_name
-                if not simple_dst.exists():
+            # Si el nombre es diferente, crear un symlink o copia
+            if expected_name != module_name:
+                expected_path = ext_dir / expected_name
+                if not expected_path.exists():
                     try:
-                        os.symlink(module_name, str(simple_dst))
-                    except:
-                        pass  # Ignorar si no se puede crear symlink
+                        # Intentar crear symlink primero (más eficiente)
+                        if not platform.system() == "Windows":
+                            os.symlink(src.name, str(expected_path))
+                            print(f"✅ Created symlink: {expected_path} -> {src.name}")
+                        else:
+                            # En Windows, copiar el archivo
+                            shutil.copy2(str(src), str(expected_path))
+                            print(f"✅ Copied module with correct name: {expected_path}")
+                    except Exception as e:
+                        print(f"⚠️  Warning: Could not create symlink/copy: {e}")
+                        print(f"   Source: {src}")
+                        print(f"   Expected: {expected_path}")
+            
+            print(f"✅ Module found: {src}")
         else:
             print("⚠️  Warning: Could not find compiled module")
             print(f"   Searched in: {build_temp}")
+            print(f"   Also searched in: {ext_dir}")
             print(f"   Pattern: *atheria_core*")
 
 

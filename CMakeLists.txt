@@ -79,11 +79,13 @@ pybind11_add_module(
 target_link_libraries(atheria_core PRIVATE pybind11::module)
 
 # Configuración de instalación
+# PyBind11 maneja el nombre del módulo, pero necesitamos asegurarnos de que tenga el formato correcto
 set_target_properties(atheria_core PROPERTIES
     CXX_VISIBILITY_PRESET "hidden"
     VISIBILITY_INLINES_HIDDEN ON
     PREFIX ""
-    SUFFIX "${Python3_SOABI}${CMAKE_SHARED_MODULE_SUFFIX}"
+    # PyBind11 añadirá automáticamente el sufijo correcto, pero podemos especificarlo explícitamente
+    OUTPUT_NAME "atheria_core"
 )
 
 # Instalación del módulo (será manejado por setup.py)
