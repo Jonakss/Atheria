@@ -114,3 +114,12 @@ class SparseQuantumEngine:
         self.active_region = next_active_region # Actualizar regiones activas
         
         return len(self.matter)
+    
+    def get_matter_count(self):
+        """Retorna el número de partículas de materia almacenadas"""
+        return len(self.matter)
+    
+    def clear(self):
+        """Limpia toda la materia del universo"""
+        self.matter.clear()
+        self.active_region.clear()
