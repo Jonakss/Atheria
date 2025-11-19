@@ -78,14 +78,13 @@ def test_native_engine():
             # Buscar en directorios comunes
             checkpoint_dir = getattr(global_cfg, 'TRAINING_CHECKPOINTS_DIR', None)
             if checkpoint_dir and experiment_name:
-                import os
                 possible_paths = [
-                    os.path.join(checkpoint_dir, experiment_name, "model_jit.pt"),
-                    os.path.join(checkpoint_dir, experiment_name, "model.pt"),
+                    Path(checkpoint_dir) / experiment_name / "model_jit.pt",
+                    Path(checkpoint_dir) / experiment_name / "model.pt",
                 ]
                 for path in possible_paths:
-                    if os.path.exists(path):
-                        model_path = path
+                    if path.exists():
+                        model_path = str(path)
                         break
         
         model_loaded = False
