@@ -4,11 +4,18 @@ import torch.optim as optim
 import numpy as np
 import os
 import logging
-from torch.utils.tensorboard import SummaryWriter
+
+# Tensorboard es opcional
+try:
+    from torch.utils.tensorboard import SummaryWriter
+    TENSORBOARD_AVAILABLE = True
+except ImportError:
+    TENSORBOARD_AVAILABLE = False
+    logging.warning("Tensorboard no está disponible. El logging de métricas se deshabilitará.")
 
 # Importamos componentes del sistema
 from ..qca_engine import Aetheria_Motor
-from ..physics.noise import QuantumNoiseInjector
+from ..physics.analysis.noise import QuantumNoiseInjector
 from .. import config as global_cfg
 
 # Configurar logging
@@ -72,8 +79,13 @@ class QC_Trainer_v4:
         self.checkpoint_dir = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, experiment_name)
         os.makedirs(self.checkpoint_dir, exist_ok=True)
         
-        # Tensorboard
-        self.writer = SummaryWriter(log_dir=os.path.join(global_cfg.LOGS_DIR, experiment_name))
+        # Tensorboard (opcional)
+        self.writer = None
+        if TENSORBOARD_AVAILABLE:
+            try:
+                self.writer = SummaryWriter(log_dir=os.path.join(global_cfg.LOGS_DIR, experiment_name))
+            except Exception as e:
+                logging.warning(f"No se pudo inicializar Tensorboard: {e}")
 
     def loss_function_evolutionary(self, psi_history, psi_initial):
         """
@@ -159,10 +171,11 @@ class QC_Trainer_v4:
         
         # Logging
         if episode_num % 10 == 0:
-            self.writer.add_scalar('Loss/Total', loss.item(), episode_num)
-            self.writer.add_scalar('Metrics/Symmetry', metrics['symmetry'], episode_num)
-            self.writer.add_scalar('Metrics/Survival', metrics['survival'], episode_num)
-            self.writer.add_scalar('Environment/NoiseLevel', current_noise, episode_num)
+            if self.writer is not None:
+                self.writer.add_scalar('Loss/Total', loss.item(), episode_num)
+                self.writer.add_scalar('Metrics/Symmetry', metrics['symmetry'], episode_num)
+                self.writer.add_scalar('Metrics/Survival', metrics['survival'], episode_num)
+                self.writer.add_scalar('Environment/NoiseLevel', current_noise, episode_num)
             
         return loss.item(), metrics
 
