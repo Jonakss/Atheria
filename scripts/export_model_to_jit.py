@@ -15,20 +15,34 @@ import argparse
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-def export_model_to_jit(model_path, output_path, d_state=4, hidden_channels=64, 
-                        model_type='UNet', input_shape=(3, 3), device='cpu'):
+def export_model_to_jit(model_path, output_path=None, experiment_name=None, 
+                        d_state=4, hidden_channels=64, model_type='UNet', 
+                        input_shape=(3, 3), device='cpu'):
     """
     Exporta un modelo a formato TorchScript.
     
     Args:
         model_path: Ruta al modelo entrenado (.pth)
-        output_path: Ruta de salida para el modelo JIT (.pt)
+        output_path: Ruta de salida para el modelo JIT (.pt). Si None, se usa experiment_name
+        experiment_name: Nombre del experimento (para determinar ruta de salida)
         d_state: Dimensión del estado cuántico
         hidden_channels: Canales ocultos del modelo
         model_type: Tipo de modelo ('UNet', 'UNetUnitary', 'DeepQCA', etc.)
         input_shape: Forma de entrada (H, W) - por defecto 3x3 para patches
         device: Dispositivo ('cpu' o 'cuda')
     """
+    # Determinar ruta de salida si no se proporciona
+    if output_path is None:
+        if experiment_name:
+            from src import config as global_cfg
+            import os
+            # Guardar en directorio de checkpoints del experimento
+            output_dir = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, experiment_name)
+            os.makedirs(output_dir, exist_ok=True)
+            output_path = os.path.join(output_dir, "model_jit.pt")
+        else:
+            raise ValueError("Debe proporcionar output_path o experiment_name")
+    
     print(f"📦 Exportando modelo a TorchScript...")
     print(f"   Modelo: {model_path}")
     print(f"   Salida: {output_path}")
@@ -99,7 +113,10 @@ def export_model_to_jit(model_path, output_path, d_state=4, hidden_channels=64,
 def main():
     parser = argparse.ArgumentParser(description='Exporta modelos entrenados a TorchScript')
     parser.add_argument('model_path', type=str, help='Ruta al modelo entrenado (.pth)')
-    parser.add_argument('output_path', type=str, help='Ruta de salida (.pt)')
+    parser.add_argument('--output_path', type=str, default=None, 
+                       help='Ruta de salida (.pt). Si no se proporciona, usa --experiment_name')
+    parser.add_argument('--experiment_name', type=str, default=None,
+                       help='Nombre del experimento (para determinar ruta automática)')
     parser.add_argument('--d_state', type=int, default=4, help='Dimensión del estado (default: 4)')
     parser.add_argument('--hidden_channels', type=int, default=64, 
                        help='Canales ocultos (default: 64)')
@@ -129,6 +146,7 @@ def main():
     success = export_model_to_jit(
         model_path=args.model_path,
         output_path=args.output_path,
+        experiment_name=args.experiment_name,
         d_state=args.d_state,
         hidden_channels=args.hidden_channels,
         model_type=args.model_type,

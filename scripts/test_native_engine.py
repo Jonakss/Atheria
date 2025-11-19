@@ -62,25 +62,46 @@ def test_native_engine():
     
     # Test con modelo (si existe)
     print("\n🤖 Test con modelo TorchScript...")
-    # Buscar modelo en modelos comunes
-    model_paths = [
-        "models/test_model.pt",
-        "checkpoints/latest/model.pt",
-    ]
     
-    model_loaded = False
-    for model_path in model_paths:
-        if Path(model_path).exists():
+    # Buscar modelo usando utils (consistente con el resto del proyecto)
+    try:
+        from src.utils import get_latest_jit_model
+        # Intentar buscar modelo del experimento por defecto
+        from src import config as global_cfg
+        experiment_name = getattr(global_cfg, 'EXPERIMENT_NAME', None)
+        
+        model_path = None
+        if experiment_name:
+            model_path = get_latest_jit_model(experiment_name, silent=True)
+        
+        if not model_path:
+            # Buscar en directorios comunes
+            checkpoint_dir = getattr(global_cfg, 'TRAINING_CHECKPOINTS_DIR', None)
+            if checkpoint_dir and experiment_name:
+                import os
+                possible_paths = [
+                    os.path.join(checkpoint_dir, experiment_name, "model_jit.pt"),
+                    os.path.join(checkpoint_dir, experiment_name, "model.pt"),
+                ]
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        model_path = path
+                        break
+        
+        model_loaded = False
+        if model_path and Path(model_path).exists():
             print(f"   Intentando cargar: {model_path}")
-            if engine.load_model(model_path):
+            if engine.load_model(str(model_path)):
                 print(f"✅ Modelo cargado: {model_path}")
                 model_loaded = True
-                break
-    
-    if not model_loaded:
-        print("⚠️  No se encontró modelo para probar")
-        print("   Para probar con modelo, exporta uno usando:")
-        print("   python scripts/export_model_to_jit.py <modelo.pth> <salida.pt>")
+        
+        if not model_loaded:
+            print("⚠️  No se encontró modelo JIT para probar")
+            print("   Para probar con modelo, exporta uno usando:")
+            print("   python scripts/export_model_to_jit.py <checkpoint.pth> --experiment_name <nombre>")
+            print(f"   O: python scripts/export_model_to_jit.py <checkpoint.pth> --output_path <salida.pt>")
+    except Exception as e:
+        print(f"⚠️  Error al buscar modelo: {e}")
     else:
         # Ejecutar step con modelo
         print("\n⚡ Ejecutando step_native() con modelo...")
