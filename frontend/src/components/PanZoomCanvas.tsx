@@ -325,11 +325,18 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
             const gridWidth = mapData[0].length;
 
             if (canvas.width !== gridWidth || canvas.height !== gridHeight) {
-                canvas.width = gridWidth;
-                canvas.height = gridHeight;
+                if (gridWidth > 0 && gridHeight > 0) {
+                    canvas.width = gridWidth;
+                    canvas.height = gridHeight;
+                }
             }
 
-            ctx.clearRect(0, 0, gridWidth, gridHeight);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Si no hay datos de mapa (por ejemplo, live feed desactivado), terminar aquí
+            if (!mapData || mapData.length === 0) {
+                return;
+            }
             
             // Verificar si es visualización HSV (solo funciona con datos en tiempo real)
             if (selectedViz === 'phase_hsv' && simData?.phase_hsv_data) {
@@ -440,6 +447,27 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                         {inferenceStatus === 'running' 
                             ? 'Carga un modelo desde el panel lateral para ver la simulación'
                             : 'Inicia la simulación o carga un modelo para ver datos'}
+                    </p>
+                </div>
+            )}
+
+            {simData && simData.simulation_info?.live_feed_enabled === false && (
+                <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    textAlign: 'center',
+                    color: '#999',
+                    zIndex: 1,
+                    pointerEvents: 'none', // Permitir interacción con el canvas
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                    padding: '1rem',
+                    borderRadius: '8px'
+                }}>
+                    <p style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold', color: '#fff' }}>Live Feed Pausado</p>
+                    <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem', color: '#ccc' }}>
+                        Simulación en ejecución (Paso: {simData.step || simData.simulation_info?.step || '...'})
                     </p>
                 </div>
             )}

@@ -2108,4 +2108,4 @@ async def main(shutdown_event=None):
                 logging.warning(f"Error al limpiar el runner: {e}")
     else:
         # Fallback: mantener el servidor corriendo indefinidamente
-    await asyncio.Event().wait()
+        await asyncio.Event().wait()
