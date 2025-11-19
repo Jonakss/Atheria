@@ -547,12 +547,9 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
                 style={{ 
-                    transform: `translate(calc(50% + ${pan.x}px), calc(50% + ${pan.y}px)) scale(${zoom})`,
-                    transformOrigin: 'center center',
-                    visibility: (dataToRender?.map_data || simData?.map_data) ? 'visible' : 'hidden',
-                    position: 'absolute',
-                    left: gridWidth > 0 ? `calc(50% - ${gridWidth / 2}px)` : '50%',
-                    top: gridHeight > 0 ? `calc(50% - ${gridHeight / 2}px)` : '50%'
+                    transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
+                    transformOrigin: '0 0',
+                    visibility: (dataToRender?.map_data || simData?.map_data) ? 'visible' : 'hidden'
                 }}
             />
             
