@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "f4e621f0c37fcfe1",
+        "id": "4dbb507c953116ed",
         "type": "tabs",
         "children": [
           {
-            "id": "f5faded8563f6b03",
+            "id": "7c2795290879b977",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -162,8 +162,10 @@
       "bases:Create new base": false
     }
   },
-  "active": "f5faded8563f6b03",
+  "active": "7c2795290879b977",
   "lastOpenFiles": [
+    "Atheria 4.md",
+    "Ley M.md",
     "30_Components/ARCHITECTURE_V3.md",
     "README.md",
     "30_Components/Models.md",

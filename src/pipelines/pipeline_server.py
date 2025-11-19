@@ -36,12 +36,14 @@ async def websocket_handler(request):
         # El cliente se desconectó antes de establecer la conexión - esto es normal
         # No loguear como error, solo como debug
         logging.debug(f"Conexión WebSocket cancelada durante preparación: {type(e).__name__}")
-        return ws
+        # Retornar respuesta HTTP normal en lugar de WebSocket no preparado
+        return web.Response(status=101, text="WebSocket connection cancelled")
     except Exception as e:
         # Otros errores inesperados
         logging.error(f"Error preparando conexión WebSocket: {e}", exc_info=True)
         logging.error(f"Headers de la solicitud: {dict(request.headers)}")
-        return ws
+        # Retornar respuesta HTTP de error en lugar de WebSocket no preparado
+        return web.Response(status=500, text=f"WebSocket connection failed: {str(e)}")
     
     ws_id = str(uuid.uuid4())
     g_state['websockets'][ws_id] = ws
@@ -116,9 +118,16 @@ async def websocket_handler(request):
     except Exception as e:
         logging.error(f"Error inesperado en WebSocket {ws_id}: {e}", exc_info=True)
     finally:
-        # Limpiar la conexión
+        # Limpiar la conexión - solo si el WebSocket fue preparado correctamente
         if ws_id in g_state['websockets']:
             del g_state['websockets'][ws_id]
+        # Verificar que el WebSocket esté preparado antes de intentar cerrarlo
+        if not ws.closed:
+            try:
+                await ws.close()
+            except (RuntimeError, ConnectionResetError, ConnectionError, OSError) as e:
+                # WebSocket ya estaba cerrado o no fue preparado - esto es normal
+                logging.debug(f"WebSocket {ws_id} ya estaba cerrado o no preparado: {type(e).__name__}")
         logging.info(f"Conexión WebSocket cerrada: {ws_id}")
     
     return ws
@@ -762,7 +771,10 @@ async def handle_load_experiment(args):
                         
                         # Exportar a JIT
                         jit_output_path = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, exp_name, "model_jit.pt")
-                        device_str = "cpu" if global_cfg.DEVICE.type == "cpu" else "cuda"
+                        # Detectar device correctamente: preferir CUDA si está disponible
+                        import torch
+                        device_str = "cuda" if torch.cuda.is_available() else "cpu"
+                        logging.info(f"Exportando modelo JIT usando device: {device_str}")
                         success = export_model_to_jit(
                             checkpoint_path,
                             output_path=jit_output_path,
@@ -788,7 +800,16 @@ async def handle_load_experiment(args):
                 # Si tenemos modelo JIT, usar motor nativo
                 if jit_path and os.path.exists(jit_path):
                     try:
-                        device_str = "cpu" if global_cfg.DEVICE.type == "cpu" else "cuda"
+                        # Detectar device: preferir CUDA si está disponible, sino CPU
+                        # El motor nativo verificará internamente si CUDA está realmente disponible
+                        import torch
+                        if torch.cuda.is_available():
+                            device_str = "cuda"
+                            logging.info("✅ CUDA detectado - usando GPU para motor nativo")
+                        else:
+                            device_str = "cpu"
+                            logging.info("⚠️ CUDA no disponible - usando CPU para motor nativo")
+                        
                         motor = NativeEngineWrapper(
                             grid_size=inference_grid_size,
                             d_state=d_state,

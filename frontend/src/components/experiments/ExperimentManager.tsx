@@ -357,7 +357,7 @@ export function ExperimentManager() {
                             })}
                         </Stack>
                     ) : (
-                        <Table fontSize="xs" verticalSpacing="xs">
+                        <Table verticalSpacing="xs">
                             <Table.Thead>
                                 <Table.Tr>
                                     <Table.Th style={{ fontSize: '0.7rem' }}>Nombre</Table.Th>

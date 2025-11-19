@@ -56,7 +56,7 @@ export function History3DViewer() {
                 if (exists) return prev;
                 
                 const newFrame: HistoryFrame = {
-                    step: simData.step,
+                    step: simData.step ?? 0,
                     timestamp: new Date().toISOString(),
                     map_data: simData.map_data as number[][]
                 };
@@ -293,7 +293,7 @@ export function History3DViewer() {
                         <Tooltip 
                             label="Visualización 3D de la evolución temporal. Cada slice transparente representa un momento en el tiempo. Eje Z = tiempo, altura = valor del estado. Útil para ver patrones temporales, ondas, y movimiento de estructuras."
                             multiline
-                            width={300}
+                            style={{ maxWidth: 300 }}
                             withArrow
                         >
                             <ActionIcon size="xs" variant="subtle" color="gray">

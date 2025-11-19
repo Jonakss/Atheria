@@ -90,7 +90,7 @@ export function HistogramPanel() {
                     <Tooltip 
                         label="Distribución de valores en el estado cuántico. Útil para entender la estadística del sistema (media, varianza, outliers)."
                         multiline
-                        width={300}
+                        style={{ maxWidth: 300 }}
                         withArrow
                     >
                         <ActionIcon size="xs" variant="subtle" color="gray">

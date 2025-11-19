@@ -10,15 +10,7 @@
  */
 
 import pako from 'pako';
-
-// Intentar importar CBOR2 (si está disponible)
-let cbor2: any = null;
-try {
-  // @ts-ignore - cbor2 puede no tener tipos TypeScript
-  cbor2 = require('@ipld/dag-cbor');
-} catch (e) {
-  console.warn('CBOR2 no disponible. Se usará descompresión alternativa.');
-}
+import { decode as cborDecode } from '@msgpack/msgpack'; // msgpack también soporta CBOR
 
 // Intentar importar LZ4 (si está disponible)
 let lz4: any = null;
@@ -192,7 +184,7 @@ export function decompressArray(compressed: CompressedArray | BinaryCompressedAr
      */
     try {
         // Detectar formato nuevo (binario)
-        if (compressed.format === 'binary' || 'quantized' in compressed) {
+        if (('format' in compressed && (compressed as any).format === 'binary') || 'quantized' in compressed) {
             const binaryCompressed = compressed as BinaryCompressedArray;
             const typedArray = decodeArrayBinary(binaryCompressed);
             return typedArrayTo2D(typedArray, binaryCompressed.shape);
@@ -287,17 +279,15 @@ export async function decodeBinaryFrame(data: ArrayBuffer | Uint8Array | string)
             return JSON.parse(text);
         }
         
-        // Intentar CBOR si está disponible
-        if (cbor2) {
-            try {
-                const decoded = cbor2.decode(bytes);
-                return decoded;
-            } catch (e) {
-                // No es CBOR válido, intentar como JSON
-                const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
-                if (text) {
-                    return JSON.parse(text);
-                }
+        // Intentar CBOR usando @msgpack/msgpack (también soporta CBOR)
+        try {
+            const decoded = cborDecode(bytes);
+            return decoded;
+        } catch (cborError) {
+            // No es CBOR válido, intentar como JSON
+            const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+            if (text) {
+                return JSON.parse(text);
             }
         }
         

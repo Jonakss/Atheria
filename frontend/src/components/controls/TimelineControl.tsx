@@ -70,8 +70,8 @@ export function TimelineControl({
                         <Tooltip 
                             label="Navega por el historial de la simulación. Reproduce, pausa o salta a cualquier frame para analizar la evolución temporal."
                             multiline
-                            width={300}
                             withArrow
+                            style={{ maxWidth: 300 }}
                         >
                             <ActionIcon size="xs" variant="subtle" color="gray">
                                 <IconHelpCircle size={14} />

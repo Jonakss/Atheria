@@ -5,17 +5,22 @@
 
 namespace atheria {
 
+// Helper function para determinar device correcto
+static torch::Device determine_device(const std::string& device_str) {
+    if (device_str == "cuda" && torch::cuda::is_available()) {
+        return torch::kCUDA;
+    } else {
+        return torch::kCPU;
+    }
+}
+
 Engine::Engine(int64_t d_state, const std::string& device_str)
     : d_state_(d_state)
-    , device_(device_str == "cuda" ? torch::kCUDA : torch::kCPU)
+    , device_(determine_device(device_str))
     , model_loaded_(false)
     , vacuum_(d_state_, device_)
     , step_count_(0) {
-    
-    // Mover el modelo al dispositivo si está disponible
-    if (device_ == torch::kCUDA && !torch::cuda::is_available()) {
-        device_ = torch::kCPU;
-    }
+    // Device ya está determinado y vacuum inicializado correctamente
 }
 
 Engine::~Engine() {

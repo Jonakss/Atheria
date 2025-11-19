@@ -40,8 +40,12 @@ export function LoadingSkeleton({
 export function CardSkeleton() {
     return (
         <div style={{ padding: '1rem' }}>
-            <LoadingSkeleton height={24} width="60%" style={{ marginBottom: '0.5rem' }} />
-            <LoadingSkeleton count={3} height={16} style={{ marginBottom: '0.25rem' }} />
+            <div style={{ marginBottom: '0.5rem' }}>
+                <LoadingSkeleton height={24} width="60%" />
+            </div>
+            <div style={{ marginBottom: '0.25rem' }}>
+                <LoadingSkeleton count={3} height={16} />
+            </div>
         </div>
     );
 }
@@ -53,7 +57,9 @@ export function ListSkeleton({ count = 5 }: { count?: number }) {
                 <div key={i} style={{ padding: '0.5rem 0', display: 'flex', gap: '1rem' }}>
                     <LoadingSkeleton circle width={40} height={40} />
                     <div style={{ flex: 1 }}>
-                        <LoadingSkeleton height={16} width="80%" style={{ marginBottom: '0.5rem' }} />
+                        <div style={{ marginBottom: '0.5rem' }}>
+                            <LoadingSkeleton height={16} width="80%" />
+                        </div>
                         <LoadingSkeleton height={12} width="60%" />
                     </div>
                 </div>

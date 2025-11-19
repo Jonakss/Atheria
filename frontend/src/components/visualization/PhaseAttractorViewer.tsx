@@ -161,7 +161,7 @@ export function PhaseAttractorViewer() {
                         <Tooltip 
                             label="Evolución temporal de la célula central en el espacio de fase (canales 0 y 1). Útil para detectar oscilaciones, ciclos límite y comportamientos periódicos. Referencia: Sistemas dinámicos, teoría de atractores."
                             multiline
-                            width={300}
+                            style={{ maxWidth: 300 }}
                             withArrow
                         >
                             <ActionIcon size="xs" variant="subtle" color="gray">

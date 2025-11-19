@@ -220,7 +220,7 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
             size="xl"
             closeOnClickOutside={false}
         >
-            <Stepper active={activeStep} onStepClick={setActiveStep} breakpoint="sm">
+            <Stepper active={activeStep} onStepClick={setActiveStep}>
                 <Stepper.Step label="Seleccionar Base" description="Elige el experimento origen">
                     <Stack gap="md" mt="md">
                         <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light">
@@ -240,7 +240,6 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
                             value={baseExperiment}
                             onChange={(value) => setBaseExperiment(value)}
                             searchable
-                            nothingFound="No hay experimentos con checkpoints"
                         />
 
                         {baseExperimentData && (
@@ -362,7 +361,6 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
                                                 min={1e-6}
                                                 max={1}
                                                 step={1e-5}
-                                                precision={6}
                                                 size="xs"
                                                 style={{ width: 120 }}
                                             />
@@ -442,7 +440,6 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
                                                 min={0}
                                                 max={1}
                                                 step={0.001}
-                                                precision={4}
                                                 size="xs"
                                                 style={{ width: 100 }}
                                             />

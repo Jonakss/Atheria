@@ -162,7 +162,7 @@ export function DataTab() {
         if (simulationHistory.length === 0) return [];
         return simulationHistory.map(s => ({
             step: s.step,
-            'Varianza': s.density.variance
+            'Varianza': (s.density.std || 0) * (s.density.std || 0) // Calcular varianza como std^2
         }));
     }, [simulationHistory]);
 

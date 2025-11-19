@@ -207,7 +207,7 @@ export function FlowViewer() {
                         <Tooltip 
                             label="Análisis estadístico del campo vectorial delta_psi. Muestra métricas sobre la magnitud, dirección y distribución del cambio en el estado cuántico."
                             multiline
-                            width={300}
+                            style={{ maxWidth: 300 }}
                             withArrow
                         >
                             <ActionIcon size="xs" variant="subtle" color="gray">
@@ -236,7 +236,7 @@ export function FlowViewer() {
                         <Tooltip 
                             label="Análisis estadístico del campo vectorial delta_psi. Muestra métricas sobre la magnitud, dirección y distribución del cambio en el estado cuántico. La visualización es opcional para mejor rendimiento."
                             multiline
-                            width={300}
+                            style={{ maxWidth: 300 }}
                             withArrow
                         >
                             <ActionIcon size="xs" variant="subtle" color="gray">
@@ -308,7 +308,7 @@ export function FlowViewer() {
                 </Group>
                 
                 {/* Tabla de métricas detalladas */}
-                <Table size="sm" withTableBorder withColumnBorders>
+                <Table withTableBorder withColumnBorders>
                     <Table.Tbody>
                         <Table.Tr>
                             <Table.Td><Text size="xs" fw={500}>Total de Celdas</Text></Table.Td>

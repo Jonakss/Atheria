@@ -77,7 +77,7 @@ export const theme = createTheme({
   // Componentes personalizados con hover effects y transiciones
   components: {
     Button: {
-      styles: (theme) => ({
+      styles: (theme: any) => ({
         root: {
           transition: 'all 0.2s ease-in-out',
           '&:hover': {
@@ -94,7 +94,7 @@ export const theme = createTheme({
       },
     },
     ActionIcon: {
-      styles: (theme) => ({
+      styles: (theme: any) => ({
         root: {
           transition: 'all 0.2s ease-in-out',
           '&:hover': {
@@ -105,7 +105,7 @@ export const theme = createTheme({
       }),
     },
     Card: {
-      styles: (theme) => ({
+      styles: (theme: any) => ({
         root: {
           transition: 'all 0.3s ease-in-out',
           '&:hover': {
@@ -117,7 +117,7 @@ export const theme = createTheme({
       }),
     },
     Paper: {
-      styles: (theme) => ({
+      styles: (theme: any) => ({
         root: {
           transition: 'all 0.3s ease-in-out',
           '&:hover': {
@@ -127,7 +127,7 @@ export const theme = createTheme({
       }),
     },
     NavLink: {
-      styles: (theme) => ({
+      styles: (theme: any) => ({
         root: {
           transition: 'all 0.2s ease-in-out',
           borderRadius: theme.radius.md,
@@ -146,7 +146,7 @@ export const theme = createTheme({
       }),
     },
     Badge: {
-      styles: (theme) => ({
+      styles: (theme: any) => ({
         root: {
           transition: 'all 0.2s ease-in-out',
           '&:hover': {
@@ -156,7 +156,7 @@ export const theme = createTheme({
       }),
     },
     Tabs: {
-      styles: (theme) => ({
+      styles: (theme: any) => ({
         tab: {
           transition: 'all 0.2s ease-in-out',
           '&:hover': {
@@ -171,7 +171,7 @@ export const theme = createTheme({
       }),
     },
     Select: {
-      styles: (theme) => ({
+      styles: (theme: any) => ({
         input: {
           transition: 'all 0.2s ease-in-out',
           '&:hover': {
@@ -185,7 +185,7 @@ export const theme = createTheme({
       }),
     },
     NumberInput: {
-      styles: (theme) => ({
+      styles: (theme: any) => ({
         input: {
           transition: 'all 0.2s ease-in-out',
           '&:hover': {
@@ -199,7 +199,7 @@ export const theme = createTheme({
       }),
     },
     Switch: {
-      styles: (theme) => ({
+      styles: (theme: any) => ({
         track: {
           transition: 'all 0.2s ease-in-out',
           '&:hover': {

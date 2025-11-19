@@ -1,10 +1,20 @@
+# Core dependencies
 torch
-snntorch
+torchvision
 numpy
+snntorch
+scikit-learn
+
+# Web server
 aiohttp
 types-aiobotocore[aiohttp]
-torchvision
-scikit-learn
+
+# C++ bindings (necesario para compilar motor nativo)
+pybind11>=2.10.0
+
 # Optimizaciones opcionales de transferencia de datos (recomendado para producción)
 lz4>=4.0.0  # Compresión rápida (2-3x más rápido que zlib)
 cbor2>=5.4.0  # Formato binario eficiente (mejor que JSON)
+
+# Opcionales (fallback disponible si no están instalados)
+tensorboard>=2.10.0  # Para logging de métricas de entrenamiento (opcional)
