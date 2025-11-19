@@ -1,9 +1,11 @@
 // frontend/src/components/HistogramPanel.tsx
 import { Paper, Select, Title, Box, Center, Text, Stack, Tooltip, ActionIcon, Group } from '@mantine/core';
 import { BarChart } from '@mantine/charts';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { useState, useEffect, useRef } from 'react';
-import classes from './LogOverlay.module.css'; // Reutilizamos el estilo
+import { motion } from 'framer-motion';
+import { hoverLift } from '../../utils/animations';
+import classes from '../ui/LogOverlay.module.css'; // Reutilizamos el estilo
 import { IconInfoCircle, IconHelpCircle } from '@tabler/icons-react';
 
 export function HistogramPanel() {
@@ -70,7 +72,18 @@ export function HistogramPanel() {
     }));
 
     return (
-        <Paper shadow="md" p="sm" className={classes.overlay} style={{ width: 450, height: 350, left: 20, right: 'auto', minHeight: 350 }}>
+        <motion.div variants={hoverLift} whileHover="hover" style={{ position: 'absolute', left: 20, top: 'auto' }}>
+            <Paper 
+                shadow="md" 
+                p="sm" 
+                className={classes.overlay} 
+                style={{ 
+                    width: 450, 
+                    height: 350, 
+                    minHeight: 350,
+                    transition: 'all 0.3s ease-in-out'
+                }}
+            >
             <Box style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--mantine-spacing-sm)' }}>
                 <Group gap="xs">
                 <Title order={6}>Histogramas</Title>
@@ -117,7 +130,8 @@ export function HistogramPanel() {
                         <Text c="dimmed" size="sm">No hay datos disponibles</Text>
                     </Center>
                 )}
-            </Box>
-        </Paper>
+                    </Box>
+            </Paper>
+        </motion.div>
     );
 }

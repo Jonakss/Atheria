@@ -1,10 +1,12 @@
 // frontend/src/components/TrainingDashboard.tsx
 import { Paper, Title, Group, Text, Progress, Badge, Stack, Box, Center } from '@mantine/core';
 import { LineChart } from '@mantine/charts';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { useEffect, useState, useRef } from 'react';
 import { IconTrendingDown, IconTrendingUp, IconClock } from '@tabler/icons-react';
-import classes from './LogOverlay.module.css';
+import { motion } from 'framer-motion';
+import { hoverLift, scaleIn } from '../../utils/animations';
+import classes from '../ui/LogOverlay.module.css';
 
 interface TrainingDataPoint {
     episode: number;
@@ -102,20 +104,25 @@ export function TrainingDashboard() {
         : 0;
 
     return (
-        <Paper 
-            shadow="xl" 
-            p="md" 
-            className={classes.overlay}
-            style={{ 
-                width: 520, 
-                height: 480, 
-                right: 20, 
-                top: 20,
-                zIndex: 10,
-                backgroundColor: 'var(--mantine-color-dark-7)',
-                border: '1px solid var(--mantine-color-dark-4)'
-            }}
+        <motion.div
+            variants={scaleIn}
+            initial="hidden"
+            animate="visible"
+            style={{ position: 'fixed', right: 20, top: 20, zIndex: 10 }}
         >
+            <motion.div variants={hoverLift} whileHover="hover" whileTap="rest">
+                <Paper 
+                    shadow="xl" 
+                    p="md" 
+                    className={classes.overlay}
+                    style={{ 
+                        width: 520, 
+                        height: 480, 
+                        backgroundColor: 'var(--mantine-color-dark-7)',
+                        border: '1px solid var(--mantine-color-dark-4)',
+                        transition: 'all 0.3s ease-in-out'
+                    }}
+                >
             <Stack gap="sm">
                 <Group justify="space-between" align="center">
                     <Title order={5}>Dashboard de Entrenamiento</Title>
@@ -252,7 +259,9 @@ export function TrainingDashboard() {
                     </Box>
                 )}
             </Stack>
-        </Paper>
+                </Paper>
+            </motion.div>
+        </motion.div>
     );
 }
 

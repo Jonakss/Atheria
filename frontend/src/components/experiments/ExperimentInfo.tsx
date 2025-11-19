@@ -1,7 +1,9 @@
 // frontend/src/components/ExperimentInfo.tsx
 import { Paper, Stack, Group, Text, Badge, Box, Divider } from '@mantine/core';
 import { IconInfoCircle, IconTransfer, IconBrain, IconSettings } from '@tabler/icons-react';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
+import { motion } from 'framer-motion';
+import { hoverLift, scaleIn } from '../../utils/animations';
 
 export function ExperimentInfo() {
     const { activeExperiment, experimentsData, compileStatus } = useWebSocket();
@@ -33,7 +35,20 @@ export function ExperimentInfo() {
     const modelParams = config.MODEL_PARAMS || {};
     
     return (
-        <Paper p="md" withBorder style={{ backgroundColor: 'var(--mantine-color-dark-7)' }}>
+        <motion.div
+            variants={scaleIn}
+            initial="hidden"
+            animate="visible"
+        >
+            <motion.div variants={hoverLift} whileHover="hover">
+                <Paper 
+                    p="md" 
+                    withBorder 
+                    style={{ 
+                        backgroundColor: 'var(--mantine-color-dark-7)',
+                        transition: 'all 0.3s ease-in-out'
+                    }}
+                >
             <Stack gap="sm">
                 <Group justify="space-between" align="flex-start">
                     <Group gap="xs">
@@ -138,7 +153,9 @@ export function ExperimentInfo() {
                     </Stack>
                 )}
             </Stack>
-        </Paper>
+                </Paper>
+            </motion.div>
+        </motion.div>
     );
 }
 
