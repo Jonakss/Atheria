@@ -1,16 +1,16 @@
 // frontend/src/components/VisualizationTab.tsx
 import { useState, useEffect } from 'react';
 import { Box, Stack, Collapse, Button, Switch, Group, Text } from '@mantine/core';
-import { PanZoomCanvas } from './PanZoomCanvas';
+import { PanZoomCanvas } from '../ui/PanZoomCanvas';
 import { HistogramPanel } from './HistogramPanel';
-import { TrainingDashboard } from './TrainingDashboard';
+import { TrainingDashboard } from '../training/TrainingDashboard';
 import { PhaseAttractorViewer } from './PhaseAttractorViewer';
 import { FlowViewer } from './FlowViewer';
 import { History3DViewer } from './History3DViewer';
 import { Complex3DViewer } from './Complex3DViewer';
 import { Poincare3DViewer } from './Poincare3DViewer';
-import { TimelineControl } from './TimelineControl';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { TimelineControl } from '../controls/TimelineControl';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { IconChevronDown, IconChevronUp, IconLivePhoto } from '@tabler/icons-react';
 
 interface HistoryFrame {
@@ -20,14 +20,13 @@ interface HistoryFrame {
 }
 
 export function VisualizationTab() {
-    const { selectedViz, simData, sendCommand } = useWebSocket();
+    const { selectedViz, simData, sendCommand, liveFeedEnabled, setLiveFeedEnabled, connectionStatus } = useWebSocket();
     const [historyFrames, setHistoryFrames] = useState<HistoryFrame[]>([]);
     const [currentFrameIndex, setCurrentFrameIndex] = useState(-1); // -1 = usar tiempo real
     const [isPlaying, setIsPlaying] = useState(false);
     const [playInterval, setPlayInterval] = useState<ReturnType<typeof setInterval> | null>(null);
     const [playbackSpeed, setPlaybackSpeed] = useState(10); // FPS
     const [toolsExpanded, setToolsExpanded] = useState(false);
-    const [liveFeedMode, setLiveFeedMode] = useState(true); // Modo live feed activado por defecto
     
     // Escuchar cuando se carga un historial desde archivo
     useEffect(() => {
@@ -120,16 +119,14 @@ export function VisualizationTab() {
             <Box style={{ padding: 'var(--mantine-spacing-sm)', borderBottom: '1px solid var(--mantine-color-dark-4)' }}>
                 <Group justify="space-between" mb="xs">
                     <Group gap="xs">
-                        <IconLivePhoto size={18} color={liveFeedMode ? 'green' : 'gray'} />
+                        <IconLivePhoto size={18} color={liveFeedEnabled ? 'green' : 'gray'} />
                         <Text size="sm" fw={500}>Modo Live Feed</Text>
                         <Switch
-                            checked={liveFeedMode}
+                            checked={liveFeedEnabled}
+                            disabled={connectionStatus !== 'connected'}
                             onChange={(e) => {
                                 const enabled = e.currentTarget.checked;
-                                setLiveFeedMode(enabled);
-                                
-                                // Enviar comando al servidor para optimizar
-                                sendCommand('simulation', 'set_live_feed', { enabled });
+                                setLiveFeedEnabled(enabled);
                                 
                                 if (enabled) {
                                     // Volver a tiempo real cuando se activa live feed
@@ -137,17 +134,22 @@ export function VisualizationTab() {
                                     setIsPlaying(false);
                                 }
                             }}
-                            label={liveFeedMode ? 'Activo' : 'Inactivo'}
+                            label={liveFeedEnabled ? 'Activo' : 'Inactivo'}
                             color="green"
                         />
+                        {!liveFeedEnabled && (
+                            <Text size="xs" c="yellow" fw={500}>
+                                ⚠️ Solo estado (sin datos de visualización)
+                            </Text>
+                        )}
                     </Group>
-                    {!liveFeedMode && (
+                    {!liveFeedEnabled && (
                         <Text size="xs" c="dimmed">
                             Modo Historial: Navegando frame {currentFrameIndex >= 0 ? currentFrameIndex + 1 : 0} de {historyFrames.length}
                         </Text>
                     )}
                 </Group>
-                {!liveFeedMode && (
+                {!liveFeedEnabled && (
                     <TimelineControl
                         frames={historyFrames}
                         currentFrameIndex={currentFrameIndex}
@@ -159,7 +161,7 @@ export function VisualizationTab() {
                         onPlaybackSpeedChange={setPlaybackSpeed}
                     />
                 )}
-                {liveFeedMode && (
+                {liveFeedEnabled && (
                     <Group gap="xs" mt="xs">
                         <Text size="xs" c="dimmed">
                             Frame en tiempo real: {simData?.step || 0} | 
@@ -185,7 +187,7 @@ export function VisualizationTab() {
                 ) : selectedViz === 'poincare_3d' ? (
                     <Poincare3DViewer />
                 ) : (
-                    <PanZoomCanvas historyFrame={liveFeedMode ? null : frameToShow} />
+                    <PanZoomCanvas historyFrame={liveFeedEnabled ? null : frameToShow} />
                 )}
             </Box>
             

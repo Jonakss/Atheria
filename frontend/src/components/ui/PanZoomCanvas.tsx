@@ -1,7 +1,7 @@
 // frontend/src/components/PanZoomCanvas.tsx
 import { useRef, useEffect, useState } from 'react';
-import { useWebSocket } from '../hooks/useWebSocket';
-import { usePanZoom } from '../hooks/usePanZoom';
+import { useWebSocket } from '../../hooks/useWebSocket';
+import { usePanZoom } from '../../hooks/usePanZoom';
 import { CanvasOverlays, OverlayControls, OverlayConfig } from './CanvasOverlays';
 import { Button, Group, ActionIcon, Tooltip, Switch, Paper, Stack, Text } from '@mantine/core';
 import { IconZoomReset, IconSettings } from '@tabler/icons-react';

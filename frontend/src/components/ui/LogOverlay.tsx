@@ -1,6 +1,6 @@
 // frontend/src/components/LogOverlay.tsx
 import { Paper, ScrollArea, Text, Box, Title, Center, Stack, Tabs, Collapse, Button, Group, ActionIcon } from '@mantine/core';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import classes from './LogOverlay.module.css';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { IconInfoCircle, IconChevronUp, IconChevronDown, IconFileText, IconChartBar, IconMinus, IconGripVertical } from '@tabler/icons-react';

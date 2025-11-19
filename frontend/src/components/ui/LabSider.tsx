@@ -2,13 +2,13 @@
 import { useState } from 'react';
 import { Box, Button, NavLink, ScrollArea, Select, Stack, Text, Group, NumberInput, Progress, Divider, Badge, Tooltip, Alert, Paper } from '@mantine/core';
 import { IconPlayerPlay, IconPlayerPause, IconRefresh, IconUpload, IconPlug, IconCheck, IconX, IconAlertCircle, IconInfoCircle, IconTransfer } from '@tabler/icons-react';
-import { useWebSocket } from '../hooks/useWebSocket';
-import { modelOptions, vizOptions } from '../utils/vizOptions';
-import { AdvancedControls } from './AdvancedControls';
-import { ExperimentManager } from './ExperimentManager';
-import { CheckpointManager } from './CheckpointManager';
-import { ExperimentInfo } from './ExperimentInfo';
-import { TransferLearningWizard } from './TransferLearningWizard';
+import { useWebSocket } from '../../hooks/useWebSocket';
+import { modelOptions, vizOptions } from '../../utils/vizOptions';
+import { AdvancedControls } from '../controls/AdvancedControls';
+import { ExperimentManager } from '../experiments/ExperimentManager';
+import { CheckpointManager } from '../training/CheckpointManager';
+import { ExperimentInfo } from '../experiments/ExperimentInfo';
+import { TransferLearningWizard } from '../experiments/TransferLearningWizard';
 import classes from './LabSider.module.css';
 
 export function LabSider() {
