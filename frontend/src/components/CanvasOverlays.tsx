@@ -18,9 +18,16 @@ interface CanvasOverlaysProps {
     pan: { x: number; y: number };
     zoom: number;
     config: OverlayConfig;
+    roiInfo?: {
+        enabled?: boolean;
+        x?: number;
+        y?: number;
+        width?: number;
+        height?: number;
+    };
 }
 
-export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config }: CanvasOverlaysProps) {
+export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config, roiInfo }: CanvasOverlaysProps) {
     const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
     
     useEffect(() => {
@@ -88,6 +95,13 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config }: Canvas
         const gridWidth = mapData[0]?.length || 0;
         
         if (gridWidth === 0 || gridHeight === 0) return;
+        
+        // Si hay ROI activa, el mapData ya está recortado, pero necesitamos las coordenadas originales
+        // para dibujar el quadtree correctamente. Usar roiInfo para ajustar coordenadas.
+        const roiOffsetX = roiInfo?.enabled ? (roiInfo.x || 0) : 0;
+        const roiOffsetY = roiInfo?.enabled ? (roiInfo.y || 0) : 0;
+        const originalGridWidth = roiInfo?.enabled ? (roiInfo.width || gridWidth) : gridWidth;
+        const originalGridHeight = roiInfo?.enabled ? (roiInfo.height || gridHeight) : gridHeight;
         
         // Calcular escala base (igual que PanZoomCanvas)
         const scaleX = overlayCanvas.width / gridWidth;
@@ -241,7 +255,9 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config }: Canvas
                     }
                 };
                 
-                // Iniciar construcción del quadtree desde el grid completo
+                // Iniciar construcción del quadtree desde la región visible (ROI o grid completo)
+                // Si hay ROI, el mapData ya está recortado, así que dibujamos desde (0,0) hasta (gridWidth, gridHeight)
+                // pero las coordenadas reales del grid completo están en roiOffsetX, roiOffsetY
                 drawQuadtree(0, 0, gridWidth, gridHeight, 0);
             }
         }

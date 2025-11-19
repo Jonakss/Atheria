@@ -452,6 +452,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                     pan={pan}
                     zoom={zoom}
                     config={overlayConfig}
+                    roiInfo={dataToRender?.roi_info}
                 />
             )}
         </div>
