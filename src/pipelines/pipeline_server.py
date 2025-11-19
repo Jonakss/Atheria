@@ -8,14 +8,14 @@ from aiohttp import web
 from pathlib import Path
 
 # Asumimos la existencia y correcto funcionamiento de estos módulos locales
-from . import config as global_cfg
-from .server_state import g_state, broadcast, send_notification, send_to_websocket, optimize_frame_payload, get_payload_size, apply_roi_to_payload
-from .utils import get_experiment_list, load_experiment_config, get_latest_checkpoint
-from .server_handlers import create_experiment_handler
+from .. import config as global_cfg
+from ..server.server_state import g_state, broadcast, send_notification, send_to_websocket, optimize_frame_payload, get_payload_size, apply_roi_to_payload
+from ..utils import get_experiment_list, load_experiment_config, get_latest_checkpoint
+from ..server.server_handlers import create_experiment_handler
 from .pipeline_viz import get_visualization_data
-from .model_loader import load_model
-from .qca_engine import Aetheria_Motor, QuantumState
-from .analysis import analyze_universe_atlas, analyze_cell_chemistry, calculate_phase_map_metrics
+from ..model_loader import load_model
+from ..engines.qca_engine import Aetheria_Motor, QuantumState
+from ..analysis.analysis import analyze_universe_atlas, analyze_cell_chemistry, calculate_phase_map_metrics
 
 # Configuración de logging para ver claramente lo que pasa en el servidor
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(module)s] - %(message)s')
@@ -163,7 +163,7 @@ async def simulation_loop():
                     # Si live_feed está desactivado, evolucionar el estado sin calcular visualizaciones
                     # pero SÍ enviar actualizaciones de estado para que el frontend sepa el progreso
                     try:
-                    g_state['motor'].evolve_internal_state()
+                        g_state['motor'].evolve_internal_state()
                         updated_step = current_step + 1
                         g_state['simulation_step'] = updated_step
                         
@@ -206,7 +206,7 @@ async def simulation_loop():
                     base_fps = target_fps * simulation_speed
                     sleep_time = max(0.001, 1.0 / base_fps)
                     await asyncio.sleep(sleep_time)
-                        continue
+                    continue
                 
                 try:
                     # Evolucionar el estado solo si live_feed está activo
@@ -269,7 +269,7 @@ async def simulation_loop():
                     # 1. Aplicar ROI primero (reduce el tamaño de los datos)
                     roi_manager = g_state.get('roi_manager')
                     if roi_manager and roi_manager.roi_enabled:
-                        from .roi_manager import apply_roi_to_payload
+                        from ..managers.roi_manager import apply_roi_to_payload
                         frame_payload_roi = apply_roi_to_payload(frame_payload_raw, roi_manager)
                     else:
                         frame_payload_roi = frame_payload_raw
@@ -308,7 +308,7 @@ async def simulation_loop():
                             # Por defecto, guardar cada 10 frames (reducción de 10x en memoria)
                             history_interval = g_state.get('history_save_interval', 10)
                             if updated_step % history_interval == 0:
-                            g_state['simulation_history'].add_frame(frame_payload)
+                                g_state['simulation_history'].add_frame(frame_payload)
                         except Exception as e:
                             logging.debug(f"Error guardando frame en historial: {e}")
                     
@@ -476,7 +476,7 @@ async def handle_continue_experiment(args):
         
         # Convertir MODEL_PARAMS de SimpleNamespace a dict para JSON
         # Usar la función recursiva de utils para manejar casos anidados
-        from .utils import sns_to_dict_recursive
+        from ..utils import sns_to_dict_recursive
         if hasattr(config, 'MODEL_PARAMS') and config.MODEL_PARAMS is not None:
             model_params = config.MODEL_PARAMS
             continue_args['MODEL_PARAMS'] = sns_to_dict_recursive(model_params)
@@ -714,27 +714,132 @@ async def handle_load_experiment(args):
         if training_grid_size and training_grid_size != inference_grid_size:
             logging.info(f"Escalando de grid de entrenamiento ({training_grid_size}x{training_grid_size}) a grid de inferencia ({inference_grid_size}x{inference_grid_size})")
         
-        # Inicializar motor con configuración para acceso a GAMMA_DECAY (término Lindbladian)
-        # Usar config como cfg para que el motor pueda acceder a GAMMA_DECAY
-        motor = Aetheria_Motor(model, inference_grid_size, d_state, global_cfg.DEVICE, cfg=config)
+        # --- INTEGRACIÓN DEL MOTOR NATIVO (C++) ---
+        # Intentar usar el motor nativo de alto rendimiento si está disponible
+        # El motor nativo es 250-400x más rápido que el motor Python
+        use_native_engine = getattr(global_cfg, 'USE_NATIVE_ENGINE', True)  # Por defecto True
         
-        # Compilar modelo para optimización de inferencia (si está habilitado)
-        try:
-            motor.compile_model()
-            if motor.is_compiled:
-                logging.info("✅ Modelo compilado con torch.compile() para inferencia optimizada")
-                if ws: await send_notification(ws, "✅ Modelo compilado con torch.compile() para mejor rendimiento", "info")
-            else:
-                model_name = model.__class__.__name__
-                logging.info(f"ℹ️ torch.compile() deshabilitado para {model_name} (configuración del modelo)")
-        except Exception as e:
-            logging.warning(f"⚠️ No se pudo compilar el modelo: {e}. Continuando sin compilación.")
+        motor = None
+        is_native = False
+        
+        if use_native_engine:
+            try:
+                from .engines.native_engine_wrapper import NativeEngineWrapper
+                
+                # Buscar modelo JIT (exportado a TorchScript)
+                from ..utils import get_latest_jit_model
+                jit_path = get_latest_jit_model(exp_name, silent=True)
+                
+                # Si no existe modelo JIT, exportarlo automáticamente desde el checkpoint
+                if not jit_path:
+                    logging.info(f"Modelo JIT no encontrado para '{exp_name}'. Exportando automáticamente...")
+                    if ws: await send_notification(ws, f"📦 Exportando modelo a TorchScript...", "info")
+                    
+                    try:
+                        # Importar función de exportación (ruta relativa al proyecto)
+                        import sys
+                        scripts_dir = Path(__file__).parent.parent / "scripts"
+                        if str(scripts_dir) not in sys.path:
+                            sys.path.insert(0, str(scripts_dir))
+                        from export_model_to_jit import export_model_to_jit
+                        
+                        # Obtener parámetros del modelo desde la configuración
+                        model_type = config.MODEL_ARCHITECTURE
+                        hidden_channels = config.MODEL_PARAMS.hidden_channels
+                        
+                        # Mapear nombres de arquitectura a las claves de MODEL_MAP
+                        # MODEL_MAP usa claves en mayúsculas con guiones bajos
+                        model_type_map = {
+                            'UNET_UNITARIA': 'UNET_UNITARY',  # Corregir nombre
+                            'SNN_UNET': 'SNN_UNET',            # Ya correcto
+                            'MLP': 'MLP',                      # Ya correcto
+                            'DEEP_QCA': 'DEEP_QCA',            # Ya correcto
+                            'UNET': 'UNET',                    # Ya correcto
+                            'UNET_CONVLSTM': 'UNET_CONVLSTM',  # Ya correcto
+                            'UNET_UNITARY_RMSNORM': 'UNET_UNITARY_RMSNORM',  # Ya correcto
+                        }
+                        model_type = model_type_map.get(model_type, model_type)  # Usar original si no está en el mapa
+                        
+                        # Exportar a JIT
+                        jit_output_path = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, exp_name, "model_jit.pt")
+                        device_str = "cpu" if global_cfg.DEVICE.type == "cpu" else "cuda"
+                        success = export_model_to_jit(
+                            checkpoint_path,
+                            output_path=jit_output_path,
+                            d_state=d_state,
+                            hidden_channels=hidden_channels,
+                            model_type=model_type,
+                            device=device_str
+                        )
+                        
+                        if success:
+                            jit_path = jit_output_path
+                            logging.info(f"✅ Modelo exportado exitosamente a: {jit_path}")
+                            if ws: await send_notification(ws, "✅ Modelo exportado a TorchScript", "success")
+                        else:
+                            logging.warning(f"⚠️ Error al exportar modelo JIT. Usando motor Python como fallback.")
+                            if ws: await send_notification(ws, "⚠️ Error exportando a JIT, usando motor Python", "warning")
+                            jit_path = None
+                    except Exception as e:
+                        logging.warning(f"⚠️ Error al exportar modelo JIT: {e}. Usando motor Python como fallback.", exc_info=True)
+                        if ws: await send_notification(ws, f"⚠️ Error exportando JIT: {str(e)[:50]}...", "warning")
+                        jit_path = None
+                
+                # Si tenemos modelo JIT, usar motor nativo
+                if jit_path and os.path.exists(jit_path):
+                    try:
+                        device_str = "cpu" if global_cfg.DEVICE.type == "cpu" else "cuda"
+                        motor = NativeEngineWrapper(
+                            grid_size=inference_grid_size,
+                            d_state=d_state,
+                            device=device_str,
+                            cfg=config
+                        )
+                        
+                        # Cargar modelo JIT en el motor nativo
+                        if motor.load_model(jit_path):
+                            is_native = True
+                            logging.info(f"✅ Motor nativo (C++) cargado exitosamente con modelo JIT")
+                            if ws: await send_notification(ws, f"⚡ Motor nativo cargado (250-400x más rápido)", "success")
+                        else:
+                            logging.warning(f"⚠️ Error al cargar modelo JIT en motor nativo. Usando motor Python como fallback.")
+                            if ws: await send_notification(ws, "⚠️ Error cargando modelo JIT, usando motor Python", "warning")
+                            motor = None
+                    except Exception as e:
+                        logging.warning(f"⚠️ Error al inicializar motor nativo: {e}. Usando motor Python como fallback.", exc_info=True)
+                        if ws: await send_notification(ws, f"⚠️ Error en motor nativo, usando Python: {str(e)[:50]}...", "warning")
+                        motor = None
+                    except Exception as e:
+                        logging.warning(f"⚠️ Error al inicializar motor nativo: {e}. Usando motor Python como fallback.", exc_info=True)
+                        if ws: await send_notification(ws, f"⚠️ Error en motor nativo, usando Python: {str(e)[:50]}...", "warning")
+                        motor = None
+            except Exception as e:
+                logging.warning(f"⚠️ Error en la inicialización del motor nativo: {e}. Usando motor Python como fallback.", exc_info=True)
+                if ws: await send_notification(ws, f"⚠️ Error inicializando motor nativo: {str(e)[:50]}...", "warning")
+                motor = None
+        
+        # Fallback: usar motor Python tradicional
+        if motor is None:
+            logging.info(f"Usando motor Python tradicional (Aetheria_Motor)")
+            motor = Aetheria_Motor(model, inference_grid_size, d_state, global_cfg.DEVICE, cfg=config)
+            
+            # Compilar modelo para optimización de inferencia (solo para motor Python)
+            try:
+                motor.compile_model()
+                if motor.is_compiled:
+                    logging.info("✅ Modelo compilado con torch.compile() para inferencia optimizada")
+                    if ws: await send_notification(ws, "✅ Modelo compilado con torch.compile() para mejor rendimiento", "info")
+                else:
+                    model_name = model.__class__.__name__
+                    logging.info(f"ℹ️ torch.compile() deshabilitado para {model_name} (configuración del modelo)")
+            except Exception as e:
+                logging.warning(f"⚠️ No se pudo compilar el modelo: {e}. Continuando sin compilación.")
         
         g_state['motor'] = motor
         g_state['simulation_step'] = 0
         
         # Actualizar ROI manager con el tamaño correcto del grid
-        from .roi_manager import ROIManager
+        from ..managers.roi_manager import ROIManager
         roi_manager = g_state.get('roi_manager')
         if roi_manager:
             roi_manager.grid_size = inference_grid_size
@@ -815,12 +920,21 @@ async def handle_load_experiment(args):
                 logging.error(f"Error generando frame inicial: {e}", exc_info=True)
                 if ws: await send_notification(ws, f"⚠️ Error al generar visualización inicial: {str(e)}", "warning")
         
-        # Enviar información sobre el estado de compilación del modelo
-        compile_status = {
-            "is_compiled": motor.is_compiled,
-            "model_name": model.__class__.__name__,
-            "compiles_enabled": getattr(model, '_compiles', True)
-        }
+        # Enviar información sobre el estado del motor
+        if is_native:
+            compile_status = {
+                "is_compiled": True,  # Motor nativo siempre está "compilado"
+                "is_native": True,
+                "model_name": "Native Engine (C++)",
+                "compiles_enabled": True
+            }
+        else:
+            compile_status = {
+                "is_compiled": motor.is_compiled,
+                "is_native": False,
+                "model_name": model.__class__.__name__ if hasattr(model, '__class__') else "Unknown",
+                "compiles_enabled": getattr(model, '_compiles', True) if hasattr(model, '_compiles') else True
+            }
         
         if ws: await send_notification(ws, f"✅ Modelo '{exp_name}' cargado exitosamente. Presiona 'Iniciar' para comenzar la simulación.", "success")
         await broadcast({
@@ -851,7 +965,7 @@ async def handle_reset(args):
     
     try:
         # Obtener el modo de inicialización de la configuración
-        from .utils import load_experiment_config
+        from ..utils import load_experiment_config
         from . import config as global_cfg
         
         # Intentar obtener el modo de inicialización del experimento activo o usar el global
@@ -1219,43 +1333,43 @@ async def handle_analyze_universe_atlas(args):
         # Crear tarea de análisis
         async def run_analysis():
             try:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            result = await loop.run_in_executor(
-                executor,
-                analyze_universe_atlas,
-                psi_snapshots,
-                compression_dim,
-                perplexity,
-                n_iter
-            )
-        
-                # Verificar si fue cancelado
-                if g_state.get('analysis_cancel_event') and g_state['analysis_cancel_event'].is_set():
-                    logging.info("Análisis cancelado por el usuario")
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    result = await loop.run_in_executor(
+                        executor,
+                        analyze_universe_atlas,
+                        psi_snapshots,
+                        compression_dim,
+                        perplexity,
+                        n_iter
+                    )
+                
+                    # Verificar si fue cancelado
+                    if g_state.get('analysis_cancel_event') and g_state['analysis_cancel_event'].is_set():
+                        logging.info("Análisis cancelado por el usuario")
+                        g_state['analysis_status'] = 'idle'
+                        g_state['analysis_type'] = None
+                        await broadcast({
+                            "type": "analysis_status_update",
+                            "payload": {"status": "cancelled", "type": None}
+                        })
+                        return
+                    
+                    # Calcular métricas
+                    metrics = calculate_phase_map_metrics(result['coords'])
+                    result['metrics'] = metrics
+                    
+                    logging.info(f"Análisis Atlas del Universo completado: {len(result['coords'])} puntos, spread={metrics['spread']:.2f}")
+                    
                     g_state['analysis_status'] = 'idle'
                     g_state['analysis_type'] = None
                     await broadcast({
                         "type": "analysis_status_update",
-                        "payload": {"status": "cancelled", "type": None}
+                        "payload": {"status": "completed", "type": None}
                     })
-                    return
-                
-        # Calcular métricas
-        metrics = calculate_phase_map_metrics(result['coords'])
-        result['metrics'] = metrics
-        
-        logging.info(f"Análisis Atlas del Universo completado: {len(result['coords'])} puntos, spread={metrics['spread']:.2f}")
-                
-                g_state['analysis_status'] = 'idle'
-                g_state['analysis_type'] = None
-                await broadcast({
-                    "type": "analysis_status_update",
-                    "payload": {"status": "completed", "type": None}
-                })
-        
-        if ws:
-            await send_notification(ws, f"✅ Atlas del Universo completado ({len(result['coords'])} puntos)", "success")
-            await send_to_websocket(ws, "analysis_universe_atlas", result)
+                    
+                    if ws:
+                        await send_notification(ws, f"✅ Atlas del Universo completado ({len(result['coords'])} puntos)", "success")
+                        await send_to_websocket(ws, "analysis_universe_atlas", result)
             except asyncio.CancelledError:
                 logging.info("Análisis cancelado")
                 g_state['analysis_status'] = 'idle'
@@ -1365,39 +1479,39 @@ async def handle_analyze_cell_chemistry(args):
         # Crear tarea de análisis
         async def run_analysis():
             try:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            result = await loop.run_in_executor(
-                executor,
-                analyze_cell_chemistry,
-                psi,
-                n_samples,
-                perplexity,
-                n_iter
-            )
-        
-                # Verificar si fue cancelado
-                if g_state.get('analysis_cancel_event') and g_state['analysis_cancel_event'].is_set():
-                    logging.info("Análisis cancelado por el usuario")
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    result = await loop.run_in_executor(
+                        executor,
+                        analyze_cell_chemistry,
+                        psi,
+                        n_samples,
+                        perplexity,
+                        n_iter
+                    )
+                
+                    # Verificar si fue cancelado
+                    if g_state.get('analysis_cancel_event') and g_state['analysis_cancel_event'].is_set():
+                        logging.info("Análisis cancelado por el usuario")
+                        g_state['analysis_status'] = 'idle'
+                        g_state['analysis_type'] = None
+                        await broadcast({
+                            "type": "analysis_status_update",
+                            "payload": {"status": "cancelled", "type": None}
+                        })
+                        return
+                    
+                    logging.info(f"Análisis Mapa Químico completado: {len(result['coords'])} células")
+                    
                     g_state['analysis_status'] = 'idle'
                     g_state['analysis_type'] = None
                     await broadcast({
                         "type": "analysis_status_update",
-                        "payload": {"status": "cancelled", "type": None}
+                        "payload": {"status": "completed", "type": None}
                     })
-                    return
-                
-        logging.info(f"Análisis Mapa Químico completado: {len(result['coords'])} células")
-                
-                g_state['analysis_status'] = 'idle'
-                g_state['analysis_type'] = None
-                await broadcast({
-                    "type": "analysis_status_update",
-                    "payload": {"status": "completed", "type": None}
-                })
-        
-        if ws:
-            await send_notification(ws, f"✅ Mapa Químico completado ({len(result['coords'])} células)", "success")
-            await send_to_websocket(ws, "analysis_cell_chemistry", result)
+                    
+                    if ws:
+                        await send_notification(ws, f"✅ Mapa Químico completado ({len(result['coords'])} células)", "success")
+                        await send_to_websocket(ws, "analysis_cell_chemistry", result)
             except asyncio.CancelledError:
                 logging.info("Análisis cancelado")
                 g_state['analysis_status'] = 'idle'
@@ -1603,7 +1717,7 @@ async def handle_set_roi(args):
     
     if not roi_manager:
         # Crear ROI manager si no existe
-        from .roi_manager import ROIManager
+        from ..managers.roi_manager import ROIManager
         grid_size = g_state.get('grid_size', 256)
         roi_manager = ROIManager(grid_size=grid_size)
         g_state['roi_manager'] = roi_manager
@@ -1690,7 +1804,7 @@ async def handle_set_inference_config(args):
             roi_manager.clear_roi()  # Resetear ROI al cambiar de tamaño
             logging.info(f"ROI manager actualizado con nuevo grid_size: {new_size}")
         else:
-            from .roi_manager import ROIManager
+            from ..managers.roi_manager import ROIManager
             g_state['roi_manager'] = ROIManager(grid_size=new_size)
             logging.info(f"ROI manager creado con grid_size: {new_size}")
     
@@ -1798,7 +1912,7 @@ async def handle_list_history_files(args):
     """Lista los archivos de historia guardados."""
     ws = g_state['websockets'].get(args.get('ws_id'))
     try:
-        from .history_manager import HISTORY_DIR
+        from ..managers.history_manager import HISTORY_DIR
         import json
         from pathlib import Path
         
@@ -1842,7 +1956,7 @@ async def handle_load_history_file(args):
     """Carga un archivo de historia."""
     ws = g_state['websockets'].get(args.get('ws_id'))
     try:
-        from .history_manager import HISTORY_DIR
+        from ..managers.history_manager import HISTORY_DIR
         import json
         from pathlib import Path
         
@@ -2054,6 +2168,50 @@ async def on_shutdown(app):
     """Cancela la tarea del bucle de simulación cuando el servidor se apaga y guarda el estado."""
     logging.info("Iniciando cierre ordenado del servidor...")
     
+    # PRIMERO: Cerrar todas las conexiones WebSocket activas de forma agresiva
+    websockets = list(g_state.get('websockets', {}).items())  # Lista de tuplas para evitar problemas de closure
+    if websockets:
+        logging.info(f"Cerrando {len(websockets)} conexiones WebSocket activas...")
+        
+        # Función helper para cerrar un WebSocket con timeout
+        async def close_ws_safe(ws_id, ws):
+            try:
+                if ws.closed:
+                    return
+                # Intentar cerrar de forma ordenada con timeout corto
+                await asyncio.wait_for(ws.close(code=1001, message=b'Server shutting down'), timeout=0.5)
+            except asyncio.TimeoutError:
+                # Timeout: intentar cerrar el transporte directamente
+                try:
+                    if hasattr(ws, '_writer') and ws._writer:
+                        ws._writer.close()
+                        await ws._writer.wait_closed()
+                except Exception:
+                    pass
+            except Exception as e:
+                logging.debug(f"Error cerrando WebSocket {ws_id}: {e}")
+        
+        # Ejecutar todos los cierres en paralelo con timeout total muy corto (1 segundo)
+        close_tasks = [close_ws_safe(ws_id, ws) for ws_id, ws in websockets if not ws.closed]
+        if close_tasks:
+            try:
+                await asyncio.wait_for(asyncio.gather(*close_tasks, return_exceptions=True), timeout=1.0)
+            except asyncio.TimeoutError:
+                logging.warning("Timeout cerrando WebSockets, continuando con shutdown...")
+        
+        # Limpiar el diccionario de WebSockets (siempre, incluso si falló el cierre)
+        g_state['websockets'].clear()
+        logging.info("Conexiones WebSocket cerradas/limpiadas")
+    
+    # Cancelar el bucle de simulación PRIMERO (para evitar que siga generando frames)
+    if 'simulation_loop' in app:
+        app['simulation_loop'].cancel()
+        try:
+            await asyncio.wait_for(app['simulation_loop'], timeout=1.0)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            pass
+        logging.info("Bucle de simulación detenido")
+    
     # Detener proceso de entrenamiento si está activo
     training_process = g_state.get('training_process')
     if training_process and training_process.returncode is None:
@@ -2063,10 +2221,10 @@ async def on_shutdown(app):
             training_process.terminate()
             # Esperar un poco para que el proceso pueda guardar
             try:
-                await asyncio.wait_for(asyncio.to_thread(training_process.wait), timeout=5.0)
+                await asyncio.wait_for(asyncio.to_thread(training_process.wait), timeout=3.0)
                 logging.info("Proceso de entrenamiento detenido correctamente.")
             except asyncio.TimeoutError:
-                logging.warning("El proceso de entrenamiento no respondió en 5 segundos. Forzando cierre...")
+                logging.warning("El proceso de entrenamiento no respondió en 3 segundos. Forzando cierre...")
                 training_process.kill()
                 await asyncio.to_thread(training_process.wait)
         except ProcessLookupError:
@@ -2079,34 +2237,13 @@ async def on_shutdown(app):
     # Guardar estado de simulación si hay un motor activo
     motor = g_state.get('motor')
     if motor and not g_state.get('is_paused', True):
-        logging.info("Guardando estado de simulación antes de cerrar...")
+        logging.info("Pausando simulación antes de cerrar...")
         try:
             # Pausar la simulación
             g_state['is_paused'] = True
-            # Aquí podrías guardar el estado del quantum state si es necesario
-            # Por ahora solo pausamos
-            logging.info("Simulación pausada y lista para guardar.")
+            logging.info("Simulación pausada")
         except Exception as e:
-            logging.error(f"Error al guardar estado de simulación: {e}")
-    
-    # Notificar a los clientes que el servidor se está cerrando
-    try:
-        await broadcast({
-            "type": "notification",
-            "payload": {
-                "status": "warning",
-                "message": "El servidor se está cerrando. Guardando estado..."
-            }
-        })
-    except Exception as e:
-        logging.warning(f"Error al notificar cierre: {e}")
-    
-    # Cancelar el bucle de simulación
-    app['simulation_loop'].cancel()
-    try:
-        await app['simulation_loop']
-    except asyncio.CancelledError:
-        pass
+            logging.error(f"Error al pausar simulación: {e}")
     
     logging.info("Cierre ordenado completado.")
 
@@ -2150,24 +2287,33 @@ async def main(shutdown_event=None):
         except asyncio.CancelledError:
             logging.info("Shutdown cancelado.")
         finally:
-            # Detener el sitio y limpiar el runner con timeout
+            # Detener el sitio y limpiar el runner con timeout más corto y forzado
             try:
                 logging.info("Deteniendo sitio...")
-                await asyncio.wait_for(site.stop(), timeout=5.0)
+                # Reducir timeout a 2 segundos
+                await asyncio.wait_for(site.stop(), timeout=2.0)
                 logging.info("Sitio detenido correctamente.")
             except asyncio.TimeoutError:
-                logging.warning("Timeout al detener el sitio. Continuando con limpieza...")
+                logging.warning("Timeout al detener el sitio. Forzando cierre...")
+                # Si hay un servidor subyacente, intentar cerrarlo directamente
+                if hasattr(site, '_server') and site._server:
+                    site._server.close()
             except Exception as e:
                 logging.warning(f"Error al detener el sitio: {e}")
             
             try:
                 logging.info("Limpiando runner...")
-                await asyncio.wait_for(runner.cleanup(), timeout=5.0)
+                # Reducir timeout a 2 segundos
+                await asyncio.wait_for(runner.cleanup(), timeout=2.0)
                 logging.info("Runner limpiado. Servidor cerrado correctamente.")
             except asyncio.TimeoutError:
-                logging.warning("Timeout al limpiar el runner. El servidor puede no haberse cerrado completamente.")
+                logging.warning("Timeout al limpiar el runner. Forzando cierre...")
+                # Forzar limpieza cancelando todas las tareas pendientes
+                for task in asyncio.all_tasks():
+                    if not task.done():
+                        task.cancel()
             except Exception as e:
                 logging.warning(f"Error al limpiar el runner: {e}")
     else:
         # Fallback: mantener el servidor corriendo indefinidamente
-    await asyncio.Event().wait()
+        await asyncio.Event().wait()

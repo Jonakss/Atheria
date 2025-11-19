@@ -13,7 +13,7 @@ from typing import List, Optional, Dict, Any
 import numpy as np
 
 from .qca_engine import QuantumState, Aetheria_Motor
-from . import config as global_cfg
+from .. import config as global_cfg
 
 
 class BatchInferenceEngine:

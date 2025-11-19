@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 from . import config as global_cfg
 from .utils import check_and_create_dir, load_experiment_config, get_latest_checkpoint
-from .pipeline_train import run_training_pipeline
+from .pipelines.pipeline_train import run_training_pipeline
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

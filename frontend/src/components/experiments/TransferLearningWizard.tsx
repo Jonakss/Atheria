@@ -51,16 +51,18 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
     useEffect(() => {
         if (baseExperiment && activeStep >= 1) {
             const exp = experimentsData?.find(e => e.name === baseExperiment);
-            if (exp?.config) {
+            // El backend ahora devuelve config anidado
+            const expConfig = exp?.config;
+            if (expConfig) {
                 const config: ExperimentConfig = {
-                    MODEL_ARCHITECTURE: exp.config.MODEL_ARCHITECTURE || 'UNET',
-                    GRID_SIZE_TRAINING: exp.config.GRID_SIZE_TRAINING || 64,
-                    LR_RATE_M: exp.config.LR_RATE_M || 0.0001,
-                    MODEL_PARAMS: exp.config.MODEL_PARAMS || { d_state: 8, hidden_channels: 32 },
-                    GAMMA_DECAY: exp.config.GAMMA_DECAY || 0.01,
-                    QCA_STEPS_TRAINING: exp.config.QCA_STEPS_TRAINING || 10,
-                    INITIAL_STATE_MODE_INFERENCE: exp.config.INITIAL_STATE_MODE_INFERENCE || 'complex_noise',
-                    TOTAL_EPISODES: exp.config.TOTAL_EPISODES || 0
+                    MODEL_ARCHITECTURE: expConfig.MODEL_ARCHITECTURE || 'UNET',
+                    GRID_SIZE_TRAINING: expConfig.GRID_SIZE_TRAINING || 64,
+                    LR_RATE_M: expConfig.LR_RATE_M || 0.0001,
+                    MODEL_PARAMS: expConfig.MODEL_PARAMS || { d_state: 8, hidden_channels: 32 },
+                    GAMMA_DECAY: expConfig.GAMMA_DECAY || 0.01,
+                    QCA_STEPS_TRAINING: expConfig.QCA_STEPS_TRAINING || 10,
+                    INITIAL_STATE_MODE_INFERENCE: expConfig.INITIAL_STATE_MODE_INFERENCE || 'complex_noise',
+                    TOTAL_EPISODES: expConfig.TOTAL_EPISODES || 0
                 };
                 setBaseConfig(config);
                 setNewConfig({ ...config }); // Copiar como punto de partida
@@ -253,13 +255,13 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
                                     <Divider />
                                     <Group gap="md">
                                         <Text size="xs" c="dimmed">
-                                            <strong>Arquitectura:</strong> {baseExperimentData.config?.MODEL_ARCHITECTURE}
+                                            <strong>Arquitectura:</strong> {baseExperimentData.config?.MODEL_ARCHITECTURE || 'N/A'}
                                         </Text>
                                         <Text size="xs" c="dimmed">
-                                            <strong>Grid Size:</strong> {baseExperimentData.config?.GRID_SIZE_TRAINING}
+                                            <strong>Grid Size:</strong> {baseExperimentData.config?.GRID_SIZE_TRAINING || 'N/A'}
                                         </Text>
                                         <Text size="xs" c="dimmed">
-                                            <strong>LR:</strong> {baseExperimentData.config?.LR_RATE_M?.toExponential(2)}
+                                            <strong>LR:</strong> {(baseExperimentData.config?.LR_RATE_M || 0.0001).toExponential(2)}
                                         </Text>
                                     </Group>
                                 </Stack>

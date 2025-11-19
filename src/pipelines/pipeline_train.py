@@ -4,11 +4,11 @@ from types import SimpleNamespace
 import logging
 import os
 
-from . import config as global_cfg
-from .model_loader import create_new_model, load_model
-from .qca_engine import Aetheria_Motor
-from .trainers import QC_Trainer_v3, QC_Trainer_v4
-from .utils import get_latest_checkpoint, load_experiment_config
+from .. import config as global_cfg
+from ..model_loader import create_new_model, load_model
+from ..engines.qca_engine import Aetheria_Motor
+from ..trainers import QC_Trainer_v3, QC_Trainer_v4
+from ..utils import get_latest_checkpoint, load_experiment_config
 
 def run_training_pipeline(exp_cfg: SimpleNamespace, checkpoint_path: str | None = None):
     """
@@ -46,7 +46,7 @@ def run_training_pipeline(exp_cfg: SimpleNamespace, checkpoint_path: str | None 
             logging.info(f"Nuevo modelo creado. Cargando pesos desde '{exp_cfg.LOAD_FROM_EXPERIMENT}' para transfer learning...")
             
             # Cargar checkpoint del experimento base
-            from .utils import get_latest_checkpoint
+            from ..utils import get_latest_checkpoint
             base_checkpoint = get_latest_checkpoint(exp_cfg.LOAD_FROM_EXPERIMENT)
             if base_checkpoint:
                 try:
@@ -137,26 +137,26 @@ def run_training_pipeline(exp_cfg: SimpleNamespace, checkpoint_path: str | None 
         _run_v4_training_loop(trainer, exp_cfg)
     else:
         # QC_Trainer_v3 usa la interfaz tradicional - necesita el motor creado
-        # 2. Inicializar el Motor Aetheria
-        # Pasar exp_cfg para que el motor tenga acceso a GAMMA_DECAY (término Lindbladian)
-        motor = Aetheria_Motor(ley_M, exp_cfg.GRID_SIZE_TRAINING, exp_cfg.MODEL_PARAMS.d_state, device, cfg=exp_cfg)
+    # 2. Inicializar el Motor Aetheria
+    # Pasar exp_cfg para que el motor tenga acceso a GAMMA_DECAY (término Lindbladian)
+    motor = Aetheria_Motor(ley_M, exp_cfg.GRID_SIZE_TRAINING, exp_cfg.MODEL_PARAMS.d_state, device, cfg=exp_cfg)
 
-        # 3. Compilar el modelo si es compatible
-        if getattr(ley_M, '_compiles', True):
-            motor.compile_model()
-        else:
-            logging.info(f"El modelo '{exp_cfg.MODEL_ARCHITECTURE}' ha deshabilitado torch.compile(). Se ejecutará sin compilar.")
-        
-        # Usar get_model_for_params() para acceder a los parámetros correctamente
-        # (maneja el caso cuando el modelo está compilado)
-        model_for_params = motor.get_model_for_params()
-        num_params = sum(p.numel() for p in model_for_params.parameters() if p.requires_grad)
+    # 3. Compilar el modelo si es compatible
+    if getattr(ley_M, '_compiles', True):
+        motor.compile_model()
+    else:
+        logging.info(f"El modelo '{exp_cfg.MODEL_ARCHITECTURE}' ha deshabilitado torch.compile(). Se ejecutará sin compilar.")
+    
+    # Usar get_model_for_params() para acceder a los parámetros correctamente
+    # (maneja el caso cuando el modelo está compilado)
+    model_for_params = motor.get_model_for_params()
+    num_params = sum(p.numel() for p in model_for_params.parameters() if p.requires_grad)
         print(f"Motor y Ley-M ({exp_cfg.MODEL_ARCHITECTURE}) inicializados (V3). Cuadrícula: {exp_cfg.GRID_SIZE_TRAINING}x{exp_cfg.GRID_SIZE_TRAINING}.")
-        print(f"Parámetros Entrenables: {num_params}")
-        
+    print(f"Parámetros Entrenables: {num_params}")
+
         # Inicializar el Entrenador V3
-        trainer = QC_Trainer_v3(motor, exp_cfg.LR_RATE_M, global_cfg, exp_cfg)
-        trainer.run_training_loop()
+    trainer = QC_Trainer_v3(motor, exp_cfg.LR_RATE_M, global_cfg, exp_cfg)
+    trainer.run_training_loop()
 
     logging.info("Pipeline de entrenamiento finalizado.")
 
@@ -209,7 +209,7 @@ def _run_v4_training_loop(trainer: QC_Trainer_v4, exp_cfg: SimpleNamespace):
     """
     import time
     from datetime import datetime
-    from .utils import save_experiment_config
+    from ..utils import save_experiment_config
     
     total_episodes = exp_cfg.TOTAL_EPISODES
     start_episode = getattr(exp_cfg, 'START_EPISODE', 0)

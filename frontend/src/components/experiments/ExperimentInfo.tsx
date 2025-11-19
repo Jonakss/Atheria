@@ -4,7 +4,7 @@ import { IconInfoCircle, IconTransfer, IconBrain, IconSettings } from '@tabler/i
 import { useWebSocket } from '../hooks/useWebSocket';
 
 export function ExperimentInfo() {
-    const { activeExperiment, experimentsData } = useWebSocket();
+    const { activeExperiment, experimentsData, compileStatus } = useWebSocket();
     
     if (!activeExperiment) {
         return (
@@ -46,6 +46,16 @@ export function ExperimentInfo() {
                         >
                             {experiment.has_checkpoint ? '✓ Entrenado' : '○ Sin entrenar'}
                         </Badge>
+                        {compileStatus?.is_native && (
+                            <Badge color="blue" variant="light" size="sm">
+                                ⚡ Nativo (C++)
+                            </Badge>
+                        )}
+                        {compileStatus && !compileStatus.is_native && (
+                            <Badge color="gray" variant="light" size="sm">
+                                🐍 Python
+                            </Badge>
+                        )}
                     </Group>
                 </Group>
                 

@@ -438,8 +438,8 @@ async def handle_load_experiment(args):
         from .utils import load_experiment_config, get_latest_checkpoint
         from . import config as global_cfg
         from .model_loader import load_model
-        from .qca_engine import Aetheria_Motor
-        from .roi_manager import ROIManager
+        from ..engines.qca_engine import Aetheria_Motor
+        from ..managers.roi_manager import ROIManager
         
         config = load_experiment_config(exp_name)
         if not config:
@@ -574,7 +574,7 @@ async def handle_reset(args):
         # Obtener el modo de inicialización de la configuración
         from .utils import load_experiment_config
         from . import config as global_cfg
-        from .qca_engine import QuantumState
+        from ..engines.qca_engine import QuantumState
         
         # Intentar obtener el modo de inicialización del experimento activo o usar el global
         initial_mode = getattr(global_cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')
@@ -1036,7 +1036,7 @@ async def handle_set_roi(args):
     
     if not roi_manager:
         # Crear ROI manager si no existe
-        from .roi_manager import ROIManager
+        from ..managers.roi_manager import ROIManager
         grid_size = g_state.get('grid_size', 256)
         roi_manager = ROIManager(grid_size=grid_size)
         g_state['roi_manager'] = roi_manager
@@ -1219,7 +1219,7 @@ async def handle_list_history_files(args):
     """Lista los archivos de historia guardados."""
     ws = g_state['websockets'].get(args.get('ws_id'))
     try:
-        from .history_manager import HISTORY_DIR
+        from ..managers.history_manager import HISTORY_DIR
         import json
         from pathlib import Path
         
@@ -1263,7 +1263,7 @@ async def handle_load_history_file(args):
     """Carga un archivo de historia."""
     ws = g_state['websockets'].get(args.get('ws_id'))
     try:
-        from .history_manager import HISTORY_DIR
+        from ..managers.history_manager import HISTORY_DIR
         import json
         from pathlib import Path
         

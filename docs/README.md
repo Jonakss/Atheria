@@ -1,170 +1,148 @@
-# Documentación de Aetheria
+# Atheria 4 - Documentación Completa
 
-Bienvenido a la documentación completa de Aetheria Simulation Lab.
+> **Vault de Obsidian** | Documentación técnica y conceptual del simulador de cosmogénesis
 
-## 📚 Índice de Documentación
+---
 
-### Guías Principales
+## 🗺️ Mapa de Contenidos (MOC)
 
-1. **[Guía de Aprendizaje Progresivo](PROGRESSIVE_LEARNING.md)**
-   - Aprende desde lo básico hasta experimentos avanzados
-   - Roadmap de aprendizaje por semanas
-   - Ejercicios prácticos
+### 📘 [📋 Core Documentation](10_core/00_CORE_MOC.md)
+- **[Brief Maestro](10_core/ATHERIA_4_MASTER_BRIEF.md)** - Visión y objetivos del proyecto
+- **[Arquitectura Técnica V4](10_core/TECHNICAL_ARCHITECTURE_V4.md)** - Arquitectura del sistema
+- **[Glosario](10_core/ATHERIA_GLOSSARY.md)** - Terminología y conceptos clave
+- **[Roadmap Fase 1](10_core/ROADMAP_PHASE_1.md)** - Plan de desarrollo inicial
+- **[Roadmap Fase 2](10_core/ROADMAP_PHASE_2.md)** - Plan de desarrollo avanzado
+- **[Aprendizaje Progresivo](10_core/PROGRESSIVE_LEARNING.md)** - Guía de aprendizaje estructurada
+- **[Arquitectura de Inferencia Masiva](10_core/MASSIVE_INFERENCE_ARCHITECTURE.md)** - Escalabilidad horizontal
 
-2. **[Guía de Experimentación](EXPERIMENTATION_GUIDE.md)**
-   - Estrategias de experimentación
-   - Cómo probar cada visualización
-   - Optimizaciones y eficiencias
-   - Ejemplos de experimentos
+### 🧩 [🔧 Componentes Técnicos](30_Components/00_COMPONENTS_MOC.md)
+- **[Modelos](30_Components/Models.md)** - Arquitecturas de modelos
+- **[UNet](30_Components/UNET.md)** - Documentación específica de UNet
+- **[Arquitectura V3](30_Components/ARCHITECTURE_V3.md)** - Sistema V3
+- **[Motor Nativo C++](30_Components/NATIVE_ENGINE_COMMUNICATION.md)** - Comunicación motor nativo
+- **[Sistema de Historia](30_Components/HISTORY_SYSTEM.md)** - Gestión de historia
+- **[Optimización GPU](30_Components/GPU_OPTIMIZATION.md)** - Optimizaciones GPU
+- **[Optimización de Transferencia](30_Components/WORLD_DATA_TRANSFER_OPTIMIZATION.md)** - Transferencia optimizada
+- **[Recomendaciones de Visualización](30_Components/VISUALIZATION_RECOMMENDATIONS.md)** - Guía de visualizaciones
+- Y más componentes técnicos...
 
-3. **[Guía de Pruebas por Visualización](VISUALIZATION_TESTING.md)**
-   - Cómo probar cada visualización
-   - Qué buscar en cada una
-   - Interpretación de resultados
-   - Combinaciones útiles
+### 🧪 [📊 Experimentos y Resultados](40_Experiments/00_EXPERIMENTS_MOC.md)
+- **[Log de Desarrollo AI](40_Experiments/AI_DEV_LOG.md)** - Bitácora de desarrollo
+- **[Guía de Experimentación](40_Experiments/EXPERIMENTATION_GUIDE.md)** - Cómo experimentar
+- **[Guía de Pruebas de Visualización](40_Experiments/VISUALIZATION_TESTING.md)** - Tests de visualizaciones
+- **[Cómo Ejecutar](40_Experiments/HOW_TO_RUN.md)** - Instrucciones de ejecución
+- **[Benchmarks de Rendimiento](40_Experiments/)** - Resultados de benchmarks
+- Y más experimentos...
 
-4. **[Recomendaciones de Visualizaciones](VISUALIZATION_RECOMMENDATIONS.md)**
-   - Análisis de visualizaciones disponibles
-   - Prioridades de implementación
-   - Costos y beneficios
+### 💡 [🔬 Conceptos](20_Concepts/00_CONCEPTS_MOC.md)
+- **[Vacío Armónico](20_Concepts/HARMONIC_VACUUM_CONCEPT.md)** - Concepto físico fundamental
 
-5. **[Análisis de Técnicas Avanzadas](TECHNIQUES_ANALYSIS.md)**
-   - RMSNorm, SwiGLU, RoPE
-   - Cuándo usar cada técnica
-   - Implementación y optimización
-
-6. **[Zoom y Transferencia de Datos](ZOOM_AND_DATA_TRANSFER.md)**
-   - Cómo funciona el zoom actual
-   - Optimizaciones disponibles (downsampling)
-   - Recomendaciones de uso
-
-7. **[Arquitectura para Inferencia Masiva](MASSIVE_INFERENCE_ARCHITECTURE.md)**
-   - Clustering y distribución de simulaciones
-   - Protocolos de comunicación entre workers
-   - Escalabilidad horizontal
-   - Casos de uso para búsqueda masiva de patrones
+### 📝 [📋 Plantillas](99_Templates/AGENT_TOOLKIT.md)
+- **[Toolkit de Agente](99_Templates/AGENT_TOOLKIT.md)** - Comandos para agentes
+- **[Guía de Agente](99_Templates/AGENT_GUIDELINES.md)** - Directrices para agentes IA
+- **[Plantilla de Componente](99_Templates/Component_Template.md)** - Template para documentar componentes
 
 ---
 
 ## 🚀 Inicio Rápido
 
 ### Para Principiantes
-1. Lee [Guía de Aprendizaje Progresivo](PROGRESSIVE_LEARNING.md) - Nivel 1
-2. Prueba [Guía de Pruebas por Visualización](VISUALIZATION_TESTING.md) - Visualizaciones Básicas
-3. Sigue los experimentos del [Nivel 1](PROGRESSIVE_LEARNING.md#nivel-1-fundamentos-semanas-1-2)
-
-### Para Usuarios Avanzados
-1. Revisa [Guía de Experimentación](EXPERIMENTATION_GUIDE.md)
-2. Consulta [Recomendaciones de Visualizaciones](VISUALIZATION_RECOMMENDATIONS.md)
-3. Implementa técnicas de [Análisis de Técnicas Avanzadas](TECHNIQUES_ANALYSIS.md)
+1. Lee [Brief Maestro](10_core/ATHERIA_4_MASTER_BRIEF.md) para entender la visión
+2. Sigue [Aprendizaje Progresivo](10_core/PROGRESSIVE_LEARNING.md) - Nivel 1
+3. Prueba [Guía de Pruebas de Visualización](40_Experiments/VISUALIZATION_TESTING.md)
 
 ### Para Desarrolladores
-1. Estudia [Arquitectura para Inferencia Masiva](MASSIVE_INFERENCE_ARCHITECTURE.md)
-2. Planifica escalabilidad y clustering
-3. Implementa protocolos de comunicación distribuida
+1. Estudia [Arquitectura Técnica V4](10_core/TECHNICAL_ARCHITECTURE_V4.md)
+2. Revisa [Motor Nativo C++](30_Components/NATIVE_ENGINE_COMMUNICATION.md)
+3. Consulta [Guía de Agente](99_Templates/AGENT_GUIDELINES.md)
+
+### Para Experimentadores
+1. Consulta [Guía de Experimentación](40_Experiments/EXPERIMENTATION_GUIDE.md)
+2. Revisa [Cómo Ejecutar](40_Experiments/HOW_TO_RUN.md)
+3. Estudia [Log de Desarrollo AI](40_Experiments/AI_DEV_LOG.md)
 
 ---
 
-## 📖 Estructura de Documentación
+## 📖 Estructura del Vault
 
 ```
 docs/
 ├── README.md (este archivo)
-├── 00_Inbox/                    # Notas y documentos pendientes de clasificar
-├── 10_core/                     # Documentación core del proyecto
+├── 00_Inbox/                    # Notas pendientes de clasificar
+│   └── notes_riscv.md
+├── 10_core/                     # Documentación core
+│   ├── 00_CORE_MOC.md
 │   ├── ATHERIA_4_MASTER_BRIEF.md
 │   ├── ATHERIA_GLOSSARY.md
-│   ├── ROADMAP_PHASE_1.md
 │   ├── TECHNICAL_ARCHITECTURE_V4.md
-│   └── PROGRESSIVE_LEARNING.md
+│   ├── ROADMAP_PHASE_1.md
+│   ├── ROADMAP_PHASE_2.md
+│   ├── PROGRESSIVE_LEARNING.md
+│   └── MASSIVE_INFERENCE_ARCHITECTURE.md
 ├── 20_Concepts/                 # Conceptos y teorías
-│   └── Concepto_Vacio_Armonico.md
-├── 30_Components/               # Documentación de componentes técnicos
-│   ├── Models.md                # Arquitecturas de modelos
-│   ├── ArchitectureV3.md        # Arquitectura del sistema (V3)
-│   └── HISTORY_SYSTEM.md        # Sistema de historia
+│   ├── 00_CONCEPTS_MOC.md
+│   └── HARMONIC_VACUUM_CONCEPT.md
+├── 30_Components/               # Componentes técnicos
+│   ├── 00_COMPONENTS_MOC.md
+│   ├── Models.md
+│   ├── UNET.md
+│   ├── ARCHITECTURE_V3.md
+│   ├── NATIVE_ENGINE_COMMUNICATION.md
+│   ├── HISTORY_SYSTEM.md
+│   ├── GPU_OPTIMIZATION.md
+│   ├── WORLD_DATA_TRANSFER_OPTIMIZATION.md
+│   └── ... (más componentes)
 ├── 40_Experiments/              # Experimentos y resultados
+│   ├── 00_EXPERIMENTS_MOC.md
 │   ├── AI_DEV_LOG.md
-│   └── Progressive_Training.md
-├── 99_Templates/                # Plantillas para documentación
-│   └── Component_Template.md
-├── EXPERIMENTATION_GUIDE.md     # Cómo experimentar
-├── VISUALIZATION_TESTING.md     # Pruebas por visualización
-├── VISUALIZATION_RECOMMENDATIONS.md  # Análisis de visualizaciones
-├── TECHNIQUES_ANALYSIS.md       # Técnicas avanzadas (RMSNorm, RoPE, etc.)
-├── ZOOM_AND_DATA_TRANSFER.md    # Optimización de zoom y datos
-└── MASSIVE_INFERENCE_ARCHITECTURE.md  # Arquitectura para inferencia masiva
+│   ├── EXPERIMENTATION_GUIDE.md
+│   ├── VISUALIZATION_TESTING.md
+│   ├── HOW_TO_RUN.md
+│   └── ... (más experimentos)
+└── 99_Templates/                # Plantillas
+    ├── AGENT_TOOLKIT.md
+    ├── AGENT_GUIDELINES.md
+    └── Component_Template.md
 ```
 
 ---
 
-## 🎯 Objetivos de Aprendizaje
+## 🔗 Convenciones de Naming
 
-### Nivel 1: Fundamentos
-- ✅ Entender física básica (QCA, unitariedad, Lindblad)
-- ✅ Dominar visualizaciones básicas (density, phase, energy)
-- ✅ Comparar arquitecturas simples (MLP vs UNet)
-
-### Nivel 2: Herramientas
-- ✅ Dominar todas las visualizaciones
-- ✅ Usar t-SNE para análisis
-- ✅ Guardar y analizar historia
-
-### Nivel 3: Optimización
-- ✅ Encontrar mejores parámetros
-- ✅ Optimizar para tu hardware
-- ✅ Documentar configuraciones exitosas
-
-### Nivel 4: A-Life
-- ✅ Buscar gliders
-- ✅ Buscar osciladores
-- ✅ Buscar replicadores
-- ✅ Caracterizar estructuras encontradas
+- **Archivos:** `UPPERCASE_WITH_UNDERSCORES.md`
+- **Carpetas:** `NN_Name/` (prefijo numérico para orden)
+- **MOCs:** `00_CATEGORY_MOC.md` (Map of Content por categoría)
+- **Enlaces:** Usar rutas relativas con nombres de archivo exactos
 
 ---
 
-## 🔧 Recursos Técnicos
+## 📋 Responsabilidades
 
-### Comandos Útiles
-```javascript
-// Habilitar historia
-simulation.enable_history({enabled: true})
-
-// Guardar historia
-simulation.save_history({filename: "experimento.json"})
-
-// Capturar snapshot
-simulation.capture_snapshot({})
-
-// Configurar FPS
-simulation.set_fps({fps: 30})
-
-// Configurar velocidad
-simulation.set_speed({speed: 2.0})
-```
-
-### Visualizaciones Disponibles
-- **Básicas:** density, phase, energy, real, imag
-- **Avanzadas:** entropy, coherence, channel_activity, physics
-- **Análisis:** spectral, gradient, flow, phase_attractor
-- **t-SNE:** universe_atlas, cell_chemistry
+Consulta **[Responsabilidades de Cada Carpeta](00_RESPONSIBILITIES.md)** para entender qué tipo de documentación va en cada carpeta.
 
 ---
 
-## 📝 Notas
+## 📌 Tags para Obsidian
 
-- La documentación se actualiza constantemente
-- Si encuentras errores o tienes sugerencias, documenta tus hallazgos
-- Comparte configuraciones exitosas con la comunidad
+Usa estos tags para organizar:
+
+- `#core` - Documentación core del proyecto
+- `#component` - Componentes técnicos
+- `#experiment` - Experimentos y resultados
+- `#concept` - Conceptos teóricos
+- `#guide` - Guías y tutoriales
+- `#template` - Plantillas
+- `#moc` - Map of Content
 
 ---
 
-## 🎓 Próximos Pasos
+## 🎯 Próximos Pasos
 
-1. **Lee la [Guía de Aprendizaje Progresivo](PROGRESSIVE_LEARNING.md)**
-2. **Prueba las visualizaciones** según [VISUALIZATION_TESTING.md](VISUALIZATION_TESTING.md)
-3. **Experimenta** siguiendo [EXPERIMENTATION_GUIDE.md](EXPERIMENTATION_GUIDE.md)
-4. **Busca A-Life** usando todas las herramientas
+1. **Explora los MOCs** de cada categoría
+2. **Lee el Brief Maestro** para entender la visión
+3. **Sigue la Guía de Aprendizaje Progresivo**
+4. **Experimenta** siguiendo las guías de experimentación
 
-¡Buena suerte en tu búsqueda de vida artificial! 🚀
+---
 
+*Última actualización: 2024-11-19*

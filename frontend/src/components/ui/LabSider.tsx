@@ -281,7 +281,7 @@ export function LabSider() {
                             min={1} 
                             step={100}
                             description={activeExperiment 
-                                ? `Si el experimento tiene ${currentExperiment?.config?.TOTAL_EPISODES || 0} episodios, añadir ${episodesToAdd} más llegará a ${(currentExperiment?.config?.TOTAL_EPISODES || 0) + episodesToAdd} totales`
+                                ? `Si el experimento tiene ${currentExperiment?.total_episodes || 0} episodios, añadir ${episodesToAdd} más llegará a ${(currentExperiment?.total_episodes || 0) + episodesToAdd} totales`
                                 : `Número de episodios para entrenar. Si continúas un experimento, se añadirán a los existentes.`}
                         />
                         <Tooltip 
@@ -329,16 +329,18 @@ export function LabSider() {
                                     return true;
                                 }).map(exp => ({
                                     value: exp.name,
-                                    label: `${exp.name} (${exp.config.MODEL_ARCHITECTURE})`
+                                    label: `${exp.name} (${exp.model_architecture || 'N/A'})`
                                 })) || []}
                                 value={transferFromExperiment}
                                 onChange={(value) => {
                                     // Validar que no sea circular
                                     if (value && experimentsData) {
                                         const selectedExp = experimentsData.find(e => e.name === value);
-                                        if (selectedExp?.config?.LOAD_FROM_EXPERIMENT) {
+                                        // Los datos vienen planos, no anidados en config
+                                        const loadFrom = selectedExp?.config?.LOAD_FROM_EXPERIMENT || selectedExp?.load_from_experiment;
+                                        if (loadFrom) {
                                             // Verificar cadena de dependencias
-                                            let current = selectedExp.config.LOAD_FROM_EXPERIMENT;
+                                            let current = loadFrom;
                                             const chain = [value];
                                             while (current) {
                                                 if (chain.includes(current)) {
@@ -347,7 +349,7 @@ export function LabSider() {
                                                 }
                                                 chain.push(current);
                                                 const exp = experimentsData.find(e => e.name === current);
-                                                current = exp?.config?.LOAD_FROM_EXPERIMENT;
+                                                current = exp?.config?.LOAD_FROM_EXPERIMENT || exp?.load_from_experiment;
                                             }
                                         }
                                     }
@@ -368,7 +370,8 @@ export function LabSider() {
                                     <Text size="xs">
                                         Transfer desde: <strong>{transferFromExperiment}</strong>
                                     </Text>
-                                    {experimentsData?.find(e => e.name === transferFromExperiment)?.config?.LOAD_FROM_EXPERIMENT && (
+                                    {(experimentsData?.find(e => e.name === transferFromExperiment)?.config?.LOAD_FROM_EXPERIMENT || 
+                                      experimentsData?.find(e => e.name === transferFromExperiment)?.load_from_experiment) && (
                                         <Text size="xs" c="dimmed" mt={4}>
                                             (Este experimento también usa transfer learning)
                                         </Text>

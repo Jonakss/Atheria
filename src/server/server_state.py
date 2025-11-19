@@ -1,10 +1,10 @@
-# src/server_state.py
+# src/server/server_state.py
 import asyncio
 import json
 import logging
-from .history_manager import SimulationHistory
+from ..managers.history_manager import SimulationHistory
 from .data_compression import optimize_frame_payload, get_payload_size
-from .roi_manager import ROIManager, apply_roi_to_payload
+from ..managers.roi_manager import ROIManager, apply_roi_to_payload
 
 # Estado global de la aplicación
 g_state = {
@@ -67,4 +67,47 @@ async def send_to_websocket(websocket, data_type: str, payload: dict):
             await websocket.send_json({"type": data_type, "payload": payload})
         except Exception as e:
             logging.warning(f"Error al enviar datos de tipo {data_type}: {e}")
+
+async def broadcast_binary(data: bytes, frame_type: str = "simulation_frame"):
+    """
+    Envía datos binarios a todos los clientes WebSocket conectados.
+    
+    Para uso con frames optimizados (data_transfer_optimized).
+    Los frames binarios son 5-10x más pequeños que JSON.
+    
+    Args:
+        data: bytes binarios a enviar (CBOR o formato optimizado)
+        frame_type: Tipo de frame para identificar en el frontend (default: "simulation_frame")
+    
+    Nota: aiohttp WebSocketResponse tiene send_bytes() que envía frames binarios.
+    Enviamos primero un mensaje JSON pequeño con metadata, luego los datos binarios.
+    """
+    if not g_state['websockets']:
+        return
+        
+    tasks = []
+    for ws in list(g_state['websockets'].values()):
+        if not ws.closed:
+            try:
+                # Estrategia híbrida: Metadata JSON (pequeño) + Datos binarios (grandes)
+                # Esto permite al frontend saber qué tipo de frame esperar
+                metadata = {
+                    "type": f"{frame_type}_binary",
+                    "size": len(data),
+                    "format": "cbor"  # o "binary" dependiendo del formato
+                }
+                
+                # Enviar metadata JSON primero (pequeño, ~50 bytes)
+                tasks.append(ws.send_json(metadata))
+                
+                # Enviar datos binarios después (grandes, 10-20 KB optimizado)
+                # aiohttp WebSocketResponse.send_bytes() envía frames binarios directamente
+                tasks.append(ws.send_bytes(data))
+                
+            except Exception as e:
+                logging.warning(f"Error enviando binary frame: {e}")
+                # Fallback silencioso: Si falla, no hacer nada (evitar spam de logs)
+    
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
 # --- FIN DE LA CORRECCIÓN ---

@@ -1,12 +1,12 @@
 // frontend/src/components/MainTabs.tsx
 import { Tabs, Box } from '@mantine/core';
 import { IconChartBar, IconDatabase, IconBook, IconChartScatter, IconHistory, IconSettings } from '@tabler/icons-react';
-import { VisualizationTab } from './VisualizationTab';
-import { DataTab } from './DataTab';
-import { LogbookTab } from './LogbookTab';
-import { AnalysisTab } from './AnalysisTab';
-import { HistoryViewer } from './HistoryViewer';
-import { InferenceConfigTab } from './InferenceConfigTab';
+import { VisualizationTab } from '../visualization/VisualizationTab';
+import { DataTab } from '../training/DataTab';
+import { LogbookTab } from '../training/LogbookTab';
+import { AnalysisTab } from '../training/AnalysisTab';
+import { HistoryViewer } from '../visualization/HistoryViewer';
+import { InferenceConfigTab } from '../controls/InferenceConfigTab';
 
 export function MainTabs() {
     return (

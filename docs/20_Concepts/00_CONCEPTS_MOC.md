@@ -1,0 +1,23 @@
+# 🔬 Concepts - Map of Content
+
+> Mapa de contenido para conceptos teóricos de Atheria 4
+
+---
+
+## 🌌 Física y Fundamentos
+
+- **[Vacío Armónico](../20_Concepts/HARMONIC_VACUUM_CONCEPT.md)** - Concepto fundamental del vacío cuántico armónico
+
+---
+
+## 🔗 Enlaces Relacionados
+
+- [[10_core/00_CORE_MOC]] - Documentación core
+- [[10_core/ATHERIA_GLOSSARY]] - Glosario completo
+
+---
+
+## 📌 Tags
+
+#concept #moc #physics #theory
+

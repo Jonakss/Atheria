@@ -348,7 +348,7 @@ Para estructuras prometedoras:
 
 ### Documentos de Referencia
 - `docs/TECHNIQUES_ANALYSIS.md` - Análisis de técnicas avanzadas
-- `docs/VISUALIZATION_RECOMMENDATIONS.md` - Guía de visualizaciones
+- `docs/30_Components/VISUALIZATION_RECOMMENDATIONS.md` - Guía de visualizaciones
 - `docs/EXPERIMENTATION_GUIDE.md` - Guía de experimentación
 
 ### Comandos Útiles

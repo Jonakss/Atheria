@@ -40,6 +40,13 @@ interface TrainingProgress {
     avg_reward?: number;
 }
 
+interface CompileStatus {
+    is_compiled: boolean;
+    is_native: boolean;  // ← INDICADOR DE MOTOR NATIVO
+    model_name: string;
+    compiles_enabled: boolean;
+}
+
 interface WebSocketContextType {
     sendCommand: (scope: string, command: string, args?: Record<string, any>) => void;
     connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'server_unavailable';
@@ -62,6 +69,7 @@ interface WebSocketContextType {
     snapshotCount: number; // Contador de snapshots capturados
     serverConfig: ServerConfig; // Configuración del servidor
     updateServerConfig: (config: Partial<ServerConfig>) => void; // Actualizar configuración
+    compileStatus: CompileStatus | null; // Estado de compilación/motor
 }
 
 export const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
@@ -90,6 +98,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     const [snapshotCount, setSnapshotCount] = useState<number>(0);
     const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'running' | 'completed' | 'cancelled' | 'error'>('idle');
     const [analysisType, setAnalysisType] = useState<'universe_atlas' | 'cell_chemistry' | null>(null);
+    const [compileStatus, setCompileStatus] = useState<CompileStatus | null>(null);
     // Usar una referencia para acceder al valor actual de activeExperiment en callbacks
     const activeExperimentRef = useRef<string | null>(null);
     
@@ -222,6 +231,10 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         break;
                     case 'inference_status_update':
                         setInferenceStatus(payload.status);
+                        // Almacenar compile_status si está disponible
+                        if (payload.compile_status) {
+                            setCompileStatus(payload.compile_status as CompileStatus);
+                        }
                         break;
                     case 'simulation_frame':
                         // Descomprimir datos si están comprimidos
@@ -417,6 +430,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         snapshotCount,
         serverConfig,
         updateServerConfig,
+        compileStatus, // Estado de compilación/motor (indica si es nativo)
     };
 
     return (

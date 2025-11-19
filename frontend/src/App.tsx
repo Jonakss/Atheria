@@ -1,14 +1,14 @@
 // frontend/src/App.tsx
 import { AppShell, Burger, Group, MantineProvider, Alert, Button } from '@mantine/core'; // Usamos MantineProvider para temas
 import { useDisclosure } from '@mantine/hooks';
-import { LabSider } from './components/LabSider';
-import { MainHeader } from './components/MainHeader';
-import { MainTabs } from './components/MainTabs';
+import { LabSider } from './components/ui/LabSider';
+import { MainHeader } from './components/ui/MainHeader';
+import { MainTabs } from './components/ui/MainTabs';
 import { Box } from '@mantine/core';
 import { IconAlertCircle, IconRefresh } from '@tabler/icons-react';
 import { WebSocketProvider } from './context/WebSocketContext';
 import { useWebSocket } from './hooks/useWebSocket'; // <-- ¡LA IMPORTACIÓN CLAVE!
-import { ErrorBoundary } from './components/ErrorBoundary';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { getWebSocketUrl } from './utils/serverConfig';
 import '@mantine/core/styles.css'; // Importa los estilos de Mantine
 

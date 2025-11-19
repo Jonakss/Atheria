@@ -23,8 +23,8 @@ try:
     sys.path.insert(0, project_root)
 
     # Ahora que el path está configurado, podemos importar nuestros módulos de forma segura.
-    from src import pipeline_server
-    log.info("Módulo 'src.pipeline_server' importado exitosamente.")
+    from src.pipelines import pipeline_server
+    log.info("Módulo 'src.pipelines.pipeline_server' importado exitosamente.")
 
 except ImportError as e:
     log.error("="*60)
@@ -38,8 +38,8 @@ except ImportError as e:
 async def save_state_before_shutdown():
     """Guarda el estado del entrenamiento y simulación antes de cerrar."""
     try:
-        from src.server_state import g_state
-        from src.server_handlers import create_experiment_handler
+        from src.server.server_state import g_state
+        from src.server.server_handlers import create_experiment_handler
         
         # Guardar estado de entrenamiento si hay un proceso activo
         training_process = g_state.get('training_process')
@@ -72,12 +72,12 @@ if __name__ == "__main__":
     def signal_handler(signum, frame):
         global shutdown_in_progress
         if shutdown_in_progress:
-            log.warning(f"Señal {signum} recibida durante shutdown. Forzando salida...")
-            # Si ya estamos en proceso de shutdown y recibimos otra señal, salir inmediatamente
-            import sys
-            sys.exit(1)
+            log.warning(f"Señal {signum} recibida durante shutdown. Forzando salida inmediata...")
+            # Si ya estamos en proceso de shutdown y recibimos otra señal (Ctrl+C nuevamente), salir inmediatamente
+            import os
+            os._exit(1)  # Salida forzada, no llama finally
         
-        log.info(f"Señal {signum} recibida. Iniciando shutdown graceful...")
+        log.info(f"Señal {signum} recibida. Iniciando shutdown graceful (máx. 5 segundos)...")
         shutdown_in_progress = True
         
         # Configurar el evento en el event loop actual
@@ -85,8 +85,21 @@ if __name__ == "__main__":
             main_loop.call_soon_threadsafe(shutdown_event.set)
         else:
             log.warning("Shutdown event o main loop no están disponibles. Forzando salida...")
-            import sys
-            sys.exit(1)
+            import os
+            os._exit(1)
+        
+        # Si después de 5 segundos no se ha cerrado, forzar salida
+        import threading
+        def force_exit_after_timeout():
+            import time
+            time.sleep(5)
+            if shutdown_in_progress:
+                log.warning("Shutdown excedió 5 segundos. Forzando salida...")
+                import os
+                os._exit(1)
+        
+        timeout_thread = threading.Thread(target=force_exit_after_timeout, daemon=True)
+        timeout_thread.start()
     
     # Registrar handlers de señales
     signal.signal(signal.SIGINT, signal_handler)

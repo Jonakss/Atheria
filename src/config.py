@@ -68,6 +68,11 @@ MODEL_PARAMS = {
 #   - > 0.1: Decaimiento rápido (presión fuerte, más difícil mantener estructuras)
 GAMMA_DECAY = 0.01
 
+# --- Motor Nativo (C++) ---
+# Si es True, intenta usar el motor nativo de alto rendimiento (250-400x más rápido)
+# Si es False o el motor nativo no está disponible, usa el motor Python tradicional
+USE_NATIVE_ENGINE = True
+
 # Hiperparámetros de Entrenamiento
 TOTAL_EPISODES = 2000 # ¡¡CAMBIO!!
 STEPS_PER_EPISODE = 50
