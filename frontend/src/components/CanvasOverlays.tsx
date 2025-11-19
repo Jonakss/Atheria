@@ -1,7 +1,6 @@
 // frontend/src/components/CanvasOverlays.tsx
 import { useRef, useEffect } from 'react';
-import { Box, Stack, Group, Text, Switch, Select, Badge } from '@mantine/core';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { Box, Stack, Text, Switch, Select } from '@mantine/core';
 
 export interface OverlayConfig {
     showGrid: boolean;
@@ -133,15 +132,20 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config, roiInfo 
             ctx.lineWidth = 0.5 / (baseScale * zoom);
             
             const step = config.gridSize;
+            
+            // Ajustar el inicio para que sea el primer múltiplo de step dentro de la vista
+            const firstX = roiInfo?.enabled ? (step - (roiInfo.x % step)) % step : 0;
+            const firstY = roiInfo?.enabled ? (step - (roiInfo.y % step)) % step : 0;
+
             // Dibujar líneas verticales
-            for (let x = 0; x <= gridWidth; x += step) {
+            for (let x = firstX; x <= gridWidth; x += step) {
                 ctx.beginPath();
                 ctx.moveTo(x, 0);
                 ctx.lineTo(x, gridHeight);
                 ctx.stroke();
             }
             // Dibujar líneas horizontales
-            for (let y = 0; y <= gridHeight; y += step) {
+            for (let y = firstY; y <= gridHeight; y += step) {
                 ctx.beginPath();
                 ctx.moveTo(0, y);
                 ctx.lineTo(gridWidth, y);
