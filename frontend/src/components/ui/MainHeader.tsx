@@ -1,7 +1,9 @@
 // frontend/src/components/MainHeader.tsx
 import { Group, Burger, Text, Badge, Tooltip } from '@mantine/core';
 import { IconPlayerPlay, IconPlayerPause } from '@tabler/icons-react';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
+import { motion } from 'framer-motion';
+import { slideInFromTop } from '../../utils/animations';
 import classes from './MainHeader.module.css';
 
 interface HeaderProps {
@@ -16,7 +18,13 @@ export function MainHeader({ mobileOpened, desktopOpened, toggleMobile, toggleDe
     const currentStep = simData?.step ?? null;
 
     return (
-        <Group h="100%" px="md" justify="space-between">
+        <motion.div
+            variants={slideInFromTop}
+            initial="hidden"
+            animate="visible"
+            style={{ height: '100%', width: '100%' }}
+        >
+            <Group h="100%" px="md" justify="space-between">
             <Group gap="md">
                 <Burger opened={mobileOpened} onClick={toggleMobile} hiddenFrom="sm" size="sm" />
                 <Burger opened={desktopOpened} onClick={toggleDesktop} visibleFrom="sm" size="sm" />
@@ -69,5 +77,6 @@ export function MainHeader({ mobileOpened, desktopOpened, toggleMobile, toggleDe
                 </Tooltip>
             </Group>
         </Group>
+        </motion.div>
     );
 }

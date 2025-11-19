@@ -1,16 +1,17 @@
 // frontend/src/App.tsx
-import { AppShell, Burger, Group, MantineProvider, Alert, Button } from '@mantine/core'; // Usamos MantineProvider para temas
+import { AppShell, Burger, Group, Alert, Button } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import { motion } from 'framer-motion';
 import { LabSider } from './components/ui/LabSider';
 import { MainHeader } from './components/ui/MainHeader';
 import { MainTabs } from './components/ui/MainTabs';
 import { Box } from '@mantine/core';
 import { IconAlertCircle, IconRefresh } from '@tabler/icons-react';
-import { WebSocketProvider } from './context/WebSocketContext';
-import { useWebSocket } from './hooks/useWebSocket'; // <-- ¡LA IMPORTACIÓN CLAVE!
+import { useWebSocket } from './hooks/useWebSocket';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { getWebSocketUrl } from './utils/serverConfig';
-import '@mantine/core/styles.css'; // Importa los estilos de Mantine
+import { fadeIn } from './utils/animations';
+import '@mantine/core/styles.css';
 
 function AppContent() {
     const { connectionStatus, serverConfig, reconnect } = useWebSocket();
@@ -18,15 +19,21 @@ function AppContent() {
     const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(true);
 
     return (
-        <AppShell
-            header={{ height: 60 }}
-            navbar={{
-                width: 400,
-                breakpoint: 'sm',
-                collapsed: { mobile: !mobileOpened, desktop: !desktopOpened },
-            }}
-            padding="md"
+        <motion.div
+            variants={fadeIn}
+            initial="hidden"
+            animate="visible"
+            style={{ height: '100vh', width: '100%' }}
         >
+            <AppShell
+                header={{ height: 60 }}
+                navbar={{
+                    width: 400,
+                    breakpoint: 'sm',
+                    collapsed: { mobile: !mobileOpened, desktop: !desktopOpened },
+                }}
+                padding="md"
+            >
             <AppShell.Header>
                 <MainHeader 
                     mobileOpened={mobileOpened} 
@@ -70,21 +77,17 @@ function AppContent() {
                 </Box>
             </AppShell.Main>
         </AppShell>
+        </motion.div>
     );
 }
 
 function App() {
     return (
-        // Envolvemos todo en el Provider de Mantine para estilos consistentes
-        <MantineProvider defaultColorScheme="dark">
-            {/* Error Boundary para capturar errores y evitar pantalla gris */}
-            <ErrorBoundary>
-                {/* ¡AQUÍ ESTÁ LA MAGIA! Envolvemos la App en nuestro WebSocketProvider */}
-                <WebSocketProvider>
-                    <AppContent />
-                </WebSocketProvider>
-            </ErrorBoundary>
-        </MantineProvider>
+        // Error Boundary para capturar errores y evitar pantalla gris
+        // El MantineProvider ya está en main.tsx con el tema personalizado
+        <ErrorBoundary>
+            <AppContent />
+        </ErrorBoundary>
     );
 }
 
