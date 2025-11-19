@@ -77,41 +77,49 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
         if (now - lastROIUpdate.current < ROIUpdateThrottle) return;
         
         const canvas = canvasRef.current;
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
+        const container = canvas.parentElement;
+        if (!container) return;
         
-        // Calcular escala base
-        const scaleX = canvasWidth / gridWidth;
-        const scaleY = canvasHeight / gridHeight;
-        const baseScale = Math.min(scaleX, scaleY);
+        const containerRect = container.getBoundingClientRect();
+        const containerWidth = containerRect.width;
+        const containerHeight = containerRect.height;
         
-        // Calcular región visible en coordenadas del grid
-        // El canvas está centrado y escalado, luego se aplica pan y zoom
-        const centerX = canvasWidth / 2;
-        const centerY = canvasHeight / 2;
+        if (containerWidth === 0 || containerHeight === 0) return;
         
-        // Calcular el tamaño visible del grid en píxeles del canvas
-        const visibleGridWidth = canvasWidth / (baseScale * zoom);
-        const visibleGridHeight = canvasHeight / (baseScale * zoom);
+        // El canvas está centrado en el contenedor con CSS
+        // El origen del transform (0,0) está en el centro del contenedor
+        // Después del scale(zoom) translate(pan.x, pan.y):
+        // - El punto (gridX, gridY) del canvas está en: (containerCenter + pan.x + gridX*zoom, containerCenter + pan.y + gridY*zoom)
+        // - Para convertir coordenadas del contenedor a coordenadas del grid:
+        //   * containerX = containerWidth/2 + pan.x + gridX*zoom
+        //   * gridX = (containerX - containerWidth/2 - pan.x) / zoom
         
-        // Convertir pan (en píxeles del canvas) a coordenadas del grid
-        // El pan está en coordenadas del canvas transformado
-        const gridCenterX = gridWidth / 2;
-        const gridCenterY = gridHeight / 2;
+        // Calcular qué región del contenedor está visible (toda la región visible)
+        // La esquina superior izquierda visible: (0, 0) en coordenadas del contenedor
+        // La esquina inferior derecha visible: (containerWidth, containerHeight)
         
-        // Calcular offset del grid desde el centro
-        const offsetX = -pan.x / (baseScale * zoom);
-        const offsetY = -pan.y / (baseScale * zoom);
+        // Convertir a coordenadas del grid
+        const topLeftX = (0 - containerWidth/2 - pan.x) / zoom;
+        const topLeftY = (0 - containerHeight/2 - pan.y) / zoom;
+        const bottomRightX = (containerWidth - containerWidth/2 - pan.x) / zoom;
+        const bottomRightY = (containerHeight - containerHeight/2 - pan.y) / zoom;
         
-        // Calcular región visible en coordenadas del grid
-        const visibleX = Math.max(0, Math.floor(gridCenterX + offsetX - visibleGridWidth / 2));
-        const visibleY = Math.max(0, Math.floor(gridCenterY + offsetY - visibleGridHeight / 2));
-        const visibleWidth = Math.min(gridWidth - visibleX, Math.ceil(visibleGridWidth));
-        const visibleHeight = Math.min(gridHeight - visibleY, Math.ceil(visibleGridHeight));
+        // El canvas está centrado, así que las coordenadas del grid son relativas al centro
+        // El centro del grid (gridWidth/2, gridHeight/2) está en el origen del transform
+        // Entonces: gridX = (containerX - containerWidth/2 - pan.x) / zoom + gridWidth/2
         
-        // Solo actualizar ROI si la región visible es significativamente diferente del grid completo
-        // y si el zoom es > 1 (estamos haciendo zoom in)
-        if (zoom > 1.1 && (visibleWidth < gridWidth * 0.9 || visibleHeight < gridHeight * 0.9)) {
+        const visibleX = Math.max(0, Math.floor((topLeftX + gridWidth/2)));
+        const visibleY = Math.max(0, Math.floor((topLeftY + gridHeight/2)));
+        const visibleRightX = Math.min(gridWidth, Math.ceil((bottomRightX + gridWidth/2)));
+        const visibleBottomY = Math.min(gridHeight, Math.ceil((bottomRightY + gridHeight/2)));
+        
+        const visibleWidth = Math.max(1, visibleRightX - visibleX);
+        const visibleHeight = Math.max(1, visibleBottomY - visibleY);
+        
+        // Solo actualizar ROI si la región visible es significativamente menor que el grid completo
+        // y si el zoom es > 1.1 (estamos haciendo zoom in)
+        const visibleRatio = (visibleWidth * visibleHeight) / (gridWidth * gridHeight);
+        if (zoom > 1.1 && visibleRatio < 0.9 && visibleWidth > 16 && visibleHeight > 16) {
             lastROIUpdate.current = now;
             sendCommand('simulation', 'set_roi', {
                 enabled: true,
@@ -120,8 +128,8 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 width: visibleWidth,
                 height: visibleHeight
             });
-        } else if (zoom <= 1.1) {
-            // Si estamos en zoom out, desactivar ROI
+        } else if (zoom <= 1.1 || visibleRatio >= 0.9) {
+            // Si estamos en zoom out o mostrando más del 90%, desactivar ROI
             lastROIUpdate.current = now;
             sendCommand('simulation', 'set_roi', { enabled: false });
         }
