@@ -5,6 +5,8 @@ __pycache__/
 
 # C extensions
 *.so
+*.pyd
+*.dylib
 
 # Distribution / packaging
 .Python
@@ -138,3 +140,20 @@ cython_debug/
 .gemini/
 frontend/dist/
 frontend/node_modules/
+
+# CMake build artifacts
+build/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+*.cmake
+!CMakeLists.txt
+*.ninja
+compile_commands.json
+
+# C++ build artifacts
+*.o
+*.a
+*.so.*
+src/cpp_core/*.so
+src/cpp_core/build/
