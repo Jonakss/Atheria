@@ -157,3 +157,6 @@ compile_commands.json
 *.so.*
 src/cpp_core/*.so
 src/cpp_core/build/
+
+# Archivos temporales de pip/redirección de salida
+=*
