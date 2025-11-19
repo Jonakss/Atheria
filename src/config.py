@@ -1,17 +1,32 @@
 # src/config.py
 import os
 import logging
+import warnings
 
 # --- Ruta Base del Proyecto ---
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIST_PATH = os.path.join(PROJECT_ROOT, "frontend", "dist")
+
+# --- Silenciar warnings de CUDA graph de PyTorch ---
+# Estos warnings son informativos y no afectan la funcionalidad
+# PyTorch intenta optimizar con CUDA graphs pero algunas operaciones no son capturables
+warnings.filterwarnings('ignore', message='.*cudagraph.*', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*CUDA graph.*', category=UserWarning)
+
+# También configurar el nivel de logging de PyTorch para CUDA graphs
+import torch
+if hasattr(torch, '_C') and hasattr(torch._C, '_set_print_stack_traces'):
+    # Silenciar mensajes de CUDA graph en stdout/stderr
+    import sys
+    import io
+    # Esto reduce el ruido de los mensajes de partición de CUDA graph
+    torch._C._set_print_stack_traces(False)
 
 # --- Setup y Constantes de Control ---
 _DEVICE = None
 def get_device():
     global _DEVICE
     if _DEVICE is None:
-        import torch
         _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         logging.info(f"Dispositivo PyTorch inicializado: {_DEVICE}")
     return _DEVICE
