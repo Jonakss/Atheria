@@ -1,34 +1,192 @@
-/* frontend/src/components/LogOverlay.module.css */
+/* Estilos para LogOverlay con hover effects mejorados */
+
 .container {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    width: 100%;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease-in-out;
 }
 
 .header {
-    color: var(--mantine-color-gray-5);
-    margin-bottom: var(--mantine-spacing-xs);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
+  border-bottom: 1px solid var(--mantine-color-dark-4);
+  transition: all 0.2s ease-in-out;
+  background: linear-gradient(135deg, var(--mantine-color-dark-8) 0%, var(--mantine-color-dark-7) 100%);
 }
 
-.logPaper {
-    flex-grow: 1;
-    background-color: rgba(26, 27, 30, 0.85);
-    backdrop-filter: blur(5px);
-    display: flex;
-    flex-direction: column;
+.header:hover {
+  background: linear-gradient(135deg, var(--mantine-color-dark-7) 0%, var(--mantine-color-dark-6) 100%);
+  border-bottom-color: var(--mantine-color-blue-6);
+}
+
+.title {
+  font-weight: 600;
+  transition: all 0.2s ease-in-out;
+}
+
+.title:hover {
+  color: var(--mantine-color-blue-4);
+  transform: translateX(2px);
 }
 
 .scrollArea {
-    flex-grow: 1;
-    height: 0; /* Necesario para que flex-grow funcione */
-    padding: var(--mantine-spacing-sm);
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--mantine-spacing-sm);
+  transition: all 0.3s ease-in-out;
 }
 
-.logLine {
-    font-family: var(--mantine-font-family-monospace);
-    color: var(--mantine-color-gray-4);
-    white-space: pre-wrap;
-    word-break: break-all;
-    margin: 0;
+.scrollArea:hover {
+  background-color: var(--mantine-color-dark-8);
+}
+
+.logEntry {
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
+  margin-bottom: var(--mantine-spacing-xs);
+  border-radius: var(--mantine-radius-sm);
+  border-left: 2px solid transparent;
+  transition: all 0.2s ease-in-out;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.logEntry:hover {
+  background-color: var(--mantine-color-dark-7);
+  border-left-color: var(--mantine-color-blue-6);
+  transform: translateX(4px);
+  box-shadow: var(--mantine-shadow-xs);
+}
+
+.logEntry.info {
+  color: var(--mantine-color-blue-2);
+}
+
+.logEntry.info:hover {
+  background-color: rgba(26, 128, 255, 0.1);
+  border-left-color: var(--mantine-color-blue-5);
+}
+
+.logEntry.warning {
+  color: var(--mantine-color-yellow-2);
+}
+
+.logEntry.warning:hover {
+  background-color: rgba(255, 200, 0, 0.1);
+  border-left-color: var(--mantine-color-yellow-5);
+}
+
+.logEntry.error {
+  color: var(--mantine-color-red-2);
+}
+
+.logEntry.error:hover {
+  background-color: rgba(255, 50, 0, 0.1);
+  border-left-color: var(--mantine-color-red-5);
+}
+
+.logEntry.success {
+  color: var(--mantine-color-green-2);
+}
+
+.logEntry.success:hover {
+  background-color: rgba(0, 200, 100, 0.1);
+  border-left-color: var(--mantine-color-green-5);
+}
+
+.timestamp {
+  opacity: 0.6;
+  font-size: 0.75rem;
+  transition: all 0.2s ease-in-out;
+}
+
+.logEntry:hover .timestamp {
+  opacity: 1;
+  color: var(--mantine-color-blue-4);
+}
+
+.message {
+  transition: all 0.2s ease-in-out;
+}
+
+.logEntry:hover .message {
+  color: var(--mantine-color-gray-0);
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
+  border-top: 1px solid var(--mantine-color-dark-4);
+  background: var(--mantine-color-dark-8);
+  transition: all 0.2s ease-in-out;
+}
+
+.footer:hover {
+  border-top-color: var(--mantine-color-blue-6);
+  background: var(--mantine-color-dark-7);
+}
+
+.clearButton {
+  transition: all 0.2s ease-in-out;
+}
+
+.clearButton:hover {
+  transform: scale(1.1);
+  color: var(--mantine-color-red-4);
+}
+
+.clearButton:active {
+  transform: scale(0.95);
+}
+
+.badge {
+  transition: all 0.2s ease-in-out;
+}
+
+.badge:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 8px rgba(26, 128, 255, 0.4);
+}
+
+/* Animación de entrada para nuevas entradas de log */
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.logEntry.new {
+  animation: slideInFromRight 0.3s ease-out;
+}
+
+/* Smooth scrollbar */
+.scrollArea::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollArea::-webkit-scrollbar-track {
+  background: var(--mantine-color-dark-8);
+  border-radius: var(--mantine-radius-md);
+}
+
+.scrollArea::-webkit-scrollbar-thumb {
+  background: var(--mantine-color-dark-5);
+  border-radius: var(--mantine-radius-md);
+  transition: all 0.2s ease-in-out;
+}
+
+.scrollArea::-webkit-scrollbar-thumb:hover {
+  background: var(--mantine-color-blue-7);
+  box-shadow: 0 0 8px rgba(26, 128, 255, 0.4);
 }

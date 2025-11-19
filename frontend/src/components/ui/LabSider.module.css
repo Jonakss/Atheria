@@ -1,33 +1,154 @@
-/* frontend/src/components/LabSider.module.css */
-.sider {
-    display: flex;
-    flex-direction: column;
-    height: 100%; /* Ocupar toda la altura del contenedor */
+/* Estilos para LabSider con hover effects mejorados */
+
+.container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-md);
+  transition: all 0.3s ease-in-out;
 }
 
-.header {
-    padding-bottom: var(--mantine-spacing-md);
-    border-bottom: 1px solid var(--mantine-color-dark-4);
+.section {
+  transition: all 0.3s ease-in-out;
+  padding: var(--mantine-spacing-sm);
+  border-radius: var(--mantine-radius-md);
 }
 
-.scrollArea {
-    flex-grow: 1; /* ¡¡CORRECCIÓN!! Hacer que esta área ocupe el espacio disponible */
-    margin-top: var(--mantine-spacing-md);
-    margin-bottom: var(--mantine-spacing-md);
+.section:hover {
+  background-color: var(--mantine-color-dark-7);
+  transform: translateY(-1px);
 }
 
-.sectionTitle {
-    padding-left: var(--mantine-spacing-xs);
-    margin-bottom: var(--mantine-spacing-xs);
-    color: var(--mantine-color-gray-6);
+.experimentCard {
+  transition: all 0.3s ease-in-out;
+  cursor: pointer;
+  border: 1px solid var(--mantine-color-dark-4);
+  border-radius: var(--mantine-radius-md);
+  padding: var(--mantine-spacing-sm);
+  margin-bottom: var(--mantine-spacing-xs);
 }
 
-.navLink {
-    border-radius: var(--mantine-radius-sm);
+.experimentCard:hover {
+  transform: translateX(4px);
+  border-color: var(--mantine-color-blue-6);
+  background-color: var(--mantine-color-dark-7);
+  box-shadow: var(--mantine-shadow-md);
 }
 
-.formSection {
-    /* Esta sección no necesita crecer, tendrá altura fija */
-    border-top: 1px solid var(--mantine-color-dark-4);
-    padding-top: var(--mantine-spacing-sm);
+.experimentCard.active {
+  border-color: var(--mantine-color-blue-6);
+  background-color: var(--mantine-color-blue-9);
+  border-left: 3px solid var(--mantine-color-blue-4);
+}
+
+.controlButton {
+  transition: all 0.2s ease-in-out;
+  width: 100%;
+}
+
+.controlButton:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--mantine-shadow-md);
+}
+
+.controlButton:active {
+  transform: translateY(0);
+}
+
+.progressBar {
+  transition: all 0.3s ease-in-out;
+  overflow: hidden;
+  border-radius: var(--mantine-radius-xl);
+}
+
+.progressBar:hover {
+  box-shadow: 0 0 8px rgba(26, 128, 255, 0.4);
+}
+
+.divider {
+  transition: all 0.2s ease-in-out;
+  margin: var(--mantine-spacing-md) 0;
+}
+
+.divider:hover {
+  border-color: var(--mantine-color-blue-6);
+  transform: scaleX(1.05);
+}
+
+.inputGroup {
+  transition: all 0.2s ease-in-out;
+  margin-bottom: var(--mantine-spacing-sm);
+}
+
+.inputGroup:hover {
+  transform: translateX(2px);
+}
+
+.badge {
+  transition: all 0.2s ease-in-out;
+  cursor: default;
+}
+
+.badge:hover {
+  transform: scale(1.05);
+  box-shadow: var(--mantine-shadow-xs);
+}
+
+/* Animación de entrada para elementos de la lista */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.listItem {
+  animation: slideIn 0.3s ease-out;
+}
+
+.listItem:nth-child(1) { animation-delay: 0.05s; }
+.listItem:nth-child(2) { animation-delay: 0.1s; }
+.listItem:nth-child(3) { animation-delay: 0.15s; }
+.listItem:nth-child(4) { animation-delay: 0.2s; }
+.listItem:nth-child(5) { animation-delay: 0.25s; }
+
+/* Hover effect para iconos */
+.iconButton {
+  transition: all 0.2s ease-in-out;
+}
+
+.iconButton:hover {
+  transform: scale(1.15) rotate(5deg);
+  color: var(--mantine-color-blue-4);
+}
+
+.iconButton:active {
+  transform: scale(0.95);
+}
+
+/* Smooth transitions para inputs */
+.input {
+  transition: all 0.2s ease-in-out;
+}
+
+.input:focus {
+  transform: scale(1.02);
+}
+
+/* Loading state con pulso */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.loading {
+  animation: pulse 2s ease-in-out infinite;
 }
