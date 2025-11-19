@@ -1,7 +1,7 @@
 // frontend/src/components/LabSider.tsx
 import { useState } from 'react';
 import { Box, Button, NavLink, ScrollArea, Select, Stack, Text, Group, NumberInput, Progress, Divider, Badge, Tooltip, Alert, Paper } from '@mantine/core';
-import { IconPlayerPlay, IconPlayerPause, IconRefresh, IconUpload, IconPlug, IconCheck, IconX, IconAlertCircle, IconInfoCircle, IconTransfer } from '@tabler/icons-react';
+import { IconPlayerPlay, IconPlayerPause, IconRefresh, IconUpload, IconPlug, IconCheck, IconX, IconAlertCircle, IconInfoCircle, IconTransfer, IconPower } from '@tabler/icons-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { modelOptions, vizOptions } from '../../utils/vizOptions';
 import { AdvancedControls } from '../controls/AdvancedControls';
@@ -14,7 +14,7 @@ import classes from './LabSider.module.css';
 export function LabSider() {
     const { 
         sendCommand, experimentsData, trainingStatus, trainingProgress, 
-        inferenceStatus, connectionStatus, connect, selectedViz, setSelectedViz, simData,
+        inferenceStatus, connectionStatus, connect, disconnect, selectedViz, setSelectedViz, simData,
         activeExperiment, setActiveExperiment
     } = useWebSocket();
     
@@ -131,6 +131,16 @@ export function LabSider() {
         sendCommand('inference', command);
     };
 
+    const handleConnectDisconnect = () => {
+        if (connectionStatus === 'connected') {
+            // Desconectar si está conectado
+            disconnect();
+        } else {
+            // Conectar si no está conectado
+            connect();
+        }
+    };
+
     const handleVizChange = (value: string | null) => {
         if (value) {
             setSelectedViz(value);
@@ -149,22 +159,34 @@ export function LabSider() {
         <Box className={classes.sider}>
             <Box className={classes.header}>
                 <Text size="lg" fw={700}>Laboratorio Aetheria</Text>
-                <Button 
-                    onClick={connect} 
-                    size="xs" 
-                    variant="outline" 
-                    leftSection={<IconPlug size={14}/>} 
-                    loading={connectionStatus === 'connecting'}
-                    color={
-                        connectionStatus === 'connected' ? 'green' :
-                        connectionStatus === 'server_unavailable' ? 'red' :
-                        'gray'
+                <Tooltip 
+                    label={
+                        connectionStatus === 'connected' ? 'Desconectar' :
+                        connectionStatus === 'server_unavailable' ? 'Servidor no disponible. Click para reconectar' :
+                        connectionStatus === 'connecting' ? 'Conectando...' :
+                        'Conectar al servidor'
                     }
+                    position="left"
                 >
-                    {connectionStatus === 'connected' ? 'Conectado' : 
-                     connectionStatus === 'server_unavailable' ? 'Servidor no disponible' :
-                     connectionStatus === 'connecting' ? 'Conectando...' : 'Conectar'}
-                </Button>
+                    <Button 
+                        onClick={handleConnectDisconnect} 
+                        size="xs" 
+                        variant={connectionStatus === 'connected' ? 'filled' : 'outline'} 
+                        leftSection={
+                            connectionStatus === 'connected' ? <IconX size={14}/> : <IconPlug size={14}/>
+                        } 
+                        loading={connectionStatus === 'connecting'}
+                        color={
+                            connectionStatus === 'connected' ? 'red' :
+                            connectionStatus === 'server_unavailable' ? 'red' :
+                            'gray'
+                        }
+                    >
+                        {connectionStatus === 'connected' ? '' : 
+                         connectionStatus === 'server_unavailable' ? 'Servidor no disponible' :
+                         connectionStatus === 'connecting' ? 'Conectando...' : 'Conectar'}
+                    </Button>
+                </Tooltip>
             </Box>
 
             <ScrollArea style={{ flex: 1, marginTop: 'var(--mantine-spacing-md)' }}>

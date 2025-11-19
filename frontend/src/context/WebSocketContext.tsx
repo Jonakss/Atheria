@@ -113,6 +113,7 @@ interface WebSocketContextType {
     setSelectedViz: (viz: string) => void;
     connect: () => void;
     reconnect: () => void; // Función para reconexión manual
+    disconnect: () => void; // Función para desconectar manualmente
     simData: SimData | null;
     trainingLog: string[];
     allLogs: string[]; // Logs unificados
@@ -509,6 +510,15 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         connect(true); // Reconexión manual, resetea los intentos
     }, [connect]);
     
+    // Función para desconectar manualmente
+    const disconnect = useCallback(() => {
+        if (ws.current) {
+            isManualClose.current = true; // Marcar como cierre manual
+            ws.current.close(1000); // Código 1000 = cierre normal
+            setConnectionStatus('disconnected');
+        }
+    }, []);
+    
     const sendCommand = useCallback((scope: string, command: string, args: Record<string, any> = {}) => {
         if (ws.current?.readyState === WebSocket.OPEN) {
             ws.current.send(JSON.stringify({ scope, command, args }));
@@ -541,6 +551,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         setSelectedViz,
         connect,
         reconnect, // Función para reconexión manual
+        disconnect, // Función para desconectar manualmente
         simData,
         trainingLog,
         allLogs,
