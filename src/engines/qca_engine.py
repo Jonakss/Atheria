@@ -4,7 +4,7 @@ import torch.nn as nn
 import numpy as np
 import os
 import logging
-from . import config as cfg
+from .. import config as cfg
 
 class QuantumState:
     """
@@ -84,7 +84,7 @@ class Aetheria_Motor:
         self.original_model = model_operator
         
         # Optimizar modelo para inferencia
-        from .gpu_optimizer import get_optimizer
+        from ..optimization.gpu_optimizer import get_optimizer
         self.optimizer = get_optimizer(device)
         model_operator = self.optimizer.optimize_model(model_operator)
         
@@ -115,7 +115,7 @@ class Aetheria_Motor:
         if self.state.psi is None: return
         
         # Usar inference_mode en lugar de no_grad para mejor rendimiento
-        from .gpu_optimizer import GPUOptimizer
+        from ..optimization.gpu_optimizer import GPUOptimizer
         with GPUOptimizer.enable_inference_mode():
             # Limpiar cache de GPU periódicamente
             self.optimizer.empty_cache_if_needed()

@@ -724,7 +724,7 @@ async def handle_load_experiment(args):
         
         if use_native_engine:
             try:
-                from .engines.native_engine_wrapper import NativeEngineWrapper
+                from ..engines.native_engine_wrapper import NativeEngineWrapper
                 
                 # Buscar modelo JIT (exportado a TorchScript)
                 from ..utils import get_latest_jit_model
