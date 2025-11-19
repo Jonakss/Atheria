@@ -1,6 +1,14 @@
 // frontend/src/theme.ts
 import { createTheme, MantineColorsTuple } from '@mantine/core';
 
+// Función auxiliar para convertir hex a rgba
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 // Paleta de colores personalizada para Atheria (tonos azules y púrpuras para un look futurista)
 const aetheriaBlue: MantineColorsTuple = [
   '#e6f0ff', // 0: lightest
@@ -157,7 +165,7 @@ export const theme = createTheme({
           },
           '&[data-active="true"]': {
             borderColor: theme.colors.blue[6],
-            backgroundColor: theme.fn.rgba(theme.colors.blue[6], 0.1),
+            backgroundColor: hexToRgba(theme.colors.blue[6], 0.1),
           },
         },
       }),
@@ -171,7 +179,7 @@ export const theme = createTheme({
           },
           '&:focus': {
             borderColor: theme.colors.blue[5],
-            boxShadow: `0 0 0 2px ${theme.fn.rgba(theme.colors.blue[5], 0.2)}`,
+            boxShadow: `0 0 0 2px ${hexToRgba(theme.colors.blue[5], 0.2)}`,
           },
         },
       }),
@@ -185,7 +193,7 @@ export const theme = createTheme({
           },
           '&:focus': {
             borderColor: theme.colors.blue[5],
-            boxShadow: `0 0 0 2px ${theme.fn.rgba(theme.colors.blue[5], 0.2)}`,
+            boxShadow: `0 0 0 2px ${hexToRgba(theme.colors.blue[5], 0.2)}`,
           },
         },
       }),
