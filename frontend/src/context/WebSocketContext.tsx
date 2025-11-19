@@ -208,39 +208,67 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                     case 'simulation_frame':
                         // Descomprimir datos si están comprimidos
                         // IMPORTANTE: Preservar step, timestamp y simulation_info
-                        const decompressedPayload = {
-                            ...payload,
-                            step: payload.step ?? payload.simulation_info?.step ?? null, // Asegurar que step esté presente
-                            timestamp: payload.timestamp,
-                            simulation_info: payload.simulation_info,
-                            map_data: payload.map_data ? decompressIfNeeded(payload.map_data) : undefined,
-                            complex_3d_data: payload.complex_3d_data ? {
-                                real: decompressIfNeeded(payload.complex_3d_data.real),
-                                imag: decompressIfNeeded(payload.complex_3d_data.imag)
-                            } : undefined,
-                            flow_data: payload.flow_data ? {
-                                dx: decompressIfNeeded(payload.flow_data.dx),
-                                dy: decompressIfNeeded(payload.flow_data.dy),
-                                magnitude: decompressIfNeeded(payload.flow_data.magnitude)
-                            } : undefined,
-                            phase_hsv_data: payload.phase_hsv_data ? {
-                                hue: decompressIfNeeded(payload.phase_hsv_data.hue),
-                                saturation: decompressIfNeeded(payload.phase_hsv_data.saturation),
-                                value: decompressIfNeeded(payload.phase_hsv_data.value)
-                            } : undefined
-                        };
-                        setSimData(decompressedPayload);
+                        // Usar función de actualización para evitar condiciones de carrera
+                        try {
+                            const decompressedPayload = {
+                                ...payload,
+                                step: payload.step ?? payload.simulation_info?.step ?? null, // Asegurar que step esté presente
+                                timestamp: payload.timestamp ?? Date.now(),
+                                simulation_info: payload.simulation_info,
+                                map_data: payload.map_data ? decompressIfNeeded(payload.map_data) : undefined,
+                                complex_3d_data: payload.complex_3d_data ? {
+                                    real: decompressIfNeeded(payload.complex_3d_data.real),
+                                    imag: decompressIfNeeded(payload.complex_3d_data.imag)
+                                } : undefined,
+                                flow_data: payload.flow_data ? {
+                                    dx: decompressIfNeeded(payload.flow_data.dx),
+                                    dy: decompressIfNeeded(payload.flow_data.dy),
+                                    magnitude: decompressIfNeeded(payload.flow_data.magnitude)
+                                } : undefined,
+                                phase_hsv_data: payload.phase_hsv_data ? {
+                                    hue: decompressIfNeeded(payload.phase_hsv_data.hue),
+                                    saturation: decompressIfNeeded(payload.phase_hsv_data.saturation),
+                                    value: decompressIfNeeded(payload.phase_hsv_data.value)
+                                } : undefined
+                            };
+                            // Usar función de actualización para evitar sobrescribir actualizaciones más recientes
+                            setSimData(prev => {
+                                // Si hay un timestamp y el payload nuevo es más antiguo, ignorarlo
+                                if (prev?.timestamp && decompressedPayload.timestamp && 
+                                    decompressedPayload.timestamp < prev.timestamp) {
+                                    return prev;
+                                }
+                                return decompressedPayload;
+                            });
+                        } catch (error) {
+                            console.error("Error procesando simulation_frame:", error);
+                        }
                         break;
                     case 'simulation_state_update':
                         // Actualización de estado sin datos de visualización (cuando live feed está desactivado)
                         // Actualizar solo step y simulation_info, preservando otros datos existentes
-                        setSimData(prev => ({
-                            ...prev,
-                            step: payload.step ?? payload.simulation_info?.step ?? prev?.step ?? null,
-                            timestamp: payload.timestamp ?? prev?.timestamp,
-                            simulation_info: payload.simulation_info ?? prev?.simulation_info
-                            // No actualizar map_data, hist_data, etc. - estos solo vienen con simulation_frame
-                        }));
+                        // Usar función de actualización para evitar condiciones de carrera
+                        try {
+                            setSimData(prev => {
+                                const newStep = payload.step ?? payload.simulation_info?.step ?? prev?.step ?? null;
+                                const newTimestamp = payload.timestamp ?? prev?.timestamp ?? Date.now();
+                                
+                                // Si hay un timestamp y el payload nuevo es más antiguo, ignorarlo
+                                if (prev?.timestamp && newTimestamp < prev.timestamp) {
+                                    return prev;
+                                }
+                                
+                                return {
+                                    ...prev,
+                                    step: newStep,
+                                    timestamp: newTimestamp,
+                                    simulation_info: payload.simulation_info ?? prev?.simulation_info
+                                    // No actualizar map_data, hist_data, etc. - estos solo vienen con simulation_frame
+                                };
+                            });
+                        } catch (error) {
+                            console.error("Error procesando simulation_state_update:", error);
+                        }
                         break;
                     case 'training_log':
                         setTrainingLog(prev => [...prev, payload]);
