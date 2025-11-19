@@ -133,7 +133,7 @@ def analyze_universe_atlas(psi_snapshots, compression_dim=64, perplexity=30, n_i
     # Ajustar perplexity si hay muy pocos snapshots
     actual_perplexity = min(perplexity, len(compressed_normalized) - 1)
     
-    tsne = TSNE(n_components=2, perplexity=actual_perplexity, n_iter=n_iter, 
+    tsne = TSNE(n_components=2, perplexity=actual_perplexity, max_iter=n_iter, 
                 random_state=42, verbose=0)
     coords_2d = tsne.fit_transform(compressed_normalized)  # [n_snapshots, 2]
     
@@ -214,7 +214,7 @@ def analyze_cell_chemistry(psi, n_samples=10000, perplexity=30, n_iter=1000):
     # Ajustar perplexity si hay muy pocas células
     actual_perplexity = min(perplexity, n_cells - 1)
     
-    tsne = TSNE(n_components=2, perplexity=actual_perplexity, n_iter=n_iter,
+    tsne = TSNE(n_components=2, perplexity=actual_perplexity, max_iter=n_iter,
                 random_state=42, verbose=0)
     coords_2d = tsne.fit_transform(cell_vectors_normalized)  # [n_cells, 2]
     
