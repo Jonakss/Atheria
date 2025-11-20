@@ -115,9 +115,9 @@ PYBIND11_MODULE(atheria_core, m) {
     
     // Clase Engine (Motor de alto rendimiento nativo)
     py::class_<Engine>(m, "Engine")
-        .def(py::init<int64_t, const std::string&>(),
+        .def(py::init<int64_t, const std::string&, int64_t>(),
              "Constructor del motor de simulación",
-             py::arg("d_state"), py::arg("device") = "cpu")
+             py::arg("d_state"), py::arg("device") = "cpu", py::arg("grid_size") = 64)
         .def("load_model", &Engine::load_model,
              "Carga un modelo TorchScript desde un archivo .pt",
              py::arg("model_path"))

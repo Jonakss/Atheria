@@ -144,8 +144,9 @@ class NativeEngineWrapper:
         self.device = torch.device(device)
         self.cfg = cfg
         
-        # Inicializar motor nativo
-        self.native_engine = atheria_core_module.Engine(d_state=d_state, device=device)
+        # Inicializar motor nativo con el tamaño del grid
+        # El grid_size se usa para construir inputs del modelo con el tamaño correcto
+        self.native_engine = atheria_core_module.Engine(d_state=d_state, device=device, grid_size=grid_size)
         
         # Estado cuántico para compatibilidad (denso)
         # El motor nativo usa formato disperso, pero necesitamos denso para visualización

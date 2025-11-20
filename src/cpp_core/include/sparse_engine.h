@@ -45,7 +45,7 @@ private:
  */
 class Engine {
 public:
-    Engine(int64_t d_state, const std::string& device_str = "cpu");
+    Engine(int64_t d_state, const std::string& device_str = "cpu", int64_t grid_size = 64);
     ~Engine();
     
     /**
@@ -100,6 +100,7 @@ public:
 private:
     // Configuración
     int64_t d_state_;
+    int64_t grid_size_;  // Tamaño del grid para construir inputs del modelo
     torch::Device device_;
     torch::jit::script::Module model_;
     bool model_loaded_;

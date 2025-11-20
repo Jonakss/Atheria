@@ -14,13 +14,15 @@ static torch::Device determine_device(const std::string& device_str) {
     }
 }
 
-Engine::Engine(int64_t d_state, const std::string& device_str)
+Engine::Engine(int64_t d_state, const std::string& device_str, int64_t grid_size)
     : d_state_(d_state)
+    , grid_size_(grid_size)
     , device_(determine_device(device_str))
     , model_loaded_(false)
     , vacuum_(d_state_, device_)
     , step_count_(0) {
     // Device ya está determinado y vacuum inicializado correctamente
+    // grid_size se usa para construir inputs del modelo con el tamaño correcto
 }
 
 Engine::~Engine() {
@@ -225,40 +227,15 @@ torch::Tensor Engine::build_batch_input(const std::vector<Coord3D>& coords) {
     // IMPORTANTE: El modelo UNet fue entrenado con inputs de tamaño completo del grid.
     // Para mantener compatibilidad con los skip connections, necesitamos usar el mismo
     // tamaño que el modelo espera. El modelo típicamente espera inputs de 64x64 o similar.
-    // Sin embargo, para procesar partículas dispersas, usamos patches centrados.
-    // 
-    // PROBLEMA: Los skip connections requieren dimensiones exactas. El modelo espera
-    // un tamaño específico (probablemente 64x64 basado en GRID_SIZE del experimento).
-    // 
-    // SOLUCIÓN TEMPORAL: Usar el tamaño mínimo que permite que el modelo funcione
-    // (al menos 4x4 después de dos MaxPool2d). Sin embargo, esto causa problemas con
-    // los skip connections si el modelo fue entrenado con otro tamaño.
     //
-    // TODO: El modelo debería ser entrenado con patches o deberíamos usar el grid completo.
+    // SOLUCIÓN: Usar el tamaño del grid con el que fue entrenado el modelo.
+    // Este tamaño se pasa al constructor del Engine y se almacena en grid_size_.
     
     int64_t batch_size = static_cast<int64_t>(coords.size());
     
-    // Usar un tamaño que sea compatible con el modelo entrenado
-    // Por defecto, usamos 64x64 si no hay información del grid size
-    // Pero para patches individuales, necesitamos usar un tamaño menor
-    // El problema es que los skip connections requieren tamaños exactos
-    
-    // Por ahora, usar un patch mínimo que funcione con MaxPool2d
-    // El modelo fue entrenado con 64x64, pero para patches usamos un tamaño que
-    // pueda procesarse correctamente. Sin embargo, los skip connections fallarán
-    // si las dimensiones no coinciden.
-    
-    // OPCIÓN 1: Usar el grid completo (ineficiente pero funciona)
-    // OPCIÓN 2: Usar un tamaño que coincida con lo que el modelo espera en los skip connections
-    // OPCIÓN 3: Re-entrenar el modelo con patches pequeños
-    
-    // Por ahora, usar un patch más grande (como el grid completo en el contexto del batch)
-    // Esto requiere conocer el tamaño del grid, que debería venir de la configuración
-    
-    // TEMPORAL: Usar un patch que sea múltiplo de 4 para que después de dos MaxPool2d
-    // siga siendo un tamaño válido y las dimensiones coincidan mejor con los skip connections
-    int64_t patch_size = 64;  // Tamaño del patch (debe coincidir con el tamaño de entrenamiento)
-    int64_t patch_radius = patch_size / 2;  // Radio del patch
+    // Usar el tamaño del grid con el que fue entrenado el modelo
+    int64_t patch_size = grid_size_;  // Tamaño del patch (debe coincidir con el tamaño de entrenamiento)
+    int64_t patch_radius = patch_size / 2;  // Radio del patch (para centrar)
     
     int64_t height = patch_size;
     int64_t width = patch_size;
@@ -284,6 +261,29 @@ torch::Tensor Engine::build_batch_input(const std::vector<Coord3D>& coords) {
                 int64_t dy = static_cast<int64_t>(py) - patch_radius;
                 
                 Coord3D patch_coord(center.x + dx, center.y + dy, center.z);
+                
+                // Obtener estado en esta coordenada (materia o vacío)
+                torch::Tensor state = get_state_at(patch_coord);
+                
+                // Convertir estado complejo a [real, imag] concatenado
+                torch::Tensor real, imag;
+                if (state.is_complex()) {
+                    real = torch::real(state);
+                    imag = torch::imag(state);
+                } else {
+                    real = state;
+                    imag = torch::zeros_like(state);
+                }
+                
+                // Copiar a batch_input [batch, channels, y, x]
+                if (real.dim() == 1 && real.size(0) == d_state_) {
+                    for (int64_t c = 0; c < d_state_; c++) {
+                        batch_input[i][c][py][px] = real[c].item<float>();
+                        batch_input[i][c + d_state_][py][px] = imag[c].item<float>();
+                    }
+                }
+            }
+        }
         
         // Construir patch: para cada posición en el patch, obtener estado
         for (int64_t py = 0; py < height; py++) {
