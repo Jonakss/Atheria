@@ -1,16 +1,17 @@
-// frontend/src/components/TransferLearningWizard.tsx
+// frontend/src/components/experiments/TransferLearningWizard.tsx
 import { useState, useEffect, useMemo } from 'react';
-import {
-    Modal, Stepper, Button, Group, Stack, Text, Card, Badge,
-    Select, NumberInput, TextInput, Alert, Divider, Table,
-    Paper, Tooltip, ActionIcon
-} from '@mantine/core';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import {
-    IconCheck, IconX, IconInfoCircle, IconArrowRight,
-    IconTransfer, IconSettings, IconFile, IconStar
-} from '@tabler/icons-react';
-import { notifications } from '@mantine/notifications';
+    Check, X, Info, ArrowRight,
+    ArrowRightLeft as TransferIcon, Settings, FileText, Star, ChevronRight
+} from 'lucide-react';
+import { Modal } from '../../modules/Dashboard/components/Modal';
+import { Stepper, Step, StepperCompleted } from '../../modules/Dashboard/components/Stepper';
+import { Alert } from '../../modules/Dashboard/components/Alert';
+import { Badge } from '../../modules/Dashboard/components/Badge';
+import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
+import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../modules/Dashboard/components/Table';
+import { NumberInput } from '../../modules/Dashboard/components/NumberInput';
 
 interface ExperimentConfig {
     MODEL_ARCHITECTURE: string;
@@ -40,18 +41,28 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
     const [baseConfig, setBaseConfig] = useState<ExperimentConfig | null>(null);
     const [newConfig, setNewConfig] = useState<ExperimentConfig | null>(null);
     const [newExperimentName, setNewExperimentName] = useState('');
+    const [isExperimentNameManuallyEdited, setIsExperimentNameManuallyEdited] = useState(false);
     const [episodesToAdd, setEpisodesToAdd] = useState(1000);
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Filtrar experimentos que tienen checkpoints
     const availableExperiments = useMemo(() => {
         return experimentsData?.filter(exp => exp.has_checkpoint) || [];
     }, [experimentsData]);
 
+    // Filtrar experimentos por búsqueda
+    const filteredExperiments = useMemo(() => {
+        if (!searchQuery.trim()) return availableExperiments;
+        const query = searchQuery.toLowerCase();
+        return availableExperiments.filter(exp => 
+            exp.name.toLowerCase().includes(query)
+        );
+    }, [availableExperiments, searchQuery]);
+
     // Cargar configuración cuando se selecciona un experimento base
     useEffect(() => {
         if (baseExperiment && activeStep >= 1) {
             const exp = experimentsData?.find(e => e.name === baseExperiment);
-            // El backend ahora devuelve config anidado
             const expConfig = exp?.config;
             if (expConfig) {
                 const config: ExperimentConfig = {
@@ -65,11 +76,13 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
                     TOTAL_EPISODES: expConfig.TOTAL_EPISODES || 0
                 };
                 setBaseConfig(config);
-                setNewConfig({ ...config }); // Copiar como punto de partida
+                setNewConfig({ ...config });
                 
-                // Generar nombre sugerido
-                const suggestedName = generateExperimentName(config);
-                setNewExperimentName(suggestedName);
+                // Solo generar nombre automáticamente si el usuario no lo ha editado manualmente
+                if (!isExperimentNameManuallyEdited) {
+                    const suggestedName = generateExperimentName(config);
+                    setNewExperimentName(suggestedName);
+                }
             }
         }
     }, [baseExperiment, activeStep, experimentsData]);
@@ -90,41 +103,33 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
 
         switch (template) {
             case 'standard':
-                // Grid size aumenta 2x, LR se mantiene
                 updated.GRID_SIZE_TRAINING = baseConfig.GRID_SIZE_TRAINING * 2;
                 updated.LR_RATE_M = baseConfig.LR_RATE_M;
                 break;
             case 'fine_tune':
-                // Grid size igual, LR se reduce ligeramente
                 updated.GRID_SIZE_TRAINING = baseConfig.GRID_SIZE_TRAINING;
                 updated.LR_RATE_M = baseConfig.LR_RATE_M * 0.5;
                 break;
             case 'aggressive':
-                // Grid size aumenta 4x, LR se ajusta
                 updated.GRID_SIZE_TRAINING = baseConfig.GRID_SIZE_TRAINING * 4;
                 updated.LR_RATE_M = baseConfig.LR_RATE_M * 0.8;
                 break;
         }
 
         setNewConfig(updated);
-        setNewExperimentName(generateExperimentName(updated));
+        // Solo regenerar nombre si el usuario no lo ha editado manualmente
+        if (!isExperimentNameManuallyEdited) {
+            setNewExperimentName(generateExperimentName(updated));
+        }
     };
 
     const handleNext = () => {
         if (activeStep === 0 && !baseExperiment) {
-            notifications.show({
-                title: 'Selecciona un experimento',
-                message: 'Debes seleccionar un experimento base para continuar',
-                color: 'orange',
-            });
+            alert('⚠️ Selecciona un experimento base para continuar');
             return;
         }
         if (activeStep === 1 && !newConfig) {
-            notifications.show({
-                title: 'Error',
-                message: 'No se pudo cargar la configuración',
-                color: 'red',
-            });
+            alert('❌ Error: No se pudo cargar la configuración');
             return;
         }
         setActiveStep(activeStep + 1);
@@ -136,15 +141,10 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
 
     const handleCreate = () => {
         if (!baseExperiment || !newConfig || !newExperimentName) {
-            notifications.show({
-                title: 'Error',
-                message: 'Faltan datos requeridos',
-                color: 'red',
-            });
+            alert('❌ Error: Faltan datos requeridos');
             return;
         }
 
-        // Verificar si el nombre ya existe
         const existingExp = experimentsData?.find(e => e.name === newExperimentName);
         if (existingExp) {
             if (!window.confirm(`⚠️ El experimento "${newExperimentName}" ya existe. ¿Deseas continuar de todas formas?`)) {
@@ -167,18 +167,14 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
 
         sendCommand('experiment', 'create', args);
         
-        notifications.show({
-            title: 'Transfer Learning iniciado',
-            message: `Creando experimento "${newExperimentName}" desde "${baseExperiment}"`,
-            color: 'green',
-        });
+        console.log(`✅ Transfer Learning iniciado: Creando experimento "${newExperimentName}" desde "${baseExperiment}"`);
 
-        // Reset y cerrar
         setActiveStep(0);
         setBaseExperiment(null);
         setBaseConfig(null);
         setNewConfig(null);
         setNewExperimentName('');
+        setIsExperimentNameManuallyEdited(false);
         onClose();
     };
 
@@ -188,6 +184,7 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
         setBaseConfig(null);
         setNewConfig(null);
         setNewExperimentName('');
+        setIsExperimentNameManuallyEdited(false);
         onClose();
     };
 
@@ -212,383 +209,423 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
             opened={opened}
             onClose={handleClose}
             title={
-                <Group gap="xs">
-                    <IconTransfer size={20} />
-                    <Text fw={600}>Transfer Learning Wizard</Text>
-                </Group>
+                <div className="flex items-center gap-2">
+                    <TransferIcon size={16} />
+                    <span>Transfer Learning Wizard</span>
+                </div>
             }
             size="xl"
             closeOnClickOutside={false}
         >
             <Stepper active={activeStep} onStepClick={setActiveStep}>
-                <Stepper.Step label="Seleccionar Base" description="Elige el experimento origen">
-                    <Stack gap="md" mt="md">
-                        <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light">
-                            <Text size="sm">
+                <Step label="Seleccionar Base" description="Elige el experimento origen">
+                    <div className="space-y-4 mt-4">
+                        <Alert icon={<Info size={16} />} color="blue" variant="light">
+                            <span className="text-xs">
                                 Selecciona un experimento que tenga checkpoints guardados. 
                                 Su configuración se cargará automáticamente y podrás ajustarla.
-                            </Text>
+                            </span>
                         </Alert>
 
-                        <Select
-                            label="Experimento Base"
-                            placeholder="Selecciona un experimento..."
-                            data={availableExperiments.map(exp => ({
-                                value: exp.name,
-                                label: exp.name
-                            }))}
-                            value={baseExperiment}
-                            onChange={(value) => setBaseExperiment(value)}
-                            searchable
-                        />
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                                Experimento Base
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Buscar experimento..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 mb-2"
+                                />
+                            </div>
+                            <select
+                                value={baseExperiment || ''}
+                                onChange={(e) => setBaseExperiment(e.target.value || null)}
+                                className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50"
+                            >
+                                <option value="">Selecciona un experimento...</option>
+                                {filteredExperiments.map(exp => (
+                                    <option key={exp.name} value={exp.name}>
+                                        {exp.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
 
                         {baseExperimentData && (
-                            <Card withBorder p="md" style={{ backgroundColor: 'var(--mantine-color-dark-7)' }}>
-                                <Stack gap="xs">
-                                    <Group justify="space-between">
-                                        <Text fw={600} size="sm">Información del Experimento Base</Text>
-                                        <Badge color="green" variant="light">
+                            <GlassPanel className="p-3 bg-[#0a0a0a]">
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold text-gray-300">Información del Experimento Base</span>
+                                        <Badge color="green" variant="light" size="xs">
                                             ✓ Tiene checkpoints
                                         </Badge>
-                                    </Group>
-                                    <Divider />
-                                    <Group gap="md">
-                                        <Text size="xs" c="dimmed">
+                                    </div>
+                                    <div className="h-px bg-white/10 my-2" />
+                                    <div className="flex items-center gap-4 flex-wrap">
+                                        <span className="text-[10px] text-gray-500">
                                             <strong>Arquitectura:</strong> {baseExperimentData.config?.MODEL_ARCHITECTURE || 'N/A'}
-                                        </Text>
-                                        <Text size="xs" c="dimmed">
+                                        </span>
+                                        <span className="text-[10px] text-gray-500">
                                             <strong>Grid Size:</strong> {baseExperimentData.config?.GRID_SIZE_TRAINING || 'N/A'}
-                                        </Text>
-                                        <Text size="xs" c="dimmed">
+                                        </span>
+                                        <span className="text-[10px] text-gray-500">
                                             <strong>LR:</strong> {(baseExperimentData.config?.LR_RATE_M || 0.0001).toExponential(2)}
-                                        </Text>
-                                    </Group>
-                                </Stack>
-                            </Card>
+                                        </span>
+                                    </div>
+                                </div>
+                            </GlassPanel>
                         )}
-                    </Stack>
-                </Stepper.Step>
+                    </div>
+                </Step>
 
-                <Stepper.Step label="Configurar" description="Ajusta los parámetros">
+                <Step label="Configurar" description="Ajusta los parámetros">
                     {baseConfig && newConfig && (
-                        <Stack gap="md" mt="md">
-                            <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light">
-                                <Text size="sm">
+                        <div className="space-y-4 mt-4">
+                            <Alert icon={<Info size={16} />} color="blue" variant="light">
+                                <span className="text-xs">
                                     La configuración del experimento base se ha cargado. 
                                     Ajusta los parámetros según tu estrategia de entrenamiento progresivo.
-                                </Text>
+                                </span>
                             </Alert>
 
                             {/* Templates rápidos */}
-                            <Card withBorder p="sm">
-                                <Stack gap="xs">
-                                    <Text size="sm" fw={600}>Templates de Progresión</Text>
-                                    <Group>
-                                        <Button
-                                            size="xs"
-                                            variant="light"
+                            <GlassPanel className="p-3 border border-white/10">
+                                <div className="space-y-2">
+                                    <span className="text-xs font-bold text-gray-300">Templates de Progresión</span>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <button
                                             onClick={() => applyProgressionTemplate('standard')}
+                                            className="px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-bold text-gray-300 rounded transition-all"
                                         >
                                             Estándar (Grid 2x, LR igual)
-                                        </Button>
-                                        <Button
-                                            size="xs"
-                                            variant="light"
+                                        </button>
+                                        <button
                                             onClick={() => applyProgressionTemplate('fine_tune')}
+                                            className="px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-bold text-gray-300 rounded transition-all"
                                         >
                                             Fine-tuning (Grid igual, LR 0.5x)
-                                        </Button>
-                                        <Button
-                                            size="xs"
-                                            variant="light"
+                                        </button>
+                                        <button
                                             onClick={() => applyProgressionTemplate('aggressive')}
+                                            className="px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-bold text-gray-300 rounded transition-all"
                                         >
                                             Agresivo (Grid 4x, LR 0.8x)
-                                        </Button>
-                                    </Group>
-                                </Stack>
-                            </Card>
+                                        </button>
+                                    </div>
+                                </div>
+                            </GlassPanel>
 
                             {/* Comparación lado a lado */}
-                            <Table>
-                                <Table.Thead>
-                                    <Table.Tr>
-                                        <Table.Th>Parámetro</Table.Th>
-                                        <Table.Th>Base</Table.Th>
-                                        <Table.Th>Nuevo</Table.Th>
-                                        <Table.Th>Cambio</Table.Th>
-                                    </Table.Tr>
-                                </Table.Thead>
-                                <Table.Tbody>
-                                    <Table.Tr>
-                                        <Table.Td><Text size="sm" fw={500}>Grid Size</Text></Table.Td>
-                                        <Table.Td><Text size="sm">{baseConfig.GRID_SIZE_TRAINING}</Text></Table.Td>
-                                        <Table.Td>
-                                            <NumberInput
-                                                value={newConfig.GRID_SIZE_TRAINING}
-                                                onChange={(val) => setNewConfig({
-                                                    ...newConfig,
-                                                    GRID_SIZE_TRAINING: Number(val) || baseConfig.GRID_SIZE_TRAINING
-                                                })}
-                                                min={16}
-                                                max={512}
-                                                size="xs"
-                                                style={{ width: 100 }}
-                                            />
-                                        </Table.Td>
-                                        <Table.Td>
-                                            {newConfig.GRID_SIZE_TRAINING > baseConfig.GRID_SIZE_TRAINING && (
-                                                <Badge color="green" size="sm">↑ {((newConfig.GRID_SIZE_TRAINING / baseConfig.GRID_SIZE_TRAINING - 1) * 100).toFixed(0)}%</Badge>
-                                            )}
-                                            {newConfig.GRID_SIZE_TRAINING < baseConfig.GRID_SIZE_TRAINING && (
-                                                <Badge color="orange" size="sm">↓ {((1 - newConfig.GRID_SIZE_TRAINING / baseConfig.GRID_SIZE_TRAINING) * 100).toFixed(0)}%</Badge>
-                                            )}
-                                            {newConfig.GRID_SIZE_TRAINING === baseConfig.GRID_SIZE_TRAINING && (
-                                                <Badge color="gray" size="sm">=</Badge>
-                                            )}
-                                        </Table.Td>
-                                    </Table.Tr>
-                                    <Table.Tr>
-                                        <Table.Td><Text size="sm" fw={500}>Learning Rate</Text></Table.Td>
-                                        <Table.Td><Text size="sm">{baseConfig.LR_RATE_M.toExponential(3)}</Text></Table.Td>
-                                        <Table.Td>
-                                            <NumberInput
-                                                value={newConfig.LR_RATE_M}
-                                                onChange={(val) => setNewConfig({
-                                                    ...newConfig,
-                                                    LR_RATE_M: Number(val) || baseConfig.LR_RATE_M
-                                                })}
-                                                min={1e-6}
-                                                max={1}
-                                                step={1e-5}
-                                                size="xs"
-                                                style={{ width: 120 }}
-                                            />
-                                        </Table.Td>
-                                        <Table.Td>
-                                            {newConfig.LR_RATE_M !== baseConfig.LR_RATE_M && (
-                                                <Badge color="blue" size="sm">
-                                                    {newConfig.LR_RATE_M > baseConfig.LR_RATE_M ? '↑' : '↓'}
-                                                </Badge>
-                                            )}
-                                        </Table.Td>
-                                    </Table.Tr>
-                                    <Table.Tr>
-                                        <Table.Td><Text size="sm" fw={500}>d_state</Text></Table.Td>
-                                        <Table.Td><Text size="sm">{baseConfig.MODEL_PARAMS.d_state}</Text></Table.Td>
-                                        <Table.Td>
-                                            <NumberInput
-                                                value={newConfig.MODEL_PARAMS.d_state}
-                                                onChange={(val) => setNewConfig({
-                                                    ...newConfig,
-                                                    MODEL_PARAMS: {
-                                                        ...newConfig.MODEL_PARAMS,
-                                                        d_state: Number(val) || baseConfig.MODEL_PARAMS.d_state
-                                                    }
-                                                })}
-                                                min={4}
-                                                max={32}
-                                                size="xs"
-                                                style={{ width: 100 }}
-                                            />
-                                        </Table.Td>
-                                        <Table.Td>
-                                            {newConfig.MODEL_PARAMS.d_state !== baseConfig.MODEL_PARAMS.d_state && (
-                                                <Badge color="blue" size="sm">
-                                                    {newConfig.MODEL_PARAMS.d_state > baseConfig.MODEL_PARAMS.d_state ? '↑' : '↓'}
-                                                </Badge>
-                                            )}
-                                        </Table.Td>
-                                    </Table.Tr>
-                                    <Table.Tr>
-                                        <Table.Td><Text size="sm" fw={500}>hidden_channels</Text></Table.Td>
-                                        <Table.Td><Text size="sm">{baseConfig.MODEL_PARAMS.hidden_channels}</Text></Table.Td>
-                                        <Table.Td>
-                                            <NumberInput
-                                                value={newConfig.MODEL_PARAMS.hidden_channels}
-                                                onChange={(val) => setNewConfig({
-                                                    ...newConfig,
-                                                    MODEL_PARAMS: {
-                                                        ...newConfig.MODEL_PARAMS,
-                                                        hidden_channels: Number(val) || baseConfig.MODEL_PARAMS.hidden_channels
-                                                    }
-                                                })}
-                                                min={8}
-                                                max={128}
-                                                size="xs"
-                                                style={{ width: 100 }}
-                                            />
-                                        </Table.Td>
-                                        <Table.Td>
-                                            {newConfig.MODEL_PARAMS.hidden_channels !== baseConfig.MODEL_PARAMS.hidden_channels && (
-                                                <Badge color="blue" size="sm">
-                                                    {newConfig.MODEL_PARAMS.hidden_channels > baseConfig.MODEL_PARAMS.hidden_channels ? '↑' : '↓'}
-                                                </Badge>
-                                            )}
-                                        </Table.Td>
-                                    </Table.Tr>
-                                    <Table.Tr>
-                                        <Table.Td><Text size="sm" fw={500}>Gamma Decay</Text></Table.Td>
-                                        <Table.Td><Text size="sm">{baseConfig.GAMMA_DECAY.toFixed(4)}</Text></Table.Td>
-                                        <Table.Td>
-                                            <NumberInput
-                                                value={newConfig.GAMMA_DECAY}
-                                                onChange={(val) => setNewConfig({
-                                                    ...newConfig,
-                                                    GAMMA_DECAY: Number(val) || baseConfig.GAMMA_DECAY
-                                                })}
-                                                min={0}
-                                                max={1}
-                                                step={0.001}
-                                                size="xs"
-                                                style={{ width: 100 }}
-                                            />
-                                        </Table.Td>
-                                        <Table.Td>
-                                            {newConfig.GAMMA_DECAY !== baseConfig.GAMMA_DECAY && (
-                                                <Badge color="blue" size="sm">
-                                                    {newConfig.GAMMA_DECAY > baseConfig.GAMMA_DECAY ? '↑' : '↓'}
-                                                </Badge>
-                                            )}
-                                        </Table.Td>
-                                    </Table.Tr>
-                                    <Table.Tr>
-                                        <Table.Td><Text size="sm" fw={500}>QCA Steps</Text></Table.Td>
-                                        <Table.Td><Text size="sm">{baseConfig.QCA_STEPS_TRAINING}</Text></Table.Td>
-                                        <Table.Td>
-                                            <NumberInput
-                                                value={newConfig.QCA_STEPS_TRAINING}
-                                                onChange={(val) => setNewConfig({
-                                                    ...newConfig,
-                                                    QCA_STEPS_TRAINING: Number(val) || baseConfig.QCA_STEPS_TRAINING
-                                                })}
-                                                min={1}
-                                                max={100}
-                                                size="xs"
-                                                style={{ width: 100 }}
-                                            />
-                                        </Table.Td>
-                                        <Table.Td>
-                                            {newConfig.QCA_STEPS_TRAINING !== baseConfig.QCA_STEPS_TRAINING && (
-                                                <Badge color="blue" size="sm">
-                                                    {newConfig.QCA_STEPS_TRAINING > baseConfig.QCA_STEPS_TRAINING ? '↑' : '↓'}
-                                                </Badge>
-                                            )}
-                                        </Table.Td>
-                                    </Table.Tr>
-                                </Table.Tbody>
-                            </Table>
+                            <div className="overflow-x-auto">
+                                <Table highlightOnHover>
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableTh>Parámetro</TableTh>
+                                            <TableTh>Base</TableTh>
+                                            <TableTh>Nuevo</TableTh>
+                                            <TableTh>Cambio</TableTh>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        <TableRow>
+                                            <TableTd><span className="text-xs font-medium">Grid Size</span></TableTd>
+                                            <TableTd><span className="text-xs">{baseConfig.GRID_SIZE_TRAINING}</span></TableTd>
+                                            <TableTd>
+                                                <NumberInput
+                                                    value={newConfig.GRID_SIZE_TRAINING}
+                                                    onChange={(val) => setNewConfig({
+                                                        ...newConfig,
+                                                        GRID_SIZE_TRAINING: Number(val) || baseConfig.GRID_SIZE_TRAINING
+                                                    })}
+                                                    min={16}
+                                                    max={512}
+                                                    size="xs"
+                                                    style={{ width: 100 }}
+                                                />
+                                            </TableTd>
+                                            <TableTd>
+                                                {newConfig.GRID_SIZE_TRAINING > baseConfig.GRID_SIZE_TRAINING && (
+                                                    <Badge color="green" size="sm">↑ {((newConfig.GRID_SIZE_TRAINING / baseConfig.GRID_SIZE_TRAINING - 1) * 100).toFixed(0)}%</Badge>
+                                                )}
+                                                {newConfig.GRID_SIZE_TRAINING < baseConfig.GRID_SIZE_TRAINING && (
+                                                    <Badge color="orange" size="sm">↓ {((1 - newConfig.GRID_SIZE_TRAINING / baseConfig.GRID_SIZE_TRAINING) * 100).toFixed(0)}%</Badge>
+                                                )}
+                                                {newConfig.GRID_SIZE_TRAINING === baseConfig.GRID_SIZE_TRAINING && (
+                                                    <Badge color="gray" size="sm">=</Badge>
+                                                )}
+                                            </TableTd>
+                                        </TableRow>
+                                        <TableRow>
+                                            <TableTd><span className="text-xs font-medium">Learning Rate</span></TableTd>
+                                            <TableTd><span className="text-xs">{baseConfig.LR_RATE_M.toExponential(3)}</span></TableTd>
+                                            <TableTd>
+                                                <NumberInput
+                                                    value={newConfig.LR_RATE_M}
+                                                    onChange={(val) => setNewConfig({
+                                                        ...newConfig,
+                                                        LR_RATE_M: Number(val) || baseConfig.LR_RATE_M
+                                                    })}
+                                                    min={1e-6}
+                                                    max={1}
+                                                    step={1e-5}
+                                                    size="xs"
+                                                    style={{ width: 120 }}
+                                                />
+                                            </TableTd>
+                                            <TableTd>
+                                                {newConfig.LR_RATE_M !== baseConfig.LR_RATE_M && (
+                                                    <Badge color="blue" size="sm">
+                                                        {newConfig.LR_RATE_M > baseConfig.LR_RATE_M ? '↑' : '↓'}
+                                                    </Badge>
+                                                )}
+                                            </TableTd>
+                                        </TableRow>
+                                        <TableRow>
+                                            <TableTd><span className="text-xs font-medium">d_state</span></TableTd>
+                                            <TableTd><span className="text-xs">{baseConfig.MODEL_PARAMS.d_state}</span></TableTd>
+                                            <TableTd>
+                                                <NumberInput
+                                                    value={newConfig.MODEL_PARAMS.d_state}
+                                                    onChange={(val) => setNewConfig({
+                                                        ...newConfig,
+                                                        MODEL_PARAMS: {
+                                                            ...newConfig.MODEL_PARAMS,
+                                                            d_state: Number(val) || baseConfig.MODEL_PARAMS.d_state
+                                                        }
+                                                    })}
+                                                    min={4}
+                                                    max={32}
+                                                    size="xs"
+                                                    style={{ width: 100 }}
+                                                />
+                                            </TableTd>
+                                            <TableTd>
+                                                {newConfig.MODEL_PARAMS.d_state !== baseConfig.MODEL_PARAMS.d_state && (
+                                                    <Badge color="blue" size="sm">
+                                                        {newConfig.MODEL_PARAMS.d_state > baseConfig.MODEL_PARAMS.d_state ? '↑' : '↓'}
+                                                    </Badge>
+                                                )}
+                                            </TableTd>
+                                        </TableRow>
+                                        <TableRow>
+                                            <TableTd><span className="text-xs font-medium">hidden_channels</span></TableTd>
+                                            <TableTd><span className="text-xs">{baseConfig.MODEL_PARAMS.hidden_channels}</span></TableTd>
+                                            <TableTd>
+                                                <NumberInput
+                                                    value={newConfig.MODEL_PARAMS.hidden_channels}
+                                                    onChange={(val) => setNewConfig({
+                                                        ...newConfig,
+                                                        MODEL_PARAMS: {
+                                                            ...newConfig.MODEL_PARAMS,
+                                                            hidden_channels: Number(val) || baseConfig.MODEL_PARAMS.hidden_channels
+                                                        }
+                                                    })}
+                                                    min={8}
+                                                    max={128}
+                                                    size="xs"
+                                                    style={{ width: 100 }}
+                                                />
+                                            </TableTd>
+                                            <TableTd>
+                                                {newConfig.MODEL_PARAMS.hidden_channels !== baseConfig.MODEL_PARAMS.hidden_channels && (
+                                                    <Badge color="blue" size="sm">
+                                                        {newConfig.MODEL_PARAMS.hidden_channels > baseConfig.MODEL_PARAMS.hidden_channels ? '↑' : '↓'}
+                                                    </Badge>
+                                                )}
+                                            </TableTd>
+                                        </TableRow>
+                                        <TableRow>
+                                            <TableTd><span className="text-xs font-medium">Gamma Decay</span></TableTd>
+                                            <TableTd><span className="text-xs">{baseConfig.GAMMA_DECAY.toFixed(4)}</span></TableTd>
+                                            <TableTd>
+                                                <NumberInput
+                                                    value={newConfig.GAMMA_DECAY}
+                                                    onChange={(val) => setNewConfig({
+                                                        ...newConfig,
+                                                        GAMMA_DECAY: Number(val) || baseConfig.GAMMA_DECAY
+                                                    })}
+                                                    min={0}
+                                                    max={1}
+                                                    step={0.001}
+                                                    size="xs"
+                                                    style={{ width: 100 }}
+                                                />
+                                            </TableTd>
+                                            <TableTd>
+                                                {newConfig.GAMMA_DECAY !== baseConfig.GAMMA_DECAY && (
+                                                    <Badge color="blue" size="sm">
+                                                        {newConfig.GAMMA_DECAY > baseConfig.GAMMA_DECAY ? '↑' : '↓'}
+                                                    </Badge>
+                                                )}
+                                            </TableTd>
+                                        </TableRow>
+                                        <TableRow>
+                                            <TableTd><span className="text-xs font-medium">QCA Steps</span></TableTd>
+                                            <TableTd><span className="text-xs">{baseConfig.QCA_STEPS_TRAINING}</span></TableTd>
+                                            <TableTd>
+                                                <NumberInput
+                                                    value={newConfig.QCA_STEPS_TRAINING}
+                                                    onChange={(val) => setNewConfig({
+                                                        ...newConfig,
+                                                        QCA_STEPS_TRAINING: Number(val) || baseConfig.QCA_STEPS_TRAINING
+                                                    })}
+                                                    min={1}
+                                                    max={100}
+                                                    size="xs"
+                                                    style={{ width: 100 }}
+                                                />
+                                            </TableTd>
+                                            <TableTd>
+                                                {newConfig.QCA_STEPS_TRAINING !== baseConfig.QCA_STEPS_TRAINING && (
+                                                    <Badge color="blue" size="sm">
+                                                        {newConfig.QCA_STEPS_TRAINING > baseConfig.QCA_STEPS_TRAINING ? '↑' : '↓'}
+                                                    </Badge>
+                                                )}
+                                            </TableTd>
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
+                            </div>
 
-                            <NumberInput
-                                label="Episodios a Entrenar"
-                                value={episodesToAdd}
-                                onChange={(val) => setEpisodesToAdd(Number(val) || 1000)}
-                                min={1}
-                                max={10000}
-                                description="Número de episodios para el nuevo entrenamiento"
-                            />
-                        </Stack>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                                    Episodios a Entrenar
+                                </label>
+                                <NumberInput
+                                    value={episodesToAdd}
+                                    onChange={(val) => setEpisodesToAdd(Number(val) || 1000)}
+                                    min={1}
+                                    max={10000}
+                                    size="sm"
+                                    placeholder="Número de episodios"
+                                />
+                                <div className="text-[10px] text-gray-600">
+                                    Número de episodios para el nuevo entrenamiento
+                                </div>
+                            </div>
+                        </div>
                     )}
-                </Stepper.Step>
+                </Step>
 
-                <Stepper.Step label="Confirmar" description="Revisa y crea">
+                <Step label="Confirmar" description="Revisa y crea">
                     {baseConfig && newConfig && (
-                        <Stack gap="md" mt="md">
-                            <Alert icon={<IconInfoCircle size={16} />} color="green" variant="light">
-                                <Text size="sm">
+                        <div className="space-y-4 mt-4">
+                            <Alert icon={<Info size={16} />} color="green" variant="light">
+                                <span className="text-xs">
                                     Revisa la configuración antes de crear el nuevo experimento con transfer learning.
-                                </Text>
+                                </span>
                             </Alert>
 
-                            <Card withBorder p="md">
-                                <Stack gap="md">
-                                    <Group justify="space-between">
-                                        <Text fw={600}>Experimento Base</Text>
+                            <GlassPanel className="p-4 border border-white/10">
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold text-gray-300">Experimento Base</span>
                                         <Badge>{baseExperiment}</Badge>
-                                    </Group>
-                                    <Divider />
-                                    <Group justify="space-between">
-                                        <Text fw={600}>Nuevo Experimento</Text>
-                                        <TextInput
+                                    </div>
+                                    <div className="h-px bg-white/10" />
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold text-gray-300">Nuevo Experimento</span>
+                                        <input
+                                            type="text"
                                             value={newExperimentName}
-                                            onChange={(e) => setNewExperimentName(e.target.value)}
-                                            style={{ flex: 1, maxWidth: 400 }}
-                                            size="sm"
+                                            onChange={(e) => {
+                                                setNewExperimentName(e.target.value);
+                                                setIsExperimentNameManuallyEdited(true);
+                                            }}
+                                            className="flex-1 max-w-[400px] px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 ml-4"
                                         />
-                                    </Group>
-                                    <Divider />
-                                    <Stack gap="xs">
-                                        <Text size="sm" fw={500}>Resumen de Cambios:</Text>
+                                    </div>
+                                    <div className="h-px bg-white/10" />
+                                    <div className="space-y-2">
+                                        <span className="text-xs font-medium text-gray-300">Resumen de Cambios:</span>
                                         {!configChanged && (
-                                            <Text size="xs" c="dimmed">No hay cambios en la configuración (solo transfer learning)</Text>
+                                            <div className="text-[10px] text-gray-500">
+                                                No hay cambios en la configuración (solo transfer learning)
+                                            </div>
                                         )}
                                         {configChanged && (
-                                            <Stack gap={4}>
+                                            <div className="space-y-1">
                                                 {newConfig.GRID_SIZE_TRAINING !== baseConfig.GRID_SIZE_TRAINING && (
-                                                    <Text size="xs">
+                                                    <div className="text-[10px] text-gray-400">
                                                         Grid Size: {baseConfig.GRID_SIZE_TRAINING} → {newConfig.GRID_SIZE_TRAINING}
-                                                    </Text>
+                                                    </div>
                                                 )}
                                                 {newConfig.LR_RATE_M !== baseConfig.LR_RATE_M && (
-                                                    <Text size="xs">
+                                                    <div className="text-[10px] text-gray-400">
                                                         LR: {baseConfig.LR_RATE_M.toExponential(3)} → {newConfig.LR_RATE_M.toExponential(3)}
-                                                    </Text>
+                                                    </div>
                                                 )}
                                                 {newConfig.MODEL_PARAMS.d_state !== baseConfig.MODEL_PARAMS.d_state && (
-                                                    <Text size="xs">
+                                                    <div className="text-[10px] text-gray-400">
                                                         d_state: {baseConfig.MODEL_PARAMS.d_state} → {newConfig.MODEL_PARAMS.d_state}
-                                                    </Text>
+                                                    </div>
                                                 )}
                                                 {newConfig.MODEL_PARAMS.hidden_channels !== baseConfig.MODEL_PARAMS.hidden_channels && (
-                                                    <Text size="xs">
+                                                    <div className="text-[10px] text-gray-400">
                                                         hidden_channels: {baseConfig.MODEL_PARAMS.hidden_channels} → {newConfig.MODEL_PARAMS.hidden_channels}
-                                                    </Text>
+                                                    </div>
                                                 )}
-                                            </Stack>
+                                            </div>
                                         )}
-                                        <Text size="xs" c="dimmed" mt="xs">
+                                        <div className="text-[10px] text-gray-500 mt-2">
                                             Episodios: {episodesToAdd}
-                                        </Text>
-                                    </Stack>
-                                </Stack>
-                            </Card>
-                        </Stack>
+                                        </div>
+                                    </div>
+                                </div>
+                            </GlassPanel>
+                        </div>
                     )}
-                </Stepper.Step>
+                </Step>
 
-                <Stepper.Completed>
-                    <Stack gap="md" mt="md" align="center">
-                        <IconCheck size={48} color="var(--mantine-color-green-6)" />
-                        <Text fw={600} size="lg">¡Experimento creado!</Text>
-                        <Text size="sm" c="dimmed" ta="center">
+                <StepperCompleted>
+                    <div className="flex flex-col items-center justify-center space-y-4 mt-4">
+                        <Check size={48} className="text-emerald-400" />
+                        <span className="text-base font-bold text-gray-200">¡Experimento creado!</span>
+                        <div className="text-xs text-gray-500 text-center">
                             El entrenamiento con transfer learning ha sido iniciado.
+                            <br />
                             Puedes monitorear el progreso en el panel lateral.
-                        </Text>
-                    </Stack>
-                </Stepper.Completed>
+                        </div>
+                    </div>
+                </StepperCompleted>
             </Stepper>
 
-            <Group justify="flex-end" mt="xl">
+            <div className="flex items-center justify-end gap-2 mt-6 pt-4 border-t border-white/10">
                 {activeStep > 0 && (
-                    <Button variant="default" onClick={handleBack}>
+                    <button
+                        onClick={handleBack}
+                        className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-gray-300 rounded transition-all"
+                    >
                         Atrás
-                    </Button>
+                    </button>
                 )}
                 {activeStep < 3 && (
-                    <Button onClick={handleNext}>
+                    <button
+                        onClick={handleNext}
+                        className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 text-xs font-bold rounded transition-all"
+                    >
                         Siguiente
-                    </Button>
+                    </button>
                 )}
                 {activeStep === 3 && (
-                    <Button onClick={handleCreate} leftSection={<IconCheck size={16} />}>
+                    <button
+                        onClick={handleCreate}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded transition-all"
+                    >
+                        <Check size={12} />
                         Crear Experimento
-                    </Button>
+                    </button>
                 )}
-                <Button variant="subtle" onClick={handleClose}>
+                <button
+                    onClick={handleClose}
+                    className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-gray-300 rounded transition-all"
+                >
                     Cancelar
-                </Button>
-            </Group>
+                </button>
+            </div>
         </Modal>
     );
 }
-
