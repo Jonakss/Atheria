@@ -357,6 +357,14 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
       
       {/* Panel de Configuración */}
       <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      
+      {/* Cerrar dropdown al hacer click fuera */}
+      {engineDropdownOpen && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={() => setEngineDropdownOpen(false)}
+        />
+      )}
     </header>
   );
 };
