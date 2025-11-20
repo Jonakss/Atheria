@@ -91,6 +91,11 @@ class CMakeBuildExt(build_ext):
         """Verifica que el módulo compilado esté en la ubicación correcta."""
         import shutil
         
+        # MODIFICACIÓN: Colocar el módulo en src/ para mejor organización
+        project_root = Path(__file__).parent.resolve()
+        target_dir = project_root / "src"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        
         # El módulo ya debería estar en ext_dir porque CMake lo configuramos así
         # Buscar el módulo compilado en ext_dir (donde CMake lo colocó)
         module_exts = [".so", ".pyd", ".dylib"]
@@ -115,6 +120,16 @@ class CMakeBuildExt(build_ext):
                     break
                 if module_name:
                     break
+        
+        # Si se encuentra, mover/copiar a src/
+        if module_name and src and src.exists():
+            target_path = target_dir / module_name
+            if src != target_path:
+                # Mover o copiar a src/
+                if target_path.exists():
+                    target_path.unlink()  # Eliminar si existe
+                shutil.copy2(str(src), str(target_path))
+                print(f"✅ Módulo copiado a src/: {target_path}")
         
         # Si se encuentra, crear symlink con nombre que setuptools espera (si es necesario)
         if module_name and src and src.exists():
