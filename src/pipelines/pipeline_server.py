@@ -257,13 +257,34 @@ async def simulation_loop():
                                     logging.debug(f"Error detectando época: {e}")
                             
                             # Calcular visualización para este frame
+                            # OPTIMIZACIÓN: Solo calcular Poincaré cada N frames si está activo
+                            viz_type = g_state.get('viz_type', 'density')
+                            should_calc_poincare = viz_type in ['poincare', 'poincare_3d']
+                            
+                            # Contador para controlar frecuencia de cálculo de Poincaré
+                            if should_calc_poincare:
+                                if 'poincare_frame_counter' not in g_state:
+                                    g_state['poincare_frame_counter'] = 0
+                                g_state['poincare_frame_counter'] += 1
+                                # Calcular Poincaré solo cada 3 frames cuando está activo
+                                calc_poincare_this_frame = g_state['poincare_frame_counter'] % 3 == 0
+                            else:
+                                calc_poincare_this_frame = False
+                                g_state['poincare_frame_counter'] = 0
+                            
                             delta_psi = g_state['motor'].last_delta_psi if hasattr(g_state['motor'], 'last_delta_psi') else None
                             viz_data = get_visualization_data(
                                 g_state['motor'].state.psi, 
-                                g_state.get('viz_type', 'density'),
+                                viz_type,
                                 delta_psi=delta_psi,
                                 motor=g_state['motor']
                             )
+                            
+                            # OPTIMIZACIÓN: Reutilizar coordenadas de Poincaré del frame anterior si no se recalcula
+                            if should_calc_poincare and not calc_poincare_this_frame and 'last_poincare_coords' in g_state:
+                                viz_data['poincare_coords'] = g_state['last_poincare_coords']
+                            elif should_calc_poincare and calc_poincare_this_frame and 'poincare_coords' in viz_data:
+                                g_state['last_poincare_coords'] = viz_data['poincare_coords']
                             
                             if viz_data and isinstance(viz_data, dict):
                                 map_data = viz_data.get("map_data", [])

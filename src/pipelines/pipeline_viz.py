@@ -2,8 +2,17 @@
 import torch
 import numpy as np
 from sklearn.decomposition import PCA
+import logging
 
 pca = PCA(n_components=2)
+
+# Caché para cálculos de Poincaré (evitar recalcular en cada frame)
+_poincare_cache = {
+    'last_psi_hash': None,
+    'last_coords': None,
+    'recalc_counter': 0
+}
+POINCARE_RECALC_INTERVAL = 5  # Recalcular cada N frames
 
 def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Tensor = None, motor=None, downsample_factor: int = 1):
     """
@@ -221,19 +230,59 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
     poincare_coords = [[0.0, 0.0]]  # Default
     if viz_type in ['poincare', 'poincare_3d']:
         try:
-            psi_flat_real = psi.real.reshape(-1, psi.shape[-1]).cpu().numpy()
-            psi_flat_imag = psi.imag.reshape(-1, psi.shape[-1]).cpu().numpy()
-            psi_flat_for_pca = np.concatenate([psi_flat_real, psi_flat_imag], axis=1)
+            # OPTIMIZACIÓN: Usar caché y submuestreo para mejorar rendimiento
+            # Crear hash simple del estado para detectar cambios
+            psi_sample = psi[::max(1, psi.shape[0]//32), ::max(1, psi.shape[1]//32), :]  # Submuestreo para hash
+            psi_hash = hash(psi_sample.cpu().numpy().tobytes())
             
-            # Validar que hay suficientes puntos para PCA
-            if psi_flat_for_pca.shape[0] >= 2:
-                poincare_coords = pca.fit_transform(psi_flat_for_pca)
-                max_abs_val = np.max(np.abs(poincare_coords))
-                if max_abs_val > 0:
-                    poincare_coords = poincare_coords / max_abs_val
+            # Verificar caché
+            use_cache = (
+                _poincare_cache['last_psi_hash'] == psi_hash and 
+                _poincare_cache['last_coords'] is not None
+            )
+            
+            # Actualizar contador para recalcular periódicamente (aunque el hash no cambie)
+            _poincare_cache['recalc_counter'] += 1
+            should_recalc = _poincare_cache['recalc_counter'] >= POINCARE_RECALC_INTERVAL
+            
+            if use_cache and not should_recalc:
+                # Usar caché
+                poincare_coords = _poincare_cache['last_coords']
+                logging.debug(f"Poincaré: usando caché (hash={psi_hash})")
+            else:
+                # Calcular Poincaré con optimizaciones
+                # OPTIMIZACIÓN 1: Submuestreo inteligente (solo usar cada N-ésimo punto para PCA)
+                subsample_factor = max(1, int(np.sqrt(psi.shape[0] * psi.shape[1] / 10000)))  # ~10k puntos máximo
+                
+                psi_subsampled = psi[::subsample_factor, ::subsample_factor, :]
+                psi_flat_real = psi_subsampled.real.reshape(-1, psi_subsampled.shape[-1]).cpu().numpy()
+                psi_flat_imag = psi_subsampled.imag.reshape(-1, psi_subsampled.shape[-1]).cpu().numpy()
+                psi_flat_for_pca = np.concatenate([psi_flat_real, psi_flat_imag], axis=1)
+                
+                # OPTIMIZACIÓN 2: Limitar número máximo de puntos para PCA
+                max_points = 5000
+                if psi_flat_for_pca.shape[0] > max_points:
+                    # Seleccionar puntos aleatorios
+                    indices = np.random.choice(psi_flat_for_pca.shape[0], max_points, replace=False)
+                    psi_flat_for_pca = psi_flat_for_pca[indices]
+                
+                # Validar que hay suficientes puntos para PCA
+                if psi_flat_for_pca.shape[0] >= 2:
+                    # OPTIMIZACIÓN 3: Usar fit_transform solo si cambió el estado significativamente
+                    poincare_coords = pca.fit_transform(psi_flat_for_pca)
+                    max_abs_val = np.max(np.abs(poincare_coords))
+                    if max_abs_val > 0:
+                        poincare_coords = poincare_coords / max_abs_val
+                    
+                    # Actualizar caché
+                    _poincare_cache['last_psi_hash'] = psi_hash
+                    _poincare_cache['last_coords'] = poincare_coords.copy()
+                    _poincare_cache['recalc_counter'] = 0
+                    logging.debug(f"Poincaré: recalculado (subsample={subsample_factor}, puntos={psi_flat_for_pca.shape[0]})")
+                else:
+                    logging.warning(f"Poincaré: no hay suficientes puntos ({psi_flat_for_pca.shape[0]})")
         except Exception as e:
-            import logging
-            logging.warning(f"Error al calcular coordenadas de Poincaré: {e}. Usando coordenadas por defecto.")
+            logging.warning(f"Error al calcular coordenadas de Poincaré: {e}. Usando coordenadas por defecto.", exc_info=True)
 
     # --- Histogramas (solo si se necesitan) ---
     hist_data = {}
