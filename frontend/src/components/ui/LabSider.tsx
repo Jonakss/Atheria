@@ -1,25 +1,28 @@
-// frontend/src/components/LabSider.tsx
-import { useState } from 'react';
-import { Box, Button, NavLink, ScrollArea, Select, Stack, Text, Group, NumberInput, Progress, Divider, Badge, Tooltip, Alert, Paper } from '@mantine/core';
-import { IconPlayerPlay, IconPlayerPause, IconRefresh, IconUpload, IconPlug, IconCheck, IconX, IconAlertCircle, IconInfoCircle, IconTransfer, IconPower } from '@tabler/icons-react';
+// frontend/src/components/ui/LabSider.tsx
+import React, { useState } from 'react';
+import { Play, Pause, RefreshCw, Upload, Plug, Power, ArrowRightLeft, ChevronRight, FlaskConical, Brain, BarChart3, Settings } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { modelOptions, vizOptions } from '../../utils/vizOptions';
-import { AdvancedControls } from '../controls/AdvancedControls';
 import { ExperimentManager } from '../experiments/ExperimentManager';
 import { CheckpointManager } from '../training/CheckpointManager';
 import { ExperimentInfo } from '../experiments/ExperimentInfo';
 import { TransferLearningWizard } from '../experiments/TransferLearningWizard';
-import classes from './LabSider.module.css';
+import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
+
+type LabSection = 'inference' | 'training' | 'analysis';
 
 export function LabSider() {
     const { 
         sendCommand, experimentsData, trainingStatus, trainingProgress, 
-        inferenceStatus, connectionStatus, connect, disconnect, selectedViz, setSelectedViz, simData,
+        inferenceStatus, connectionStatus, connect, disconnect, selectedViz, setSelectedViz,
         activeExperiment, setActiveExperiment
     } = useWebSocket();
     
+    const isConnected = connectionStatus === 'connected';
+    const [activeSection, setActiveSection] = useState<LabSection>('inference');
+    
     // Estados para los inputs de entrenamiento
-    const [selectedModel, setSelectedModel] = useState<string | null>('UNET');
+    const [selectedModel, setSelectedModel] = useState<string>('UNET');
     const [learningRate, setLearningRate] = useState(0.0001);
     const [gridSize, setGridSize] = useState(64);
     const [qcaSteps, setQcaSteps] = useState(16);
@@ -27,12 +30,21 @@ export function LabSider() {
     const [hiddenChannels, setHiddenChannels] = useState(32);
     const [episodesToAdd, setEpisodesToAdd] = useState(100);
     const [transferFromExperiment, setTransferFromExperiment] = useState<string | null>(null);
-    const [gammaDecay, setGammaDecay] = useState(0.01);  // Término Lindbladian (decaimiento)
-    const [initialStateMode, setInitialStateMode] = useState('complex_noise');  // Modo de inicialización del estado
+    const [gammaDecay, setGammaDecay] = useState(0.01);
+    const [initialStateMode, setInitialStateMode] = useState('complex_noise');
     const [transferWizardOpened, setTransferWizardOpened] = useState(false);
 
+    // Encontrar el experimento activo
+    const currentExperiment = activeExperiment 
+        ? experimentsData?.find(exp => exp.name === activeExperiment) 
+        : null;
+
     const handleCreateExperiment = () => {
-        // Validaciones
+        if (!isConnected) {
+            alert('⚠️ No hay conexión con el servidor. Conecta primero.');
+            return;
+        }
+        
         if (!selectedModel) {
             alert('⚠️ Por favor selecciona una arquitectura de modelo.');
             return;
@@ -53,7 +65,6 @@ export function LabSider() {
             return;
         }
         
-        // Verificar si el nombre del experimento ya existe
         const expName = `${selectedModel}-d${dState}-h${hiddenChannels}-g${gridSize}-lr${learningRate.toExponential(0)}`;
         const existingExp = experimentsData?.find(e => e.name === expName);
         if (existingExp) {
@@ -70,19 +81,24 @@ export function LabSider() {
             QCA_STEPS_TRAINING: qcaSteps,
             TOTAL_EPISODES: episodesToAdd,
             MODEL_PARAMS: { d_state: dState, hidden_channels: hiddenChannels, alpha: 0.9, beta: 0.85 },
-            GAMMA_DECAY: gammaDecay,  // Término Lindbladian: presión evolutiva hacia metabolismo (0.0 = cerrado, >0 = abierto)
-            INITIAL_STATE_MODE_INFERENCE: initialStateMode  // Modo de inicialización del estado cuántico
+            GAMMA_DECAY: gammaDecay,
+            INITIAL_STATE_MODE_INFERENCE: initialStateMode
         };
         
-        // Si se seleccionó un experimento base, agregar transfer learning
         if (transferFromExperiment) {
             args.LOAD_FROM_EXPERIMENT = transferFromExperiment;
         }
         
         sendCommand('experiment', 'create', args);
+        setActiveSection('training'); // Cambiar a sección de entrenamiento
     };
 
     const handleContinueExperiment = () => {
+        if (!isConnected) {
+            alert('⚠️ No hay conexión con el servidor.');
+            return;
+        }
+        
         if (!activeExperiment) {
             alert('⚠️ Por favor selecciona un experimento primero.');
             return;
@@ -115,366 +131,508 @@ export function LabSider() {
     };
 
     const handleLoadExperiment = () => { 
+        if (!isConnected) return;
         if (activeExperiment) {
-            // Verificar que el experimento tenga checkpoint antes de cargar
             const exp = experimentsData?.find(e => e.name === activeExperiment);
-            if (exp && !exp.has_checkpoint) {
-                // No hacer nada, el botón ya está deshabilitado
-                return;
-            }
+            if (exp && !exp.has_checkpoint) return;
             sendCommand('inference', 'load_experiment', { experiment_name: activeExperiment }); 
         }
     };
-    const handleResetSimulation = () => sendCommand('inference', 'reset');
+    
+    const handleResetSimulation = () => {
+        if (!isConnected) return;
+        sendCommand('inference', 'reset');
+    };
+    
     const togglePlayPause = () => {
+        if (!isConnected) return;
         const command = inferenceStatus === 'running' ? 'pause' : 'play';
         sendCommand('inference', command);
     };
 
     const handleConnectDisconnect = () => {
         if (connectionStatus === 'connected') {
-            // Desconectar si está conectado
             disconnect();
         } else {
-            // Conectar si no está conectado
             connect();
         }
     };
 
-    const handleVizChange = (value: string | null) => {
-        if (value) {
+    const handleVizChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const value = e.target.value;
+        if (value && isConnected) {
             setSelectedViz(value);
             sendCommand('simulation', 'set_viz', { viz_type: value });
         }
     };
 
     const progressPercent = trainingProgress ? (trainingProgress.current_episode / trainingProgress.total_episodes) * 100 : 0;
-    
-    // Encontrar el experimento activo desde experimentsData
-    const currentExperiment = activeExperiment 
-        ? experimentsData?.find(exp => exp.name === activeExperiment) 
-        : null;
+
+    const sectionButtons = [
+        { id: 'inference' as LabSection, icon: FlaskConical, label: 'Inferencia', color: 'blue' },
+        { id: 'training' as LabSection, icon: Brain, label: 'Entrenamiento', color: 'emerald' },
+        { id: 'analysis' as LabSection, icon: BarChart3, label: 'Análisis', color: 'amber' },
+    ];
 
     return (
-        <Box className={classes.sider}>
-            <Box className={classes.header}>
-                <Text size="lg" fw={700}>Laboratorio Aetheria</Text>
-                <Tooltip 
-                    label={
+        <div className="h-full flex flex-col bg-[#080808] text-gray-300">
+            {/* Header - Design System */}
+            <div className="h-12 border-b border-white/10 bg-[#0a0a0a] flex items-center justify-between px-4 shrink-0">
+                <span className="text-xs font-bold text-gray-200 tracking-wide">LABORATORIO</span>
+                <button
+                    onClick={handleConnectDisconnect}
+                    disabled={connectionStatus === 'connecting'}
+                    className={`flex items-center gap-2 px-2 py-1 rounded text-[10px] font-bold border transition-all ${
+                        connectionStatus === 'connected'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+                            : connectionStatus === 'connecting'
+                            ? 'bg-gray-500/10 text-gray-500 border-gray-500/30 cursor-wait opacity-50'
+                            : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10'
+                    }`}
+                    title={
                         connectionStatus === 'connected' ? 'Desconectar' :
-                        connectionStatus === 'server_unavailable' ? 'Servidor no disponible. Click para reconectar' :
                         connectionStatus === 'connecting' ? 'Conectando...' :
                         'Conectar al servidor'
                     }
-                    position="left"
                 >
-                    <Button 
-                        onClick={handleConnectDisconnect} 
-                        size="xs" 
-                        variant={connectionStatus === 'connected' ? 'filled' : 'outline'} 
-                        leftSection={
-                            connectionStatus === 'connected' ? <IconX size={14}/> : <IconPlug size={14}/>
-                        } 
-                        loading={connectionStatus === 'connecting'}
-                        color={
-                            connectionStatus === 'connected' ? 'red' :
-                            connectionStatus === 'server_unavailable' ? 'red' :
-                            'gray'
-                        }
-                    >
-                        {connectionStatus === 'connected' ? '' : 
-                         connectionStatus === 'server_unavailable' ? 'Servidor no disponible' :
-                         connectionStatus === 'connecting' ? 'Conectando...' : 'Conectar'}
-                    </Button>
-                </Tooltip>
-            </Box>
+                    {connectionStatus === 'connected' ? (
+                        <Power size={14} />
+                    ) : connectionStatus === 'connecting' ? (
+                        <div className="w-2 h-2 rounded-full border-2 border-gray-500 border-t-transparent animate-spin" />
+                    ) : (
+                        <Plug size={12} />
+                    )}
+                </button>
+            </div>
 
-            <ScrollArea style={{ flex: 1, marginTop: 'var(--mantine-spacing-md)' }}>
-                <Stack gap="xl">
-                    {trainingStatus === 'running' && (
-                        <Box style={{ display: 'block' }}>
-                        <Stack gap="xs">
-                            <Text size="xs" fw={700} className={classes.sectionTitle}>PROGRESO DEL ENTRENAMIENTO</Text>
-                            <Progress value={progressPercent} animated />
-                            {trainingProgress && (
-                                <Text size="xs" c="dimmed">
-                                    Episodio {trainingProgress.current_episode}/{trainingProgress.total_episodes} | 
-                                    Pérdida: {trainingProgress.avg_loss.toFixed(6)}
-                                </Text>
-                            )}
-                            <Button color="red" variant="outline" size="xs" onClick={() => sendCommand('experiment', 'stop')}>
-                                Detener Entrenamiento
-                            </Button>
-                        </Stack>
-                        </Box>
+            {/* Tabs de Secciones - Design System */}
+            <div className="flex border-b border-white/10 bg-[#0a0a0a] shrink-0">
+                {sectionButtons.map((section) => {
+                    const Icon = section.icon;
+                    const isActive = activeSection === section.id;
+                    const colorClasses = {
+                        blue: isActive ? 'text-blue-400 border-blue-500/40 bg-blue-500/10' : 'text-gray-500 hover:text-gray-300',
+                        emerald: isActive ? 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10' : 'text-gray-500 hover:text-gray-300',
+                        amber: isActive ? 'text-amber-400 border-amber-500/40 bg-amber-500/10' : 'text-gray-500 hover:text-gray-300',
+                    };
+                    
+                    return (
+                        <button
+                            key={section.id}
+                            onClick={() => setActiveSection(section.id)}
+                            className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 px-2 border-b-2 transition-all ${
+                                colorClasses[section.color as keyof typeof colorClasses]
+                            } ${isActive ? 'border-' + section.color + '-500/40' : 'border-transparent'}`}
+                        >
+                            <Icon size={16} />
+                            <span className="text-[9px] font-bold uppercase tracking-wider">{section.label}</span>
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                {/* Progreso de Entrenamiento - Siempre visible si está corriendo */}
+                {trainingStatus === 'running' && (
+                    <div className="m-4 mb-0 bg-white/5 border border-white/10 rounded-lg p-3 space-y-2">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                            <span>PROGRESO</span>
+                            <span className="text-emerald-400">ACTIVO</span>
+                        </div>
+                        <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden">
+                            <div 
+                                className="h-full bg-emerald-500 transition-all duration-300"
+                                style={{ width: `${progressPercent}%` }}
+                            />
+                        </div>
+                        {trainingProgress && (
+                            <div className="flex items-center justify-between text-xs text-gray-400">
+                                <span>Episodio {trainingProgress.current_episode}/{trainingProgress.total_episodes}</span>
+                                <span className="font-mono">Loss: {trainingProgress.avg_loss.toFixed(6)}</span>
+                            </div>
+                        )}
+                        <button
+                            onClick={() => isConnected && sendCommand('experiment', 'stop', {})}
+                            disabled={!isConnected}
+                            className="w-full py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-bold rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Detener Entrenamiento
+                        </button>
+                    </div>
+                )}
+
+                <div className="p-4 space-y-6">
+                    {/* SECCIÓN: INFERENCIA */}
+                    {activeSection === 'inference' && (
+                        <div className="space-y-4">
+                            {/* Experimento Activo */}
+                            <div className="space-y-3">
+                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">EXPERIMENTO ACTIVO</div>
+                                <ExperimentInfo />
+                                
+                                <button
+                                    onClick={handleLoadExperiment}
+                                    disabled={!isConnected || !activeExperiment || !currentExperiment?.has_checkpoint || inferenceStatus === 'running'}
+                                    className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded text-xs font-bold border transition-all ${
+                                        currentExperiment?.has_checkpoint && inferenceStatus !== 'running' && isConnected
+                                            ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/20'
+                                            : 'bg-white/5 text-gray-500 border-white/10'
+                                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                >
+                                    <Upload size={14} />
+                                    Cargar Modelo
+                                </button>
+                            </div>
+
+                            {/* Controles de Inferencia */}
+                            <div className="space-y-3 pt-3 border-t border-white/5">
+                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">CONTROLES</div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        onClick={togglePlayPause}
+                                        disabled={!isConnected || (!activeExperiment || !currentExperiment?.has_checkpoint) && inferenceStatus !== 'running'}
+                                        className={`flex items-center justify-center gap-2 px-3 py-2 rounded text-xs font-bold border transition-all ${
+                                            inferenceStatus === 'running'
+                                                ? 'bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500/20'
+                                                : 'bg-green-500/10 text-green-400 border-green-500/30 hover:bg-green-500/20'
+                                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                    >
+                                        {inferenceStatus === 'running' ? <Pause size={14} /> : <Play size={14} />}
+                                        {inferenceStatus === 'running' ? 'Pausar' : 'Iniciar'}
+                                    </button>
+                                    <button
+                                        onClick={handleResetSimulation}
+                                        disabled={!isConnected || !activeExperiment || !currentExperiment?.has_checkpoint}
+                                        className="flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 text-xs font-bold rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <RefreshCw size={14} />
+                                        Reiniciar
+                                    </button>
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-[10px] text-gray-400 mb-1 uppercase">Visualización</label>
+                                    <select
+                                        value={selectedViz || 'density'}
+                                        onChange={handleVizChange}
+                                        disabled={!isConnected}
+                                        className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                                    >
+                                        {vizOptions.map(opt => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Gestión de Experimentos (Compacta) */}
+                            <div className="space-y-3 pt-3 border-t border-white/5">
+                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">GESTIÓN</div>
+                                <ExperimentManager />
+                                <CheckpointManager />
+                            </div>
+                        </div>
                     )}
 
-                    <Stack gap="sm">
-                        <Text size="xs" fw={700} className={classes.sectionTitle}>INFERENCIA</Text>
-                        <Tooltip 
-                            label={
-                                !activeExperiment && inferenceStatus !== 'running' ? 
-                                    "Selecciona y carga un experimento primero" :
-                                    !currentExperiment?.has_checkpoint && inferenceStatus !== 'running' ?
-                                    "Este experimento no tiene checkpoints. Entrénalo primero." :
-                                    inferenceStatus === 'running' ? "Pausar simulación" : "Iniciar simulación"
-                            }
-                            position="top"
-                        >
-                            <Group grow>
-                                <Button 
-                                    onClick={togglePlayPause} 
-                                    leftSection={inferenceStatus === 'running' ? <IconPlayerPause size={16} /> : <IconPlayerPlay size={16} />} 
-                                    color={inferenceStatus === 'running' ? 'yellow' : 'green'}
-                                    disabled={
-                                        (inferenceStatus !== 'running') && 
-                                        (!activeExperiment || !currentExperiment?.has_checkpoint)
-                                    }
-                                >
-                                    {inferenceStatus === 'running' ? 'Pausar' : 'Iniciar'}
-                                </Button>
-                                <Button 
-                                    leftSection={<IconRefresh size={14} />} 
-                                    variant="default" 
-                                    onClick={handleResetSimulation}
-                                    disabled={!activeExperiment || !currentExperiment?.has_checkpoint}
-                                >
-                                    Reiniciar
-                                </Button>
-                            </Group>
-                        </Tooltip>
-                        <Select 
-                            label="Mapa de Visualización" 
-                            data={vizOptions} 
-                            value={selectedViz} 
-                            onChange={handleVizChange} 
-                        />
-                    </Stack>
-
-                    <Stack gap="sm">
-                        <Text size="xs" fw={700} className={classes.sectionTitle}>EXPERIMENTO ACTIVO</Text>
-                        
-                        {/* Información del experimento activo */}
-                        <ExperimentInfo />
-                        
-                        <Tooltip 
-                            label={!activeExperiment ? "Selecciona un experimento primero" : 
-                                   !currentExperiment?.has_checkpoint ? 
-                                   "Este experimento no tiene checkpoints. Entrénalo primero." :
-                                   inferenceStatus === 'running' ? "Detén la simulación primero para cargar otro modelo" :
-                                   "Cargar modelo para inferencia"}
-                            position="top"
-                        >
-                            <Button 
-                                leftSection={<IconUpload size={14} />} 
-                                variant="default" 
-                                onClick={handleLoadExperiment} 
-                                disabled={!activeExperiment || !currentExperiment?.has_checkpoint || inferenceStatus === 'running'}
-                                color={currentExperiment?.has_checkpoint && inferenceStatus !== 'running' ? "blue" : "gray"}
-                                fullWidth
-                            >
-                                Cargar Modelo para Inferencia
-                            </Button>
-                        </Tooltip>
-                        
-                        <Divider />
-                        
-                        <Text size="xs" fw={700} className={classes.sectionTitle}>GESTIÓN DE EXPERIMENTOS</Text>
-                        
-                        {/* Gestor de Experimentos Completo */}
-                        <ExperimentManager />
-                        
-                        {/* Gestor de Checkpoints y Notas */}
-                        <CheckpointManager />
-                    </Stack>
-
-                    <Stack gap="sm">
-                        <Text size="xs" fw={700} className={classes.sectionTitle}>ENTRENAMIENTO</Text>
-                        {activeExperiment && (
-                            <Box p="xs" style={{ backgroundColor: 'var(--mantine-color-dark-6)', borderRadius: 'var(--mantine-radius-sm)' }}>
-                                <Text size="xs" c="dimmed" mb={4}>Experimento activo:</Text>
-                                <Text size="sm" fw={500}>{activeExperiment}</Text>
-                            </Box>
-                        )}
-                        <NumberInput 
-                            label="Episodios a Añadir/Entrenar" 
-                            value={episodesToAdd} 
-                            onChange={(val) => setEpisodesToAdd(Number(val) || 0)} 
-                            min={1} 
-                            step={100}
-                            description={activeExperiment 
-                                ? `Si el experimento tiene ${currentExperiment?.total_episodes || 0} episodios, añadir ${episodesToAdd} más llegará a ${(currentExperiment?.total_episodes || 0) + episodesToAdd} totales`
-                                : `Número de episodios para entrenar. Si continúas un experimento, se añadirán a los existentes.`}
-                        />
-                        <Tooltip 
-                            label={!activeExperiment ? "Selecciona un experimento primero" : 
-                                   trainingStatus === 'running' ? "El entrenamiento ya está en curso" : 
-                                   "Continuar entrenamiento del experimento seleccionado"}
-                            position="top"
-                        >
-                            <Button 
-                                leftSection={<IconPlayerPlay size={14} />} 
-                                variant="default" 
-                                onClick={handleContinueExperiment} 
-                                disabled={!activeExperiment || trainingStatus === 'running'}
-                                loading={trainingStatus === 'running'}
-                            >
-                                {trainingStatus === 'running' ? 'Entrenando...' : 'Continuar Entrenamiento'}
-                            </Button>
-                        </Tooltip>
-                        <Divider label="O crear uno nuevo" labelPosition="center" my="sm" />
-                        
-                        {/* Botón para Transfer Learning Wizard */}
-                        <Button
-                            variant="light"
-                            color="blue"
-                            leftSection={<IconTransfer size={16} />}
-                            onClick={() => setTransferWizardOpened(true)}
-                            fullWidth
-                            mb="xs"
-                        >
-                            Transfer Learning (Wizard)
-                        </Button>
-                        <Text size="xs" c="dimmed" ta="center" mb="md">
-                            Usa el wizard para crear experimentos con transfer learning de forma guiada
-                        </Text>
-                        
-                        {/* Selector de Transfer Learning con validación (método manual, opcional) */}
-                        <Box>
-                            <Select 
-                                label="Entrenamiento Progresivo (Manual, Opcional)" 
-                                placeholder="O selecciona manualmente..."
-                                data={experimentsData?.filter(exp => {
-                                    // Solo mostrar experimentos que tienen checkpoint
-                                    if (!exp.has_checkpoint) return false;
-                                    // Evitar seleccionar el mismo experimento (si ya existe)
-                                    return true;
-                                }).map(exp => ({
-                                    value: exp.name,
-                                    label: `${exp.name} (${exp.model_architecture || 'N/A'})`
-                                })) || []}
-                                value={transferFromExperiment}
-                                onChange={(value) => {
-                                    // Validar que no sea circular
-                                    if (value && experimentsData) {
-                                        const selectedExp = experimentsData.find(e => e.name === value);
-                                        // Los datos vienen planos, no anidados en config
-                                        const loadFrom = selectedExp?.config?.LOAD_FROM_EXPERIMENT || selectedExp?.load_from_experiment;
-                                        if (loadFrom) {
-                                            // Verificar cadena de dependencias
-                                            let current = loadFrom;
-                                            const chain = [value];
-                                            while (current) {
-                                                if (chain.includes(current)) {
-                                                    alert(`⚠️ Dependencia circular detectada. No se puede usar '${value}' como base.`);
-                                                    return;
-                                                }
-                                                chain.push(current);
-                                                const exp = experimentsData.find(e => e.name === current);
-                                                current = exp?.config?.LOAD_FROM_EXPERIMENT || exp?.load_from_experiment;
-                                            }
-                                        }
-                                    }
-                                    setTransferFromExperiment(value);
-                                }}
-                                clearable
-                                leftSection={<IconTransfer size={16} />}
-                                description="Método manual: solo carga pesos, no ajusta configuración"
-                            />
-                            {transferFromExperiment && (
-                                <Alert 
-                                    icon={<IconInfoCircle size={16} />} 
-                                    color="blue" 
-                                    variant="light" 
-                                    mt="xs" 
-                                    p="xs"
-                                >
-                                    <Text size="xs">
-                                        Transfer desde: <strong>{transferFromExperiment}</strong>
-                                    </Text>
-                                    {(experimentsData?.find(e => e.name === transferFromExperiment)?.config?.LOAD_FROM_EXPERIMENT || 
-                                      experimentsData?.find(e => e.name === transferFromExperiment)?.load_from_experiment) && (
-                                        <Text size="xs" c="dimmed" mt={4}>
-                                            (Este experimento también usa transfer learning)
-                                        </Text>
-                                    )}
-                                </Alert>
+                    {/* SECCIÓN: ENTRENAMIENTO */}
+                    {activeSection === 'training' && (
+                        <div className="space-y-4">
+                            {/* Continuar Entrenamiento */}
+                            {activeExperiment && (
+                                <div className="space-y-3 p-3 bg-white/5 border border-white/10 rounded">
+                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Continuar: {activeExperiment}</div>
+                                    <div>
+                                        <label className="block text-[10px] text-gray-400 mb-1 uppercase">Episodios a Añadir</label>
+                                        <input
+                                            type="number"
+                                            value={episodesToAdd}
+                                            onChange={(e) => setEpisodesToAdd(Number(e.target.value) || 0)}
+                                            min={1}
+                                            step={100}
+                                            disabled={!isConnected}
+                                            className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50 font-mono"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={handleContinueExperiment}
+                                        disabled={!isConnected || !activeExperiment || trainingStatus === 'running'}
+                                        className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <Play size={14} />
+                                        Continuar Entrenamiento
+                                    </button>
+                                </div>
                             )}
-                        </Box>
-                        
-                        <Select label="Arquitectura del Modelo" data={modelOptions} value={selectedModel} onChange={setSelectedModel} />
-                        <Group grow>
-                            <NumberInput label="Grid Size" value={gridSize} onChange={(val) => setGridSize(Number(val) || 0)} min={16} step={16} />
-                            <NumberInput label="QCA Steps" value={qcaSteps} onChange={(val) => setQcaSteps(Number(val) || 0)} min={1} />
-                        </Group>
-                        <Group grow>
-                            <NumberInput label="d_state" value={dState} onChange={(val) => setDState(Number(val) || 0)} min={2} />
-                            <NumberInput label="Hidden Ch." value={hiddenChannels} onChange={(val) => setHiddenChannels(Number(val) || 0)} min={4} />
-                        </Group>
-                        <NumberInput 
-                            label="Learning Rate" 
-                            value={learningRate} 
-                            onChange={(val) => setLearningRate(Number(val) || 0)} 
-                            step={0.00001} 
-                        />
-                        <NumberInput 
-                            label="Gamma Decay (Lindbladian)" 
-                            description="Término de decaimiento para sistemas abiertos (0.0 = cerrado, >0 = abierto)"
-                            value={gammaDecay} 
-                            onChange={(val) => setGammaDecay(Number(val) || 0)} 
-                            step={0.001} 
-                            min={0} 
-                            max={1}
-                        />
-                        <Select
-                            label="Modo de Inicialización"
-                            description="Cómo se inicializa el estado cuántico en inferencia"
-                            value={initialStateMode}
-                            onChange={(val) => setInitialStateMode(val || 'complex_noise')}
-                            data={[
-                                { value: 'complex_noise', label: 'Ruido Complejo (default, más estable)' },
-                                { value: 'random', label: 'Aleatorio Normalizado (más variado)' },
-                                { value: 'zeros', label: 'Ceros (requiere activación externa)' }
-                            ]}
-                        />
-                        <Button 
-                            onClick={handleCreateExperiment} 
-                            loading={trainingStatus === 'running'} 
-                            disabled={!selectedModel}
-                            fullWidth
-                        >
-                            {transferFromExperiment ? 'Crear con Transfer Learning' : 'Crear Nuevo Experimento'}
-                        </Button>
-                        
-                        {/* Preview de configuración */}
-                        <Paper p="xs" withBorder style={{ backgroundColor: 'var(--mantine-color-dark-6)' }}>
-                            <Text size="xs" fw={600} mb="xs">Vista Previa:</Text>
-                            <Stack gap={4}>
-                                <Text size="xs" c="dimmed">
-                                    <strong>Nombre:</strong> {selectedModel ? `${selectedModel}-d${dState}-h${hiddenChannels}-g${gridSize}-lr${learningRate.toExponential(0)}` : 'N/A'}
-                                </Text>
-                                <Text size="xs" c="dimmed">
-                                    <strong>Grid:</strong> {gridSize}x{gridSize} | <strong>QCA Steps:</strong> {qcaSteps}
-                                </Text>
-                                <Text size="xs" c="dimmed">
-                                    <strong>Episodios:</strong> {episodesToAdd} | <strong>LR:</strong> {learningRate.toExponential(2)}
-                                </Text>
-                                {transferFromExperiment && (
-                                    <Text size="xs" c="blue">
-                                        <strong>Transfer desde:</strong> {transferFromExperiment}
-                                    </Text>
-                                )}
-                            </Stack>
-                        </Paper>
-                    </Stack>
-                </Stack>
-            </ScrollArea>
+
+                            <div className="h-px bg-white/5 my-3" />
+
+                            {/* Crear Nuevo Experimento */}
+                            <div className="space-y-3">
+                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Nuevo Experimento</div>
+                                
+                                <button
+                                    onClick={() => setTransferWizardOpened(true)}
+                                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-300 text-xs font-bold rounded transition-all"
+                                >
+                                    <ArrowRightLeft size={14} />
+                                    Transfer Learning (Wizard)
+                                </button>
+
+                                <div className="space-y-3 pt-3 border-t border-white/5">
+                                    <div>
+                                        <label className="block text-[10px] text-gray-400 mb-1 uppercase">Transfer Learning (Opcional)</label>
+                                        <select
+                                            value={transferFromExperiment || ''}
+                                            onChange={(e) => setTransferFromExperiment(e.target.value || null)}
+                                            disabled={!isConnected}
+                                            className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                                        >
+                                            <option value="">Ninguno (desde cero)</option>
+                                            {experimentsData?.filter(exp => exp.has_checkpoint).map(exp => (
+                                                <option key={exp.name} value={exp.name}>
+                                                    {exp.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="block text-[10px] text-gray-400 mb-1 uppercase">Arquitectura</label>
+                                            <select
+                                                value={selectedModel}
+                                                onChange={(e) => setSelectedModel(e.target.value)}
+                                                disabled={!isConnected}
+                                                className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                                            >
+                                                {modelOptions.map(opt => (
+                                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] text-gray-400 mb-1 uppercase">Episodios</label>
+                                            <input
+                                                type="number"
+                                                value={episodesToAdd}
+                                                onChange={(e) => setEpisodesToAdd(Number(e.target.value) || 0)}
+                                                min={1}
+                                                step={100}
+                                                disabled={!isConnected}
+                                                className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50 font-mono"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="block text-[10px] text-gray-400 mb-1 uppercase">Grid Size</label>
+                                            <input
+                                                type="number"
+                                                value={gridSize}
+                                                onChange={(e) => setGridSize(Number(e.target.value) || 0)}
+                                                min={16}
+                                                step={16}
+                                                disabled={!isConnected}
+                                                className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50 font-mono"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] text-gray-400 mb-1 uppercase">QCA Steps</label>
+                                            <input
+                                                type="number"
+                                                value={qcaSteps}
+                                                onChange={(e) => setQcaSteps(Number(e.target.value) || 0)}
+                                                min={1}
+                                                disabled={!isConnected}
+                                                className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50 font-mono"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="block text-[10px] text-gray-400 mb-1 uppercase">d_state</label>
+                                            <input
+                                                type="number"
+                                                value={dState}
+                                                onChange={(e) => setDState(Number(e.target.value) || 0)}
+                                                min={2}
+                                                disabled={!isConnected}
+                                                className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50 font-mono"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] text-gray-400 mb-1 uppercase">Hidden Ch.</label>
+                                            <input
+                                                type="number"
+                                                value={hiddenChannels}
+                                                onChange={(e) => setHiddenChannels(Number(e.target.value) || 0)}
+                                                min={4}
+                                                disabled={!isConnected}
+                                                className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50 font-mono"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[10px] text-gray-400 mb-1 uppercase">Learning Rate</label>
+                                        <input
+                                            type="number"
+                                            value={learningRate}
+                                            onChange={(e) => setLearningRate(Number(e.target.value) || 0)}
+                                            step={0.00001}
+                                            min={0}
+                                            max={1}
+                                            disabled={!isConnected}
+                                            className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50 font-mono"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[10px] text-gray-400 mb-1 uppercase">Gamma Decay</label>
+                                        <input
+                                            type="number"
+                                            value={gammaDecay}
+                                            onChange={(e) => setGammaDecay(Number(e.target.value) || 0)}
+                                            step={0.001}
+                                            min={0}
+                                            max={1}
+                                            disabled={!isConnected}
+                                            className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50 font-mono"
+                                        />
+                                        <div className="text-[10px] text-gray-600 mt-1">Sistema abierto (&gt;0) o cerrado (=0)</div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[10px] text-gray-400 mb-1 uppercase">Inicialización</label>
+                                        <select
+                                            value={initialStateMode}
+                                            onChange={(e) => setInitialStateMode(e.target.value)}
+                                            disabled={!isConnected}
+                                            className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                                        >
+                                            <option value="complex_noise">Ruido Complejo (estable)</option>
+                                            <option value="random">Aleatorio Normalizado</option>
+                                            <option value="zeros">Ceros</option>
+                                        </select>
+                                    </div>
+
+                                    <button
+                                        onClick={handleCreateExperiment}
+                                        disabled={!isConnected || !selectedModel || trainingStatus === 'running'}
+                                        className="w-full px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {transferFromExperiment ? 'Crear con Transfer Learning' : 'Crear y Entrenar'}
+                                    </button>
+
+                                    {/* Vista Previa */}
+                                    <div className="p-3 bg-white/5 border border-white/10 rounded">
+                                        <div className="text-[10px] font-semibold text-gray-400 mb-2">Vista Previa</div>
+                                        <div className="space-y-1 text-[10px] text-gray-600 font-mono">
+                                            <div><span className="text-gray-400">Nombre:</span> {selectedModel ? `${selectedModel}-d${dState}-h${hiddenChannels}-g${gridSize}-lr${learningRate.toExponential(0)}` : 'N/A'}</div>
+                                            <div><span className="text-gray-400">Grid:</span> {gridSize}x{gridSize} | <span className="text-gray-400">Steps:</span> {qcaSteps}</div>
+                                            <div><span className="text-gray-400">Episodios:</span> {episodesToAdd} | <span className="text-gray-400">LR:</span> {learningRate.toExponential(2)}</div>
+                                            {transferFromExperiment && (
+                                                <div className="text-blue-400"><span className="text-gray-400">Transfer:</span> {transferFromExperiment}</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* SECCIÓN: ANÁLISIS */}
+                    {activeSection === 'analysis' && (
+                        <div className="space-y-4">
+                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Análisis de Experimentos</div>
+                            
+                            {/* Resumen de Experimento Activo */}
+                            {activeExperiment && currentExperiment && (
+                                <GlassPanel className="p-4">
+                                    <div className="text-xs font-bold text-gray-200 mb-3">{activeExperiment}</div>
+                                    <div className="grid grid-cols-2 gap-4 text-xs">
+                                        <div>
+                                            <div className="text-[10px] text-gray-500 uppercase mb-1">Estado</div>
+                                            <div className={`font-mono font-medium ${
+                                                currentExperiment.has_checkpoint ? 'text-emerald-400' : 'text-gray-500'
+                                            }`}>
+                                                {currentExperiment.has_checkpoint ? '✓ Entrenado' : '○ Sin entrenar'}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] text-gray-500 uppercase mb-1">Episodios</div>
+                                            <div className="font-mono text-gray-300">{currentExperiment.total_episodes || 0}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] text-gray-500 uppercase mb-1">Grid</div>
+                                            <div className="font-mono text-gray-300">{currentExperiment.grid_size_training || 'N/A'}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] text-gray-500 uppercase mb-1">Arquitectura</div>
+                                            <div className="font-mono text-gray-300">{currentExperiment.model_architecture || 'N/A'}</div>
+                                        </div>
+                                    </div>
+                                </GlassPanel>
+                            )}
+
+                            {/* Métricas de Entrenamiento Activo */}
+                            {trainingStatus === 'running' && trainingProgress && (
+                                <GlassPanel className="p-4">
+                                    <div className="text-xs font-bold text-gray-200 mb-3">Entrenamiento en Curso</div>
+                                    <div className="space-y-2 text-xs">
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-400">Progreso</span>
+                                            <span className="font-mono text-emerald-400">{progressPercent.toFixed(1)}%</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-400">Episodio</span>
+                                            <span className="font-mono text-gray-300">{trainingProgress.current_episode}/{trainingProgress.total_episodes}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-400">Loss Promedio</span>
+                                            <span className="font-mono text-amber-400">{trainingProgress.avg_loss.toFixed(6)}</span>
+                                        </div>
+                                    </div>
+                                </GlassPanel>
+                            )}
+
+                            {/* Análisis Comparativo - Placeholder */}
+                            <GlassPanel className="p-4">
+                                <div className="text-xs font-bold text-gray-200 mb-3">Comparación de Experimentos</div>
+                                <div className="text-xs text-gray-600 text-center py-4">
+                                    Análisis comparativo - Próximamente
+                                </div>
+                            </GlassPanel>
+
+                            {/* Estadísticas Globales */}
+                            <GlassPanel className="p-4">
+                                <div className="text-xs font-bold text-gray-200 mb-3">Estadísticas Globales</div>
+                                <div className="grid grid-cols-2 gap-4 text-xs">
+                                    <div>
+                                        <div className="text-[10px] text-gray-500 uppercase mb-1">Total Experimentos</div>
+                                        <div className="font-mono text-gray-300 text-lg">{experimentsData?.length || 0}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] text-gray-500 uppercase mb-1">Entrenados</div>
+                                        <div className="font-mono text-emerald-400 text-lg">
+                                            {experimentsData?.filter(e => e.has_checkpoint).length || 0}
+                                        </div>
+                                    </div>
+                                </div>
+                            </GlassPanel>
+                        </div>
+                    )}
+                </div>
+            </div>
             
             {/* Transfer Learning Wizard */}
             <TransferLearningWizard 
                 opened={transferWizardOpened}
                 onClose={() => setTransferWizardOpened(false)}
             />
-        </Box>
+        </div>
     );
 }
