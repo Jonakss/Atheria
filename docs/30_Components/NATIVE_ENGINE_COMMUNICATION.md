@@ -197,7 +197,21 @@ El frontend recibe `compile_status.is_native` pero no lo muestra. Deberíamos:
 - Agregar un badge en `MainHeader` o `ExperimentInfo` que muestre "⚡ Nativo" o "🐍 Python"
 - Mostrar esto en `ExperimentInfo.tsx` junto con otros detalles del modelo
 
-### 2. **Conversión Disperso → Denso Costosa**
+### 2. **Cleanup del Motor Nativo (RESUELTO)**
+
+**Problema Original:**
+- Segmentation fault al cambiar de motor nativo a Python
+- Motor nativo no se limpiaba correctamente antes de destruir el wrapper
+
+**Solución Implementada (2024-12-20):**
+- ✅ Método `cleanup()` explícito en `NativeEngineWrapper`
+- ✅ Destructor `__del__()` que llama a `cleanup()` automáticamente
+- ✅ Cleanup explícito en `handle_load_experiment` antes de crear nuevo motor
+- ✅ Cleanup al fallar inicialización usando variable temporal
+
+**Ver:** [[Native_Engine_Core#Cleanup y Gestión de Memoria]] para más detalles.
+
+### 3. **Conversión Disperso → Denso Costosa**
 
 El `_update_dense_state_from_sparse()` itera sobre **todo el grid** (256x256 = 65,536 coordenadas) en cada paso. Esto puede ser más lento que la simulación misma.
 
@@ -206,7 +220,7 @@ El `_update_dense_state_from_sparse()` itera sobre **todo el grid** (256x256 = 6
 - Usar batching más agresivo
 - Paralelizar la conversión con multiprocessing
 
-### 3. **Falta Información de Rendimiento**
+### 4. **Falta Información de Rendimiento**
 
 No hay forma de ver en tiempo real:
 - Cuánto tiempo toma `step_native()` en C++
