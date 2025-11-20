@@ -311,11 +311,27 @@ export function ExperimentManager() {
                                                         {rootNode.hasCheckpoint ? '✓' : '○'}
                                                     </span>
                                                     <div className="flex-1 min-w-0">
-                                                        <div 
-                                                            className={`text-xs cursor-pointer truncate ${isActive ? 'font-bold text-blue-400' : 'font-medium text-gray-300'}`}
-                                                            onClick={() => setActiveExperiment(root)}
-                                                        >
-                                                            {root}
+                                                        <div className="flex items-center gap-2">
+                                                            <div 
+                                                                className={`text-xs cursor-pointer truncate flex-1 ${isActive ? 'font-bold text-blue-400' : 'font-medium text-gray-300'}`}
+                                                                onClick={() => setActiveExperiment(root)}
+                                                            >
+                                                                {root}
+                                                            </div>
+                                                            {/* Mostrar indicador de transfer si el root tiene loadFrom */}
+                                                            {(() => {
+                                                                const rootExp = sortedExperiments.find(e => e.name === root);
+                                                                const rootHasTransfer = rootExp?.config?.LOAD_FROM_EXPERIMENT;
+                                                                if (rootHasTransfer) {
+                                                                    return (
+                                                                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border bg-purple-500/10 text-purple-400 border-purple-500/30 shrink-0" title={`Transfer desde: ${rootHasTransfer}`}>
+                                                                            <ArrowRightLeft size={8} />
+                                                                            <span className="truncate max-w-[60px]" title={rootHasTransfer}>{rootHasTransfer}</span>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                return null;
+                                                            })()}
                                                         </div>
                                                         {(() => {
                                                             const exp = sortedExperiments.find(e => e.name === root);
@@ -417,6 +433,12 @@ export function ExperimentManager() {
                                                         <span className={`text-xs flex-1 min-w-0 truncate ${isActive ? 'font-bold text-blue-400' : 'font-medium text-gray-300'}`}>
                                                             {exp.name}
                                                         </span>
+                                                        {node.loadFrom && (
+                                                            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border bg-purple-500/10 text-purple-400 border-purple-500/30 shrink-0" title={`Transfer desde: ${node.loadFrom}`}>
+                                                                <ArrowRightLeft size={8} />
+                                                                <span className="truncate max-w-[60px]" title={node.loadFrom}>{node.loadFrom}</span>
+                                                            </div>
+                                                        )}
                                                         {isActive && (
                                                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border bg-blue-500/10 text-blue-400 border-blue-500/30 shrink-0">
                                                                 Activo
@@ -448,9 +470,9 @@ export function ExperimentManager() {
                                                 </td>
                                                 <td className="py-2 pr-4">
                                                     {node.loadFrom ? (
-                                                        <div className="flex items-center gap-1">
-                                                            <ArrowRightLeft size={10} className="text-gray-500" />
-                                                            <span className="text-xs text-gray-500 truncate max-w-[100px]">
+                                                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border bg-purple-500/10 text-purple-400 border-purple-500/30" title={`Transfer desde: ${node.loadFrom}`}>
+                                                            <ArrowRightLeft size={10} />
+                                                            <span className="text-xs truncate max-w-[100px]" title={node.loadFrom}>
                                                                 {node.loadFrom}
                                                             </span>
                                                         </div>
