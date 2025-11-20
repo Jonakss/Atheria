@@ -5,6 +5,7 @@ import logging
 from ..managers.history_manager import SimulationHistory
 from .data_compression import optimize_frame_payload, get_payload_size
 from ..managers.roi_manager import ROIManager, apply_roi_to_payload
+from .data_serialization import serialize_frame_binary, should_use_binary
 
 # Estado global de la aplicación
 g_state = {
@@ -37,14 +38,50 @@ g_state = {
 # evitar importaciones circulares.
 
 async def broadcast(data):
-    """Envía un mensaje JSON a todos los clientes WebSocket conectados."""
+    """
+    Envía un mensaje a todos los clientes WebSocket conectados.
+    
+    Estrategia:
+    - simulation_frame: Binario (MessagePack/CBOR) para eficiencia
+    - Otros mensajes: JSON (comandos, notificaciones, metadatos del servidor)
+    """
     if not g_state['websockets']:
         return
-        
+    
+    message_type = data.get("type", "")
+    payload = data.get("payload", {})
+    
+    # Determinar si debe usar binario o JSON
+    use_binary = should_use_binary(message_type, payload)
+    
     tasks = []
     for ws in list(g_state['websockets'].values()):
-        if not ws.closed:
-            tasks.append(ws.send_json(data))
+        if ws.closed:
+            continue
+        
+        try:
+            if use_binary:
+                # Serializar frame de visualización a binario
+                binary_data, format_used = serialize_frame_binary(payload)
+                
+                # Enviar metadata JSON primero (pequeño, ~100 bytes)
+                metadata = {
+                    "type": f"{message_type}_binary",
+                    "format": format_used,
+                    "size": len(binary_data)
+                }
+                
+                # Enviar metadata JSON y luego datos binarios
+                tasks.append(ws.send_json(metadata))
+                tasks.append(ws.send_bytes(binary_data))
+                
+                logging.debug(f"Enviado frame binario: {message_type}, formato={format_used}, tamaño={len(binary_data)} bytes")
+            else:
+                # Enviar como JSON (comandos, notificaciones, etc.)
+                tasks.append(ws.send_json(data))
+                
+        except Exception as e:
+            logging.warning(f"Error enviando mensaje {message_type}: {e}")
     
     if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)

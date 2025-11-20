@@ -254,9 +254,14 @@ export function isCompressed(data: any): data is CompressedArray | BinaryCompres
 }
 
 /**
- * Decodifica un frame binario completo (CBOR o JSON con datos binarios).
+ * Decodifica un frame binario completo (MessagePack, CBOR o JSON).
+ * 
+ * Soporta:
+ * - MessagePack: Más eficiente para arrays numéricos (preferido)
+ * - CBOR: Formato binario alternativo
+ * - JSON: Fallback para compatibilidad
  */
-export async function decodeBinaryFrame(data: ArrayBuffer | Uint8Array | string): Promise<any> {
+export async function decodeBinaryFrame(data: ArrayBuffer | Uint8Array | string, format?: string): Promise<any> {
     try {
         let bytes: Uint8Array;
         
@@ -270,24 +275,36 @@ export async function decodeBinaryFrame(data: ArrayBuffer | Uint8Array | string)
             bytes = data;
         }
         
-        // Intentar detectar si es CBOR
-        // CBOR normalmente comienza con ciertos bytes mágicos
-        // Por ahora, intentamos JSON primero si parece texto
+        // Si el formato está especificado, intentar ese formato primero
+        if (format === 'msgpack' || format === 'cbor') {
+            try {
+                // @msgpack/msgpack puede decodificar tanto MessagePack como CBOR
+                const decoded = cborDecode(bytes);
+                if (decoded && typeof decoded === 'object') {
+                    return decoded;
+                }
+            } catch (decodeError) {
+                // Si el formato está especificado y falla, continuar con fallbacks
+                console.warn(`Error decodificando ${format}, intentando auto-detección:`, decodeError);
+            }
+        }
+        
+        // Auto-detección: intentar detectar formato por primer byte
         if (bytes[0] === 0x7b || bytes[0] === 0x5b) {  // '{' o '['
             // Probablemente JSON
             const text = new TextDecoder('utf-8').decode(bytes);
             return JSON.parse(text);
         }
         
-        // Intentar CBOR usando @msgpack/msgpack (también soporta CBOR)
-        try {
-            const decoded = cborDecode(bytes);
-            return decoded;
-        } catch (cborError) {
-            // No es CBOR válido, intentar como JSON
-            const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
-            if (text) {
-                return JSON.parse(text);
+        // Intentar MessagePack/CBOR usando @msgpack/msgpack (puede decodificar ambos)
+        if (!format || format === 'msgpack' || format === 'cbor') {
+            try {
+                const decoded = cborDecode(bytes);
+                if (decoded && typeof decoded === 'object') {
+                    return decoded;
+                }
+            } catch (decodeError) {
+                // No es MessagePack/CBOR válido, continuar con JSON
             }
         }
         

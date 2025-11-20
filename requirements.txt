@@ -15,6 +15,7 @@ pybind11>=2.10.0
 # Optimizaciones de transferencia de datos (recomendado para producción)
 lz4>=4.0.0  # Compresión rápida (2-3x más rápido que zlib)
 cbor2>=5.4.0  # Formato binario eficiente (mejor que JSON)
+msgpack>=1.0.0  # Serialización binaria eficiente (más rápido que CBOR para arrays numéricos)
 
 # Herramientas de desarrollo y análisis
 psutil>=5.9.0  # Monitoreo de sistema y memoria (usado en benchmarks)

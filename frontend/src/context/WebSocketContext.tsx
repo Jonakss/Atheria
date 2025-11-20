@@ -164,6 +164,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     const reconnectAttempts = useRef(0);
     const lastErrorLog = useRef(0);
     const isManualClose = useRef(false); // Flag para indicar si el cierre fue manual
+    const pendingBinaryFormat = useRef<string | undefined>(undefined); // Formato esperado para datos binarios (msgpack/cbor/json)
     const [serverConfig, setServerConfigState] = useState<ServerConfig>(getServerConfig());
     // Usar una referencia para acceder al valor actual de serverConfig en callbacks
     const serverConfigRef = useRef<ServerConfig>(serverConfig);
@@ -297,8 +298,12 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         : event.data;
                     
                     try {
-                        // Decodificar frame binario (CBOR o JSON con datos binarios)
-                        const frameData = await decodeBinaryFrame(new Uint8Array(arrayBuffer));
+                        // Leer metadata JSON primero (si existe como mensaje separado anterior)
+                        // En el nuevo formato, primero recibimos metadata JSON, luego datos binarios
+                        // Para este caso (datos binarios directos), decodificar directamente
+                        const format = pendingBinaryFormat.current; // Formato esperado desde metadata
+                        const frameData = await decodeBinaryFrame(new Uint8Array(arrayBuffer), format);
+                        pendingBinaryFormat.current = undefined; // Limpiar formato pendiente
                         
                         // Si tiene estructura de frame optimizado (metadata + arrays)
                         if (frameData.metadata && frameData.arrays) {
@@ -334,8 +339,20 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         }
                     }
                 } else if (typeof event.data === 'string') {
-                    // Mensaje JSON (formato antiguo o fallback)
-                    message = JSON.parse(event.data);
+                    // Mensaje JSON (metadata del servidor o metadata de frame binario)
+                    const jsonMessage = JSON.parse(event.data);
+                    
+                    // Verificar si es metadata para un frame binario (formato híbrido: JSON + binario)
+                    if (jsonMessage.type && jsonMessage.type.endsWith('_binary') && jsonMessage.format && jsonMessage.size !== undefined) {
+                        // Este es metadata JSON que precede a un frame binario
+                        // Almacenar formato esperado y esperar el siguiente mensaje binario
+                        pendingBinaryFormat.current = jsonMessage.format; // "msgpack", "cbor", o "json"
+                        // No procesar este mensaje como un mensaje completo, esperar el binario
+                        return; // Salir y esperar el siguiente mensaje binario
+                    }
+                    
+                    // Mensaje JSON normal (comandos, notificaciones, metadatos del servidor)
+                    message = jsonMessage;
                     
                     // Descomprimir arrays en el payload si existen
                     if (message.payload) {
