@@ -1134,9 +1134,17 @@ async def handle_load_experiment(args):
                 motor = None
         
         # Fallback: usar motor Python tradicional
+        # Esto se usa cuando:
+        # 1. No hay checkpoint (modelo sin entrenar)
+        # 2. Motor nativo no está disponible
+        # 3. Error al cargar modelo JIT
         if motor is None:
-            logging.info(f"Usando motor Python tradicional (Aetheria_Motor)")
+            if not has_checkpoint:
+                logging.info(f"Usando motor Python tradicional (Aetheria_Motor) - Modelo sin entrenar, iniciando con ruido aleatorio")
+            else:
+                logging.info(f"Usando motor Python tradicional (Aetheria_Motor)")
             # device_str ya está definido al inicio de la función
+            # El estado inicial se creará automáticamente con ruido aleatorio según INITIAL_STATE_MODE_INFERENCE
             motor = Aetheria_Motor(model, inference_grid_size, d_state, global_cfg.DEVICE, cfg=config)
             
             # Compilar modelo para optimización de inferencia (solo para motor Python)
