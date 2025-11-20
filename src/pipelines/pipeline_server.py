@@ -1040,13 +1040,13 @@ async def handle_load_experiment(args):
             if native_module_available:
                 try:
                     from ..engines.native_engine_wrapper import NativeEngineWrapper
-                
-                # Buscar modelo JIT (exportado a TorchScript)
-                from ..utils import get_latest_jit_model
-                jit_path = get_latest_jit_model(exp_name, silent=True)
-                
-                # Si no existe modelo JIT, exportarlo automáticamente desde el checkpoint
-                if not jit_path:
+                    
+                    # Buscar modelo JIT (exportado a TorchScript)
+                    from ..utils import get_latest_jit_model
+                    jit_path = get_latest_jit_model(exp_name, silent=True)
+                    
+                    # Si no existe modelo JIT, exportarlo automáticamente desde el checkpoint
+                    if not jit_path:
                     logging.info(f"Modelo JIT no encontrado para '{exp_name}'. Exportando automáticamente...")
                     if ws: await send_notification(ws, f"📦 Exportando modelo a TorchScript...", "info")
                     
@@ -1112,9 +1112,9 @@ async def handle_load_experiment(args):
                         logging.warning(f"⚠️ Error al exportar modelo JIT: {e}. Usando motor Python como fallback.", exc_info=True)
                         if ws: await send_notification(ws, f"⚠️ Error exportando JIT: {str(e)[:50]}...", "warning")
                         jit_path = None
-                
-                # Si tenemos modelo JIT, usar motor nativo
-                if jit_path and os.path.exists(jit_path):
+                    
+                    # Si tenemos modelo JIT, usar motor nativo
+                    if jit_path and os.path.exists(jit_path):
                     try:
                         # Usar auto-detección del device (configurado en config.py)
                         # Si device=None, usa auto-detección desde config.get_native_device()
