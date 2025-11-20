@@ -356,7 +356,8 @@ async def simulation_loop():
                         "simulation_info": {
                             "step": updated_step,
                             "is_paused": False,
-                            "live_feed_enabled": live_feed_enabled
+                            "live_feed_enabled": live_feed_enabled,
+                            "fps": g_state.get('current_fps', 0.0)
                         }
                     }
                     
@@ -693,7 +694,8 @@ async def handle_set_viz(args):
                 "simulation_info": {
                     "step": current_step,
                     "is_paused": g_state.get('is_paused', True),
-                    "live_feed_enabled": live_feed_enabled
+                    "live_feed_enabled": live_feed_enabled,
+                    "fps": g_state.get('current_fps', 0.0)
                 }
             }
             

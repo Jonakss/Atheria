@@ -72,6 +72,7 @@ interface SimData {
         is_paused?: boolean;
         live_feed_enabled?: boolean;
         gamma_decay?: number;
+        fps?: number;
     };
     phase_attractor?: any;
     flow_data?: {
