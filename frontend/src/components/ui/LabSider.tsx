@@ -1,6 +1,6 @@
 // frontend/src/components/ui/LabSider.tsx
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, RefreshCw, Upload, ArrowRightLeft, ChevronLeft, ChevronRight, FlaskConical, Brain, BarChart3 } from 'lucide-react';
+import { Play, Pause, RefreshCw, Upload, ArrowRightLeft, ChevronLeft, ChevronRight, FlaskConical, Brain, BarChart3, X, Trash2 } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { modelOptions, vizOptions } from '../../utils/vizOptions';
 import { ExperimentManager } from '../experiments/ExperimentManager';
@@ -22,7 +22,7 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
     const { 
         sendCommand, experimentsData, trainingStatus, trainingProgress, 
         inferenceStatus, connectionStatus, connect, disconnect, selectedViz, setSelectedViz,
-        activeExperiment, setActiveExperiment
+        activeExperiment, setActiveExperiment, compileStatus
     } = useWebSocket();
     
     const isConnected = connectionStatus === 'connected';
@@ -164,6 +164,15 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
             sendCommand('inference', 'load_experiment', { experiment_name: activeExperiment }); 
         }
     };
+
+    const handleUnloadModel = () => {
+        if (!isConnected) return;
+        if (window.confirm('¿Descargar el modelo cargado? Esto limpiará la memoria y dejará el laboratorio sin modelo activo.')) {
+            sendCommand('inference', 'unload', {});
+            // Opcional: limpiar experimento activo en el frontend
+            setActiveExperiment(null);
+        }
+    };
     
     const handleResetSimulation = () => {
         if (!isConnected) return;
@@ -264,18 +273,34 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
                                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">EXPERIMENTO ACTIVO</div>
                                 <ExperimentInfo />
                                 
-                                <button
-                                    onClick={handleLoadExperiment}
-                                    disabled={!isConnected || !activeExperiment || !currentExperiment?.has_checkpoint || inferenceStatus === 'running'}
-                                    className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded text-xs font-bold border transition-all ${
-                                        currentExperiment?.has_checkpoint && inferenceStatus !== 'running' && isConnected
-                                            ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/20'
-                                            : 'bg-white/5 text-gray-500 border-white/10'
-                                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                                >
-                                    <Upload size={14} />
-                                    Cargar Modelo
-                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={handleLoadExperiment}
+                                        disabled={!isConnected || !activeExperiment || !currentExperiment?.has_checkpoint || inferenceStatus === 'running'}
+                                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded text-xs font-bold border transition-all ${
+                                            currentExperiment?.has_checkpoint && inferenceStatus !== 'running' && isConnected
+                                                ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/20'
+                                                : 'bg-white/5 text-gray-500 border-white/10'
+                                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                    >
+                                        <Upload size={14} />
+                                        Cargar
+                                    </button>
+                                    
+                                    <button
+                                        onClick={handleUnloadModel}
+                                        disabled={!isConnected || (!compileStatus?.is_native && !compileStatus?.is_compiled) || inferenceStatus === 'running'}
+                                        className={`flex items-center justify-center gap-2 px-3 py-2 rounded text-xs font-bold border transition-all ${
+                                            (compileStatus?.is_native || compileStatus?.is_compiled) && inferenceStatus !== 'running' && isConnected
+                                                ? 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20'
+                                                : 'bg-white/5 text-gray-500 border-white/10'
+                                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                        title="Descargar modelo y limpiar memoria"
+                                    >
+                                        <X size={14} />
+                                        Descargar
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Configuración de Inferencia */}
