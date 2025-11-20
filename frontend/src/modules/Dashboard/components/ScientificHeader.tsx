@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Settings, Aperture, Power, Plug, ChevronRight, ChevronLeft } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Settings, Aperture, Power, Plug, ChevronRight, ChevronLeft, ChevronDown, Cpu, Gauge, RefreshCcw } from 'lucide-react';
 import { EpochBadge } from './EpochBadge';
 import { SettingsPanel } from './SettingsPanel';
 import { useWebSocket } from '../../../hooks/useWebSocket';
@@ -13,7 +13,8 @@ interface ScientificHeaderProps {
 export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch, onEpochChange }) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [epochsExpanded, setEpochsExpanded] = useState(false); // Badges colapsados por defecto
-  const { connectionStatus, compileStatus, connect, disconnect } = useWebSocket();
+  const [engineDropdownOpen, setEngineDropdownOpen] = useState(false);
+  const { connectionStatus, compileStatus, connect, disconnect, sendCommand, simData } = useWebSocket();
   
   const handleConnectDisconnect = () => {
     if (connectionStatus === 'connected') {
@@ -85,6 +86,80 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
   };
   
   const systemStatus = getSystemStatus();
+
+  // Obtener información del engine y FPS
+  const engineInfo = useMemo(() => {
+    if (connectionStatus !== 'connected') {
+      return {
+        type: 'disconnected' as const,
+        label: 'DESCONECTADO',
+        color: 'text-gray-500',
+        bgColor: 'bg-gray-500/10',
+        borderColor: 'border-gray-500/20',
+        dotColor: 'bg-gray-500',
+        device: 'N/A',
+        version: null as string | null
+      };
+    }
+    
+    const deviceLabel = compileStatus?.device_str?.toUpperCase() || 'N/A';
+    
+    if (compileStatus?.is_native) {
+      return {
+        type: 'native' as const,
+        label: 'NATIVO (C++)',
+        color: 'text-emerald-400',
+        bgColor: 'bg-emerald-500/10',
+        borderColor: 'border-emerald-500/30',
+        dotColor: 'bg-emerald-500',
+        device: deviceLabel,
+        version: compileStatus?.native_version || compileStatus?.wrapper_version || null
+      };
+    } else if (compileStatus?.is_compiled) {
+      return {
+        type: 'compiled' as const,
+        label: 'COMPILADO (PyTorch)',
+        color: 'text-blue-400',
+        bgColor: 'bg-blue-500/10',
+        borderColor: 'border-blue-500/30',
+        dotColor: 'bg-blue-500',
+        device: deviceLabel,
+        version: null
+      };
+    } else {
+      return {
+        type: 'python' as const,
+        label: 'PYTHON',
+        color: 'text-amber-400',
+        bgColor: 'bg-amber-500/10',
+        borderColor: 'border-amber-500/30',
+        dotColor: 'bg-amber-500',
+        device: deviceLabel,
+        version: compileStatus?.python_version || null
+      };
+    }
+  }, [compileStatus, connectionStatus]);
+
+  const fps = simData?.simulation_info?.fps ?? 0;
+  
+  // Determinar color del FPS según velocidad
+  const fpsColor = useMemo(() => {
+    if (fps === 0) return 'text-gray-500';
+    if (fps < 5) return 'text-red-400';
+    if (fps < 15) return 'text-amber-400';
+    if (fps < 30) return 'text-yellow-400';
+    return 'text-emerald-400';
+  }, [fps]);
+
+  const handleSwitchEngine = (targetEngine: 'native' | 'python') => {
+    if (connectionStatus === 'connected' && compileStatus?.model_name && compileStatus.model_name !== 'None') {
+      const currentIsNative = compileStatus.is_native || false;
+      if ((targetEngine === 'native' && !currentIsNative) || (targetEngine === 'python' && currentIsNative)) {
+        sendCommand('inference', 'switch_engine', { engine: targetEngine });
+      }
+      setEngineDropdownOpen(false);
+    }
+  };
 
   return (
     <header className="h-12 border-b border-white/10 bg-[#050505] flex items-center justify-between px-4 z-50 shrink-0">
@@ -161,14 +236,92 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
 
       <div className="flex items-center gap-4">
         {/* Indicador de Estado del Sistema - Conectado a datos reales */}
-        <div className="flex items-center gap-2 px-2 py-1 bg-white/5 rounded border border-white/5">
-          <div className={`w-1.5 h-1.5 rounded-full ${systemStatus.dotColor} ${
-            systemStatus.pulse ? `animate-pulse ${systemStatus.shadow}` : ''
-          }`} />
-          <span className={`text-[10px] font-mono ${systemStatus.textColor} tracking-wide`}>
-            {systemStatus.text}
-          </span>
+        <div className="relative">
+          <button
+            onClick={() => connectionStatus === 'connected' && compileStatus?.model_name && compileStatus.model_name !== 'None' && setEngineDropdownOpen(!engineDropdownOpen)}
+            className={`flex items-center gap-2 px-2 py-1 bg-white/5 rounded border ${engineInfo.borderColor} transition-all ${
+              connectionStatus === 'connected' && compileStatus?.model_name && compileStatus.model_name !== 'None' 
+                ? 'hover:bg-white/10 cursor-pointer' 
+                : 'cursor-default'
+            }`}
+            title={connectionStatus === 'connected' && compileStatus?.model_name && compileStatus.model_name !== 'None' ? 'Cambiar motor de simulación' : 'Motor de simulación'}
+          >
+            <div className={`w-1.5 h-1.5 rounded-full ${engineInfo.dotColor} ${
+              connectionStatus === 'connected' && compileStatus?.is_native ? 'animate-pulse' : ''
+            }`} />
+            <span className={`text-[10px] font-mono ${engineInfo.color} tracking-wide`}>
+              {engineInfo.label}
+            </span>
+            {engineInfo.device && engineInfo.device !== 'N/A' && (
+              <span className="text-[9px] text-gray-500 uppercase">
+                {engineInfo.device}
+              </span>
+            )}
+            {connectionStatus === 'connected' && compileStatus?.model_name && compileStatus.model_name !== 'None' && (
+              <ChevronDown size={10} className={`text-gray-500 transition-transform ${engineDropdownOpen ? 'rotate-180' : ''}`} />
+            )}
+          </button>
+          
+          {/* Dropdown para cambiar motor */}
+          {engineDropdownOpen && connectionStatus === 'connected' && compileStatus?.model_name && compileStatus.model_name !== 'None' && (
+            <div className="absolute top-full right-0 mt-1 z-50 min-w-[200px]">
+              <div className="bg-[#0a0a0a] border border-white/20 rounded shadow-xl p-2 space-y-1">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1">
+                  Cambiar Motor
+                </div>
+                
+                {/* Opción: Motor Nativo (C++) */}
+                {(!compileStatus?.is_native) && (
+                  <button
+                    onClick={() => handleSwitchEngine('native')}
+                    className="w-full flex items-center justify-between px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded text-[10px] text-emerald-400 transition-all"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Cpu size={12} className="text-emerald-400" />
+                      <span className="font-mono">Nativo (C++)</span>
+                    </div>
+                    {compileStatus?.native_version && (
+                      <span className="text-[9px] text-gray-500 font-mono">v{compileStatus.native_version}</span>
+                    )}
+                  </button>
+                )}
+                
+                {/* Opción: Motor Python */}
+                {(compileStatus?.is_native) && (
+                  <button
+                    onClick={() => handleSwitchEngine('python')}
+                    className="w-full flex items-center justify-between px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded text-[10px] text-amber-400 transition-all"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Cpu size={12} className="text-amber-400" />
+                      <span className="font-mono">Python</span>
+                    </div>
+                    {compileStatus?.python_version && (
+                      <span className="text-[9px] text-gray-500 font-mono">v{compileStatus.python_version}</span>
+                    )}
+                  </button>
+                )}
+                
+                {/* Información de versión */}
+                {engineInfo.version && (
+                  <div className="px-3 py-2 text-[9px] text-gray-500 font-mono border-t border-white/10 pt-2">
+                    Versión: {engineInfo.version}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
+        
+        {/* FPS y Velocidad */}
+        {connectionStatus === 'connected' && (
+          <div className="flex items-center gap-2 px-2 py-1 bg-white/5 rounded border border-white/5">
+            <Gauge size={12} className="text-gray-400" />
+            <span className={`text-[10px] font-mono ${fpsColor} font-semibold`}>
+              {fps > 0 ? `${fps.toFixed(1)} FPS` : 'N/A'}
+            </span>
+          </div>
+        )}
         
         <div className="h-4 w-px bg-white/10" />
 
