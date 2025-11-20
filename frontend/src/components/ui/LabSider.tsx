@@ -1,5 +1,5 @@
 // frontend/src/components/ui/LabSider.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Play, Pause, RefreshCw, Upload, ArrowRightLeft, ChevronLeft, ChevronRight, FlaskConical, Brain, BarChart3 } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { modelOptions, vizOptions } from '../../utils/vizOptions';
@@ -48,6 +48,16 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
     const [episodesToAdd, setEpisodesToAdd] = useState(100);
     const [transferFromExperiment, setTransferFromExperiment] = useState<string | null>(null);
     const [gammaDecay, setGammaDecay] = useState(0.01);
+    
+    // Estados para configuración de inferencia (movidos desde SettingsPanel)
+    const [gridSizeInference, setGridSizeInference] = useState<number>(() => {
+        const saved = localStorage.getItem('atheria_gridSizeInference');
+        return saved ? parseInt(saved, 10) : 256;
+    });
+    const [initialStateMode, setInitialStateMode] = useState<string>(() => {
+        const saved = localStorage.getItem('atheria_initialStateMode');
+        return saved || 'complex_noise';
+    });
     const [initialStateMode, setInitialStateMode] = useState('complex_noise');
     const [transferWizardOpened, setTransferWizardOpened] = useState(false);
 
@@ -267,6 +277,107 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
                                     <Upload size={14} />
                                     Cargar Modelo
                                 </button>
+                            </div>
+
+                            {/* Configuración de Inferencia */}
+                            <div className="space-y-3 pt-3 border-t border-white/5">
+                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">CONFIGURACIÓN</div>
+                                
+                                {/* Grid Size Inferencia */}
+                                <div>
+                                    <label className="block text-[10px] text-gray-400 mb-1 uppercase">Tamaño de Grid</label>
+                                    <input
+                                        type="number"
+                                        value={gridSizeInference}
+                                        onChange={(e) => {
+                                            const val = Math.max(64, Math.min(1024, Number(e.target.value) || 256));
+                                            setGridSizeInference(val);
+                                            localStorage.setItem('atheria_gridSizeInference', val.toString());
+                                        }}
+                                        onBlur={() => {
+                                            // Enviar configuración cuando se deja de editar
+                                            sendCommand('inference', 'set_config', {
+                                                grid_size: gridSizeInference,
+                                                initial_state_mode: initialStateMode,
+                                                gamma_decay: gammaDecay
+                                            });
+                                        }}
+                                        min={64}
+                                        max={1024}
+                                        step={64}
+                                        disabled={!isConnected}
+                                        className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50 font-mono"
+                                    />
+                                    <div className="text-[10px] text-gray-600 mt-1">
+                                        Tamaño del grid para simulación (requiere recargar experimento)
+                                        {currentExperiment && currentExperiment.config?.GRID_SIZE_TRAINING && (
+                                            currentExperiment.config.GRID_SIZE_TRAINING !== gridSizeInference ? (
+                                                <span className="block mt-0.5 text-amber-400">
+                                                    ⚠️ Escalando desde {currentExperiment.config.GRID_SIZE_TRAINING}x{currentExperiment.config.GRID_SIZE_TRAINING}
+                                                </span>
+                                            ) : (
+                                                <span className="block mt-0.5 text-emerald-400">
+                                                    ✓ Mismo tamaño que entrenamiento
+                                                </span>
+                                            )
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                {/* Modo de Inicialización */}
+                                <div>
+                                    <label className="block text-[10px] text-gray-400 mb-1 uppercase">Modo de Inicialización</label>
+                                    <select
+                                        value={initialStateMode}
+                                        onChange={(e) => {
+                                            setInitialStateMode(e.target.value);
+                                            localStorage.setItem('atheria_initialStateMode', e.target.value);
+                                            sendCommand('inference', 'set_config', {
+                                                grid_size: gridSizeInference,
+                                                initial_state_mode: e.target.value,
+                                                gamma_decay: gammaDecay
+                                            });
+                                        }}
+                                        disabled={!isConnected}
+                                        className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                                    >
+                                        <option value="complex_noise">Ruido Complejo (recomendado)</option>
+                                        <option value="random">Aleatorio Normalizado</option>
+                                        <option value="zeros">Ceros</option>
+                                    </select>
+                                    <div className="text-[10px] text-gray-600 mt-1">
+                                        Estado inicial del campo cuántico
+                                    </div>
+                                </div>
+                                
+                                {/* Gamma Decay */}
+                                <div>
+                                    <label className="block text-[10px] text-gray-400 mb-1 uppercase">Gamma Decay (Disipación)</label>
+                                    <input
+                                        type="number"
+                                        value={gammaDecay}
+                                        onChange={(e) => {
+                                            const val = Math.max(0, Math.min(0.1, Number(e.target.value) || 0.01));
+                                            setGammaDecay(val);
+                                        }}
+                                        onBlur={() => {
+                                            // Enviar configuración cuando se deja de editar
+                                            sendCommand('inference', 'set_config', {
+                                                grid_size: gridSizeInference,
+                                                initial_state_mode: initialStateMode,
+                                                gamma_decay: gammaDecay
+                                            });
+                                        }}
+                                        min={0}
+                                        max={0.1}
+                                        step={0.001}
+                                        disabled={!isConnected}
+                                        className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50 font-mono"
+                                    />
+                                    <div className="text-[10px] text-gray-600 mt-1">
+                                        Término Lindbladian (0.0 = cerrado, &gt;0 = abierto)
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Configuración de Visualización */}
