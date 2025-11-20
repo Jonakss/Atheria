@@ -16,14 +16,6 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
   const [engineDropdownOpen, setEngineDropdownOpen] = useState(false);
   const { connectionStatus, compileStatus, connect, disconnect, sendCommand, simData } = useWebSocket();
   
-  // Función para cambiar de motor
-  const handleSwitchEngine = (targetEngine: 'native' | 'python') => {
-    if (connectionStatus === 'connected' && compileStatus?.model_name && compileStatus.model_name !== 'None') {
-      sendCommand('inference', 'switch_engine', { engine: targetEngine });
-      setEngineDropdownOpen(false);
-    }
-  };
-  
   const handleConnectDisconnect = () => {
     if (connectionStatus === 'connected') {
       disconnect();
