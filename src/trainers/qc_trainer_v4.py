@@ -9,7 +9,7 @@ from typing import Dict, Optional
 
 # Tensorboard es opcional
 try:
-from torch.utils.tensorboard import SummaryWriter
+    from torch.utils.tensorboard import SummaryWriter
     TENSORBOARD_AVAILABLE = True
 except ImportError:
     TENSORBOARD_AVAILABLE = False
