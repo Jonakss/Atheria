@@ -53,6 +53,39 @@ async def websocket_handler(request):
     
     # Enviar estado inicial al cliente
     experiments = get_experiment_list()
+    
+    # Obtener versiones de los engines incluso sin modelo cargado
+    compile_status_without_model = None
+    try:
+        # Intentar obtener versiones de los engines disponibles
+        from ..engines.qca_engine import Aetheria_Motor
+        python_version = getattr(Aetheria_Motor, 'VERSION', None) or getattr(Aetheria_Motor, 'get_version', lambda: "unknown")() if hasattr(Aetheria_Motor, 'get_version') else "unknown"
+        
+        native_version = None
+        wrapper_version = None
+        try:
+            import atheria_core
+            # Obtener versión del motor nativo si está disponible
+            from ..engines.native_engine_wrapper import NativeEngineWrapper
+            wrapper_version = getattr(NativeEngineWrapper, 'VERSION', None) or "unknown"
+            # Intentar obtener versión del motor C++ (requiere motor instanciado)
+            native_version = "available"  # Solo indicar que está disponible
+        except (ImportError, OSError, RuntimeError):
+            pass
+        
+        compile_status_without_model = {
+            "is_compiled": False,
+            "is_native": False,
+            "model_name": "None",
+            "compiles_enabled": True,
+            "device_str": None,
+            "native_version": native_version,
+            "wrapper_version": wrapper_version,
+            "python_version": python_version
+        }
+    except Exception as e:
+        logging.debug(f"No se pudieron obtener versiones de engines: {e}")
+    
     initial_state = {
         "type": "initial_state",
         "payload": {
@@ -61,6 +94,10 @@ async def websocket_handler(request):
             "inference_status": "running" if not g_state.get('is_paused', True) else "paused"
         }
     }
+    
+    # Si hay compile_status sin modelo, incluirlo en el estado inicial
+    if compile_status_without_model:
+        initial_state["payload"]["compile_status"] = compile_status_without_model
     # Enviar estado inicial - manejar errores de conexión
     try:
         await ws.send_json(initial_state)
@@ -187,9 +224,15 @@ async def simulation_loop():
                         if 'last_frame_sent_step' not in g_state:
                             g_state['last_frame_sent_step'] = -1  # Para forzar primer frame
                         
-                        # Ejecutar múltiples pasos en cada iteración (hasta steps_interval o más)
-                        # Esto permite que la simulación corra a máxima velocidad
-                        steps_to_execute = steps_interval  # Ejecutar tantos pasos como el intervalo configurado
+                        # Si steps_interval es 0 (modo manual), ejecutar pasos pero NO enviar frames
+                        # El usuario debe presionar el botón para actualizar visualización
+                        if steps_interval == 0:
+                            # Modo manual: ejecutar pasos rápidamente sin enviar frames
+                            # Usar un valor razonable para ejecutar múltiples pasos (ej: 100)
+                            steps_to_execute = 100  # Ejecutar múltiples pasos para velocidad
+                        else:
+                            # Ejecutar múltiples pasos en cada iteración (hasta steps_interval)
+                            steps_to_execute = steps_interval
                         
                         # Medir tiempo para calcular FPS basado en pasos reales
                         steps_start_time = time.time()
@@ -202,15 +245,30 @@ async def simulation_loop():
                         updated_step = current_step
                         
                         # CRÍTICO: Verificar is_paused en cada paso para permitir pausa inmediata
+                        # Para motor nativo, ejecutar pasos de uno en uno para permitir pausa más frecuente
+                        steps_executed_this_iteration = 0
                         for step_idx in range(steps_to_execute):
-                            # Verificar si se pausó durante la ejecución
+                            # Verificar si se pausó durante la ejecución (ANTES de cada paso)
                             if g_state.get('is_paused', True):
                                 break  # Salir del bucle si se pausó
+                            
+                            # Para motor nativo: verificar pausa también ANTES de llamar a evolve_internal_state
+                            # ya que el motor nativo puede ser bloqueante
+                            if motor_is_native:
+                                # Verificar pausa nuevamente antes de ejecutar paso nativo (más crítico)
+                                if g_state.get('is_paused', True):
+                                    break
                             
                             if motor:
                                 motor.evolve_internal_state()
                             updated_step = current_step + step_idx + 1
                             g_state['simulation_step'] = updated_step
+                            steps_executed_this_iteration += 1
+                            
+                            # Para motor nativo: verificar pausa también DESPUÉS de cada paso
+                            # para evitar acumulación de pasos si se pausó durante la ejecución
+                            if motor_is_native and g_state.get('is_paused', True):
+                                break
                             
                             # Verificar qué motor se está usando (logging cada 1000 pasos, después de actualizar)
                             if updated_step % 1000 == 0 and updated_step > 0:
@@ -228,27 +286,56 @@ async def simulation_loop():
                         steps_execution_time = time.time() - steps_start_time
                         
                         # Calcular FPS basado en pasos reales ejecutados
-                        steps_per_second = steps_to_execute / steps_execution_time if steps_execution_time > 0 else 0
+                        # Usar steps_executed_this_iteration en lugar de steps_to_execute
+                        # porque algunos pasos pueden no haberse ejecutado si se pausó
+                        actual_steps_executed = steps_executed_this_iteration if steps_executed_this_iteration > 0 else steps_to_execute
+                        
+                        # Evitar división por cero y valores extremos
+                        if steps_execution_time > 0.0001:  # Mínimo 0.1ms para evitar valores extremos
+                            steps_per_second = actual_steps_executed / steps_execution_time
+                            # Limitar a un máximo razonable (ej: 10000 pasos/segundo)
+                            steps_per_second = min(steps_per_second, 10000.0)
+                        else:
+                            steps_per_second = 0.0
+                        
+                        # IMPORTANTE: Distinguir entre "pasos/segundo" y "frames/segundo"
+                        # Cuando live_feed está OFF, mostramos pasos/segundo
+                        # Cuando live_feed está ON, mostramos frames/segundo
+                        # Almacenar ambos para poder mostrar el correcto
+                        g_state['steps_per_second'] = steps_per_second
                         
                         # Actualizar FPS en g_state (promediado con anterior)
-                        if 'current_fps' not in g_state or 'fps_samples' not in g_state:
-                            g_state['current_fps'] = steps_per_second
-                            g_state['fps_samples'] = [steps_per_second]
-                        else:
-                            # Promediar con últimos valores para suavizar
-                            g_state['fps_samples'].append(steps_per_second)
-                            if len(g_state['fps_samples']) > 10:  # Mantener solo últimos 10
-                                g_state['fps_samples'].pop(0)
-                            g_state['current_fps'] = sum(g_state['fps_samples']) / len(g_state['fps_samples'])
+                        # Para live_feed OFF: mostrar pasos/segundo (limitado a 10000)
+                        # Para live_feed ON: se actualizará con frames/segundo en el bloque de visualización
+                        if not live_feed_enabled:
+                            # Live feed OFF: mostrar pasos/segundo
+                            if 'current_fps' not in g_state or 'fps_samples' not in g_state:
+                                g_state['current_fps'] = min(steps_per_second, 10000.0)
+                                g_state['fps_samples'] = [min(steps_per_second, 10000.0)]
+                            else:
+                                # Promediar con últimos valores para suavizar
+                                fps_value = min(steps_per_second, 10000.0)
+                                g_state['fps_samples'].append(fps_value)
+                                if len(g_state['fps_samples']) > 10:  # Mantener solo últimos 10
+                                    g_state['fps_samples'].pop(0)
+                                g_state['current_fps'] = sum(g_state['fps_samples']) / len(g_state['fps_samples'])
+                        # Si live_feed está ON, el FPS se actualizará en el bloque de visualización
                         
-                        # Actualizar contador para frames
+                        # Actualizar contador para frames (solo si no es modo manual)
                         steps_interval_counter = g_state.get('steps_interval_counter', 0)
                         steps_interval_counter += steps_to_execute
                         g_state['steps_interval_counter'] = steps_interval_counter
                         
                         # Enviar frame cada X pasos configurados
+                        # Modo manual (steps_interval = 0): NO enviar frames automáticamente
                         # También enviar frame si nunca se ha enviado uno (last_frame_sent_step == -1)
-                        should_send_frame = (steps_interval_counter >= steps_interval) or (g_state['last_frame_sent_step'] == -1)
+                        if steps_interval == 0:
+                            # Modo manual: NO enviar frames automáticamente
+                            # Solo enviar el primer frame si nunca se ha enviado uno
+                            should_send_frame = (g_state['last_frame_sent_step'] == -1)
+                        else:
+                            # Modo automático: enviar frame cada N pasos
+                            should_send_frame = (steps_interval_counter >= steps_interval) or (g_state['last_frame_sent_step'] == -1)
                         
                         if should_send_frame:
                             # Resetear contador
@@ -258,7 +345,13 @@ async def simulation_loop():
                             epoch_detector = g_state.get('epoch_detector')
                             if epoch_detector and updated_step % 50 == 0:
                                 try:
-                                    psi_tensor = g_state['motor'].state.psi
+                                    # OPTIMIZACIÓN: Para motor nativo, usar get_dense_state() si está disponible
+                                    motor = g_state['motor']
+                                    motor_is_native = g_state.get('motor_is_native', False)
+                                    if motor_is_native and hasattr(motor, 'get_dense_state'):
+                                        psi_tensor = motor.get_dense_state(check_pause_callback=lambda: g_state.get('is_paused', True))
+                                    else:
+                                        psi_tensor = motor.state.psi if hasattr(motor, 'state') and motor.state else None
                                     if psi_tensor is not None:
                                         # Analizar estado y determinar época
                                         metrics = epoch_detector.analyze_state(psi_tensor)
@@ -288,12 +381,45 @@ async def simulation_loop():
                                 calc_poincare_this_frame = False
                                 g_state['poincare_frame_counter'] = 0
                             
-                            delta_psi = g_state['motor'].last_delta_psi if hasattr(g_state['motor'], 'last_delta_psi') else None
+                            # OPTIMIZACIÓN CRÍTICA: Usar lazy conversion para motor nativo
+                            # Solo convertir estado denso cuando se necesita visualizar
+                            motor = g_state['motor']
+                            motor_is_native = g_state.get('motor_is_native', False)
+                            
+                            # Para motor nativo: usar get_dense_state() con ROI y verificación de pausa
+                            if motor_is_native and hasattr(motor, 'get_dense_state'):
+                                # Obtener ROI si está habilitada
+                                roi = None
+                                roi_manager = g_state.get('roi_manager')
+                                if roi_manager and roi_manager.roi_enabled:
+                                    roi = (
+                                        roi_manager.roi_x,
+                                        roi_manager.roi_y,
+                                        roi_manager.roi_x + roi_manager.roi_width,
+                                        roi_manager.roi_y + roi_manager.roi_height
+                                    )
+                                
+                                # Callback para verificar pausa durante conversión
+                                def check_pause():
+                                    return g_state.get('is_paused', True)
+                                
+                                # Obtener estado denso (solo convierte si es necesario)
+                                psi = motor.get_dense_state(roi=roi, check_pause_callback=check_pause)
+                            else:
+                                # Motor Python: acceder directamente (ya es denso)
+                                psi = motor.state.psi if hasattr(motor, 'state') and motor.state else None
+                            
+                            # Verificar que psi no sea None
+                            if psi is None:
+                                logging.warning("Estado psi es None. Saltando frame.")
+                                continue
+                            
+                            delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
                             viz_data = get_visualization_data(
-                                g_state['motor'].state.psi, 
+                                psi, 
                                 viz_type,
                                 delta_psi=delta_psi,
-                                motor=g_state['motor']
+                                motor=motor
                             )
                             
                             # OPTIMIZACIÓN: Reutilizar coordenadas de Poincaré del frame anterior si no se recalcula
@@ -317,6 +443,9 @@ async def simulation_loop():
                                         "complex_3d_data": viz_data.get("complex_3d_data"),
                                         "simulation_info": {
                                             "step": updated_step,
+                                            "initial_step": g_state.get('initial_step', 0),
+                                            "checkpoint_step": g_state.get('checkpoint_step', 0),
+                                            "checkpoint_episode": g_state.get('checkpoint_episode', 0),
                                             "is_paused": False,
                                             "live_feed_enabled": False,
                                             "fps": g_state.get('current_fps', 0.0),
@@ -371,10 +500,16 @@ async def simulation_loop():
                         
                         # Enviar log de simulación cada 100 pasos para no saturar los logs
                         if updated_step % 100 == 0:
-                            await broadcast({
-                                "type": "simulation_log",
-                                "payload": f"[Simulación] Paso {updated_step} completado (live feed desactivado, mostrando cada {steps_interval} pasos)"
-                            })
+                            if steps_interval == 0:
+                                await broadcast({
+                                    "type": "simulation_log",
+                                    "payload": f"[Simulación] Paso {updated_step} completado (modo manual: presiona 'Actualizar Visualización' para ver)"
+                                })
+                            else:
+                                await broadcast({
+                                    "type": "simulation_log",
+                                    "payload": f"[Simulación] Paso {updated_step} completado (live feed desactivado, mostrando cada {steps_interval} pasos)"
+                                })
                             
                     except Exception as e:
                         logging.error(f"Error evolucionando estado (live_feed desactivado): {e}", exc_info=True)
@@ -438,14 +573,48 @@ async def simulation_loop():
                                 logging.debug(f"Error detectando época: {e}")
                     
                     # --- CALCULAR VISUALIZACIONES SOLO SI LIVE_FEED ESTÁ ACTIVO ---
+                    # OPTIMIZACIÓN CRÍTICA: Usar lazy conversion para motor nativo
+                    # Solo convertir estado denso cuando se necesita visualizar
+                    motor = g_state['motor']
+                    motor_is_native = g_state.get('motor_is_native', False)
+                    
+                    # Para motor nativo: usar get_dense_state() con ROI y verificación de pausa
+                    if motor_is_native and hasattr(motor, 'get_dense_state'):
+                        # Obtener ROI si está habilitada
+                        roi = None
+                        roi_manager = g_state.get('roi_manager')
+                        if roi_manager and roi_manager.roi_enabled:
+                            roi = (
+                                roi_manager.roi_x,
+                                roi_manager.roi_y,
+                                roi_manager.roi_x + roi_manager.roi_width,
+                                roi_manager.roi_y + roi_manager.roi_height
+                            )
+                        
+                        # Callback para verificar pausa durante conversión
+                        def check_pause():
+                            return g_state.get('is_paused', True)
+                        
+                        # Obtener estado denso (solo convierte si es necesario)
+                        psi = motor.get_dense_state(roi=roi, check_pause_callback=check_pause)
+                    else:
+                        # Motor Python: acceder directamente (ya es denso)
+                        psi = motor.state.psi if hasattr(motor, 'state') and motor.state else None
+                    
+                    # Verificar que psi no sea None
+                    if psi is None:
+                        logging.warning("Estado psi es None. Saltando frame.")
+                        await asyncio.sleep(0.1)
+                        continue
+                    
                     # Optimización: Usar inference_mode para mejor rendimiento GPU
                     # Obtener delta_psi si está disponible para visualizaciones de flujo
-                    delta_psi = g_state['motor'].last_delta_psi if hasattr(g_state['motor'], 'last_delta_psi') else None
+                    delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
                     viz_data = get_visualization_data(
-                        g_state['motor'].state.psi, 
+                        psi, 
                         g_state.get('viz_type', 'density'),
                         delta_psi=delta_psi,
-                        motor=g_state['motor']
+                        motor=motor
                     )
                     
                     # Validar que viz_data tenga los campos necesarios
@@ -478,11 +647,17 @@ async def simulation_loop():
                         # Información adicional para la UI
                         "simulation_info": {
                             "step": updated_step,
+                            "initial_step": g_state.get('initial_step', 0),
+                            "checkpoint_step": g_state.get('checkpoint_step', 0),
+                            "checkpoint_episode": g_state.get('checkpoint_episode', 0),
                             "is_paused": False,
                             "live_feed_enabled": live_feed_enabled,
                             "fps": g_state.get('current_fps', 0.0),
                             "epoch": g_state.get('current_epoch', 0),
-                            "epoch_metrics": g_state.get('epoch_metrics', {})
+                            "epoch_metrics": g_state.get('epoch_metrics', {}),
+                            "training_grid_size": g_state.get('training_grid_size'),
+                            "inference_grid_size": g_state.get('inference_grid_size'),
+                            "grid_scaled": g_state.get('grid_size_ratio', 1.0) != 1.0
                         }
                     }
                     
@@ -542,16 +717,38 @@ async def simulation_loop():
                     await broadcast({"type": "simulation_frame", "payload": frame_payload})
                     frame_count += 1
                     
-                    # OPTIMIZACIÓN: Calcular FPS solo ocasionalmente (cada 60 frames = ~1 segundo a 60 FPS)
-                    # Evitar cálculos costosos en cada frame
-                    if frame_count % 60 == 0:
-                        last_frame_time = time.time()
-                        if frame_count > 60 and 'last_fps_calc_time' in g_state:
-                            delta_time = last_frame_time - g_state.get('last_fps_calc_time', last_frame_time)
-                            if delta_time > 0:
-                                g_state['current_fps'] = 60 / delta_time  # 60 frames / tiempo transcurrido
-                        g_state['last_fps_calc_time'] = last_frame_time
-                    g_state['last_frame_sent_time'] = time.time()
+                    # CRÍTICO: Calcular FPS de frames cuando live_feed está ON
+                    # Cuando live_feed está ON, mostrar frames/segundo (no pasos/segundo)
+                    if live_feed_enabled:
+                        # Calcular FPS basado en frames reales enviados
+                        if 'last_frame_sent_time' not in g_state:
+                            g_state['last_frame_sent_time'] = time.time()
+                            g_state['frame_fps_samples'] = []
+                        
+                        current_time = time.time()
+                        last_frame_time = g_state.get('last_frame_sent_time', current_time)
+                        delta_time = current_time - last_frame_time
+                        
+                        if delta_time > 0:
+                            # Calcular FPS instantáneo (1 frame / delta_time)
+                            instant_fps = 1.0 / delta_time
+                            
+                            # Promediar para suavizar
+                            if 'frame_fps_samples' not in g_state:
+                                g_state['frame_fps_samples'] = []
+                            g_state['frame_fps_samples'].append(instant_fps)
+                            
+                            # Mantener solo últimos 30 samples (aproximadamente 0.5-1 segundo a 30-60 FPS)
+                            if len(g_state['frame_fps_samples']) > 30:
+                                g_state['frame_fps_samples'].pop(0)
+                            
+                            # Calcular promedio
+                            if len(g_state['frame_fps_samples']) > 0:
+                                avg_frame_fps = sum(g_state['frame_fps_samples']) / len(g_state['frame_fps_samples'])
+                                # Limitar a máximo razonable (ej: 120 FPS para frames)
+                                g_state['current_fps'] = min(avg_frame_fps, 120.0)
+                        
+                        g_state['last_frame_sent_time'] = current_time
                     
                     # Logging ocasional para debug (cada 100 frames para reducir overhead)
                     if updated_step % 100 == 0:
@@ -636,9 +833,12 @@ async def simulation_loop():
                 # Con live feed: usar throttle mínimo para evitar CPU spin excesivo
                 sleep_time = max(0.016, ideal_sleep)  # Mínimo 16ms cuando hay live feed
             
-            # Aplicar frame skip si está configurado
-            if frame_skip > 0 and g_state.get('simulation_step', 0) % (frame_skip + 1) != 0:
+            # Aplicar frame skip solo si live_feed está OFF
+            # Cuando live_feed está ON, siempre enviamos frames (no saltamos)
+            live_feed_enabled = g_state.get('live_feed_enabled', True)
+            if frame_skip > 0 and not live_feed_enabled and g_state.get('simulation_step', 0) % (frame_skip + 1) != 0:
                 # Saltar frame: solo evolución, no visualización
+                # SOLO cuando live_feed está OFF
                 if not is_paused and motor:
                     try:
                         motor = g_state['motor']
@@ -786,6 +986,114 @@ async def handle_stop_training(args):
             await broadcast({"type": "training_status_update", "payload": {"status": "idle"}})
             if ws: await send_notification(ws, "Entrenamiento detenido por el usuario.", "info")
 
+async def handle_update_visualization(args):
+    """Actualiza la visualización manualmente (útil cuando steps_interval = 0)."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    motor = g_state.get('motor')
+    
+    if not motor:
+        msg = "⚠️ No hay modelo cargado. Carga un experimento primero."
+        logging.warning(msg)
+        if ws: await send_notification(ws, msg, "warning")
+        return
+    
+    if not motor.state or motor.state.psi is None:
+        msg = "⚠️ El modelo cargado no tiene un estado válido."
+        logging.warning(msg)
+        if ws: await send_notification(ws, msg, "warning")
+        return
+    
+    try:
+        # Obtener estado actual
+        motor_is_native = g_state.get('motor_is_native', False)
+        if motor_is_native and hasattr(motor, 'get_dense_state'):
+            # Motor nativo: usar lazy conversion
+            roi = None
+            roi_manager = g_state.get('roi_manager')
+            if roi_manager and roi_manager.roi_enabled:
+                roi = (
+                    roi_manager.roi_x,
+                    roi_manager.roi_y,
+                    roi_manager.roi_x + roi_manager.roi_width,
+                    roi_manager.roi_y + roi_manager.roi_height
+                )
+            psi = motor.get_dense_state(roi=roi, check_pause_callback=lambda: g_state.get('is_paused', True))
+        else:
+            # Motor Python: acceder directamente
+            psi = motor.state.psi if hasattr(motor, 'state') and motor.state else None
+        
+        if psi is None:
+            msg = "⚠️ No se pudo obtener el estado actual."
+            logging.warning(msg)
+            if ws: await send_notification(ws, msg, "warning")
+            return
+        
+        # Generar datos de visualización
+        viz_type = g_state.get('viz_type', 'density')
+        delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
+        viz_data = get_visualization_data(psi, viz_type, delta_psi=delta_psi, motor=motor)
+        
+        if not viz_data or not isinstance(viz_data, dict):
+            msg = "⚠️ Error generando datos de visualización."
+            logging.warning(msg)
+            if ws: await send_notification(ws, msg, "warning")
+            return
+        
+        current_step = g_state.get('simulation_step', 0)
+        live_feed_enabled = g_state.get('live_feed_enabled', False)
+        
+        frame_payload_raw = {
+            "step": current_step,
+            "timestamp": asyncio.get_event_loop().time(),
+            "map_data": viz_data.get("map_data", []),
+            "hist_data": viz_data.get("hist_data", {}),
+            "poincare_coords": viz_data.get("poincare_coords", []),
+            "phase_attractor": viz_data.get("phase_attractor"),
+            "flow_data": viz_data.get("flow_data"),
+            "phase_hsv_data": viz_data.get("phase_hsv_data"),
+            "complex_3d_data": viz_data.get("complex_3d_data"),
+            "simulation_info": {
+                "step": current_step,
+                "initial_step": g_state.get('initial_step', 0),
+                "checkpoint_step": g_state.get('checkpoint_step', 0),
+                "checkpoint_episode": g_state.get('checkpoint_episode', 0),
+                "is_paused": g_state.get('is_paused', True),
+                "live_feed_enabled": live_feed_enabled,
+                "fps": g_state.get('current_fps', 0.0),
+                "epoch": g_state.get('current_epoch', 0),
+                "epoch_metrics": g_state.get('epoch_metrics', {}),
+                "training_grid_size": g_state.get('training_grid_size'),
+                "inference_grid_size": g_state.get('inference_grid_size'),
+                "grid_scaled": g_state.get('grid_size_ratio', 1.0) != 1.0
+            }
+        }
+        
+        # Aplicar optimizaciones si están habilitadas
+        compression_enabled = g_state.get('data_compression_enabled', True)
+        downsample_factor = g_state.get('downsample_factor', 1)
+        
+        if compression_enabled or downsample_factor > 1:
+            frame_payload = await optimize_frame_payload(
+                frame_payload_raw,
+                enable_compression=compression_enabled,
+                downsample_factor=downsample_factor,
+                viz_type=viz_type
+            )
+        else:
+            frame_payload = frame_payload_raw
+        
+        # Enviar frame a todos los clientes conectados
+        await broadcast({"type": "simulation_frame", "payload": frame_payload})
+        g_state['last_frame_sent_step'] = current_step  # Actualizar último frame enviado
+        
+        msg = f"✅ Visualización actualizada (paso {current_step})"
+        logging.info(msg)
+        if ws: await send_notification(ws, msg, "success")
+        
+    except Exception as e:
+        logging.error(f"Error actualizando visualización: {e}", exc_info=True)
+        if ws: await send_notification(ws, f"Error al actualizar visualización: {str(e)}", "error")
+
 async def handle_set_viz(args):
     viz_type = args.get("viz_type", "density")
     g_state['viz_type'] = viz_type
@@ -797,12 +1105,21 @@ async def handle_set_viz(args):
     if g_state.get('motor') and live_feed_enabled:
         try:
             motor = g_state['motor']
-            if motor.state.psi is None:
+            # OPTIMIZACIÓN CRÍTICA: Usar lazy conversion para motor nativo
+            motor_is_native = hasattr(motor, 'native_engine')
+            if motor_is_native and hasattr(motor, 'get_dense_state'):
+                # Para motor nativo, usar get_dense_state() solo cuando se necesita visualizar
+                psi = motor.get_dense_state(check_pause_callback=lambda: g_state.get('is_paused', True))
+            else:
+                # Motor Python: acceder directamente (ya es denso)
+                psi = motor.state.psi if hasattr(motor, 'state') and motor.state else None
+            
+            if psi is None:
                 logging.warning("Motor activo pero sin estado psi. No se puede actualizar visualización.")
                 return
             
             delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
-            viz_data = get_visualization_data(motor.state.psi, viz_type, delta_psi=delta_psi, motor=motor)
+            viz_data = get_visualization_data(psi, viz_type, delta_psi=delta_psi, motor=motor)
             if not viz_data or not isinstance(viz_data, dict):
                 logging.warning("get_visualization_data retornó datos inválidos.")
                 return
@@ -962,13 +1279,35 @@ async def handle_load_experiment(args):
                 if 'simulation_history' in g_state:
                     g_state['simulation_history'].clear()
                 
+                # CRÍTICO: Limpiar motor nativo explícitamente antes de eliminarlo
+                # Esto previene segfaults al destruir el motor nativo C++
+                if hasattr(old_motor, 'native_engine'):
+                    # Es un motor nativo - llamar cleanup explícitamente
+                    try:
+                        if hasattr(old_motor, 'cleanup'):
+                            old_motor.cleanup()
+                            logging.debug("Motor nativo limpiado explícitamente antes de eliminarlo")
+                        else:
+                            # Fallback: limpiar manualmente si no hay método cleanup
+                            if hasattr(old_motor, 'native_engine') and old_motor.native_engine is not None:
+                                old_motor.native_engine = None
+                            if hasattr(old_motor, 'state') and old_motor.state is not None:
+                                if hasattr(old_motor.state, 'psi') and old_motor.state.psi is not None:
+                                    old_motor.state.psi = None
+                                old_motor.state = None
+                    except Exception as cleanup_error:
+                        logging.warning(f"Error durante cleanup de motor nativo: {cleanup_error}")
+                
+                # Remover referencia del estado global antes de destruir
+                g_state['motor'] = None
+                
                 # Liberar motor anterior
                 del old_motor
                 import gc
                 gc.collect()  # Forzar garbage collection
                 logging.debug("Motor anterior liberado para liberar memoria")
             except Exception as e:
-                logging.debug(f"Error liberando motor anterior: {e}")
+                logging.warning(f"Error liberando motor anterior: {e}", exc_info=True)
         
         config = load_experiment_config(exp_name)
         if not config:
@@ -988,11 +1327,38 @@ async def handle_load_experiment(args):
             config.INITIAL_STATE_MODE_INFERENCE = getattr(global_cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')
             logging.info(f"INITIAL_STATE_MODE_INFERENCE no encontrado en config, usando valor por defecto: {config.INITIAL_STATE_MODE_INFERENCE}")
         
+        # CRÍTICO: Siempre usar el último checkpoint disponible
         checkpoint_path = get_latest_checkpoint(exp_name)
         model = None
         state_dict = None
+        checkpoint_step = 0  # Paso guardado en el checkpoint
+        checkpoint_episode = 0  # Episodio guardado en el checkpoint
         
         if checkpoint_path:
+            # Cargar información del checkpoint ANTES de cargar el modelo
+            try:
+                import torch
+                checkpoint_data = torch.load(checkpoint_path, map_location='cpu')
+                
+                # Obtener step/episode del checkpoint si está disponible
+                if isinstance(checkpoint_data, dict):
+                    checkpoint_step = checkpoint_data.get('step', checkpoint_data.get('simulation_step', 0))
+                    checkpoint_episode = checkpoint_data.get('episode', 0)
+                    
+                    # Si no hay 'step', intentar calcular desde episode y steps_per_episode
+                    if checkpoint_step == 0 and checkpoint_episode > 0:
+                        steps_per_episode = getattr(config, 'QCA_STEPS_TRAINING', getattr(config, 'STEPS_PER_EPISODE', 100))
+                        checkpoint_step = checkpoint_episode * steps_per_episode
+                        logging.info(f"⚠️ Checkpoint no tiene 'step', calculado desde episode: {checkpoint_episode} × {steps_per_episode} = {checkpoint_step}")
+                    
+                    if checkpoint_step > 0:
+                        logging.info(f"📊 Checkpoint encontrado: episode={checkpoint_episode}, step={checkpoint_step}")
+                        if ws: await send_notification(ws, f"📊 Checkpoint: episodio {checkpoint_episode}, paso {checkpoint_step}", "info")
+                else:
+                    logging.warning(f"⚠️ Checkpoint tiene formato inesperado, no se puede leer step/episode")
+            except Exception as e:
+                logging.warning(f"⚠️ No se pudo leer información del checkpoint: {e}")
+            
             # Cargar modelo desde checkpoint (modelo entrenado)
             model, state_dict = load_model(config, checkpoint_path)
             if model is None:
@@ -1142,19 +1508,22 @@ async def handle_load_experiment(args):
                     
                     # Si tenemos modelo JIT, usar motor nativo
                     if jit_path and os.path.exists(jit_path):
+                        temp_motor = None
                         try:
                             # Usar auto-detección del device (configurado en config.py)
                             # Si device=None, usa auto-detección desde config.get_native_device()
-                            motor = NativeEngineWrapper(
+                            temp_motor = NativeEngineWrapper(
                                 grid_size=inference_grid_size,
                                 d_state=d_state,
                                 device=None,  # None = auto-detección desde config
                                 cfg=config
                             )
-                            logging.info(f"✅ Motor nativo inicializado con device: {motor.device_str}")
+                            logging.info(f"✅ Motor nativo inicializado con device: {temp_motor.device_str}")
                             
                             # Cargar modelo JIT en el motor nativo
-                            if motor.load_model(jit_path):
+                            if temp_motor.load_model(jit_path):
+                                motor = temp_motor
+                                temp_motor = None  # Evitar cleanup - motor se usará
                                 is_native = True
                                 # Obtener versión del motor nativo después de cargar el modelo
                                 try:
@@ -1169,10 +1538,26 @@ async def handle_load_experiment(args):
                             else:
                                 logging.warning(f"⚠️ Error al cargar modelo JIT en motor nativo. Usando motor Python como fallback.")
                                 if ws: await send_notification(ws, "⚠️ Error cargando modelo JIT, usando motor Python", "warning")
+                                # Limpiar motor nativo que falló
+                                if temp_motor is not None:
+                                    try:
+                                        if hasattr(temp_motor, 'cleanup'):
+                                            temp_motor.cleanup()
+                                    except Exception as cleanup_error:
+                                        logging.debug(f"Error durante cleanup de motor nativo fallido: {cleanup_error}")
+                                    temp_motor = None
                                 motor = None
                         except Exception as e:
                             logging.warning(f"⚠️ Error al inicializar motor nativo: {e}. Usando motor Python como fallback.", exc_info=True)
                             if ws: await send_notification(ws, f"⚠️ Error en motor nativo, usando Python: {str(e)[:50]}...", "warning")
+                            # CRÍTICO: Limpiar motor nativo que falló durante inicialización
+                            if temp_motor is not None:
+                                try:
+                                    if hasattr(temp_motor, 'cleanup'):
+                                        temp_motor.cleanup()
+                                except Exception as cleanup_error:
+                                    logging.debug(f"Error durante cleanup de motor nativo fallido: {cleanup_error}")
+                                temp_motor = None
                             motor = None
                 except Exception as e:
                     logging.warning(f"⚠️ Error en la inicialización del motor nativo: {e}. Usando motor Python como fallback.", exc_info=True)
@@ -1212,8 +1597,24 @@ async def handle_load_experiment(args):
         # device_str ya está definido al inicio de la función
         
         g_state['motor'] = motor
-        g_state['simulation_step'] = 0
+        # CRÍTICO: Restaurar step desde checkpoint si está disponible
+        # Si hay checkpoint, usar el step guardado; si no, empezar desde 0
+        initial_step = checkpoint_step if checkpoint_path else 0
+        g_state['simulation_step'] = initial_step
+        g_state['initial_step'] = initial_step  # Guardar step inicial para mostrar "total - actual"
+        g_state['checkpoint_step'] = checkpoint_step  # Step del checkpoint
+        g_state['checkpoint_episode'] = checkpoint_episode  # Episode del checkpoint
         g_state['active_experiment'] = exp_name  # Guardar experimento activo
+        
+        # Información del grid para mostrar
+        g_state['training_grid_size'] = training_grid_size
+        g_state['inference_grid_size'] = inference_grid_size
+        g_state['grid_size_ratio'] = inference_grid_size / training_grid_size if training_grid_size > 0 else 1.0
+        
+        # Inicializar FPS a 0.0 cuando se carga un experimento
+        g_state['current_fps'] = 0.0
+        g_state['fps_samples'] = []
+        g_state['last_fps_calc_time'] = None
         
         # Guardar información sobre el tipo de motor para verificación
         motor_type = "native" if is_native else "python"
@@ -1251,26 +1652,45 @@ async def handle_load_experiment(args):
         g_state['is_paused'] = True
         g_state['live_feed_enabled'] = True  # Live feed habilitado por defecto al cargar modelo
         
+        # Información del grid para mostrar en UI
+        g_state['training_grid_size'] = training_grid_size
+        g_state['inference_grid_size'] = inference_grid_size
+        g_state['grid_size_ratio'] = inference_grid_size / training_grid_size if training_grid_size > 0 else 1.0
+        
         # Enviar frame inicial inmediatamente para mostrar el estado inicial
         # SOLO si live_feed está habilitado
         live_feed_enabled = g_state.get('live_feed_enabled', True)
         if live_feed_enabled:
             try:
                 motor = g_state['motor']
-                if motor and motor.state and motor.state.psi is not None:
-                    delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
-                    viz_data = get_visualization_data(
-                        motor.state.psi, 
-                        g_state.get('viz_type', 'density'),
-                        delta_psi=delta_psi,
-                        motor=motor
-                    )
+                if motor:
+                    # OPTIMIZACIÓN CRÍTICA: Usar lazy conversion para motor nativo
+                    motor_is_native = g_state.get('motor_is_native', False)
+                    if motor_is_native and hasattr(motor, 'get_dense_state'):
+                        # Para motor nativo, usar get_dense_state() solo cuando se necesita visualizar
+                        psi = motor.get_dense_state(check_pause_callback=lambda: g_state.get('is_paused', True))
+                    else:
+                        # Motor Python: acceder directamente (ya es denso)
+                        psi = motor.state.psi if hasattr(motor, 'state') and motor.state else None
+                    
+                    if psi is not None:
+                        delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
+                        viz_data = get_visualization_data(
+                            psi, 
+                            g_state.get('viz_type', 'density'),
+                            delta_psi=delta_psi,
+                            motor=motor
+                        )
+                    else:
+                        viz_data = None
                     if viz_data and isinstance(viz_data, dict):
                         # Validar que los datos sean válidos antes de enviar
                         map_data = viz_data.get("map_data", [])
                         if map_data and len(map_data) > 0:
+                            # Usar el step inicial (del checkpoint si existe, sino 0)
+                            initial_step = g_state.get('initial_step', 0)
                             frame_payload_raw = {
-                                "step": 0,
+                                "step": initial_step,
                                 "timestamp": asyncio.get_event_loop().time(),
                                 "map_data": map_data,
                                 "hist_data": viz_data.get("hist_data", {}),
@@ -1280,9 +1700,16 @@ async def handle_load_experiment(args):
                                 "phase_hsv_data": viz_data.get("phase_hsv_data"),
                                 "complex_3d_data": viz_data.get("complex_3d_data"),
                                 "simulation_info": {
-                                    "step": 0,
+                                    "step": initial_step,
+                                    "initial_step": initial_step,
+                                    "checkpoint_step": checkpoint_step,
+                                    "checkpoint_episode": checkpoint_episode,
                                     "is_paused": True,
-                                    "live_feed_enabled": live_feed_enabled
+                                    "live_feed_enabled": live_feed_enabled,
+                                    "fps": g_state.get('current_fps', 0.0),
+                                    "training_grid_size": training_grid_size,
+                                    "inference_grid_size": inference_grid_size,
+                                    "grid_scaled": training_grid_size != inference_grid_size
                                 }
                             }
                             
@@ -1302,12 +1729,13 @@ async def handle_load_experiment(args):
                                 frame_payload = frame_payload_raw
                             
                             # Verificar que el payload tenga step antes de enviar
+                            initial_step = g_state.get('initial_step', 0)
                             if 'step' not in frame_payload:
-                                logging.warning(f"⚠️ Frame inicial sin step, añadiendo step=0")
-                                frame_payload['step'] = 0
+                                logging.warning(f"⚠️ Frame inicial sin step, añadiendo step={initial_step}")
+                                frame_payload['step'] = initial_step
                             
                             await broadcast({"type": "simulation_frame", "payload": frame_payload})
-                            logging.info(f"Frame inicial enviado exitosamente para '{exp_name}' (step=0, keys={list(frame_payload.keys())})")
+                            logging.info(f"Frame inicial enviado exitosamente para '{exp_name}' (step={initial_step}, keys={list(frame_payload.keys())})")
                         else:
                             logging.warning("get_visualization_data retornó map_data vacío.")
                             if ws: await send_notification(ws, "⚠️ Modelo cargado pero sin datos de visualización iniciales.", "warning")
@@ -1373,19 +1801,36 @@ async def handle_load_experiment(args):
         
         if ws: await send_notification(ws, f"✅ Modelo '{exp_name}' cargado exitosamente. Presiona 'Iniciar' para comenzar la simulación.", "success")
         
-        # Enviar compile_status en el broadcast
+        # Enviar compile_status en el broadcast con información del checkpoint y grid
+        initial_step = checkpoint_step if checkpoint_path else 0
         status_payload = {
             "status": "paused",
             "model_loaded": True,
             "experiment_name": exp_name,
-            "compile_status": compile_status
+            "compile_status": compile_status,
+            "checkpoint_info": {
+                "checkpoint_path": checkpoint_path if checkpoint_path else None,
+                "checkpoint_step": checkpoint_step,
+                "checkpoint_episode": checkpoint_episode,
+                "initial_step": initial_step,
+                "training_grid_size": training_grid_size,
+                "inference_grid_size": inference_grid_size,
+                "grid_scaled": training_grid_size != inference_grid_size,
+                "grid_size_ratio": inference_grid_size / training_grid_size if training_grid_size > 0 else 1.0
+            }
         }
         logging.info(f"📤 Enviando inference_status_update con compile_status: {status_payload}")
         await broadcast({
             "type": "inference_status_update", 
             "payload": status_payload
         })
-        logging.info(f"Modelo '{exp_name}' cargado por [{args['ws_id']}]. Simulación en pausa, esperando inicio manual.")
+        
+        # Mensaje informativo sobre el checkpoint y grid
+        if checkpoint_path:
+            grid_msg = f" (Grid escalado: {training_grid_size}→{inference_grid_size})" if training_grid_size != inference_grid_size else ""
+            logging.info(f"Modelo '{exp_name}' cargado desde checkpoint (episode={checkpoint_episode}, step={checkpoint_step}){grid_msg}. Simulación en pausa, esperando inicio manual.")
+        else:
+            logging.info(f"Modelo '{exp_name}' cargado sin checkpoint (nuevo modelo). Simulación en pausa, esperando inicio manual.")
         
         # Logging adicional para verificación (ya se hizo arriba, pero para confirmar)
         if is_native:
@@ -1403,9 +1848,11 @@ async def handle_switch_engine(args):
     target_engine = args.get('engine', 'auto')  # 'native', 'python', o 'auto'
     
     motor = g_state.get('motor')
-    if not motor:
-        if ws: await send_notification(ws, "⚠️ No hay modelo cargado. Carga un experimento primero.", "warning")
-        return
+    # Permitir cambiar de motor incluso sin modelo cargado
+    # Si no hay modelo, simplemente guardar la preferencia
+    # if not motor:
+    #     if ws: await send_notification(ws, "⚠️ No hay modelo cargado. Carga un experimento primero.", "warning")
+    #     return
     
     # Verificar qué motor está actualmente en uso
     current_is_native = hasattr(motor, 'native_engine') if motor else False
@@ -1420,9 +1867,19 @@ async def handle_switch_engine(args):
         return
     
     # Obtener información del experimento actual
+    # Si no hay experimento cargado, simplemente guardar la preferencia para cuando se cargue uno
     exp_name = g_state.get('active_experiment')
     if not exp_name:
-        if ws: await send_notification(ws, "⚠️ No se puede identificar el experimento actual.", "error")
+        # Guardar preferencia de motor sin modelo
+        if target_engine == 'native':
+            # Verificar si el motor nativo está disponible
+            try:
+                import atheria_core
+                if ws: await send_notification(ws, "✅ Motor nativo seleccionado. Se usará cuando cargues un experimento con checkpoint.", "info")
+            except (ImportError, OSError, RuntimeError):
+                if ws: await send_notification(ws, "⚠️ Motor nativo no disponible. El módulo C++ no está compilado.", "error")
+        else:
+            if ws: await send_notification(ws, "✅ Motor Python seleccionado. Se usará cuando cargues un experimento.", "info")
         return
     
     # Verificar disponibilidad del motor objetivo
@@ -1461,11 +1918,37 @@ async def handle_switch_engine(args):
         g_state['is_paused'] = True
         await broadcast({"type": "inference_status_update", "payload": {"status": "paused"}})
     
+    # CRÍTICO: Limpiar motor anterior antes de cambiar para prevenir segfaults
+    old_motor = motor
+    try:
+        # Limpiar motor nativo explícitamente antes de eliminarlo
+        if old_motor and hasattr(old_motor, 'native_engine'):
+            try:
+                if hasattr(old_motor, 'cleanup'):
+                    old_motor.cleanup()
+                    logging.debug("Motor nativo limpiado explícitamente antes de cambiar de engine")
+                else:
+                    # Fallback: limpiar manualmente
+                    if hasattr(old_motor, 'native_engine') and old_motor.native_engine is not None:
+                        old_motor.native_engine = None
+                    if hasattr(old_motor, 'state') and old_motor.state is not None:
+                        if hasattr(old_motor.state, 'psi') and old_motor.state.psi is not None:
+                            old_motor.state.psi = None
+                        old_motor.state = None
+            except Exception as cleanup_error:
+                logging.warning(f"Error durante cleanup de motor nativo al cambiar engine: {cleanup_error}")
+    except Exception as e:
+        logging.warning(f"Error limpiando motor anterior al cambiar engine: {e}", exc_info=True)
+    
     # Guardar estado actual si es posible
     current_step = g_state.get('simulation_step', 0)
     current_psi = None
-    if motor and hasattr(motor, 'state') and motor.state and motor.state.psi is not None:
-        current_psi = motor.state.psi.clone().detach()
+    try:
+        if motor and hasattr(motor, 'state') and motor.state and motor.state.psi is not None:
+            current_psi = motor.state.psi.clone().detach()
+    except Exception as e:
+        logging.warning(f"Error guardando estado al cambiar engine: {e}")
+        current_psi = None
     
     try:
         # Recargar el experimento con el motor objetivo
@@ -1618,7 +2101,8 @@ async def handle_reset(args):
                             "simulation_info": {
                                 "step": 0,
                                 "is_paused": True,
-                                "live_feed_enabled": live_feed_enabled
+                                "live_feed_enabled": live_feed_enabled,
+                                "fps": g_state.get('current_fps', 0.0)
                             }
                         }
                         
@@ -2221,20 +2705,32 @@ async def handle_clear_snapshots(args):
             await send_notification(ws, f"Error al limpiar snapshots: {str(e)}", "error")
 
 async def handle_set_steps_interval(args):
-    """Configura el intervalo de pasos para mostrar frames cuando live feed está desactivado."""
+    """Configura el intervalo de pasos para mostrar frames cuando live feed está desactivado.
+    
+    Args:
+        steps_interval: Intervalo en pasos. Valores:
+            - 0: Modo manual (solo actualizar con botón)
+            - 1-1000000: Enviar frame cada N pasos automáticamente (permite intervalos muy grandes)
+    """
     ws = g_state['websockets'].get(args.get('ws_id'))
     
     try:
         steps_interval = args.get('steps_interval', 10)
-        if steps_interval < 1:
-            steps_interval = 1
-        if steps_interval > 1000:
-            steps_interval = 1000
+        if steps_interval < 0:
+            steps_interval = 0  # Permitir 0 para modo manual
+        elif steps_interval > 1000000:  # Límite aumentado a 1 millón
+            steps_interval = 1000000
+            logging.warning(f"steps_interval limitado a 1,000,000 (valor solicitado: {args.get('steps_interval')})")
         
         g_state['steps_interval'] = int(steps_interval)
         g_state['steps_interval_counter'] = 0  # Resetear contador
         
-        msg = f"✅ Intervalo de pasos configurado: cada {steps_interval} pasos"
+        if steps_interval == 0:
+            msg = "✅ Modo manual activado: solo actualizar con botón 'Actualizar Visualización'"
+        else:
+            # Formatear número con separadores de miles para mejor legibilidad
+            steps_str = f"{steps_interval:,}".replace(",", ".")
+            msg = f"✅ Intervalo de pasos configurado: cada {steps_str} pasos"
         logging.info(msg)
         if ws:
             await send_notification(ws, msg, "success")
@@ -2328,7 +2824,8 @@ async def handle_set_live_feed(args):
                         "simulation_info": {
                             "step": current_step,
                             "is_paused": False,
-                            "live_feed_enabled": False
+                            "live_feed_enabled": False,
+                            "fps": g_state.get('current_fps', 0.0)
                         }
                     }
                     
@@ -2615,7 +3112,8 @@ async def handle_inject_energy(args):
                             "simulation_info": {
                                 "step": 0,
                                 "is_paused": g_state.get('is_paused', True),
-                                "live_feed_enabled": live_feed_enabled
+                                "live_feed_enabled": live_feed_enabled,
+                                "fps": g_state.get('current_fps', 0.0)
                             }
                         }
                         await broadcast({"type": "frame", "payload": frame_payload_raw})
@@ -2914,6 +3412,7 @@ HANDLERS = {
     },
     "simulation": {
         "set_viz": handle_set_viz,
+        "update_visualization": handle_update_visualization,  # Nuevo: actualización manual
         "set_speed": handle_set_simulation_speed,
         "set_fps": handle_set_fps,
         "set_frame_skip": handle_set_frame_skip,
