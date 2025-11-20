@@ -4,9 +4,9 @@ import { Play, Pause, RefreshCw, Upload, ArrowRightLeft, ChevronRight, FlaskConi
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { modelOptions, vizOptions } from '../../utils/vizOptions';
 import { ExperimentManager } from '../experiments/ExperimentManager';
-import { CheckpointManager } from '../training/CheckpointManager';
+// import { CheckpointManager } from '../training/CheckpointManager'; // TODO: Migrar a Tailwind
 import { ExperimentInfo } from '../experiments/ExperimentInfo';
-import { TransferLearningWizard } from '../experiments/TransferLearningWizard';
+// import { TransferLearningWizard } from '../experiments/TransferLearningWizard'; // TODO: Migrar a Tailwind
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
 
 type LabSection = 'inference' | 'training' | 'analysis';
@@ -310,7 +310,7 @@ export function LabSider() {
                             <div className="space-y-3 pt-3 border-t border-white/5">
                                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">GESTIÓN</div>
                                 <ExperimentManager />
-                                <CheckpointManager />
+                                {/* <CheckpointManager /> TODO: Migrar a Tailwind */}
                             </div>
                         </div>
                     )}
@@ -609,11 +609,11 @@ export function LabSider() {
                 </div>
             </div>
             
-            {/* Transfer Learning Wizard */}
-            <TransferLearningWizard 
+            {/* Transfer Learning Wizard - TODO: Migrar a Tailwind */}
+            {/* <TransferLearningWizard 
                 opened={transferWizardOpened}
                 onClose={() => setTransferWizardOpened(false)}
-            />
+            /> */}
         </div>
     );
 }
