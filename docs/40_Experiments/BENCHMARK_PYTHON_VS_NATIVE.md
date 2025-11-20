@@ -143,7 +143,35 @@ El script genera un reporte en Markdown con:
 
 ## 🚨 Estado Actual
 
-**Estado:** ⏳ Benchmark creado, pendiente de ejecución
+**Estado:** ⏳ Benchmark creado, pendiente de ejecución con experimento válido
+
+### Estado Actual del Benchmark
+
+**Script creado:** ✅ `scripts/benchmark_python_vs_native.py`  
+**Documentación:** ✅ Completa  
+**Ejecución:** ⏳ Pendiente - requiere experimento con:
+- `config.json` en `output/experiments/EXPERIMENT_NAME/`
+- Checkpoint en `output/checkpoints/EXPERIMENT_NAME/*.pth`
+
+### Ejecutar Benchmark
+
+Para ejecutar el benchmark cuando haya un experimento válido:
+
+```bash
+# CPU mode (más rápido para pruebas)
+python3 scripts/benchmark_python_vs_native.py \
+    --experiment EXPERIMENT_NAME \
+    --steps 100 \
+    --device cpu
+
+# GPU mode (si CUDA está disponible)
+python3 scripts/benchmark_python_vs_native.py \
+    --experiment EXPERIMENT_NAME \
+    --steps 100 \
+    --device cuda
+```
+
+El script generará un reporte en Markdown: `benchmark_report_EXPERIMENT_NAME.md`
 
 ### Por Qué el Motor Nativo No Se Usa Automáticamente
 
