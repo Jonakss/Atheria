@@ -42,17 +42,17 @@ export function ExperimentInfo() {
                         <span className="text-sm font-bold text-blue-400">{activeExperiment}</span>
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1 ${
                             experiment.has_checkpoint 
-                                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-[0_0_8px_rgba(16,185,129,0.3)]' 
-                                : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                ? 'bg-teal-500/20 text-teal-400 border-teal-500/50 shadow-glow-teal' 
+                                : 'bg-pink-500/10 text-pink-400 border-pink-500/30'
                         }`}>
                             {experiment.has_checkpoint ? (
                                 <>
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
                                     <span>Checkpoint Disponible</span>
                                 </>
                             ) : (
                                 <>
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-pink-400" />
                                     <span>Sin Checkpoint</span>
                                 </>
                             )}
@@ -109,7 +109,7 @@ export function ExperimentInfo() {
                         </div>
                         <div>
                             <span className="text-[10px] text-gray-500 block">Gamma Decay</span>
-                            <span className={`text-sm font-medium ${config.GAMMA_DECAY === 0 ? 'text-gray-400' : 'text-amber-400'}`}>
+                            <span className={`text-sm font-medium ${config.GAMMA_DECAY === 0 ? 'text-gray-400' : 'text-pink-400'}`}>
                                 {config.GAMMA_DECAY || 0.01}
                                 {config.GAMMA_DECAY === 0 ? ' (Cerrado)' : ' (Abierto)'}
                             </span>
@@ -128,11 +128,11 @@ export function ExperimentInfo() {
                         <div>
                             <span className="text-[10px] text-gray-500 block">Motor</span>
                             {config.USE_NATIVE_ENGINE ? (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 inline-block">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-teal-500/10 text-teal-400 border-teal-500/30 inline-block">
                                     ⚡ Nativo (C++)
                                 </span>
                             ) : (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-amber-500/10 text-amber-400 border-amber-500/30 inline-block">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-teal-500/10 text-teal-300 border-teal-500/30 inline-block">
                                     🐍 Python
                                 </span>
                             )}

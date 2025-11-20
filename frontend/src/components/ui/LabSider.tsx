@@ -206,8 +206,8 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
 
     const sectionButtons = [
         { id: 'inference' as LabSection, icon: FlaskConical, label: 'Inferencia', color: 'blue' },
-        { id: 'training' as LabSection, icon: Brain, label: 'Entrenamiento', color: 'emerald' },
-        { id: 'analysis' as LabSection, icon: BarChart3, label: 'Análisis', color: 'amber' },
+        { id: 'training' as LabSection, icon: Brain, label: 'Entrenamiento', color: 'teal' },
+        { id: 'analysis' as LabSection, icon: BarChart3, label: 'Análisis', color: 'pink' },
     ];
 
     return (
@@ -232,8 +232,8 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
             {!isCollapsed && (
             <div className={`flex-1 overflow-y-auto custom-scrollbar transition-all duration-300 ${
                 activeSection === 'inference' ? 'bg-blue-500/5' :
-                activeSection === 'training' ? 'bg-emerald-500/5' :
-                activeSection === 'analysis' ? 'bg-amber-500/5' :
+                activeSection === 'training' ? 'bg-teal-500/5' :
+                activeSection === 'analysis' ? 'bg-pink-500/5' :
                 ''
             }`}>
                     {/* Progreso de Entrenamiento - Siempre visible si está corriendo */}
@@ -241,11 +241,11 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
                         <div className="m-4 mb-0 bg-white/5 border border-white/10 rounded-lg p-3 space-y-2">
                             <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                                 <span>PROGRESO</span>
-                                <span className="text-emerald-400">ACTIVO</span>
+                                <span className="text-teal-400">ACTIVO</span>
                             </div>
                             <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden">
                                 <div 
-                                    className="h-full bg-emerald-500 transition-all duration-300"
+                                    className="h-full bg-teal-500 transition-all duration-300"
                                     style={{ width: `${progressPercent}%` }}
                                 />
                             </div>
@@ -337,11 +337,11 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
                                         Tamaño del grid para simulación (requiere recargar experimento)
                                         {currentExperiment && currentExperiment.config?.GRID_SIZE_TRAINING && (
                                             currentExperiment.config.GRID_SIZE_TRAINING !== gridSizeInference ? (
-                                                <span className="block mt-0.5 text-amber-400">
+                                                <span className="block mt-0.5 text-pink-400">
                                                     ⚠️ Escalando desde {currentExperiment.config.GRID_SIZE_TRAINING}x{currentExperiment.config.GRID_SIZE_TRAINING}
                                                 </span>
                                             ) : (
-                                                <span className="block mt-0.5 text-emerald-400">
+                                                <span className="block mt-0.5 text-teal-400">
                                                     ✓ Mismo tamaño que entrenamiento
                                                 </span>
                                             )

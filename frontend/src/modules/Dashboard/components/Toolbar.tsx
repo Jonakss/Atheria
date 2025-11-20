@@ -88,8 +88,8 @@ export const Toolbar: React.FC = () => {
             !canControlInference
               ? 'bg-white/5 text-gray-600 border-white/5 cursor-not-allowed opacity-50'
               : isPlaying 
-                ? 'bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500/20' 
-                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+                ? 'bg-pink-500/10 text-pink-500 border-pink-500/30 hover:bg-pink-500/20' 
+                : 'bg-teal-500/10 text-teal-400 border-teal-500/30 hover:bg-teal-500/20'
           }`}
           title={canControlInference ? (isPlaying ? 'Pausar simulación' : 'Iniciar simulación') : 'Necesitas un experimento con checkpoint activo'}
         >
@@ -122,7 +122,7 @@ export const Toolbar: React.FC = () => {
       <GlassPanel className="pointer-events-auto flex items-center px-3 py-1 gap-3">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-bold text-gray-500">FPS</span>
-          <span className={`text-xs font-mono ${fps !== null ? 'text-emerald-400' : 'text-gray-600'}`}>
+          <span className={`text-xs font-mono ${fps !== null ? 'text-teal-400' : 'text-gray-600'}`}>
             {fps !== null ? fps : 'N/A'}
           </span>
         </div>

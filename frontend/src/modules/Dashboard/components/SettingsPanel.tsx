@@ -379,7 +379,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-400">Estado de Conexión</span>
                 <span className={`font-mono font-medium ${
-                  isConnected ? 'text-emerald-400' : 'text-gray-600'
+                  isConnected ? 'text-teal-400' : 'text-gray-600'
                 }`}>
                   {connectionStatus === 'connected' ? 'CONECTADO' : connectionStatus === 'connecting' ? 'CONECTANDO...' : 'DESCONECTADO'}
                 </span>
@@ -390,7 +390,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-400">Motor</span>
                     <span className={`font-mono font-medium ${
-                      compileStatus.is_native ? 'text-emerald-400' : 
+                      compileStatus.is_native ? 'text-teal-400' : 
                       compileStatus.is_compiled ? 'text-blue-400' : 'text-gray-600'
                     }`}>
                       {compileStatus.is_native ? 'NATIVO (C++)' : 

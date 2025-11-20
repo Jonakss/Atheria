@@ -305,8 +305,8 @@ export function ExperimentManager() {
                                                 <div className="flex items-center gap-2 flex-1 min-w-0">
                                                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border shrink-0 ${
                                                         rootNode.hasCheckpoint 
-                                                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
-                                                            : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                                            ? 'bg-teal-500/10 text-teal-400 border-teal-500/30' 
+                                                            : 'bg-pink-500/10 text-pink-400 border-pink-500/30'
                                                     }`}>
                                                         {rootNode.hasCheckpoint ? '✓' : '○'}
                                                     </span>
@@ -389,7 +389,7 @@ export function ExperimentManager() {
                                                                         {expName}
                                                                     </div>
                                                                     {node.hasCheckpoint && (
-                                                                        <span className="px-1 py-0.5 rounded text-[10px] font-bold border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shrink-0">
+                                                                        <span className="px-1 py-0.5 rounded text-[10px] font-bold border bg-teal-500/10 text-teal-400 border-teal-500/30 shrink-0">
                                                                             ✓
                                                                         </span>
                                                                     )}
@@ -449,8 +449,8 @@ export function ExperimentManager() {
                                                 <td className="py-2 pr-4">
                                                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
                                                         exp.has_checkpoint 
-                                                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
-                                                            : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                                            ? 'bg-teal-500/10 text-teal-400 border-teal-500/30' 
+                                                            : 'bg-pink-500/10 text-pink-400 border-pink-500/30'
                                                     }`}>
                                                         {exp.has_checkpoint ? '✓' : '○'}
                                                     </span>
@@ -644,8 +644,8 @@ export function ExperimentManager() {
                                                     <td className="text-xs py-1">
                                                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
                                                             selectedExperiment.hasCheckpoint 
-                                                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
-                                                                : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                                                ? 'bg-teal-500/10 text-teal-400 border-teal-500/30' 
+                                                                : 'bg-pink-500/10 text-pink-400 border-pink-500/30'
                                                         }`}>
                                                             {selectedExperiment.hasCheckpoint ? 'Entrenado' : 'Sin entrenar'}
                                                         </span>
