@@ -1132,10 +1132,7 @@ async def handle_load_experiment(args):
             except Exception as e:
                 logging.warning(f"⚠️ No se pudo compilar el modelo: {e}. Continuando sin compilación.")
         
-        # Asegurar que device_str esté definido antes de usarlo
-        if 'device_str' not in locals():
-            import torch
-            device_str = "cuda" if torch.cuda.is_available() else "cpu"
+        # device_str ya está definido al inicio de la función
         
         g_state['motor'] = motor
         g_state['simulation_step'] = 0
