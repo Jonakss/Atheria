@@ -150,6 +150,21 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
                 )}
               </div>
             </div>
+            
+            {/* Botón para cambiar de motor */}
+            {connectionStatus === 'connected' && compileStatus && compileStatus.model_name && (
+              <button
+                onClick={() => {
+                  const currentIsNative = compileStatus.is_native || false;
+                  const targetEngine = currentIsNative ? 'python' : 'native';
+                  sendCommand('inference', 'switch_engine', { engine: targetEngine });
+                }}
+                className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded border border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-gray-400 hover:text-gray-200 transition-all"
+                title={compileStatus.is_native ? 'Cambiar a motor Python' : 'Cambiar a motor Nativo (C++)'}
+              >
+                ↻
+              </button>
+            )}
           </div>
 
           {/* Indicador de FPS/Velocidad */}

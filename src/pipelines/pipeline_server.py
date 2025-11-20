@@ -1037,7 +1037,14 @@ async def handle_load_experiment(args):
         # El motor nativo es 250-400x más rápido que el motor Python
         # NOTA: Solo usar motor nativo si hay checkpoint (modelo entrenado)
         # Si no hay checkpoint, usar motor Python con modelo sin entrenar
-        use_native_engine = getattr(global_cfg, 'USE_NATIVE_ENGINE', True)  # Por defecto True
+        # Permitir forzar el motor desde args (para cambio dinámico)
+        force_engine = args.get('force_engine', None)  # 'native', 'python', o None para auto
+        if force_engine == 'python':
+            use_native_engine = False
+        elif force_engine == 'native':
+            use_native_engine = True
+        else:
+            use_native_engine = getattr(global_cfg, 'USE_NATIVE_ENGINE', True)  # Por defecto True
         has_checkpoint = checkpoint_path is not None
         
         motor = None
@@ -1360,6 +1367,109 @@ async def handle_load_experiment(args):
     except Exception as e:
         logging.error(f"Error crítico cargando experimento '{exp_name}': {e}", exc_info=True)
         if ws: await send_notification(ws, f"Error al cargar '{exp_name}': {str(e)}", "error")
+
+async def handle_switch_engine(args):
+    """Cambia entre motor nativo (C++) y motor Python si están disponibles."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    target_engine = args.get('engine', 'auto')  # 'native', 'python', o 'auto'
+    
+    motor = g_state.get('motor')
+    if not motor:
+        if ws: await send_notification(ws, "⚠️ No hay modelo cargado. Carga un experimento primero.", "warning")
+        return
+    
+    # Verificar qué motor está actualmente en uso
+    current_is_native = hasattr(motor, 'native_engine') if motor else False
+    current_engine_type = 'native' if current_is_native else 'python'
+    
+    # Determinar qué motor usar
+    if target_engine == 'auto':
+        # Auto: cambiar al opuesto si es posible
+        target_engine = 'python' if current_is_native else 'native'
+    elif target_engine == current_engine_type:
+        if ws: await send_notification(ws, f"⚠️ Ya estás usando el motor {current_engine_type}.", "info")
+        return
+    
+    # Obtener información del experimento actual
+    exp_name = g_state.get('active_experiment')
+    if not exp_name:
+        if ws: await send_notification(ws, "⚠️ No se puede identificar el experimento actual.", "error")
+        return
+    
+    # Verificar disponibilidad del motor objetivo
+    if target_engine == 'native':
+        try:
+            import atheria_core
+            native_available = True
+        except (ImportError, OSError, RuntimeError):
+            native_available = False
+            if ws: await send_notification(ws, "⚠️ Motor nativo no disponible. El módulo C++ no está compilado.", "error")
+            return
+        
+        # Verificar que haya checkpoint y modelo JIT
+        from ..utils import get_latest_checkpoint, get_latest_jit_model
+        checkpoint_path = get_latest_checkpoint(exp_name)
+        jit_path = get_latest_jit_model(exp_name, silent=True)
+        
+        if not checkpoint_path:
+            if ws: await send_notification(ws, "⚠️ Motor nativo requiere un modelo entrenado (checkpoint).", "error")
+            return
+        
+        if not jit_path:
+            if ws: await send_notification(ws, "📦 Modelo JIT no encontrado. Exportando automáticamente...", "info")
+            # El export se hará en handle_load_experiment
+            # Por ahora, simplemente recargar el experimento con motor nativo
+            await handle_load_experiment({
+                'ws_id': args.get('ws_id'),
+                'experiment_name': exp_name,
+                'force_engine': 'native'
+            })
+            return
+    
+    # Pausar simulación si está corriendo
+    was_running = not g_state.get('is_paused', True)
+    if was_running:
+        g_state['is_paused'] = True
+        await broadcast({"type": "inference_status_update", "payload": {"status": "paused"}})
+    
+    # Guardar estado actual si es posible
+    current_step = g_state.get('simulation_step', 0)
+    current_psi = None
+    if motor and hasattr(motor, 'state') and motor.state and motor.state.psi is not None:
+        current_psi = motor.state.psi.clone().detach()
+    
+    try:
+        # Recargar el experimento con el motor objetivo
+        # Usar handle_load_experiment pero forzar el motor específico
+        await handle_load_experiment({
+            'ws_id': args.get('ws_id'),
+            'experiment_name': exp_name,
+            'force_engine': target_engine
+        })
+        
+        # Restaurar el paso y estado si es posible
+        if current_psi is not None:
+            new_motor = g_state.get('motor')
+            if new_motor and hasattr(new_motor, 'state'):
+                try:
+                    # Intentar restaurar el estado (puede fallar si cambió el formato)
+                    new_motor.state.psi = current_psi.to(new_motor.state.psi.device)
+                    g_state['simulation_step'] = current_step
+                    logging.info(f"✅ Estado restaurado al cambiar de motor (step={current_step})")
+                except Exception as e:
+                    logging.warning(f"⚠️ No se pudo restaurar el estado: {e}. Usando estado inicial.")
+        
+        if ws: 
+            engine_label = "Nativo (C++)" if target_engine == 'native' else "Python"
+            await send_notification(ws, f"✅ Cambiado a motor {engine_label}", "success")
+        
+        # Reanudar simulación si estaba corriendo
+        if was_running:
+            await handle_play({'ws_id': args.get('ws_id')})
+            
+    except Exception as e:
+        logging.error(f"Error cambiando de motor: {e}", exc_info=True)
+        if ws: await send_notification(ws, f"❌ Error cambiando de motor: {str(e)[:50]}...", "error")
 
 async def handle_unload_model(args):
     """Descarga el modelo cargado y limpia el estado."""
@@ -2804,6 +2914,7 @@ HANDLERS = {
         "load": handle_load_experiment,  # También acepta "load" además de "load_experiment"
         "load_experiment": handle_load_experiment, 
         "unload": handle_unload_model,  # Nuevo: descargar modelo
+        "switch_engine": handle_switch_engine,  # Nuevo: cambiar entre motor nativo y Python
         "reset": handle_reset,
         "set_config": handle_set_inference_config,
         "inject_energy": handle_inject_energy
