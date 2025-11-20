@@ -198,10 +198,10 @@ class QC_Trainer_v4:
         # Logging
         if episode_num % 10 == 0:
             if self.writer is not None:
-            self.writer.add_scalar('Loss/Total', loss.item(), episode_num)
-            self.writer.add_scalar('Metrics/Symmetry', metrics['symmetry'], episode_num)
-            self.writer.add_scalar('Metrics/Survival', metrics['survival'], episode_num)
-            self.writer.add_scalar('Environment/NoiseLevel', current_noise, episode_num)
+                self.writer.add_scalar('Loss/Total', loss.item(), episode_num)
+                self.writer.add_scalar('Metrics/Symmetry', metrics['symmetry'], episode_num)
+                self.writer.add_scalar('Metrics/Survival', metrics['survival'], episode_num)
+                self.writer.add_scalar('Environment/NoiseLevel', current_noise, episode_num)
             
         return loss.item(), metrics
 
