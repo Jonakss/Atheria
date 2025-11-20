@@ -189,7 +189,9 @@ async def simulation_loop():
                         steps_start_time = time.time()
                         
                         for _ in range(steps_to_execute):
-                            g_state['motor'].evolve_internal_state()
+                            motor = g_state['motor']
+                        if motor:
+                            motor.evolve_internal_state()
                             updated_step = current_step + 1
                             g_state['simulation_step'] = updated_step
                             current_step = updated_step
@@ -589,7 +591,9 @@ async def simulation_loop():
                 # Saltar frame: solo evolución, no visualización
                 if not is_paused and motor:
                     try:
-                        g_state['motor'].evolve_internal_state()
+                        motor = g_state['motor']
+                        if motor:
+                            motor.evolve_internal_state()
                         g_state['simulation_step'] = g_state.get('simulation_step', 0) + 1
                     except:
                         pass
@@ -1070,6 +1074,29 @@ async def handle_load_experiment(args):
         
         g_state['motor'] = motor
         g_state['simulation_step'] = 0
+        
+        # Guardar información sobre el tipo de motor para verificación
+        motor_type = "native" if is_native else "python"
+        g_state['motor_type'] = motor_type
+        g_state['motor_is_native'] = is_native
+        logging.info(f"✅ Motor almacenado en g_state: tipo={motor_type}, device={device_str}, is_native={is_native}")
+        
+        # Verificar que el motor tiene los métodos necesarios
+        if hasattr(motor, 'evolve_internal_state'):
+            logging.info(f"✅ Motor tiene método evolve_internal_state()")
+        else:
+            logging.error(f"❌ Motor NO tiene método evolve_internal_state()")
+        
+        # Verificar si es motor nativo
+        if is_native and hasattr(motor, 'native_engine'):
+            logging.info(f"✅ Motor nativo confirmado: tiene native_engine")
+        elif not is_native:
+            logging.info(f"✅ Motor Python confirmado")
+        
+        # Guardar información sobre el tipo de motor para verificación
+        motor_type = "native" if is_native else "python"
+        g_state['motor_type'] = motor_type
+        logging.info(f"✅ Motor almacenado en g_state: tipo={motor_type}, device={device_str}, is_native={is_native}")
         
         # Actualizar ROI manager con el tamaño correcto del grid
         from ..managers.roi_manager import ROIManager
