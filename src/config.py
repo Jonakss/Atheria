@@ -106,12 +106,16 @@ def get_device():
                                         logging.warning(f"⚠️ Error al crear tensor CUDA: {e}")
                                         cuda_available = False
                                         cuda_error = str(e)
-                        except (RuntimeError, AttributeError) as e:
-                            error_str = str(e)
-                            if '101' not in error_str:
-                                logging.warning(f"⚠️ Error obteniendo device_count: {e}")
-                            cuda_available = False
-                            cuda_error = str(e)
+                                except Exception as e:
+                                    logging.warning(f"⚠️ Error verificando CUDA: {e}")
+                                    cuda_available = False
+                                    cuda_error = str(e)
+                            except (RuntimeError, AttributeError) as e:
+                                error_str = str(e)
+                                if '101' not in error_str:
+                                    logging.warning(f"⚠️ Error obteniendo device_count: {e}")
+                                cuda_available = False
+                                cuda_error = str(e)
         except Exception as e:
             # Si hay cualquier error, usar CPU como fallback
             logging.debug(f"Error detectando CUDA: {e}. Usando CPU como fallback.")

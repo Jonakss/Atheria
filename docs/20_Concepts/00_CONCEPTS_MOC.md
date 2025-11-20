@@ -11,6 +11,7 @@
 ## 🔧 Arquitecturas y Sistemas
 
 - **[Arquitectura Sparse en V4](../20_Concepts/SPARSE_ARCHITECTURE_V4.md)** - Sparse como arquitectura base del motor nativo C++
+- **[Configuración de CUDA](../20_Concepts/CUDA_CONFIGURATION.md)** - Configuración y troubleshooting de CUDA para PyTorch y motor nativo
 
 ---
 
