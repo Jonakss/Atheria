@@ -157,14 +157,48 @@ int64_t Engine::step_native() {
                 // El modelo devuelve [batch, 2*d_state, grid_size, grid_size] (mismo tamaño que input)
                 // Extraer el centro del patch (posición central)
                 
+                // Verificar shape del output para debugging
+                if (batch_output.dim() != 4) {
+                    throw std::runtime_error("Shape inesperado del output del modelo: esperado 4D [batch, channels, H, W], obtenido " + 
+                                              std::to_string(batch_output.dim()) + "D");
+                }
+                
+                int64_t batch_dim = batch_output.size(0);
+                int64_t channels_dim = batch_output.size(1);
+                int64_t height_dim = batch_output.size(2);
+                int64_t width_dim = batch_output.size(3);
+                
+                // Validar que el shape sea correcto
+                if (channels_dim != 2 * d_state_ || height_dim != grid_size_ || width_dim != grid_size_) {
+                    throw std::runtime_error("Shape inesperado del output del modelo: esperado [batch, " + 
+                                              std::to_string(2 * d_state_) + ", " + std::to_string(grid_size_) + ", " + 
+                                              std::to_string(grid_size_) + "], obtenido [" + std::to_string(batch_dim) + 
+                                              ", " + std::to_string(channels_dim) + ", " + std::to_string(height_dim) + 
+                                              ", " + std::to_string(width_dim) + "]");
+                }
+                
                 int64_t center_idx = grid_size_ / 2;  // Centro del patch
+                
+                // Validar que center_idx esté en rango
+                if (center_idx < 0 || center_idx >= grid_size_) {
+                    throw std::runtime_error("center_idx fuera de rango: " + std::to_string(center_idx) + 
+                                              " debe estar en [0, " + std::to_string(grid_size_) + ")");
+                }
                 
                 for (size_t j = 0; j < batch_coords.size(); j++) {
                     // Extraer salida del centro del patch
                     // batch_output shape: [batch, 2*d_state, grid_size, grid_size]
                     // Extraer el centro [batch, :, center_idx, center_idx] -> [2*d_state]
                     // Usar índices correctos: dim 0 = batch, dim 1 = channels, dim 2 = H, dim 3 = W
-                    torch::Tensor output_center = batch_output[j].select(2, center_idx).select(2, center_idx); // [2*d_state]
+                    // Primero seleccionar height (dim 2), luego width (dim 2 se convierte en dim 1 después del primer select)
+                    torch::Tensor output_center = batch_output[j].select(2, center_idx).select(1, center_idx); // [2*d_state]
+                    
+                    // Verificar que el tensor tiene la forma esperada
+                    if (output_center.dim() != 1 || output_center.size(0) != 2 * d_state_) {
+                        throw std::runtime_error("Shape inesperado del output del modelo: esperado [2*d_state], obtenido " + 
+                                                  std::to_string(output_center.dim()) + "D con size[0]=" + 
+                                                  std::to_string(output_center.size(0)));
+                    }
                     
                     // Dividir en real e imag: [0:d_state] es real, [d_state:2*d_state] es imag
                     torch::Tensor delta_real = output_center.slice(0, 0, d_state_);
