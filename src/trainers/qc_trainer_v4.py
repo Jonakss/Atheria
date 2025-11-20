@@ -109,7 +109,7 @@ class QC_Trainer_v4:
         self.writer = None
         if TENSORBOARD_AVAILABLE:
             try:
-        self.writer = SummaryWriter(log_dir=os.path.join(global_cfg.LOGS_DIR, experiment_name))
+                self.writer = SummaryWriter(log_dir=os.path.join(global_cfg.LOGS_DIR, experiment_name))
             except Exception as e:
                 logging.warning(f"No se pudo inicializar Tensorboard: {e}")
 
