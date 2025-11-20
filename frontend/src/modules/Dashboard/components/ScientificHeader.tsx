@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Settings, Aperture, Power, Plug, ChevronRight, ChevronLeft, ChevronDown, Cpu, Gauge, RefreshCcw } from 'lucide-react';
 import { EpochBadge } from './EpochBadge';
 import { SettingsPanel } from './SettingsPanel';
