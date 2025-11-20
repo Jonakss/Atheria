@@ -17,6 +17,7 @@
 
 - **[Log de Desarrollo AI](../40_Experiments/AI_DEV_LOG.md)** - Bitácora de desarrollo con IA
 - **[Log de Setup Fase 2](../40_Experiments/PHASE_2_SETUP_LOG.md)** - Setup del Motor Nativo C++
+- **[Test de Motor Nativo con Modelos Reales](../40_Experiments/PHASE_2_NATIVE_ENGINE_TEST.md)** - Script de prueba con modelos entrenados
 
 ---
 
