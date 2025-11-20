@@ -136,8 +136,22 @@ async def create_experiment_handler(args):
                         continue
                     error_msg = line.decode().strip()
                     if error_msg:
-                        await broadcast({"type": "training_log", "payload": f"[Error] {error_msg}"})
-                        logging.error(f"Error en entrenamiento: {error_msg}")
+                        # Filtrar mensajes informativos de PyTorch/CUDA que no son errores reales
+                        # Los mensajes de "cudagraph partition" son warnings informativos de PyTorch
+                        # cuando torch.compile encuentra operaciones no capturables (como torch.cat dinámico)
+                        cudagraph_keywords = [
+                            'cudagraph partition',
+                            'cudagraph partition due to non gpu ops',
+                            'No CUDA runtime is found',
+                            'CUDA_HOME'
+                        ]
+                        if any(keyword.lower() in error_msg.lower() for keyword in cudagraph_keywords):
+                            # Estos son warnings informativos, no errores reales - loguear como debug
+                            logging.debug(f"Warning de PyTorch/CUDA (ignorado): {error_msg}")
+                        else:
+                            # Este es un error real - loguear como error y enviar al frontend
+                            await broadcast({"type": "training_log", "payload": f"[Error] {error_msg}"})
+                            logging.error(f"Error en entrenamiento: {error_msg}")
             except Exception as e:
                 logging.error(f"Error leyendo stderr: {e}")
         
