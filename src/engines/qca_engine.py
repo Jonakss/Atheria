@@ -6,6 +6,12 @@ import os
 import logging
 from .. import config as cfg
 
+# Versión del motor Python
+try:
+    from .__version__ import __version__ as ENGINE_VERSION
+except ImportError:
+    ENGINE_VERSION = "4.1.0"  # Fallback
+
 class QuantumState:
     """
     Estado cuántico con soporte para memoria temporal (ConvLSTM).
