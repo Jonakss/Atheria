@@ -119,7 +119,7 @@ def run_training_pipeline(exp_cfg: SimpleNamespace, checkpoint_path: str | None 
             trainer_kwargs['model_params'] = model_params_dict  # Para obtener d_state
         else:
             # Crear nuevo modelo - necesitamos la clase del modelo
-            from .model_loader import MODEL_MAP
+            from ..model_loader import MODEL_MAP
             if exp_cfg.MODEL_ARCHITECTURE not in MODEL_MAP:
                 logging.error(f"Arquitectura de modelo desconocida: '{exp_cfg.MODEL_ARCHITECTURE}'")
                 raise ValueError(f"Arquitectura de modelo desconocida: '{exp_cfg.MODEL_ARCHITECTURE}'")
