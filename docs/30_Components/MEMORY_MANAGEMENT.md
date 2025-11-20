@@ -72,5 +72,51 @@
 
 ---
 
-**Estado:** ⏳ Revisión y optimizaciones en progreso
+**Estado:** ✅ Optimizaciones implementadas y documentadas
+
+---
+
+## ✅ Cambios Implementados
+
+### Backend (Python)
+
+1. **`src/trainers/qc_trainer_v4.py`**:
+   - Subsampling de `psi_history`: Solo guardar estados necesarios (~10 estados máximo)
+   - Liberación explícita de `psi_history` después de calcular pérdida
+   - `gc.collect()` para liberar memoria inmediatamente
+
+2. **`src/pipelines/pipeline_server.py`**:
+   - Limpieza de motor anterior antes de cargar nuevo modelo
+   - Snapshots movidos a CPU explícitamente con `torch.no_grad()`
+   - Liberación de tensores antiguos al exceder límite de snapshots
+   - `gc.collect()` después de limpiar snapshots
+
+### Frontend (React/TypeScript)
+
+1. **`frontend/src/context/WebSocketContext.tsx`**:
+   - Límite de logs reducido de 1000 a 500
+   - Rotación automática de logs antiguos
+   - Constante `MAX_LOGS = 500` para consistencia
+
+---
+
+## 📊 Impacto Esperado
+
+- **Reducción de memoria en entrenamiento**: ~50-80% menos uso de memoria por episodio
+- **Reducción de memoria en snapshots**: Snapshots en CPU en lugar de GPU
+- **Reducción de memoria en frontend**: ~50% menos logs almacenados
+- **Mejor gestión al cambiar modelos**: Motor anterior liberado correctamente
+
+---
+
+## 🔍 Áreas para Monitoreo
+
+1. **Memoria de GPU**: Verificar que los tensores se mueven correctamente a CPU
+2. **Memoria de CPU**: Monitorear acumulación en simulaciones muy largas (>100k pasos)
+3. **ConvLSTM Memory States**: Verificar que `h_state` y `c_state` se resetean correctamente
+4. **Frontend**: Monitorear acumulación de `simData` en sesiones largas
+
+---
+
+**Última actualización:** 2024-12-XX
 
