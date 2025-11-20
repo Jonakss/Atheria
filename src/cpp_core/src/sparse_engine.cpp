@@ -139,8 +139,9 @@ int64_t Engine::step_native() {
                 for (size_t j = 0; j < batch_coords.size(); j++) {
                     // Extraer salida del centro del patch
                     // batch_output shape: [batch, 2*d_state, 3, 3]
-                    // Extraer el centro [batch, :, 1, 1]
-                    torch::Tensor output_center = batch_output[j].select(1, 1).select(1, 1); // [2*d_state]
+                    // Extraer el centro [batch, :, 1, 1] -> [2*d_state]
+                    // Usar índices correctos: dim 0 = batch, dim 1 = channels, dim 2 = H, dim 3 = W
+                    torch::Tensor output_center = batch_output[j].select(2, 1).select(2, 1); // [2*d_state]
                     
                     // Dividir en real e imag: [0:d_state] es real, [d_state:2*d_state] es imag
                     torch::Tensor delta_real = output_center.slice(0, 0, d_state_);
@@ -266,12 +267,15 @@ torch::Tensor Engine::build_batch_input(const std::vector<Coord3D>& coords) {
                 // Copiar a batch_input [batch, channels, y, x]
                 // Asegurarse de que real e imag tengan la forma correcta
                 if (real.dim() == 1 && real.size(0) == d_state_) {
-                    // Expandir a [1, d_state, 1, 1]
-                    real = real.unsqueeze(0).unsqueeze(-1).unsqueeze(-1);
-                    imag = imag.unsqueeze(0).unsqueeze(-1).unsqueeze(-1);
-                    
-                    batch_input[i].slice(0, 0, d_state_).slice(1, py, py+1).slice(2, px, px+1) = real;
-                    batch_input[i].slice(0, d_state_, 2*d_state_).slice(1, py, py+1).slice(2, px, px+1) = imag;
+                    // Copiar cada canal de d_state individualmente
+                    // batch_input shape: [batch, 2*d_state, 3, 3]
+                    // Para cada canal c en [0, d_state):
+                    //   batch_input[i, c, py, px] = real[c]
+                    //   batch_input[i, c + d_state, py, px] = imag[c]
+                    for (int64_t c = 0; c < d_state_; c++) {
+                        batch_input[i][c][py][px] = real[c].item<float>();
+                        batch_input[i][c + d_state_][py][px] = imag[c].item<float>();
+                    }
                 }
             }
         }
