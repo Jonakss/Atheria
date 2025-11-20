@@ -184,11 +184,25 @@ class QC_Trainer_v4:
             # (Opcional, activo si pasos > 50)
             # if self.qca_steps > 50 and t % 10 == 0:
             #     psi = torch.utils.checkpoint.checkpoint(self.motor.operator, psi)
-                
-            psi_history.append(psi)
             
+            # OPTIMIZACIÓN DE MEMORIA: Solo guardar estados necesarios para la pérdida
+            # Solo guardamos: estado inicial, estados intermedios (cada N pasos), y estado final
+            save_interval = max(1, self.qca_steps // 10)  # Guardar ~10 estados máximo
+            if t == 0 or t == self.qca_steps - 1 or t % save_interval == 0:
+                psi_history.append(psi)
+        
+        # Asegurar que tenemos al menos el estado inicial y final
+        if len(psi_history) == 0 or not torch.equal(psi_history[-1], psi):
+            psi_history.append(psi)
+        
         # Calcular pérdida evolutiva
         loss, metrics = self.loss_function_evolutionary(psi_history, psi_initial)
+        
+        # OPTIMIZACIÓN DE MEMORIA: Limpiar psi_history después de calcular pérdida
+        # Los tensores ya no se necesitan y pueden ocupar mucha memoria
+        del psi_history
+        import gc
+        gc.collect()  # Forzar garbage collection para liberar memoria inmediatamente
         
         # Retropropagación
         loss.backward()

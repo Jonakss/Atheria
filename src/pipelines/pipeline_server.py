@@ -452,8 +452,9 @@ async def simulation_loop():
                         # y mover a CPU de forma asíncrona si es necesario
                         try:
                             psi_tensor = g_state['motor'].state.psi
-                            # Detach y clonar de forma más eficiente
-                            snapshot = psi_tensor.detach().cpu().clone() if hasattr(psi_tensor, 'detach') else psi_tensor.cpu().clone()
+                            # Detach y clonar de forma más eficiente, mover a CPU inmediatamente
+                            with torch.no_grad():
+                                snapshot = psi_tensor.detach().cpu().clone() if hasattr(psi_tensor, 'detach') else psi_tensor.cpu().clone()
                             
                             g_state['snapshots'].append({
                                 'psi': snapshot,
@@ -464,8 +465,18 @@ async def simulation_loop():
                             # Limitar número de snapshots almacenados (mantener últimos 500 para reducir memoria)
                             max_snapshots = g_state.get('max_snapshots', 500)
                             if len(g_state['snapshots']) > max_snapshots:
+                                # Liberar memoria de los snapshots más antiguos antes de eliminarlos
+                                old_snapshots = g_state['snapshots'][:-max_snapshots]
+                                for old_snap in old_snapshots:
+                                    if 'psi' in old_snap and old_snap['psi'] is not None:
+                                        del old_snap['psi']  # Liberar tensor explícitamente
+                                
                                 # Eliminar los más antiguos de forma eficiente
                                 g_state['snapshots'] = g_state['snapshots'][-max_snapshots:]
+                                
+                                # Forzar garbage collection para liberar memoria inmediatamente
+                                import gc
+                                gc.collect()
                         except Exception as e:
                             # Si falla la captura, no afectar la simulación
                             logging.debug(f"Error capturando snapshot en paso {updated_step}: {e}")
@@ -793,6 +804,30 @@ async def handle_load_experiment(args):
     try:
         logging.info(f"Intentando cargar el experimento '{exp_name}' para [{args['ws_id']}]...")
         if ws: await send_notification(ws, f"Cargando modelo '{exp_name}'...", "info")
+        
+        # OPTIMIZACIÓN DE MEMORIA: Liberar motor anterior antes de cargar uno nuevo
+        old_motor = g_state.get('motor')
+        if old_motor is not None:
+            try:
+                # Limpiar snapshots y historial del motor anterior
+                if 'snapshots' in g_state:
+                    for snap in g_state['snapshots']:
+                        if isinstance(snap, dict) and 'psi' in snap and snap['psi'] is not None:
+                            if hasattr(snap['psi'], 'detach'):
+                                del snap['psi']
+                    g_state['snapshots'] = []
+                
+                # Limpiar historial si está habilitado
+                if 'simulation_history' in g_state:
+                    g_state['simulation_history'].clear()
+                
+                # Liberar motor anterior
+                del old_motor
+                import gc
+                gc.collect()  # Forzar garbage collection
+                logging.debug("Motor anterior liberado para liberar memoria")
+            except Exception as e:
+                logging.debug(f"Error liberando motor anterior: {e}")
         
         config = load_experiment_config(exp_name)
         if not config:
