@@ -9,6 +9,12 @@ import logging
 import numpy as np
 from typing import Optional
 
+# Versión del wrapper
+try:
+    from .__version__ import __version__ as ENGINE_VERSION
+except ImportError:
+    ENGINE_VERSION = "4.1.0"  # Fallback
+
 # Intentar importar el módulo nativo con manejo robusto de errores CUDA
 NATIVE_AVAILABLE = False
 _native_import_error = None
@@ -62,6 +68,9 @@ class NativeEngineWrapper:
     Convierte entre el formato disperso del motor nativo y el formato
     denso (grid) usado por el frontend.
     """
+    
+    # Versión del wrapper Python
+    VERSION = ENGINE_VERSION
     
     def __init__(self, grid_size: int, d_state: int, device: str = None, cfg=None):
         """

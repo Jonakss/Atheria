@@ -10,6 +10,7 @@
 #include <pybind11/numpy.h>
 #include "../include/sparse_map.h"
 #include "../include/sparse_engine.h"
+#include "../include/version.h"
 
 namespace py = pybind11;
 using namespace atheria;
@@ -22,6 +23,15 @@ int add(int i, int j) {
 // Módulo PyBind11
 PYBIND11_MODULE(atheria_core, m) {
     m.doc() = "Atheria Core: Motor nativo de alto rendimiento para simulaciones cuánticas";
+    
+    // Exponer información de versión
+    m.attr("__version__") = ATHERIA_NATIVE_VERSION_STRING;
+    m.attr("VERSION_MAJOR") = ATHERIA_NATIVE_VERSION_MAJOR;
+    m.attr("VERSION_MINOR") = ATHERIA_NATIVE_VERSION_MINOR;
+    m.attr("VERSION_PATCH") = ATHERIA_NATIVE_VERSION_PATCH;
+    m.def("get_version", []() {
+        return std::string(ATHERIA_NATIVE_VERSION_STRING);
+    }, "Retorna la versión del motor nativo en formato SemVer");
     
     // Función de prueba simple
     m.def("add", &add, "Suma dos enteros",

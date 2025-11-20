@@ -1314,14 +1314,21 @@ async def handle_load_experiment(args):
         if is_native:
             # Obtener device del motor nativo
             device_str = motor.device_str if hasattr(motor, 'device_str') else 'cpu'
+            
+            # Obtener versiones del motor nativo
+            native_version = getattr(motor, 'native_version', None) or "unknown"
+            wrapper_version = getattr(NativeEngineWrapper, 'VERSION', None) or "unknown"
+            
             compile_status = {
                 "is_compiled": True,  # Motor nativo siempre está "compilado"
                 "is_native": True,
                 "model_name": "Native Engine (C++)",
                 "compiles_enabled": True,
-                "device_str": device_str  # CPU/CUDA - CORREGIDO: usar device_str en lugar de device
+                "device_str": device_str,  # CPU/CUDA - CORREGIDO: usar device_str en lugar de device
+                "native_version": native_version,  # Versión del motor C++ (SemVer)
+                "wrapper_version": wrapper_version  # Versión del wrapper Python (SemVer)
             }
-            logging.info(f"📤 Enviando compile_status NATIVO: is_native=True, device_str={device_str}, is_compiled=True")
+            logging.info(f"📤 Enviando compile_status NATIVO: is_native=True, device_str={device_str}, native_version={native_version}, wrapper_version={wrapper_version}")
         else:
             # Motor Python: obtener device del motor o usar global
             device_str = str(motor.device) if hasattr(motor, 'device') else str(global_cfg.DEVICE)
@@ -1330,14 +1337,19 @@ async def handle_load_experiment(args):
                 device_str = 'cuda'
             else:
                 device_str = 'cpu'
+            
+            # Obtener versión del motor Python
+            python_version = getattr(motor, 'VERSION', None) or (motor.get_version() if hasattr(motor, 'get_version') else 'unknown')
+            
             compile_status = {
                 "is_compiled": motor.is_compiled,
                 "is_native": False,
                 "model_name": model.__class__.__name__ if hasattr(model, '__class__') else "Unknown",
                 "compiles_enabled": getattr(model, '_compiles', True) if hasattr(model, '_compiles') else True,
-                "device_str": device_str  # CPU/CUDA - CORREGIDO: usar device_str en lugar de device
+                "device_str": device_str,  # CPU/CUDA - CORREGIDO: usar device_str en lugar de device
+                "python_version": python_version  # Versión del motor Python (SemVer)
             }
-            logging.info(f"📤 Enviando compile_status PYTHON: is_native=False, device_str={device_str}, is_compiled={motor.is_compiled}")
+            logging.info(f"📤 Enviando compile_status PYTHON: is_native=False, device_str={device_str}, python_version={python_version}")
         
         # Logging detallado para debugging
         logging.info(f"📊 compile_status completo: {compile_status}")

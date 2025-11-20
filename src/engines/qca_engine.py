@@ -75,6 +75,19 @@ class QuantumState:
         torch.save(save_dict, filepath)
 
 class Aetheria_Motor:
+    """
+    Motor Python de Atheria 4 para simulaciones cuánticas.
+    
+    Versión: {ENGINE_VERSION}
+    Sigue Semantic Versioning (SemVer): MAJOR.MINOR.PATCH
+    """.format(ENGINE_VERSION=ENGINE_VERSION)
+    
+    # Versión del motor
+    VERSION = ENGINE_VERSION
+    
+    def get_version(self):
+        """Retorna la versión del motor Python."""
+        return ENGINE_VERSION
     def __init__(self, model_operator: nn.Module, grid_size: int, d_state: int, device, cfg=None, d_memory=None):
         self.device = device
         self.grid_size = int(grid_size)

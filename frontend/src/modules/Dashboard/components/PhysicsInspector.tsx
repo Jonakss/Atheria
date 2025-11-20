@@ -134,36 +134,59 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
           </div>
           
           {/* Indicador de Engine */}
-          <div className={`px-3 py-2 rounded border ${engineInfo.bgColor} ${engineInfo.borderColor} flex items-center justify-between`}>
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${engineInfo.dotColor} ${
-                connectionStatus === 'connected' && compileStatus?.is_native ? 'animate-pulse' : ''
-              }`} />
-              <div className="flex flex-col">
-                <span className={`text-xs font-mono ${engineInfo.color} font-semibold`}>
-                  {engineInfo.label}
-                </span>
-                {engineInfo.device && engineInfo.device !== 'N/A' && (
-                  <span className="text-[9px] text-gray-500 uppercase">
-                    {engineInfo.device}
+          <div className={`px-3 py-2 rounded border ${engineInfo.bgColor} ${engineInfo.borderColor} flex flex-col gap-2`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${engineInfo.dotColor} ${
+                  connectionStatus === 'connected' && compileStatus?.is_native ? 'animate-pulse' : ''
+                }`} />
+                <div className="flex flex-col">
+                  <span className={`text-xs font-mono ${engineInfo.color} font-semibold`}>
+                    {engineInfo.label}
+                  </span>
+                  {engineInfo.device && engineInfo.device !== 'N/A' && (
+                    <span className="text-[9px] text-gray-500 uppercase">
+                      {engineInfo.device}
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              {/* Botón para cambiar de motor */}
+              {connectionStatus === 'connected' && compileStatus && compileStatus.model_name && (
+                <button
+                  onClick={() => {
+                    const currentIsNative = compileStatus.is_native || false;
+                    const targetEngine = currentIsNative ? 'python' : 'native';
+                    sendCommand('inference', 'switch_engine', { engine: targetEngine });
+                  }}
+                  className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded border border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-gray-400 hover:text-gray-200 transition-all"
+                  title={compileStatus.is_native ? 'Cambiar a motor Python' : 'Cambiar a motor Nativo (C++)'}
+                >
+                  ↻
+                </button>
+              )}
+            </div>
+            
+            {/* Versión del motor */}
+            {connectionStatus === 'connected' && compileStatus && (
+              <div className="flex flex-col gap-0.5 pl-4">
+                {compileStatus.is_native && compileStatus.native_version && (
+                  <span className="text-[9px] text-gray-500 font-mono">
+                    Native: {compileStatus.native_version}
+                  </span>
+                )}
+                {compileStatus.is_native && compileStatus.wrapper_version && (
+                  <span className="text-[9px] text-gray-500 font-mono">
+                    Wrapper: {compileStatus.wrapper_version}
+                  </span>
+                )}
+                {!compileStatus.is_native && compileStatus.python_version && (
+                  <span className="text-[9px] text-gray-500 font-mono">
+                    Python: {compileStatus.python_version}
                   </span>
                 )}
               </div>
-            </div>
-            
-            {/* Botón para cambiar de motor */}
-            {connectionStatus === 'connected' && compileStatus && compileStatus.model_name && (
-              <button
-                onClick={() => {
-                  const currentIsNative = compileStatus.is_native || false;
-                  const targetEngine = currentIsNative ? 'python' : 'native';
-                  sendCommand('inference', 'switch_engine', { engine: targetEngine });
-                }}
-                className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded border border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-gray-400 hover:text-gray-200 transition-all"
-                title={compileStatus.is_native ? 'Cambiar a motor Python' : 'Cambiar a motor Nativo (C++)'}
-              >
-                ↻
-              </button>
             )}
           </div>
 
