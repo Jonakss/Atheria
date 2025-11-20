@@ -2705,7 +2705,9 @@ HANDLERS = {
     "inference": {
         "play": handle_play, 
         "pause": handle_pause, 
+        "load": handle_load_experiment,  # También acepta "load" además de "load_experiment"
         "load_experiment": handle_load_experiment, 
+        "unload": handle_unload_model,  # Nuevo: descargar modelo
         "reset": handle_reset,
         "set_config": handle_set_inference_config,
         "inject_energy": handle_inject_energy
