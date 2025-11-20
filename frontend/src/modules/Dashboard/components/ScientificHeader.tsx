@@ -152,13 +152,39 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
 
   // Función para cambiar de motor
   const handleSwitchEngine = useCallback((targetEngine: 'native' | 'python') => {
-    if (connectionStatus === 'connected' && compileStatus?.model_name && compileStatus.model_name !== 'None') {
-      console.log(`🔄 Cambiando motor a: ${targetEngine}`);
-      sendCommand('inference', 'switch_engine', { engine: targetEngine });
+    console.log(`🔄 handleSwitchEngine llamado con: ${targetEngine}`);
+    console.log(`🔍 Estado: connectionStatus=${connectionStatus}, model_name=${compileStatus?.model_name}`);
+    
+    if (connectionStatus !== 'connected') {
+      console.warn('⚠️ No se puede cambiar de motor: no hay conexión');
       setEngineDropdownOpen(false);
-    } else {
-      console.warn('⚠️ No se puede cambiar de motor: conexión o modelo no disponible');
+      return;
     }
+    
+    if (!compileStatus?.model_name || compileStatus.model_name === 'None') {
+      console.warn('⚠️ No se puede cambiar de motor: no hay modelo cargado');
+      setEngineDropdownOpen(false);
+      return;
+    }
+    
+    const currentIsNative = compileStatus.is_native || false;
+    const targetIsNative = targetEngine === 'native';
+    
+    // Solo cambiar si es diferente al actual
+    if (currentIsNative === targetIsNative) {
+      console.info(`ℹ️ Ya estás usando el motor ${targetEngine}`);
+      setEngineDropdownOpen(false);
+      return;
+    }
+    
+    console.log(`✅ Enviando comando switch_engine: ${currentIsNative ? 'Native' : 'Python'} → ${targetEngine}`);
+    try {
+      sendCommand('inference', 'switch_engine', { engine: targetEngine });
+      console.log(`✅ Comando enviado exitosamente`);
+    } catch (error) {
+      console.error(`❌ Error enviando comando:`, error);
+    }
+    setEngineDropdownOpen(false);
   }, [connectionStatus, compileStatus, sendCommand]);
 
   return (
