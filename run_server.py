@@ -129,7 +129,7 @@ if __name__ == "__main__":
         
         try:
             # Pasar configuración de frontend al servidor
-            serve_frontend = not args.no_frontend if hasattr(args, 'no_frontend') else None
+            serve_frontend = not args.no_frontend
             await pipeline_server.main(shutdown_event, serve_frontend=serve_frontend)
         except asyncio.CancelledError:
             log.info("Tareas canceladas durante shutdown.")
