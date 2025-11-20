@@ -66,7 +66,7 @@ class QC_Trainer_v4:
         elif model_class is not None and model_params is not None:
             # Crear nuevo modelo
             if isinstance(model_params, dict):
-        self.motor = Aetheria_Motor(model_class(**model_params), grid_size, model_params['d_state'], device)
+                self.motor = Aetheria_Motor(model_class(**model_params), grid_size, model_params['d_state'], device)
             else:
                 # Si model_params es SimpleNamespace o similar
                 params_dict = vars(model_params) if hasattr(model_params, '__dict__') else model_params
