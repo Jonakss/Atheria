@@ -16,6 +16,14 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
   const [engineDropdownOpen, setEngineDropdownOpen] = useState(false);
   const { connectionStatus, compileStatus, connect, disconnect, sendCommand, simData } = useWebSocket();
   
+  // Función para cambiar de motor
+  const handleSwitchEngine = (targetEngine: 'native' | 'python') => {
+    if (connectionStatus === 'connected' && compileStatus?.model_name && compileStatus.model_name !== 'None') {
+      sendCommand('inference', 'switch_engine', { engine: targetEngine });
+      setEngineDropdownOpen(false);
+    }
+  };
+  
   const handleConnectDisconnect = () => {
     if (connectionStatus === 'connected') {
       disconnect();
@@ -150,15 +158,16 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
     return 'text-emerald-400';
   }, [fps]);
 
-  const handleSwitchEngine = (targetEngine: 'native' | 'python') => {
+  // Función para cambiar de motor
+  const handleSwitchEngine = useCallback((targetEngine: 'native' | 'python') => {
     if (connectionStatus === 'connected' && compileStatus?.model_name && compileStatus.model_name !== 'None') {
-      const currentIsNative = compileStatus.is_native || false;
-      if ((targetEngine === 'native' && !currentIsNative) || (targetEngine === 'python' && currentIsNative)) {
-        sendCommand('inference', 'switch_engine', { engine: targetEngine });
-      }
+      console.log(`🔄 Cambiando motor a: ${targetEngine}`);
+      sendCommand('inference', 'switch_engine', { engine: targetEngine });
       setEngineDropdownOpen(false);
+    } else {
+      console.warn('⚠️ No se puede cambiar de motor: conexión o modelo no disponible');
     }
-  };
+  }, [connectionStatus, compileStatus, sendCommand]);
 
   return (
     <header className="h-12 border-b border-white/10 bg-[#050505] flex items-center justify-between px-4 z-50 shrink-0">
