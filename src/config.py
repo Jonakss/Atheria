@@ -28,14 +28,46 @@ except Exception:
 # Configurar filtros de warnings para Python warnings relacionados
 warnings.filterwarnings('ignore', message='.*cudagraph.*', category=UserWarning)
 warnings.filterwarnings('ignore', message='.*CUDA graph.*', category=UserWarning)
+# Silenciar warnings de inicialización de CUDA (Error 101: invalid device ordinal)
+warnings.filterwarnings('ignore', message='.*CUDA initialization.*', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*cudaGetDeviceCount.*', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*invalid device ordinal.*', category=UserWarning)
 
 # --- Setup y Constantes de Control ---
 _DEVICE = None
 def get_device():
     global _DEVICE
     if _DEVICE is None:
-        _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        logging.info(f"Dispositivo PyTorch inicializado: {_DEVICE}")
+        # Intentar detectar CUDA con manejo de errores robusto
+        cuda_available = False
+        try:
+            # Silenciar warnings durante la detección de CUDA
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', category=UserWarning)
+                warnings.filterwarnings('ignore', category=RuntimeWarning)
+                # Intentar acceder a CUDA de forma segura
+                if hasattr(torch.cuda, 'is_available'):
+                    cuda_available = torch.cuda.is_available()
+                    # Verificar que realmente podemos usar CUDA (no solo que está disponible)
+                    if cuda_available:
+                        try:
+                            # Intentar obtener el device count para verificar que funciona
+                            device_count = torch.cuda.device_count()
+                            if device_count == 0:
+                                cuda_available = False
+                        except (RuntimeError, AttributeError):
+                            # Si falla al obtener device count, CUDA no es usable
+                            cuda_available = False
+        except Exception as e:
+            # Si hay cualquier error, usar CPU como fallback
+            logging.debug(f"Error detectando CUDA: {e}. Usando CPU como fallback.")
+            cuda_available = False
+        
+        _DEVICE = torch.device("cuda" if cuda_available else "cpu")
+        if cuda_available:
+            logging.info(f"Dispositivo PyTorch inicializado: {_DEVICE}")
+        else:
+            logging.info(f"Dispositivo PyTorch inicializado: {_DEVICE} (CUDA no disponible o falló la inicialización)")
     return _DEVICE
 DEVICE = get_device()
 
