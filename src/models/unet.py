@@ -30,6 +30,7 @@ class ConvBlock(nn.Module):
 
 
 class UNet(nn.Module):
+    _compiles = False  # Desactivar torch.compile para este modelo (problemas con CUDA Graphs)
     """ Arquitectura U-Net estándar. """
     def __init__(self, d_state, hidden_channels, **kwargs):
         super().__init__()
