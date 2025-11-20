@@ -120,6 +120,9 @@ interface CompileStatus {
     model_name: string;
     compiles_enabled: boolean;
     device_str?: string;  // CPU/CUDA - CORREGIDO: usar device_str para consistencia
+    native_version?: string;  // Versión del motor C++ (SemVer)
+    wrapper_version?: string;  // Versión del wrapper Python (SemVer)
+    python_version?: string;  // Versión del motor Python (SemVer)
 }
 
 interface WebSocketContextType {

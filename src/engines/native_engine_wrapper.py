@@ -183,7 +183,20 @@ class NativeEngineWrapper:
             # Inicializar motor nativo con el tamaño del grid
             # El grid_size se usa para construir inputs del modelo con el tamaño correcto
             self.native_engine = atheria_core_module.Engine(d_state=d_state, device=device, grid_size=grid_size)
-            logging.info(f"✅ Motor nativo C++ inicializado (device={device}, grid_size={grid_size})")
+            
+            # Obtener versión del motor nativo C++ después de inicializarlo
+            try:
+                if hasattr(atheria_core_module, 'get_version'):
+                    self.native_version = atheria_core_module.get_version()
+                elif hasattr(atheria_core_module, '__version__'):
+                    self.native_version = atheria_core_module.__version__
+                else:
+                    self.native_version = "unknown"
+            except Exception as e:
+                logging.debug(f"No se pudo obtener versión del motor nativo: {e}")
+                self.native_version = "unknown"
+            
+            logging.info(f"✅ Motor nativo C++ inicializado (device={device}, grid_size={grid_size}, version={self.native_version})")
         except RuntimeError as e:
             error_str = str(e)
             if device == 'cuda' and ('cuda' in error_str.lower() or '101' in error_str):
@@ -194,7 +207,20 @@ class NativeEngineWrapper:
                 self.device_str = device
                 self.device = torch.device(device)
                 self.native_engine = atheria_core_module.Engine(d_state=d_state, device='cpu', grid_size=grid_size)
-                logging.info("✅ Motor nativo inicializado en CPU mode (fallback desde CUDA)")
+                
+                # Obtener versión del motor nativo C++ después de inicializarlo
+                try:
+                    if hasattr(atheria_core_module, 'get_version'):
+                        self.native_version = atheria_core_module.get_version()
+                    elif hasattr(atheria_core_module, '__version__'):
+                        self.native_version = atheria_core_module.__version__
+                    else:
+                        self.native_version = "unknown"
+                except Exception as e:
+                    logging.debug(f"No se pudo obtener versión del motor nativo: {e}")
+                    self.native_version = "unknown"
+                
+                logging.info(f"✅ Motor nativo inicializado en CPU mode (fallback desde CUDA, version={self.native_version})")
             else:
                 raise
         
