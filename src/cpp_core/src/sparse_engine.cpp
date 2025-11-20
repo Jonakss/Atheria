@@ -134,17 +134,17 @@ int64_t Engine::step_native() {
                 torch::Tensor batch_output = model_.forward(inputs).toTensor();
                 
                 // Procesar salida del modelo
-                // El modelo devuelve [batch, 2*d_state, 5, 5] (mismo tamaño que input por U-Net)
-                // Extraer el centro del patch (posición [2, 2] en patch 5x5, índice 2)
+                // El modelo devuelve [batch, 2*d_state, grid_size, grid_size] (mismo tamaño que input)
+                // Extraer el centro del patch (posición central)
+                
+                int64_t center_idx = grid_size_ / 2;  // Centro del patch
                 
                 for (size_t j = 0; j < batch_coords.size(); j++) {
                     // Extraer salida del centro del patch
-                    // batch_output shape: [batch, 2*d_state, 5, 5]
-                    // Extraer el centro [batch, :, 2, 2] -> [2*d_state]
+                    // batch_output shape: [batch, 2*d_state, grid_size, grid_size]
+                    // Extraer el centro [batch, :, center_idx, center_idx] -> [2*d_state]
                     // Usar índices correctos: dim 0 = batch, dim 1 = channels, dim 2 = H, dim 3 = W
-                    int64_t center_idx_h = 2;  // Centro del patch 5x5
-                    int64_t center_idx_w = 2;
-                    torch::Tensor output_center = batch_output[j].select(2, center_idx_h).select(2, center_idx_w); // [2*d_state]
+                    torch::Tensor output_center = batch_output[j].select(2, center_idx).select(2, center_idx); // [2*d_state]
                     
                     // Dividir en real e imag: [0:d_state] es real, [d_state:2*d_state] es imag
                     torch::Tensor delta_real = output_center.slice(0, 0, d_state_);
@@ -277,40 +277,6 @@ torch::Tensor Engine::build_batch_input(const std::vector<Coord3D>& coords) {
                 
                 // Copiar a batch_input [batch, channels, y, x]
                 if (real.dim() == 1 && real.size(0) == d_state_) {
-                    for (int64_t c = 0; c < d_state_; c++) {
-                        batch_input[i][c][py][px] = real[c].item<float>();
-                        batch_input[i][c + d_state_][py][px] = imag[c].item<float>();
-                    }
-                }
-            }
-        }
-        
-        // Construir patch: para cada posición en el patch, obtener estado
-        for (int64_t py = 0; py < height; py++) {
-            for (int64_t px = 0; px < width; px++) {
-                const Coord3D& patch_coord = patch_coords[py * width + px];
-                torch::Tensor state = get_state_at(patch_coord);
-                
-                // Convertir estado complejo a [real, imag] concatenado
-                // Si el estado es complejo, extraer real e imag
-                torch::Tensor real, imag;
-                if (state.is_complex()) {
-                    real = torch::real(state);
-                    imag = torch::imag(state);
-                } else {
-                    // Si no es complejo, asumir que es real
-                    real = state;
-                    imag = torch::zeros_like(state);
-                }
-                
-                // Copiar a batch_input [batch, channels, y, x]
-                // Asegurarse de que real e imag tengan la forma correcta
-                if (real.dim() == 1 && real.size(0) == d_state_) {
-                    // Copiar cada canal de d_state individualmente
-                    // batch_input shape: [batch, 2*d_state, 3, 3]
-                    // Para cada canal c en [0, d_state):
-                    //   batch_input[i, c, py, px] = real[c]
-                    //   batch_input[i, c + d_state, py, px] = imag[c]
                     for (int64_t c = 0; c < d_state_; c++) {
                         batch_input[i][c][py][px] = real[c].item<float>();
                         batch_input[i][c + d_state_][py][px] = imag[c].item<float>();
