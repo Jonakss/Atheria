@@ -121,13 +121,43 @@ def test_native_engine(experiment_name, device_str="cpu", num_steps=10):
     
     # 1. Verificar que el módulo C++ está disponible
     try:
+        # Si hay problemas de CUDA, forzar CPU mode desde el inicio
+        import os
+        if device_str == "cpu":
+            os.environ['CUDA_VISIBLE_DEVICES'] = ''
+        
         import atheria_core
         logger.info(f"✅ Módulo C++ importable: atheria_core")
         logger.info(f"   has_torch_support: {atheria_core.has_torch_support()}")
-    except ImportError as e:
-        logger.error(f"❌ Error: atheria_core no disponible: {e}")
-        logger.error("   Compila el módulo con: python setup.py build_ext --inplace")
-        return False
+        
+        # Si se usó CPU mode, mantenerlo
+        if device_str == "cpu":
+            device_str = "cpu"
+            logger.info("   Usando CPU mode (forzado para evitar problemas de CUDA runtime)")
+    except (ImportError, OSError, RuntimeError) as e:
+        error_str = str(e)
+        if '__nvJitLinkCreate' in error_str or 'libnvJitLink' in error_str:
+            # Problema de CUDA runtime - intentar en CPU mode
+            logger.warning(f"⚠️ Problema de CUDA runtime detectado: {error_str[:100]}")
+            logger.info("   Intentando importar en CPU mode...")
+            try:
+                os.environ['CUDA_VISIBLE_DEVICES'] = ''
+                # Reimportar atheria_core después de deshabilitar CUDA
+                import importlib
+                if 'atheria_core' in sys.modules:
+                    del sys.modules['atheria_core']
+                import atheria_core
+                device_str = "cpu"  # Forzar CPU mode
+                logger.info(f"✅ Módulo C++ importable en CPU mode: atheria_core")
+                logger.info(f"   has_torch_support: {atheria_core.has_torch_support()}")
+            except Exception as e2:
+                logger.error(f"❌ Error: atheria_core no disponible incluso en CPU mode: {e2}")
+                logger.error("   Compila el módulo con: python setup.py build_ext --inplace")
+                return False
+        else:
+            logger.error(f"❌ Error: atheria_core no disponible: {e}")
+            logger.error("   Compila el módulo con: python setup.py build_ext --inplace")
+            return False
     
     # 2. Cargar configuración del experimento
     logger.info(f"\n📋 Cargando configuración del experimento: {experiment_name}")
