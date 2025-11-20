@@ -35,7 +35,14 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
       };
     }
     
+    // Debug: Log compileStatus para verificar qué se recibe
+    if (compileStatus) {
+      console.log('🔍 PhysicsInspector - compileStatus:', compileStatus);
+    }
+    
     const deviceLabel = compileStatus?.device_str?.toUpperCase() || 'N/A'; // CORREGIDO: usar device_str
+    
+    console.log(`🔍 PhysicsInspector - deviceLabel=${deviceLabel}, is_native=${compileStatus?.is_native}, is_compiled=${compileStatus?.is_compiled}`);
     
     if (compileStatus?.is_native) {
       return {

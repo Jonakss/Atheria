@@ -26,10 +26,17 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
   // Determinar estado del sistema según connectionStatus y compileStatus
   const getSystemStatus = () => {
     if (connectionStatus === 'connected') {
+      // Debug: Log compileStatus para verificar qué se recibe
+      if (compileStatus) {
+        console.log('🔍 ScientificHeader - compileStatus:', compileStatus);
+      }
+      
       // Mostrar dispositivo (CPU/CUDA) y tipo de motor
       const device = compileStatus?.device_str?.toUpperCase() || 'CPU'; // CORREGIDO: usar device_str
       const isNative = compileStatus?.is_native || false;
       const isCompiled = compileStatus?.is_compiled || false;
+      
+      console.log(`🔍 ScientificHeader - device=${device}, isNative=${isNative}, isCompiled=${isCompiled}`);
       
       let text = device;
       let dotColor = device === 'CUDA' ? 'bg-emerald-500' : 'bg-blue-500';

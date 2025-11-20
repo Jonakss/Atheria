@@ -1248,6 +1248,7 @@ async def handle_load_experiment(args):
                 "compiles_enabled": True,
                 "device_str": device_str  # CPU/CUDA - CORREGIDO: usar device_str en lugar de device
             }
+            logging.info(f"📤 Enviando compile_status NATIVO: is_native=True, device_str={device_str}, is_compiled=True")
         else:
             # Motor Python: obtener device del motor o usar global
             device_str = str(motor.device) if hasattr(motor, 'device') else str(global_cfg.DEVICE)
@@ -1263,16 +1264,24 @@ async def handle_load_experiment(args):
                 "compiles_enabled": getattr(model, '_compiles', True) if hasattr(model, '_compiles') else True,
                 "device_str": device_str  # CPU/CUDA - CORREGIDO: usar device_str en lugar de device
             }
+            logging.info(f"📤 Enviando compile_status PYTHON: is_native=False, device_str={device_str}, is_compiled={motor.is_compiled}")
+        
+        # Logging detallado para debugging
+        logging.info(f"📊 compile_status completo: {compile_status}")
         
         if ws: await send_notification(ws, f"✅ Modelo '{exp_name}' cargado exitosamente. Presiona 'Iniciar' para comenzar la simulación.", "success")
+        
+        # Enviar compile_status en el broadcast
+        status_payload = {
+            "status": "paused",
+            "model_loaded": True,
+            "experiment_name": exp_name,
+            "compile_status": compile_status
+        }
+        logging.info(f"📤 Enviando inference_status_update con compile_status: {status_payload}")
         await broadcast({
             "type": "inference_status_update", 
-            "payload": {
-                "status": "paused",
-                "model_loaded": True,
-                "experiment_name": exp_name,
-                "compile_status": compile_status
-            }
+            "payload": status_payload
         })
         logging.info(f"Modelo '{exp_name}' cargado por [{args['ws_id']}]. Simulación en pausa, esperando inicio manual.")
         
