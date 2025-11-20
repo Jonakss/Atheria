@@ -248,6 +248,10 @@ class NativeEngineWrapper:
         self.last_psi_input = None
         self.last_delta_psi_decay = None
         
+        # OPTIMIZACIÓN: Lazy conversion - solo convertir cuando se necesita
+        self._dense_state_stale = True  # Estado denso está desactualizado después de evolve
+        self._last_conversion_roi = None  # Última ROI usada para conversión
+        
         logging.info(f"NativeEngineWrapper inicializado (grid_size={grid_size}, d_state={d_state}, device={device})")
     
     def load_model(self, model_path: str) -> bool:
@@ -278,19 +282,51 @@ class NativeEngineWrapper:
         particle_count = self.native_engine.step_native()
         self.step_count += 1
         
-        # Convertir estado disperso a denso para visualización
-        # Esto es necesario porque el frontend espera un grid denso
-        self._update_dense_state_from_sparse()
+        # OPTIMIZACIÓN CRÍTICA: NO convertir aquí - solo marcar como "stale"
+        # La conversión se hará solo cuando se necesite (lazy conversion)
+        # Esto evita convertir 65,536 coordenadas en cada paso
+        self._dense_state_stale = True
     
-    def _update_dense_state_from_sparse(self):
+    def get_dense_state(self, roi=None, check_pause_callback=None):
+        """
+        Obtiene el estado denso, convirtiendo solo si es necesario.
+        
+        Args:
+            roi: Region of Interest (x_min, y_min, x_max, y_max) opcional. Si se proporciona,
+                 solo convierte esa región. Si None, convierte todo el grid.
+            check_pause_callback: Función callback opcional para verificar pausa.
+                                 Debe retornar True si está pausado.
+        
+        Returns:
+            Tensor complejo con el estado denso [1, H, W, d_state]
+        """
+        # Convertir solo si el estado está desactualizado o no existe
+        # O si la ROI cambió (necesitamos convertir más/menos del grid)
+        roi_changed = (roi is not None and roi != self._last_conversion_roi) or \
+                      (roi is None and self._last_conversion_roi is not None)
+        
+        if self._dense_state_stale or self.state.psi is None or roi_changed:
+            self._update_dense_state_from_sparse(roi=roi, check_pause_callback=check_pause_callback)
+            self._dense_state_stale = False
+            self._last_conversion_roi = roi
+        
+        return self.state.psi
+    
+    def _update_dense_state_from_sparse(self, roi=None, check_pause_callback=None):
         """
         Convierte el estado disperso del motor nativo a formato denso (grid)
         para compatibilidad con el frontend.
         
-        OPTIMIZACIÓN: Solo actualizar regiones activas cuando sea posible.
-        El motor nativo almacena partículas dispersas, pero el frontend necesita
-        un grid denso. Iteramos sobre todo el grid y obtenemos el estado desde
-        el motor nativo (que genera vacío automáticamente si no hay partícula).
+        OPTIMIZACIONES CRÍTICAS:
+        - Lazy conversion: solo se llama cuando se necesita
+        - ROI support: solo convierte región visible si se proporciona
+        - Pause check: verifica pausa periódicamente durante conversión
+        
+        Args:
+            roi: Region of Interest (x_min, y_min, x_max, y_max) opcional.
+                 Si se proporciona, solo convierte esa región.
+            check_pause_callback: Función callback para verificar pausa.
+                                 Debe retornar True si está pausado.
         """
         # Inicializar grid denso si no existe
         if self.state.psi is None:
@@ -299,67 +335,87 @@ class NativeEngineWrapper:
                 dtype=torch.complex64, device=self.device
             )
         
-        # OPTIMIZACIÓN: Usar batching más grande y procesamiento vectorizado cuando sea posible
+        # OPTIMIZACIÓN: Determinar región a convertir (ROI o todo el grid)
+        if roi is not None:
+            x_min, y_min, x_max, y_max = roi
+            # Asegurar que ROI esté dentro del grid
+            x_min = max(0, min(x_min, self.grid_size))
+            y_min = max(0, min(y_min, self.grid_size))
+            x_max = max(x_min, min(x_max, self.grid_size))
+            y_max = max(y_min, min(y_max, self.grid_size))
+            
+            # Crear lista de coordenadas solo para ROI
+            coords_list = [
+                atheria_core.Coord3D(x, y, 0)
+                for y in range(y_min, y_max)
+                for x in range(x_min, x_max)
+            ]
+            logging.debug(f"Convirtiendo solo ROI: ({x_min}, {y_min}) - ({x_max}, {y_max}), {len(coords_list)} coordenadas")
+        else:
+            # Sin ROI: convertir todo el grid (fallback)
+            coords_list = [
+                atheria_core.Coord3D(x, y, 0)
+                for y in range(self.grid_size)
+                for x in range(self.grid_size)
+            ]
+            logging.debug(f"Convirtiendo todo el grid: {len(coords_list)} coordenadas")
+        
+        # OPTIMIZACIÓN: Usar batching y verificación de pausa
         try:
             # Obtener lista de coordenadas activas del motor nativo si está disponible
-            # Si no está disponible, iterar sobre todo el grid
+            # Si no está disponible, usar la lista completa (ROI o todo el grid)
             active_coords = None
             try:
                 # Intentar obtener coordenadas activas (si el motor nativo lo expone)
                 if hasattr(self.native_engine, 'get_active_coords'):
-                    active_coords = self.native_engine.get_active_coords()
+                    active_coords_list = self.native_engine.get_active_coords()
+                    if active_coords_list and len(active_coords_list) > 0:
+                        # Filtrar coordenadas activas por ROI si aplica
+                        if roi is not None:
+                            x_min, y_min, x_max, y_max = roi
+                            active_coords = [
+                                coord for coord in active_coords_list
+                                if x_min <= coord.x < x_max and y_min <= coord.y < y_max
+                            ]
+                        else:
+                            active_coords = active_coords_list
             except:
                 pass
             
-            if active_coords is None or len(active_coords) == 0:
-                # No hay coordenadas activas o método no disponible - iterar sobre todo el grid
-                # OPTIMIZACIÓN: Usar batch más grande para mejor rendimiento
-                BATCH_SIZE = 500  # Aumentado de 100 a 500 para mejor rendimiento
-                
-                coords_list = [
-                    atheria_core.Coord3D(x, y, 0)
-                    for y in range(self.grid_size)
-                    for x in range(self.grid_size)
-                ]
-                
-                # Procesar en batches más grandes
-                for i in range(0, len(coords_list), BATCH_SIZE):
-                    batch_coords = coords_list[i:i+BATCH_SIZE]
-                    for coord in batch_coords:
-                        try:
-                            state_tensor = self.native_engine.get_state_at(coord)
-                            
-                            # Verificar shape antes de copiar
-                            if state_tensor.shape == (self.d_state,):
-                                # Mover a dispositivo correcto si es necesario
-                                if state_tensor.device != self.device:
-                                    state_tensor = state_tensor.to(self.device)
-                                
-                                # Copiar al estado denso (batch, H, W, d_state)
-                                self.state.psi[0, coord.y, coord.x] = state_tensor
-                        except Exception as e:
-                            logging.debug(f"Error obteniendo estado en ({coord.x}, {coord.y}): {e}")
-            else:
-                # OPTIMIZACIÓN: Solo actualizar coordenadas activas (mucho más rápido)
-                # Procesar solo las partículas activas
+            # Si tenemos coordenadas activas, usar solo esas (mucho más rápido)
+            if active_coords is not None and len(active_coords) > 0:
+                coords_to_process = active_coords
                 BATCH_SIZE = 1000  # Batch más grande para coordenadas activas
+                logging.debug(f"Usando {len(active_coords)} coordenadas activas (ROI aplicado)")
+            else:
+                # Sin coordenadas activas: usar lista completa (ROI o todo el grid)
+                coords_to_process = coords_list
+                BATCH_SIZE = 500  # Batch más pequeño para lista completa
+                logging.debug(f"Usando lista completa: {len(coords_to_process)} coordenadas")
+            
+            # Procesar en batches con verificación de pausa
+            for i in range(0, len(coords_to_process), BATCH_SIZE):
+                # CRÍTICO: Verificar pausa cada batch para permitir pausa inmediata
+                if check_pause_callback and check_pause_callback():
+                    logging.debug("Conversión interrumpida por pausa")
+                    return  # Salir temprano si está pausado
                 
-                for i in range(0, len(active_coords), BATCH_SIZE):
-                    batch_coords = active_coords[i:i+BATCH_SIZE]
-                    for coord in batch_coords:
-                        try:
-                            state_tensor = self.native_engine.get_state_at(coord)
+                batch_coords = coords_to_process[i:i+BATCH_SIZE]
+                for coord in batch_coords:
+                    try:
+                        state_tensor = self.native_engine.get_state_at(coord)
+                        
+                        # Verificar shape antes de copiar
+                        if state_tensor.shape == (self.d_state,):
+                            # Mover a dispositivo correcto si es necesario
+                            if state_tensor.device != self.device:
+                                state_tensor = state_tensor.to(self.device)
                             
-                            if state_tensor.shape == (self.d_state,):
-                                # Mover a dispositivo correcto si es necesario
-                                if state_tensor.device != self.device:
-                                    state_tensor = state_tensor.to(self.device)
-                                
-                                # Copiar solo coordenadas activas
-                                if 0 <= coord.y < self.grid_size and 0 <= coord.x < self.grid_size:
-                                    self.state.psi[0, coord.y, coord.x] = state_tensor
-                        except Exception as e:
-                            logging.debug(f"Error obteniendo estado en ({coord.x}, {coord.y}): {e}")
+                            # Copiar al estado denso (batch, H, W, d_state)
+                            if 0 <= coord.y < self.grid_size and 0 <= coord.x < self.grid_size:
+                                self.state.psi[0, coord.y, coord.x] = state_tensor
+                    except Exception as e:
+                        logging.debug(f"Error obteniendo estado en ({coord.x}, {coord.y}): {e}")
                         
         except Exception as e:
             logging.warning(f"Error convirtiendo estado disperso a denso: {e}")
@@ -401,6 +457,60 @@ class NativeEngineWrapper:
         
         logging.info(f"✅ {num_particles} partículas iniciales agregadas al motor nativo")
         
-        # Actualizar estado denso
-        self._update_dense_state_from_sparse()
+        # Actualizar estado denso (solo si se necesita)
+        # Usar get_dense_state() para lazy conversion
+        self.get_dense_state()
+    
+    def cleanup(self):
+        """
+        Limpia recursos del motor nativo de forma explícita.
+        Debe llamarse antes de destruir el wrapper para evitar segfaults.
+        """
+        try:
+            # Limpiar estado denso primero
+            if hasattr(self, 'state') and self.state is not None:
+                if hasattr(self.state, 'psi') and self.state.psi is not None:
+                    self.state.psi = None
+                self.state = None
+            
+            # Limpiar referencias al motor nativo
+            # El destructor de C++ se llamará automáticamente cuando no haya más referencias
+            if hasattr(self, 'native_engine') and self.native_engine is not None:
+                # Liberar referencias explícitamente
+                self.native_engine = None
+            
+            # Limpiar otras referencias
+            self.model_loaded = False
+            self.step_count = 0
+            self.last_delta_psi = None
+            self.last_psi_input = None
+            self.last_delta_psi_decay = None
+            
+            logging.debug("NativeEngineWrapper limpiado correctamente")
+        except Exception as e:
+            logging.warning(f"Error durante cleanup de NativeEngineWrapper: {e}")
+    
+    def __del__(self):
+        """Destructor - llama a cleanup para asegurar limpieza correcta."""
+        try:
+            self.cleanup()
+        except Exception:
+            # Ignorar errores en destructor para evitar problemas durante garbage collection
+            pass
+    
+    @property
+    def _state_psi_property(self):
+        """
+        Property helper para acceder a state.psi con lazy conversion.
+        Usado internamente para compatibilidad con código existente.
+        """
+        return self.get_dense_state(check_pause_callback=lambda: False)
+    
+    def _ensure_state_psi(self):
+        """
+        Asegura que state.psi esté disponible (para compatibilidad).
+        Internamente usa lazy conversion.
+        """
+        if self.state.psi is None or self._dense_state_stale:
+            self.get_dense_state(check_pause_callback=lambda: False)
 
