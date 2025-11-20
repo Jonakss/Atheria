@@ -147,6 +147,7 @@ async def simulation_loop():
     
     try:
         while True:
+            # CRÍTICO: Verificar is_paused al inicio de cada iteración para permitir pausa inmediata
             is_paused = g_state.get('is_paused', True)
             motor = g_state.get('motor')
             live_feed_enabled = g_state.get('live_feed_enabled', True)
@@ -165,7 +166,12 @@ async def simulation_loop():
                     logging.warning("Simulación en ejecución pero sin motor cargado. Carga un modelo para ver datos.")
                     simulation_loop._last_warning_time = current_time
             
-            if not is_paused and motor:
+            # Si está pausado, solo esperar y continuar (no ejecutar pasos)
+            if is_paused:
+                await asyncio.sleep(0.1)  # Pequeña pausa cuando está pausado para no saturar CPU
+                continue
+            
+            if motor:
                 current_step = g_state.get('simulation_step', 0)
                 
                 # OPTIMIZACIÓN CRÍTICA: Si live_feed está desactivado, ejecutar múltiples pasos rápidamente
@@ -202,12 +208,19 @@ async def simulation_loop():
                             else:
                                 logging.info(f"✅ Paso {updated_step}: Usando motor {motor_type} (confirmado)")
                         
-                        for _ in range(steps_to_execute):
+                        # CRÍTICO: Verificar is_paused en cada paso para permitir pausa inmediata
+                        for step_idx in range(steps_to_execute):
+                            # Verificar si se pausó durante la ejecución
+                            if g_state.get('is_paused', True):
+                                break  # Salir del bucle si se pausó
+                            
                             if motor:
                                 motor.evolve_internal_state()
-                            updated_step = current_step + 1
+                            updated_step = current_step + step_idx + 1
                             g_state['simulation_step'] = updated_step
-                            current_step = updated_step
+                        
+                        # Actualizar current_step con el último valor ejecutado
+                        current_step = updated_step
                         
                         steps_execution_time = time.time() - steps_start_time
                         
@@ -915,8 +928,12 @@ async def handle_load_experiment(args):
         return
 
     # Inicializar device_str al inicio para evitar UnboundLocalError
+    # SIEMPRE intentar usar el mejor dispositivo disponible (CUDA primero si está disponible)
     import torch
-    device_str = "cuda" if torch.cuda.is_available() else "cpu"
+    from .. import config as global_cfg
+    # Usar get_device() que ya tiene lógica robusta de detección
+    device = global_cfg.DEVICE
+    device_str = str(device).split(':')[0]  # 'cuda' o 'cpu'
 
     try:
         logging.info(f"Intentando cargar el experimento '{exp_name}' para [{args['ws_id']}]...")
@@ -1047,98 +1064,98 @@ async def handle_load_experiment(args):
                     
                     # Si no existe modelo JIT, exportarlo automáticamente desde el checkpoint
                     if not jit_path:
-                    logging.info(f"Modelo JIT no encontrado para '{exp_name}'. Exportando automáticamente...")
-                    if ws: await send_notification(ws, f"📦 Exportando modelo a TorchScript...", "info")
-                    
-                    # device_str ya está definido al inicio de la función
-                    device = torch.device(device_str)
-                    
-                    try:
-                        # MEJORA: Usar función mejorada de test_native_engine.py que maneja mejor
-                        # el tamaño completo del grid y modelos ConvLSTM
-                        import sys
-                        import importlib.util
-                        from pathlib import Path
+                        logging.info(f"Modelo JIT no encontrado para '{exp_name}'. Exportando automáticamente...")
+                        if ws: await send_notification(ws, f"📦 Exportando modelo a TorchScript...", "info")
                         
-                        # Obtener el directorio raíz del proyecto
-                        project_root = Path(__file__).parent.parent.parent
-                        scripts_dir = project_root / "scripts"
-                        test_native_path = scripts_dir / "test_native_engine.py"
+                        # device_str ya está definido al inicio de la función
+                        device = torch.device(device_str)
                         
-                        if not test_native_path.exists():
-                            raise ImportError(f"No se encontró test_native_engine.py en {scripts_dir}")
-                        
-                        # Agregar el directorio scripts al path para que las importaciones funcionen
-                        if str(scripts_dir) not in sys.path:
-                            sys.path.insert(0, str(scripts_dir))
-                        
-                        # Cargar módulo dinámicamente
-                        spec = importlib.util.spec_from_file_location("test_native_engine", test_native_path)
-                        test_native_module = importlib.util.module_from_spec(spec)
-                        spec.loader.exec_module(test_native_module)
-                        export_model_to_torchscript = test_native_module.export_model_to_torchscript
-                        
-                        # El modelo ya está cargado (línea 936), usarlo directamente
-                        # Asegurar que el modelo esté en modo evaluación y en el dispositivo correcto
-                        model.eval()
-                        model.to(device)
-                        model.eval()
-                        model.to(device)
-                        
-                        # Usar grid_size de inferencia (más grande que entrenamiento si aplica)
-                        # Esto es importante para modelos UNet que necesitan el tamaño completo
-                        export_grid_size = inference_grid_size
-                        logging.info(f"Exportando modelo JIT usando device: {device_str}, grid_size: {export_grid_size}")
-                        
-                        # Exportar a JIT usando la función mejorada
-                        jit_output_path = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, exp_name, "model_jit.pt")
-                        exported_path = export_model_to_torchscript(
-                            model,
-                            device,
-                            jit_output_path,
-                            grid_size=export_grid_size,
-                            d_state=d_state
-                        )
-                        
-                        if exported_path and os.path.exists(exported_path):
-                            jit_path = exported_path
-                            logging.info(f"✅ Modelo exportado exitosamente a: {jit_path}")
-                            if ws: await send_notification(ws, "✅ Modelo exportado a TorchScript", "success")
-                        else:
-                            logging.warning(f"⚠️ Error al exportar modelo JIT. Usando motor Python como fallback.")
-                            if ws: await send_notification(ws, "⚠️ Error exportando a JIT, usando motor Python", "warning")
+                        try:
+                            # MEJORA: Usar función mejorada de test_native_engine.py que maneja mejor
+                            # el tamaño completo del grid y modelos ConvLSTM
+                            import sys
+                            import importlib.util
+                            from pathlib import Path
+                            
+                            # Obtener el directorio raíz del proyecto
+                            project_root = Path(__file__).parent.parent.parent
+                            scripts_dir = project_root / "scripts"
+                            test_native_path = scripts_dir / "test_native_engine.py"
+                            
+                            if not test_native_path.exists():
+                                raise ImportError(f"No se encontró test_native_engine.py en {scripts_dir}")
+                            
+                            # Agregar el directorio scripts al path para que las importaciones funcionen
+                            if str(scripts_dir) not in sys.path:
+                                sys.path.insert(0, str(scripts_dir))
+                            
+                            # Cargar módulo dinámicamente
+                            spec = importlib.util.spec_from_file_location("test_native_engine", test_native_path)
+                            test_native_module = importlib.util.module_from_spec(spec)
+                            spec.loader.exec_module(test_native_module)
+                            export_model_to_torchscript = test_native_module.export_model_to_torchscript
+                            
+                            # El modelo ya está cargado (línea 936), usarlo directamente
+                            # Asegurar que el modelo esté en modo evaluación y en el dispositivo correcto
+                            model.eval()
+                            model.to(device)
+                            model.eval()
+                            model.to(device)
+                            
+                            # Usar grid_size de inferencia (más grande que entrenamiento si aplica)
+                            # Esto es importante para modelos UNet que necesitan el tamaño completo
+                            export_grid_size = inference_grid_size
+                            logging.info(f"Exportando modelo JIT usando device: {device_str}, grid_size: {export_grid_size}")
+                            
+                            # Exportar a JIT usando la función mejorada
+                            jit_output_path = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, exp_name, "model_jit.pt")
+                            exported_path = export_model_to_torchscript(
+                                model,
+                                device,
+                                jit_output_path,
+                                grid_size=export_grid_size,
+                                d_state=d_state
+                            )
+                            
+                            if exported_path and os.path.exists(exported_path):
+                                jit_path = exported_path
+                                logging.info(f"✅ Modelo exportado exitosamente a: {jit_path}")
+                                if ws: await send_notification(ws, "✅ Modelo exportado a TorchScript", "success")
+                            else:
+                                logging.warning(f"⚠️ Error al exportar modelo JIT. Usando motor Python como fallback.")
+                                if ws: await send_notification(ws, "⚠️ Error exportando a JIT, usando motor Python", "warning")
+                                jit_path = None
+                        except Exception as e:
+                            logging.warning(f"⚠️ Error al exportar modelo JIT: {e}. Usando motor Python como fallback.", exc_info=True)
+                            if ws: await send_notification(ws, f"⚠️ Error exportando JIT: {str(e)[:50]}...", "warning")
                             jit_path = None
-                    except Exception as e:
-                        logging.warning(f"⚠️ Error al exportar modelo JIT: {e}. Usando motor Python como fallback.", exc_info=True)
-                        if ws: await send_notification(ws, f"⚠️ Error exportando JIT: {str(e)[:50]}...", "warning")
-                        jit_path = None
                     
                     # Si tenemos modelo JIT, usar motor nativo
                     if jit_path and os.path.exists(jit_path):
-                    try:
-                        # Usar auto-detección del device (configurado en config.py)
-                        # Si device=None, usa auto-detección desde config.get_native_device()
-                        motor = NativeEngineWrapper(
-                            grid_size=inference_grid_size,
-                            d_state=d_state,
-                            device=None,  # None = auto-detección desde config
-                            cfg=config
-                        )
-                        logging.info(f"✅ Motor nativo inicializado con device: {motor.device_str}")
-                        
-                        # Cargar modelo JIT en el motor nativo
-                        if motor.load_model(jit_path):
-                            is_native = True
-                            logging.info(f"✅ Motor nativo (C++) cargado exitosamente con modelo JIT")
-                            if ws: await send_notification(ws, f"⚡ Motor nativo cargado (250-400x más rápido)", "success")
-                        else:
-                            logging.warning(f"⚠️ Error al cargar modelo JIT en motor nativo. Usando motor Python como fallback.")
-                            if ws: await send_notification(ws, "⚠️ Error cargando modelo JIT, usando motor Python", "warning")
+                        try:
+                            # Usar auto-detección del device (configurado en config.py)
+                            # Si device=None, usa auto-detección desde config.get_native_device()
+                            motor = NativeEngineWrapper(
+                                grid_size=inference_grid_size,
+                                d_state=d_state,
+                                device=None,  # None = auto-detección desde config
+                                cfg=config
+                            )
+                            logging.info(f"✅ Motor nativo inicializado con device: {motor.device_str}")
+                            
+                            # Cargar modelo JIT en el motor nativo
+                            if motor.load_model(jit_path):
+                                is_native = True
+                                logging.info(f"✅ Motor nativo (C++) cargado exitosamente con modelo JIT")
+                                if ws: await send_notification(ws, f"⚡ Motor nativo cargado (250-400x más rápido)", "success")
+                            else:
+                                logging.warning(f"⚠️ Error al cargar modelo JIT en motor nativo. Usando motor Python como fallback.")
+                                if ws: await send_notification(ws, "⚠️ Error cargando modelo JIT, usando motor Python", "warning")
+                                motor = None
+                        except Exception as e:
+                            logging.warning(f"⚠️ Error al inicializar motor nativo: {e}. Usando motor Python como fallback.", exc_info=True)
+                            if ws: await send_notification(ws, f"⚠️ Error en motor nativo, usando Python: {str(e)[:50]}...", "warning")
                             motor = None
-                    except Exception as e:
-                        logging.warning(f"⚠️ Error al inicializar motor nativo: {e}. Usando motor Python como fallback.", exc_info=True)
-                        if ws: await send_notification(ws, f"⚠️ Error en motor nativo, usando Python: {str(e)[:50]}...", "warning")
-                        motor = None
                 except Exception as e:
                     logging.warning(f"⚠️ Error en la inicialización del motor nativo: {e}. Usando motor Python como fallback.", exc_info=True)
                     if ws: await send_notification(ws, f"⚠️ Error en motor nativo, usando Python: {str(e)[:50]}...", "warning")

@@ -86,6 +86,15 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
     
     # OPTIMIZACIÓN: Mover todos los datos a CPU en un solo paso (una sincronización)
     # Usar .detach() para evitar problemas con el grafo computacional
+    # Mantener cálculos en GPU el mayor tiempo posible antes de convertir a numpy
+    device = psi.device if isinstance(psi, torch.Tensor) else torch.device('cpu')
+    is_cuda = device.type == 'cuda'
+    
+    # Si estamos en CUDA, sincronizar una sola vez al final
+    if is_cuda:
+        torch.cuda.synchronize()  # Asegurar que todos los cálculos GPU terminen antes de copiar
+    
+    # Mover todo a CPU en batch (una sola sincronización CUDA)
     density = density.detach().cpu().numpy()
     phase = phase.detach().cpu().numpy() if isinstance(phase, torch.Tensor) else phase
     real_part = real_part.detach().cpu().numpy() if isinstance(real_part, torch.Tensor) else real_part
@@ -93,9 +102,20 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
     energy = energy.detach().cpu().numpy()
     
     # Calcular gradiente espacial (magnitud del gradiente)
+    # OPTIMIZACIÓN: Calcular gradiente en GPU si es posible, luego mover a CPU
     if len(density.shape) == 2:
-        grad_y, grad_x = np.gradient(density)
-        gradient_magnitude = np.sqrt(grad_x**2 + grad_y**2)
+        # Convertir densidad a tensor si es necesario para cálculo en GPU
+        density_tensor = torch.tensor(density) if not isinstance(density, torch.Tensor) else density
+        if isinstance(density_tensor, torch.Tensor):
+            # Calcular gradiente en GPU usando torch.diff
+            grad_y_torch = torch.diff(density_tensor, dim=0, prepend=density_tensor[0:1, :])
+            grad_x_torch = torch.diff(density_tensor, dim=1, prepend=density_tensor[:, 0:1])
+            gradient_magnitude_tensor = torch.sqrt(grad_x_torch**2 + grad_y_torch**2)
+            gradient_magnitude = gradient_magnitude_tensor.cpu().numpy()
+        else:
+            # Fallback a numpy si no es tensor
+            grad_y, grad_x = np.gradient(density)
+            gradient_magnitude = np.sqrt(grad_x**2 + grad_y**2)
     else:
         gradient_magnitude = np.zeros_like(density)
 
