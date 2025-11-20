@@ -198,15 +198,8 @@ async def simulation_loop():
                         motor_type = g_state.get('motor_type', 'unknown')
                         motor_is_native = g_state.get('motor_is_native', False)
                         
-                        # Verificar qué motor se está usando (logging cada 1000 pasos)
-                        if updated_step % 1000 == 0 and updated_step > 0:
-                            # Verificar tipo real del motor
-                            actual_is_native = hasattr(motor, 'native_engine') if motor else False
-                            actual_type = "native" if actual_is_native else "python"
-                            if actual_type != motor_type:
-                                logging.warning(f"⚠️ Inconsistencia detectada en paso {updated_step}: motor_type en g_state={motor_type}, pero motor real={actual_type}")
-                            else:
-                                logging.info(f"✅ Paso {updated_step}: Usando motor {motor_type} (confirmado)")
+                        # Inicializar updated_step antes de usarlo (será actualizado en el bucle)
+                        updated_step = current_step
                         
                         # CRÍTICO: Verificar is_paused en cada paso para permitir pausa inmediata
                         for step_idx in range(steps_to_execute):
@@ -218,6 +211,16 @@ async def simulation_loop():
                                 motor.evolve_internal_state()
                             updated_step = current_step + step_idx + 1
                             g_state['simulation_step'] = updated_step
+                            
+                            # Verificar qué motor se está usando (logging cada 1000 pasos, después de actualizar)
+                            if updated_step % 1000 == 0 and updated_step > 0:
+                                # Verificar tipo real del motor
+                                actual_is_native = hasattr(motor, 'native_engine') if motor else False
+                                actual_type = "native" if actual_is_native else "python"
+                                if actual_type != motor_type:
+                                    logging.warning(f"⚠️ Inconsistencia detectada en paso {updated_step}: motor_type en g_state={motor_type}, pero motor real={actual_type}")
+                                else:
+                                    logging.info(f"✅ Paso {updated_step}: Usando motor {motor_type} (confirmado)")
                         
                         # Actualizar current_step con el último valor ejecutado
                         current_step = updated_step
