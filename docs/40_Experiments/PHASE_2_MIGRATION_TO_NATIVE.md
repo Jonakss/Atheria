@@ -56,7 +56,7 @@
 python3 -c "import atheria_core; print('✅ Módulo nativo disponible')"
 
 # Si no está disponible, compilar:
-python setup.py build_ext --inplace
+python3 setup.py build_ext --inplace
 
 # O usando pip:
 pip install -e .

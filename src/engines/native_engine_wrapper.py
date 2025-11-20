@@ -106,11 +106,17 @@ class NativeEngineWrapper:
                     error_msg += " (Problema de CUDA runtime - solo CPU mode disponible, pero también falló)"
                 raise ImportError(error_msg + " Usa el motor Python como fallback.")
         
-        # Verificar una vez más después del intento
+        # Verificar una vez más después del intento - asegurar que atheria_core esté disponible
+        # Importar atheria_core para usarlo en el resto del método
+        import atheria_core as atheria_core_module
+        
+        # Verificar una vez más si no estaba disponible antes
         if not NATIVE_AVAILABLE:
-            # Intentar importar directamente para verificar
+            # Intentar verificar que funciona
             try:
-                import atheria_core
+                # Probar crear un Engine temporal para verificar
+                test_engine = atheria_core_module.Engine(d_state=1, device='cpu')
+                del test_engine
             except (ImportError, OSError, RuntimeError) as e:
                 # No disponible para nada
                 error_msg = "atheria_core no está disponible."
@@ -122,10 +128,15 @@ class NativeEngineWrapper:
                     error_msg += " (Problema de CUDA runtime - intenta usar device='cpu')"
                 raise ImportError(error_msg + " Usa el motor Python como fallback.")
         
-        # Si hay problema de CUDA runtime y se intenta usar CUDA, forzar CPU mode
-        if device == "cuda" and _native_cuda_issue:
-            logging.warning("⚠️ Problema de CUDA runtime detectado. Forzando CPU mode para motor nativo.")
+        # Si hay problema de CUDA runtime, forzar CPU mode independientemente del device solicitado
+        if _native_cuda_issue:
+            if device == "cuda":
+                logging.warning("⚠️ Problema de CUDA runtime detectado. Forzando CPU mode para motor nativo.")
             device = "cpu"
+            # Asegurar que CUDA_VISIBLE_DEVICES esté deshabilitado
+            import os
+            os.environ['CUDA_VISIBLE_DEVICES'] = ''
+            logging.info("✅ CUDA_VISIBLE_DEVICES='' configurado para evitar problemas de CUDA runtime")
         
         self.grid_size = int(grid_size)
         self.d_state = int(d_state)
@@ -134,7 +145,7 @@ class NativeEngineWrapper:
         self.cfg = cfg
         
         # Inicializar motor nativo
-        self.native_engine = atheria_core.Engine(d_state=d_state, device=device)
+        self.native_engine = atheria_core_module.Engine(d_state=d_state, device=device)
         
         # Estado cuántico para compatibilidad (denso)
         # El motor nativo usa formato disperso, pero necesitamos denso para visualización

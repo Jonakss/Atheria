@@ -92,6 +92,11 @@ public:
      */
     void activate_neighborhood(const Coord3D& coord, int radius = 1);
     
+    /**
+     * Obtiene todas las coordenadas activas en el motor
+     */
+    std::vector<Coord3D> get_active_coords() const;
+    
 private:
     // Configuración
     int64_t d_state_;

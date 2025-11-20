@@ -293,8 +293,44 @@ class QC_Trainer_v4:
                             logging.info(f"🗑️  Checkpoint eliminado (Smart Save): {os.path.basename(worst_checkpoint['path'])} - Episodio {worst_checkpoint['episode']}")
                     except Exception as e:
                         logging.warning(f"Error al eliminar checkpoint antiguo: {e}")
+        
+        # OPTIMIZACIÓN DE DISCO: Limpiar checkpoints periódicos antiguos (no solo los mejores)
+        # Mantener solo los últimos N checkpoints periódicos además de los mejores
+        max_periodic_checkpoints = 10  # Mantener solo los últimos 10 checkpoints periódicos
+        try:
+            # Obtener todos los checkpoints periódicos (no best_model.pth ni last_checkpoint.pth)
+            periodic_checkpoints = []
+            if os.path.exists(self.checkpoint_dir):
+                for filename in os.listdir(self.checkpoint_dir):
+                    if filename.endswith('.pth') and filename.startswith('checkpoint_ep'):
+                        filepath = os.path.join(self.checkpoint_dir, filename)
+                        try:
+                            # Obtener número de episodio del nombre
+                            ep_num = int(filename.replace('checkpoint_ep', '').replace('.pth', ''))
+                            periodic_checkpoints.append((ep_num, filepath))
+                        except:
+                            continue
             
-            # Registrar en el logger de documentación
+            # Ordenar por episodio (más recientes primero)
+            periodic_checkpoints.sort(reverse=True)
+            
+            # Eliminar los más antiguos si exceden el límite
+            if len(periodic_checkpoints) > max_periodic_checkpoints:
+                to_remove = periodic_checkpoints[max_periodic_checkpoints:]
+                for ep_num, filepath in to_remove:
+                    try:
+                        # Verificar que no está en la lista de mejores
+                        is_best = any(cp['path'] == filepath for cp in self.best_checkpoints)
+                        if not is_best:
+                            os.remove(filepath)
+                            logging.info(f"🗑️  Checkpoint periódico antiguo eliminado: {os.path.basename(filepath)} - Episodio {ep_num}")
+                    except Exception as e:
+                        logging.warning(f"Error al eliminar checkpoint periódico antiguo: {e}")
+        except Exception as e:
+            logging.warning(f"Error limpiando checkpoints periódicos antiguos: {e}")
+        
+        # Registrar en el logger de documentación solo si es el mejor
+        if is_best:
             self.doc_logger.log_result(
                 episodes=episode,
                 metrics=current_metrics,

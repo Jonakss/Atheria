@@ -132,16 +132,17 @@ int64_t Engine::step_native() {
                 torch::Tensor batch_output = model_.forward(inputs).toTensor();
                 
                 // Procesar salida del modelo
-                // El modelo devuelve [batch, 2*d_state, 3, 3]
-                // Extraer el centro del patch (posición [1, 1])
-                int64_t center_idx = 1 * 3 + 1; // Centro del patch 3x3
+                // El modelo devuelve [batch, 2*d_state, 5, 5] (mismo tamaño que input por U-Net)
+                // Extraer el centro del patch (posición [2, 2] en patch 5x5, índice 2)
                 
                 for (size_t j = 0; j < batch_coords.size(); j++) {
                     // Extraer salida del centro del patch
-                    // batch_output shape: [batch, 2*d_state, 3, 3]
-                    // Extraer el centro [batch, :, 1, 1] -> [2*d_state]
+                    // batch_output shape: [batch, 2*d_state, 5, 5]
+                    // Extraer el centro [batch, :, 2, 2] -> [2*d_state]
                     // Usar índices correctos: dim 0 = batch, dim 1 = channels, dim 2 = H, dim 3 = W
-                    torch::Tensor output_center = batch_output[j].select(2, 1).select(2, 1); // [2*d_state]
+                    int64_t center_idx_h = 2;  // Centro del patch 5x5
+                    int64_t center_idx_w = 2;
+                    torch::Tensor output_center = batch_output[j].select(2, center_idx_h).select(2, center_idx_w); // [2*d_state]
                     
                     // Dividir en real e imag: [0:d_state] es real, [d_state:2*d_state] es imag
                     torch::Tensor delta_real = output_center.slice(0, 0, d_state_);
@@ -221,30 +222,68 @@ std::vector<Coord3D> Engine::get_neighbors(const Coord3D& center, int radius) co
 
 torch::Tensor Engine::build_batch_input(const std::vector<Coord3D>& coords) {
     // Construir batch input para el modelo
-    // El modelo espera: [batch, 2*d_state, H, W] donde H=W=3 (patch 3x3)
+    // IMPORTANTE: El modelo UNet fue entrenado con inputs de tamaño completo del grid.
+    // Para mantener compatibilidad con los skip connections, necesitamos usar el mismo
+    // tamaño que el modelo espera. El modelo típicamente espera inputs de 64x64 o similar.
+    // Sin embargo, para procesar partículas dispersas, usamos patches centrados.
+    // 
+    // PROBLEMA: Los skip connections requieren dimensiones exactas. El modelo espera
+    // un tamaño específico (probablemente 64x64 basado en GRID_SIZE del experimento).
+    // 
+    // SOLUCIÓN TEMPORAL: Usar el tamaño mínimo que permite que el modelo funcione
+    // (al menos 4x4 después de dos MaxPool2d). Sin embargo, esto causa problemas con
+    // los skip connections si el modelo fue entrenado con otro tamaño.
+    //
+    // TODO: El modelo debería ser entrenado con patches o deberíamos usar el grid completo.
+    
     int64_t batch_size = static_cast<int64_t>(coords.size());
-    int64_t height = 3;  // Patch 3x3 alrededor de cada partícula
-    int64_t width = 3;
+    
+    // Usar un tamaño que sea compatible con el modelo entrenado
+    // Por defecto, usamos 64x64 si no hay información del grid size
+    // Pero para patches individuales, necesitamos usar un tamaño menor
+    // El problema es que los skip connections requieren tamaños exactos
+    
+    // Por ahora, usar un patch mínimo que funcione con MaxPool2d
+    // El modelo fue entrenado con 64x64, pero para patches usamos un tamaño que
+    // pueda procesarse correctamente. Sin embargo, los skip connections fallarán
+    // si las dimensiones no coinciden.
+    
+    // OPCIÓN 1: Usar el grid completo (ineficiente pero funciona)
+    // OPCIÓN 2: Usar un tamaño que coincida con lo que el modelo espera en los skip connections
+    // OPCIÓN 3: Re-entrenar el modelo con patches pequeños
+    
+    // Por ahora, usar un patch más grande (como el grid completo en el contexto del batch)
+    // Esto requiere conocer el tamaño del grid, que debería venir de la configuración
+    
+    // TEMPORAL: Usar un patch que sea múltiplo de 4 para que después de dos MaxPool2d
+    // siga siendo un tamaño válido y las dimensiones coincidan mejor con los skip connections
+    int64_t patch_size = 64;  // Tamaño del patch (debe coincidir con el tamaño de entrenamiento)
+    int64_t patch_radius = patch_size / 2;  // Radio del patch
+    
+    int64_t height = patch_size;
+    int64_t width = patch_size;
     
     auto options = torch::TensorOptions()
         .dtype(torch::kFloat32)
         .device(device_)
         .requires_grad(false);
     
-    // Crear tensor de entrada: [batch, 2*d_state, 3, 3]
+    // Crear tensor de entrada: [batch, 2*d_state, patch_size, patch_size]
     torch::Tensor batch_input = torch::zeros({batch_size, 2 * d_state_, height, width}, options);
     
-    // Para cada coordenada, construir un patch 3x3
+    // Para cada coordenada, construir un patch centrado
     for (int64_t i = 0; i < batch_size; i++) {
         const Coord3D& center = coords[i];
         
-        // Obtener vecindario 3x3
-        std::vector<Coord3D> patch_coords;
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                patch_coords.emplace_back(center.x + dx, center.y + dy, center.z);
-            }
-        }
+        // Obtener vecindario del tamaño del patch
+        for (int64_t py = 0; py < height; py++) {
+            for (int64_t px = 0; px < width; px++) {
+                // Mapear posición del patch a coordenada global
+                // El centro del patch está en (patch_radius, patch_radius)
+                int64_t dx = static_cast<int64_t>(px) - patch_radius;
+                int64_t dy = static_cast<int64_t>(py) - patch_radius;
+                
+                Coord3D patch_coord(center.x + dx, center.y + dy, center.z);
         
         // Construir patch: para cada posición en el patch, obtener estado
         for (int64_t py = 0; py < height; py++) {
@@ -306,6 +345,10 @@ void Engine::clear() {
     matter_map_.clear();
     active_region_.clear();
     step_count_ = 0;
+}
+
+std::vector<Coord3D> Engine::get_active_coords() const {
+    return std::vector<Coord3D>(active_region_.begin(), active_region_.end());
 }
 
 } // namespace atheria

@@ -138,6 +138,8 @@ PYBIND11_MODULE(atheria_core, m) {
              "Limpia toda la materia del universo")
         .def("activate_neighborhood", &Engine::activate_neighborhood,
              "Activa el vecindario de una coordenada",
-             py::arg("coord"), py::arg("radius") = 1);
+             py::arg("coord"), py::arg("radius") = 1)
+        .def("get_active_coords", &Engine::get_active_coords,
+             "Retorna una lista de todas las coordenadas activas");
 #endif
 }
