@@ -16,8 +16,19 @@
               "icon": "lucide-git-fork",
               "title": "Graph view"
             }
+          },
+          {
+            "id": "64c18a1d76fa4115",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
+            }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -162,7 +173,7 @@
       "bases:Create new base": false
     }
   },
-  "active": "7c2795290879b977",
+  "active": "64c18a1d76fa4115",
   "lastOpenFiles": [
     "Atheria 4.md",
     "Ley M.md",

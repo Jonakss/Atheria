@@ -197,7 +197,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
             const topLeftY = (0 - containerHeight/2 - pan.y) / zoom;
             const bottomRightX = (containerWidth - containerWidth/2 - pan.x) / zoom;
             const bottomRightY = (containerHeight - containerHeight/2 - pan.y) / zoom;
-            
+        
             // El canvas está centrado, así que las coordenadas del grid son relativas al centro
             // El centro del grid (gridWidth/2, gridHeight/2) está en el origen del transform
             // Entonces: gridX = (containerX - containerWidth/2 - pan.x) / zoom + gridWidth/2
@@ -209,24 +209,24 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
             
             const visibleWidth = Math.max(1, visibleRightX - visibleX);
             const visibleHeight = Math.max(1, visibleBottomY - visibleY);
-            
+        
             // Solo actualizar ROI si la región visible es significativamente menor que el grid completo
             // y si el zoom es > 1.1 (estamos haciendo zoom in)
             const visibleRatio = (visibleWidth * visibleHeight) / (gridWidth * gridHeight);
             if (zoom > 1.1 && visibleRatio < 0.9 && visibleWidth > 16 && visibleHeight > 16) {
-                lastROIUpdate.current = now;
-                sendCommand('simulation', 'set_roi', {
-                    enabled: true,
-                    x: visibleX,
-                    y: visibleY,
-                    width: visibleWidth,
-                    height: visibleHeight
-                });
+            lastROIUpdate.current = now;
+            sendCommand('simulation', 'set_roi', {
+                enabled: true,
+                x: visibleX,
+                y: visibleY,
+                width: visibleWidth,
+                height: visibleHeight
+            });
             } else if (zoom <= 1.1 || visibleRatio >= 0.9) {
                 // Si estamos en zoom out o mostrando más del 90%, desactivar ROI
-                lastROIUpdate.current = now;
-                sendCommand('simulation', 'set_roi', { enabled: false });
-            }
+            lastROIUpdate.current = now;
+            sendCommand('simulation', 'set_roi', { enabled: false });
+        }
         }, ROIDebounceDelay); // Debounce: esperar 500ms después de la última interacción
         
         // Cleanup: cancelar timeout si el componente se desmonta o cambian las dependencias
@@ -536,20 +536,20 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                     range = rangeMax - rangeMin || 1;
                 } else {
                     // Para muestras grandes, calcular percentiles (más robusto, O(N log N))
-                    values.sort((a, b) => a - b);
-                    const minVal = values[0];
-                    const maxVal = values[values.length - 1];
-                    
-                    // Usar percentiles para normalización robusta (evita que un outlier comprima todo)
-                    // Percentil 1% como mínimo y 99% como máximo para visualizaciones con outliers
-                    const p1Index = Math.floor(values.length * 0.01);
-                    const p99Index = Math.floor(values.length * 0.99);
-                    const robustMin = values[p1Index] || minVal;
-                    const robustMax = values[p99Index] || maxVal;
-                    
-                    // Si hay mucha diferencia entre min/max y los percentiles, usar percentiles
-                    // Esto es especialmente útil para FFT/spectral que tiene picos extremos
-                    const useRobust = (maxVal - minVal) > (robustMax - robustMin) * 2;
+                values.sort((a, b) => a - b);
+                const minVal = values[0];
+                const maxVal = values[values.length - 1];
+                
+                // Usar percentiles para normalización robusta (evita que un outlier comprima todo)
+                // Percentil 1% como mínimo y 99% como máximo para visualizaciones con outliers
+                const p1Index = Math.floor(values.length * 0.01);
+                const p99Index = Math.floor(values.length * 0.99);
+                const robustMin = values[p1Index] || minVal;
+                const robustMax = values[p99Index] || maxVal;
+                
+                // Si hay mucha diferencia entre min/max y los percentiles, usar percentiles
+                // Esto es especialmente útil para FFT/spectral que tiene picos extremos
+                const useRobust = (maxVal - minVal) > (robustMax - robustMin) * 2;
                     rangeMin = useRobust ? robustMin : minVal;
                     rangeMax = useRobust ? robustMax : maxVal;
                     range = rangeMax - rangeMin || 1;
@@ -634,7 +634,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
         window.addEventListener('keydown', handleKeyPress);
         return () => window.removeEventListener('keydown', handleKeyPress);
     }, [sendCommand, resetView]);
-    
+
     return (
         <Box 
             className="relative w-full h-full"
@@ -690,10 +690,10 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                     <Box className="absolute top-10 right-0 z-30">
                         <GlassPanel className="p-3">
                             <Stack gap={2}>
-                                <OverlayControls
-                                    config={overlayConfig}
-                                    onConfigChange={setOverlayConfig}
-                                />
+                        <OverlayControls
+                            config={overlayConfig}
+                            onConfigChange={setOverlayConfig}
+                        />
                                 <Box className="border-t border-white/10 pt-2 mt-1">
                                     <Switch
                                         label="ROI Automático"
@@ -841,7 +841,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                                 </div>
                             </div>
                         </div>
-                    </div>
+        </div>
                 </GlassPanel>
             </Box>
         </Box>
