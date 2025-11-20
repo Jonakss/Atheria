@@ -245,8 +245,9 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
             
             // Convertir el punto del mouse a coordenadas del canvas (antes del zoom)
             // Con transform: scale(zoom) translate(pan.x, pan.y) y transformOrigin: '0 0':
+            // El punto (0,0) del canvas está en el centro del contenedor
             // Un punto del canvas (canvasX, canvasY) se transforma a:
-            //   (canvasX * zoom + pan.x, canvasY * zoom + pan.y) en coordenadas relativas al centro del contenedor
+            //   screenX = canvasX * zoom + pan.x  (relativo al centro del contenedor)
             // Inversamente, para un punto del mouse (mouseRelToCenterX, mouseRelToCenterY):
             //   canvasX = (mouseRelToCenterX - pan.x) / zoom
             //   canvasY = (mouseRelToCenterY - pan.y) / zoom
@@ -262,10 +263,11 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
             // Después del nuevo zoom, queremos que el punto (canvasX, canvasY) siga estando bajo el mouse:
             //   mouseRelToCenterX = canvasX * constrainedZoom + newPanX
             //   Por lo tanto: newPanX = mouseRelToCenterX - canvasX * constrainedZoom
-            // Sustituyendo canvasX:
+            // Sustituyendo canvasX de arriba:
             //   newPanX = mouseRelToCenterX - ((mouseRelToCenterX - pan.x) / zoom) * constrainedZoom
             //   newPanX = mouseRelToCenterX - (mouseRelToCenterX - pan.x) * (constrainedZoom / zoom)
             //   newPanX = mouseRelToCenterX * (1 - constrainedZoom / zoom) + pan.x * (constrainedZoom / zoom)
+            // Simplificando:
             const zoomRatio = constrainedZoom / zoom;
             const newPanX = mouseRelToCenterX * (1 - zoomRatio) + pan.x * zoomRatio;
             const newPanY = mouseRelToCenterY * (1 - zoomRatio) + pan.y * zoomRatio;

@@ -58,29 +58,39 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
             ).mean(dim=(1, 3))
             psi = psi_downsampled
     
-    density = torch.sum(psi.abs()**2, dim=-1).cpu().numpy()
+    # OPTIMIZACIÓN CUDA: Calcular en GPU primero, luego mover a CPU una sola vez
+    # Esto evita múltiples sincronizaciones CUDA costosas
+    with torch.no_grad():  # No necesitamos gradientes para visualización
+        density = torch.sum(psi.abs()**2, dim=-1)
+        
+        # Calcular fase en GPU
+        if psi.shape[-1] > 0:
+            # Usar el primer canal para la fase (más visible)
+            phase_single = torch.angle(psi[..., 0])
+            # Alternativa: promedio de todas las fases ponderado por densidad
+            phase_weighted = torch.angle(psi)
+            # Calcular promedio circular de fases en GPU (más eficiente)
+            phase_cos = torch.cos(phase_weighted).mean(dim=-1)
+            phase_sin = torch.sin(phase_weighted).mean(dim=-1)
+            phase = torch.atan2(phase_sin, phase_cos)
+        else:
+            phase = torch.angle(psi)
+            if phase.ndim > 2:
+                phase = phase[..., 0]
+        
+        real_part = psi.real
+        imag_part = psi.imag
+        
+        # Calcular energía total (suma de |ψ|² sobre todos los canales)
+        energy = torch.sum(psi.abs()**2, dim=-1)
     
-    # Mejorar visualización de fase: usar el canal 0 o promedio ponderado
-    if psi.shape[-1] > 0:
-        # Usar el primer canal para la fase (más visible)
-        phase_single = torch.angle(psi[..., 0]).cpu().numpy()
-        # Alternativa: promedio de todas las fases ponderado por densidad
-        phase_weighted = torch.angle(psi).cpu().numpy()
-        # Calcular promedio circular de fases
-        phase_cos = np.cos(phase_weighted).mean(axis=-1)
-        phase_sin = np.sin(phase_weighted).mean(axis=-1)
-        phase = np.arctan2(phase_sin, phase_cos)
-    else:
-        phase = torch.angle(psi).cpu().numpy()
-        if phase.ndim > 2:
-            phase = phase[..., 0]
-    
-    real_part = psi.real.cpu().numpy()
-    imag_part = psi.imag.cpu().numpy()
-    
-    # Calcular energía total (suma de |ψ|² sobre todos los canales)
-    # Usar torch.sum() en lugar de np.sum() porque psi es un tensor de PyTorch
-    energy = torch.sum(psi.abs()**2, dim=-1).cpu().numpy()
+    # OPTIMIZACIÓN: Mover todos los datos a CPU en un solo paso (una sincronización)
+    # Usar .detach() para evitar problemas con el grafo computacional
+    density = density.detach().cpu().numpy()
+    phase = phase.detach().cpu().numpy() if isinstance(phase, torch.Tensor) else phase
+    real_part = real_part.detach().cpu().numpy() if isinstance(real_part, torch.Tensor) else real_part
+    imag_part = imag_part.detach().cpu().numpy() if isinstance(imag_part, torch.Tensor) else imag_part
+    energy = energy.detach().cpu().numpy()
     
     # Calcular gradiente espacial (magnitud del gradiente)
     if len(density.shape) == 2:
