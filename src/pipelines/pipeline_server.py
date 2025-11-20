@@ -976,47 +976,39 @@ async def handle_load_experiment(args):
                     if ws: await send_notification(ws, f"📦 Exportando modelo a TorchScript...", "info")
                     
                     try:
-                        # Importar función de exportación (ruta relativa al proyecto)
+                        # MEJORA: Usar función mejorada de test_native_engine.py que maneja mejor
+                        # el tamaño completo del grid y modelos ConvLSTM
                         import sys
                         scripts_dir = Path(__file__).parent.parent / "scripts"
                         if str(scripts_dir) not in sys.path:
                             sys.path.insert(0, str(scripts_dir))
-                        from export_model_to_jit import export_model_to_jit
+                        from test_native_engine import export_model_to_torchscript
                         
-                        # Obtener parámetros del modelo desde la configuración
-                        model_type = config.MODEL_ARCHITECTURE
-                        hidden_channels = config.MODEL_PARAMS.hidden_channels
-                        
-                        # Mapear nombres de arquitectura a las claves de MODEL_MAP
-                        # MODEL_MAP usa claves en mayúsculas con guiones bajos
-                        model_type_map = {
-                            'UNET_UNITARIA': 'UNET_UNITARY',  # Corregir nombre
-                            'SNN_UNET': 'SNN_UNET',            # Ya correcto
-                            'MLP': 'MLP',                      # Ya correcto
-                            'DEEP_QCA': 'DEEP_QCA',            # Ya correcto
-                            'UNET': 'UNET',                    # Ya correcto
-                            'UNET_CONVLSTM': 'UNET_CONVLSTM',  # Ya correcto
-                            'UNET_UNITARY_RMSNORM': 'UNET_UNITARY_RMSNORM',  # Ya correcto
-                        }
-                        model_type = model_type_map.get(model_type, model_type)  # Usar original si no está en el mapa
-                        
-                        # Exportar a JIT
-                        jit_output_path = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, exp_name, "model_jit.pt")
-                        # Detectar device correctamente: preferir CUDA si está disponible
+                        # El modelo ya está cargado (línea 936), usarlo directamente
+                        # Asegurar que el modelo esté en modo evaluación y en el dispositivo correcto
                         import torch
                         device_str = "cuda" if torch.cuda.is_available() else "cpu"
-                        logging.info(f"Exportando modelo JIT usando device: {device_str}")
-                        success = export_model_to_jit(
-                            checkpoint_path,
-                            output_path=jit_output_path,
-                            d_state=d_state,
-                            hidden_channels=hidden_channels,
-                            model_type=model_type,
-                            device=device_str
+                        device = torch.device(device_str)
+                        model.eval()
+                        model.to(device)
+                        
+                        # Usar grid_size de inferencia (más grande que entrenamiento si aplica)
+                        # Esto es importante para modelos UNet que necesitan el tamaño completo
+                        export_grid_size = inference_grid_size
+                        logging.info(f"Exportando modelo JIT usando device: {device_str}, grid_size: {export_grid_size}")
+                        
+                        # Exportar a JIT usando la función mejorada
+                        jit_output_path = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, exp_name, "model_jit.pt")
+                        exported_path = export_model_to_torchscript(
+                            model,
+                            device,
+                            jit_output_path,
+                            grid_size=export_grid_size,
+                            d_state=d_state
                         )
                         
-                        if success:
-                            jit_path = jit_output_path
+                        if exported_path and os.path.exists(exported_path):
+                            jit_path = exported_path
                             logging.info(f"✅ Modelo exportado exitosamente a: {jit_path}")
                             if ws: await send_notification(ws, "✅ Modelo exportado a TorchScript", "success")
                         else:
