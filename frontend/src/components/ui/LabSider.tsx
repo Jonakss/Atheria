@@ -58,7 +58,6 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
         const saved = localStorage.getItem('atheria_initialStateMode');
         return saved || 'complex_noise';
     });
-    const [initialStateMode, setInitialStateMode] = useState('complex_noise');
     const [transferWizardOpened, setTransferWizardOpened] = useState(false);
 
     // Encontrar el experimento activo
