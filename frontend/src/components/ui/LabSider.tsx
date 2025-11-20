@@ -205,64 +205,73 @@ export function LabSider() {
                 </button>
             </div>
 
-            {/* Tabs de Secciones - Design System */}
-            <div className="flex border-b border-white/10 bg-[#0a0a0a] shrink-0">
-                {sectionButtons.map((section) => {
-                    const Icon = section.icon;
-                    const isActive = activeSection === section.id;
-                    const colorClasses = {
-                        blue: isActive ? 'text-blue-400 border-blue-500/40 bg-blue-500/10' : 'text-gray-500 hover:text-gray-300',
-                        emerald: isActive ? 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10' : 'text-gray-500 hover:text-gray-300',
-                        amber: isActive ? 'text-amber-400 border-amber-500/40 bg-amber-500/10' : 'text-gray-500 hover:text-gray-300',
-                    };
-                    
-                    return (
-                        <button
-                            key={section.id}
-                            onClick={() => setActiveSection(section.id)}
-                            className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 px-2 border-b-2 transition-all ${
-                                colorClasses[section.color as keyof typeof colorClasses]
-                            } ${isActive ? 'border-' + section.color + '-500/40' : 'border-transparent'}`}
-                        >
-                            <Icon size={16} />
-                            <span className="text-[9px] font-bold uppercase tracking-wider">{section.label}</span>
-                        </button>
-                    );
-                })}
-            </div>
+            {/* Layout: Sidebar Vertical + Contenido */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* Sidebar Vertical de Secciones - Similar a NavigationSidebar */}
+                <aside className="w-12 border-r border-white/5 bg-[#050505] flex flex-col items-center py-3 gap-2 shrink-0">
+                    {sectionButtons.map((section) => {
+                        const Icon = section.icon;
+                        const isActive = activeSection === section.id;
+                        
+                        return (
+                            <button
+                                key={section.id}
+                                onClick={() => setActiveSection(section.id)}
+                                className={`w-8 h-8 rounded flex items-center justify-center transition-all relative group ${
+                                    isActive 
+                                        ? section.id === 'inference' ? 'bg-blue-500/10 text-blue-400' :
+                                          section.id === 'training' ? 'bg-emerald-500/10 text-emerald-400' :
+                                          'bg-amber-500/10 text-amber-400'
+                                        : 'text-gray-600 hover:text-gray-300 hover:bg-white/5'
+                                }`}
+                                title={section.label}
+                            >
+                                <Icon size={16} strokeWidth={2} />
+                                {/* Indicador Activo */}
+                                {isActive && (
+                                    <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-r ${
+                                        section.id === 'inference' ? 'bg-blue-500' :
+                                        section.id === 'training' ? 'bg-emerald-500' :
+                                        'bg-amber-500'
+                                    }`} />
+                                )}
+                            </button>
+                        );
+                    })}
+                </aside>
 
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar">
-                {/* Progreso de Entrenamiento - Siempre visible si está corriendo */}
-                {trainingStatus === 'running' && (
-                    <div className="m-4 mb-0 bg-white/5 border border-white/10 rounded-lg p-3 space-y-2">
-                        <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                            <span>PROGRESO</span>
-                            <span className="text-emerald-400">ACTIVO</span>
-                        </div>
-                        <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden">
-                            <div 
-                                className="h-full bg-emerald-500 transition-all duration-300"
-                                style={{ width: `${progressPercent}%` }}
-                            />
-                        </div>
-                        {trainingProgress && (
-                            <div className="flex items-center justify-between text-xs text-gray-400">
-                                <span>Episodio {trainingProgress.current_episode}/{trainingProgress.total_episodes}</span>
-                                <span className="font-mono">Loss: {trainingProgress.avg_loss.toFixed(6)}</span>
+                {/* Contenido Scrollable */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    {/* Progreso de Entrenamiento - Siempre visible si está corriendo */}
+                    {trainingStatus === 'running' && (
+                        <div className="m-4 mb-0 bg-white/5 border border-white/10 rounded-lg p-3 space-y-2">
+                            <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                                <span>PROGRESO</span>
+                                <span className="text-emerald-400">ACTIVO</span>
                             </div>
-                        )}
-                        <button
-                            onClick={() => isConnected && sendCommand('experiment', 'stop', {})}
-                            disabled={!isConnected}
-                            className="w-full py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-bold rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Detener Entrenamiento
-                        </button>
-                    </div>
-                )}
+                            <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-emerald-500 transition-all duration-300"
+                                    style={{ width: `${progressPercent}%` }}
+                                />
+                            </div>
+                            {trainingProgress && (
+                                <div className="flex items-center justify-between text-xs text-gray-400">
+                                    <span>Episodio {trainingProgress.current_episode}/{trainingProgress.total_episodes}</span>
+                                    <span className="font-mono">Loss: {trainingProgress.avg_loss.toFixed(6)}</span>
+                                </div>
+                            )}
+                            <button
+                                onClick={() => isConnected && sendCommand('experiment', 'stop', {})}
+                                disabled={!isConnected}
+                                className="w-full py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-bold rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Detener Entrenamiento
+                            </button>
+                        </div>
+                    )}
 
-                <div className="p-4 space-y-6">
+                    <div className="p-4 space-y-6">
                     {/* SECCIÓN: INFERENCIA */}
                     {activeSection === 'inference' && (
                         <div className="space-y-4">
@@ -625,6 +634,7 @@ export function LabSider() {
                             </GlassPanel>
                         </div>
                     )}
+                </div>
                 </div>
             </div>
             
