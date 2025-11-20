@@ -10,7 +10,7 @@ interface SettingsPanelProps {
 }
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
-  const { sendCommand, connectionStatus, compileStatus, serverConfig, updateServerConfig, connect } = useWebSocket();
+  const { sendCommand, connectionStatus, compileStatus, serverConfig, updateServerConfig, connect, activeExperiment, experimentsData, simData } = useWebSocket();
   const isConnected = connectionStatus === 'connected';
   
   // Estados para configuraciones del servidor
@@ -27,6 +27,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
   const [frameRate, setFrameRate] = useState(30);
   const [maxFramesPerSecond, setMaxFramesPerSecond] = useState(60);
   const [logLevel, setLogLevel] = useState<'info' | 'warning' | 'error'>('info');
+  
+  // Estados para configuración de inferencia
+  const [gridSizeInference, setGridSizeInference] = useState(256);
+  const [initialStateMode, setInitialStateMode] = useState('complex_noise');
+  const [gammaDecay, setGammaDecay] = useState(0.01);
+  
+  // Obtener información del experimento activo
+  const currentExperiment = activeExperiment 
+    ? experimentsData?.find(exp => exp.name === activeExperiment) 
+    : null;
+  const trainingGridSize = currentExperiment?.config?.GRID_SIZE_TRAINING || 64;
+  const currentGridSize = simData?.map_data?.length || gridSizeInference;
   
   // Sincronizar estados del servidor cuando serverConfig cambia
   React.useEffect(() => {
@@ -50,11 +62,33 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
     setServerConfigChanged(changed || false);
   }, [serverHost, serverPort, serverProtocol, serverPath, serverConfig]);
   
+  // Cargar configuración de inferencia desde localStorage al montar
+  React.useEffect(() => {
+    const savedConfig = localStorage.getItem('atheria_global_config');
+    if (savedConfig) {
+      try {
+        const config = JSON.parse(savedConfig);
+        if (config.gridSizeInference !== undefined) setGridSizeInference(config.gridSizeInference);
+        if (config.initialStateMode !== undefined) setInitialStateMode(config.initialStateMode);
+        if (config.gammaDecay !== undefined) setGammaDecay(config.gammaDecay);
+      } catch (e) {
+        console.warn('Error cargando configuración guardada:', e);
+      }
+    }
+  }, []);
+  
   const handleSaveSettings = () => {
     if (!isConnected) {
       alert('⚠️ No hay conexión con el servidor.');
       return;
     }
+    
+    // Enviar configuración de inferencia (requiere recargar experimento para aplicar cambios)
+    sendCommand('inference', 'set_config', {
+      grid_size: gridSizeInference,
+      initial_state_mode: initialStateMode,
+      gamma_decay: gammaDecay
+    });
     
     // Enviar configuraciones al backend
     sendCommand('simulation', 'set_global_config', {
@@ -73,10 +107,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
       autoRotate,
       frameRate,
       maxFramesPerSecond,
-      logLevel
+      logLevel,
+      gridSizeInference,
+      initialStateMode,
+      gammaDecay
     }));
     
-    alert('✅ Configuraciones guardadas correctamente.');
+    const needsReload = gridSizeInference !== 256 || initialStateMode !== 'complex_noise' || gammaDecay !== 0.01;
+    if (needsReload && activeExperiment) {
+      alert('✅ Configuraciones guardadas. ⚠️ Debes recargar el experimento para aplicar cambios en el tamaño de grid, modo de inicialización o gamma decay.');
+    } else {
+      alert('✅ Configuraciones guardadas correctamente.');
+    }
   };
   
   const handleSaveServerConfig = () => {
@@ -89,7 +131,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
     
     // Reconectar con la nueva configuración
     setTimeout(() => {
-      connect(true);
+      connect();
       alert('✅ Configuración del servidor guardada. Reconectando...');
     }, 100);
   };
@@ -105,6 +147,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
     setFrameRate(30);
     setMaxFramesPerSecond(60);
     setLogLevel('info');
+    setGridSizeInference(256);
+    setInitialStateMode('complex_noise');
+    setGammaDecay(0.01);
     
     // Resetear configuración del servidor
     if (updateServerConfig) {
@@ -140,7 +185,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/80 backdrop-blur-sm pointer-events-auto"
@@ -322,6 +367,111 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
                 />
                 <div className="text-[10px] text-gray-600">Límite máximo de frames por segundo</div>
               </div>
+            </div>
+          </div>
+          
+          {/* Sección: Inferencia */}
+          <div className="space-y-3 pt-4 border-t border-white/5">
+            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Inferencia</div>
+            
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="block text-xs text-gray-300 font-medium">
+                  Tamaño de Grid (Inferencia)
+                </label>
+                <input
+                  type="number"
+                  value={gridSizeInference}
+                  onChange={(e) => setGridSizeInference(Math.max(64, Math.min(1024, Number(e.target.value) || 256)))}
+                  min={64}
+                  max={1024}
+                  step={64}
+                  disabled={!isConnected}
+                  className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50 font-mono"
+                />
+                <div className="text-[10px] text-gray-600">
+                  Tamaño del grid para simulación de inferencia (requiere recargar experimento)
+                  {currentExperiment && trainingGridSize !== gridSizeInference && (
+                    <span className="block mt-1 text-amber-400">
+                      ⚠️ Escalando desde {trainingGridSize}x{trainingGridSize} (entrenamiento) a {gridSizeInference}x{gridSizeInference}
+                    </span>
+                  )}
+                  {currentExperiment && trainingGridSize === gridSizeInference && (
+                    <span className="block mt-1 text-emerald-400">
+                      ✓ Mismo tamaño que entrenamiento ({trainingGridSize}x{trainingGridSize})
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              <div className="space-y-1.5">
+                <label className="block text-xs text-gray-300 font-medium">
+                  Modo de Inicialización
+                </label>
+                <select
+                  value={initialStateMode}
+                  onChange={(e) => setInitialStateMode(e.target.value)}
+                  disabled={!isConnected}
+                  className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                >
+                  <option value="complex_noise">Ruido Complejo (recomendado)</option>
+                  <option value="random">Aleatorio Normalizado</option>
+                  <option value="zeros">Ceros</option>
+                </select>
+                <div className="text-[10px] text-gray-600">Estado inicial del campo cuántico (requiere recargar experimento)</div>
+              </div>
+              
+              <div className="space-y-1.5">
+                <label className="block text-xs text-gray-300 font-medium">
+                  Gamma Decay (Decaimiento)
+                </label>
+                <input
+                  type="number"
+                  value={gammaDecay}
+                  onChange={(e) => setGammaDecay(Math.max(0, Math.min(0.1, Number(e.target.value) || 0.01)))}
+                  min={0}
+                  max={0.1}
+                  step={0.001}
+                  disabled={!isConnected}
+                  className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50 font-mono"
+                />
+                <div className="text-[10px] text-gray-600">
+                  Término Lindbladian (decaimiento/disipación) - 0.0 = sistema cerrado, &gt;0 = sistema abierto
+                  {gammaDecay > 0 && (
+                    <span className="block mt-1 text-blue-400">
+                      Sistema abierto: presión evolutiva activa
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              {currentExperiment && (
+                <div className="p-3 bg-white/5 rounded border border-white/10 space-y-2">
+                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Información del Experimento</div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-400">Grid Entrenamiento</span>
+                    <span className="font-mono text-blue-400">{trainingGridSize}x{trainingGridSize}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-400">Grid Inferencia</span>
+                    <span className="font-mono text-emerald-400">{gridSizeInference}x{gridSizeInference}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-400">Escalado</span>
+                    <span className={`font-mono font-medium ${
+                      gridSizeInference !== trainingGridSize ? 'text-amber-400' : 'text-gray-500'
+                    }`}>
+                      {gridSizeInference !== trainingGridSize 
+                        ? `${(gridSizeInference / trainingGridSize).toFixed(2)}x` 
+                        : '1.0x (sin escalado)'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-400">Grid Actual</span>
+                    <span className="font-mono text-gray-300">{currentGridSize}x{currentGridSize}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           

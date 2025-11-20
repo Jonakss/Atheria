@@ -1,20 +1,54 @@
-import React, { useMemo } from 'react';
-import { Play, Pause } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Play, Pause, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp } from 'lucide-react';
 import { GlassPanel } from './GlassPanel';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 
 export const Toolbar: React.FC = () => {
-  const { inferenceStatus, sendCommand, simData } = useWebSocket();
+  const { 
+    inferenceStatus, 
+    sendCommand, 
+    simData, 
+    connectionStatus, 
+    activeExperiment, 
+    experimentsData,
+    liveFeedEnabled,
+    setLiveFeedEnabled
+  } = useWebSocket();
   const isPlaying = inferenceStatus === 'running';
+  const isConnected = connectionStatus === 'connected';
   
-  const currentStep = simData?.step ?? simData?.simulation_info?.step ?? 0;
+  // Estado para el intervalo de pasos cuando live feed está desactivado
+  const [stepsInterval, setStepsInterval] = useState<number>(() => {
+    const saved = localStorage.getItem('atheria_steps_interval');
+    return saved ? parseInt(saved, 10) : 10; // Por defecto cada 10 pasos
+  });
+  const [showIntervalControl, setShowIntervalControl] = useState(false);
   
-  // Calcular FPS aproximado (placeholder - se podría calcular desde timestamps)
-  const fps = 118;
+  // Guardar intervalo en localStorage cuando cambia
+  useEffect(() => {
+    localStorage.setItem('atheria_steps_interval', stepsInterval.toString());
+    // Enviar al backend
+    if (isConnected && !liveFeedEnabled) {
+      sendCommand('simulation', 'set_steps_interval', { steps_interval: stepsInterval });
+    }
+  }, [stepsInterval, isConnected, liveFeedEnabled, sendCommand]);
   
-  // Calcular número de partículas (aproximado desde map_data)
+  // Verificar si hay experimento activo con checkpoint
+  const currentExperiment = activeExperiment 
+    ? experimentsData?.find(exp => exp.name === activeExperiment) 
+    : null;
+  const hasActiveExperiment = currentExperiment?.has_checkpoint || false;
+  const canControlInference = isConnected && (hasActiveExperiment || inferenceStatus === 'running');
+  
+  const currentStep = isConnected ? (simData?.step ?? simData?.simulation_info?.step ?? 0) : 0;
+  
+  // Calcular FPS solo si está conectado y hay datos
+  // TODO: Calcular FPS real desde timestamps en el futuro
+  const fps = isConnected && simData ? 118 : null;
+  
+  // Calcular número de partículas solo si está conectado y hay datos
   const particleCount = useMemo(() => {
-    if (!simData?.map_data) return '0';
+    if (!isConnected || !simData?.map_data) return null;
     
     let count = 0;
     for (const row of simData.map_data) {
@@ -25,26 +59,55 @@ export const Toolbar: React.FC = () => {
       }
     }
     return count > 1000 ? `${(count / 1000).toFixed(1)}K` : count.toString();
-  }, [simData?.map_data]);
+  }, [simData?.map_data, isConnected]);
 
   const handlePlayPause = () => {
+    if (!canControlInference) return;
     const command = isPlaying ? 'pause' : 'play';
     sendCommand('inference', command);
   };
 
+  const handleReset = () => {
+    if (!canControlInference) return;
+    sendCommand('inference', 'reset');
+  };
+
+  const handleToggleLiveFeed = () => {
+    if (!isConnected) return;
+    setLiveFeedEnabled(!liveFeedEnabled);
+  };
+
   return (
     <div className="absolute top-4 left-4 z-30 flex gap-2 pointer-events-none">
+      {/* Panel Principal: Play/Pause + Reset + Paso Actual - según mockup */}
       <GlassPanel className="pointer-events-auto flex items-center p-1 gap-1">
         <button 
           onClick={handlePlayPause}
+          disabled={!canControlInference}
           className={`px-4 py-1.5 rounded text-xs font-bold flex items-center gap-2 transition-all border ${
-            isPlaying 
-              ? 'bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500/20' 
-              : 'bg-white/5 text-gray-200 border-white/10 hover:bg-white/10'
+            !canControlInference
+              ? 'bg-white/5 text-gray-600 border-white/5 cursor-not-allowed opacity-50'
+              : isPlaying 
+                ? 'bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500/20' 
+                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
           }`}
+          title={canControlInference ? (isPlaying ? 'Pausar simulación' : 'Iniciar simulación') : 'Necesitas un experimento con checkpoint activo'}
         >
           {isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
           {isPlaying ? 'PAUSAR' : 'EJECUTAR'}
+        </button>
+        
+        <button 
+          onClick={handleReset}
+          disabled={!canControlInference}
+          className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1.5 transition-all border ${
+            !canControlInference
+              ? 'bg-white/5 text-gray-600 border-white/5 cursor-not-allowed opacity-50'
+              : 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10'
+          }`}
+          title={canControlInference ? 'Reiniciar simulación' : 'Necesitas un experimento con checkpoint activo'}
+        >
+          <RefreshCw size={12} />
         </button>
         
         <div className="w-px h-4 bg-white/10 mx-2" />
@@ -55,15 +118,105 @@ export const Toolbar: React.FC = () => {
         </div>
       </GlassPanel>
 
+      {/* Panel Secundario: FPS + Partículas + Live Feed - según mockup */}
       <GlassPanel className="pointer-events-auto flex items-center px-3 py-1 gap-3">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-bold text-gray-500">FPS</span>
-          <span className="text-xs font-mono text-emerald-400">{fps}</span>
+          <span className={`text-xs font-mono ${fps !== null ? 'text-emerald-400' : 'text-gray-600'}`}>
+            {fps !== null ? fps : 'N/A'}
+          </span>
         </div>
         <div className="w-px h-3 bg-white/10" />
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-bold text-gray-500">PARTÍCULAS</span>
-          <span className="text-xs font-mono text-blue-400">{particleCount}</span>
+          <span className={`text-xs font-mono ${particleCount !== null ? 'text-blue-400' : 'text-gray-600'}`}>
+            {particleCount !== null ? particleCount : 'N/A'}
+          </span>
+        </div>
+        <div className="w-px h-3 bg-white/10" />
+        <div className="relative flex items-center gap-1">
+          <button
+            onClick={handleToggleLiveFeed}
+            disabled={!isConnected || !canControlInference}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold border transition-all ${
+              !isConnected || !canControlInference
+                ? 'bg-white/5 text-gray-600 border-white/5 cursor-not-allowed opacity-50'
+                : liveFeedEnabled
+                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/20'
+                  : 'bg-gray-800 text-gray-500 border-gray-700 hover:bg-gray-700'
+            }`}
+            title={liveFeedEnabled ? 'Live Feed ON - Desactivar para acelerar simulación' : `Live Feed OFF - Mostrando cada ${stepsInterval} pasos`}
+          >
+            {liveFeedEnabled ? <Eye size={12} /> : <EyeOff size={12} />}
+            <span>{liveFeedEnabled ? 'LIVE' : 'OFF'}</span>
+          </button>
+          
+          {!liveFeedEnabled && (
+            <>
+              <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-[9px] font-mono text-gray-400">
+                <span>cada</span>
+                <span className="text-blue-400 font-bold">{stepsInterval}</span>
+                <span>pasos</span>
+              </div>
+              <button
+                onClick={() => setShowIntervalControl(!showIntervalControl)}
+                disabled={!isConnected || !canControlInference}
+                className="p-0.5 text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50"
+                title="Configurar intervalo de pasos"
+              >
+                {showIntervalControl ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+              </button>
+            </>
+          )}
+          
+          {/* Control de intervalo (dropdown) */}
+          {showIntervalControl && !liveFeedEnabled && (
+            <div className="absolute top-full left-0 mt-1 z-50">
+              <GlassPanel className="p-2 shadow-xl border border-white/20 min-w-[180px]">
+                <div className="space-y-2">
+                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    Intervalo de Pasos
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-[10px] text-gray-500">Cada</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={1000}
+                      step={1}
+                      value={stepsInterval}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (!isNaN(val) && val >= 1 && val <= 1000) {
+                          setStepsInterval(val);
+                        }
+                      }}
+                      className="w-16 px-2 py-1 bg-white/5 border border-white/10 rounded text-xs font-mono text-gray-300 focus:outline-none focus:border-blue-500/50"
+                    />
+                    <span className="text-[10px] text-gray-500">pasos</span>
+                  </div>
+                  <div className="flex gap-1">
+                    {[1, 5, 10, 25, 50, 100].map(val => (
+                      <button
+                        key={val}
+                        onClick={() => setStepsInterval(val)}
+                        className={`px-2 py-0.5 text-[9px] font-mono rounded border transition-all ${
+                          stepsInterval === val
+                            ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                            : 'bg-white/5 text-gray-500 border-white/10 hover:bg-white/10'
+                        }`}
+                      >
+                        {val}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="text-[9px] text-gray-600 pt-1 border-t border-white/10">
+                    Mostrar frame cada {stepsInterval} pasos cuando live feed está desactivado
+                  </div>
+                </div>
+              </GlassPanel>
+            </div>
+          )}
         </div>
       </GlassPanel>
     </div>

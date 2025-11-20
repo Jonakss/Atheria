@@ -167,14 +167,80 @@ async def simulation_loop():
                 current_step = g_state.get('simulation_step', 0)
                 
                 # OPTIMIZACIÓN CRÍTICA: Si live_feed está desactivado, NO procesar visualizaciones
-                # pero SÍ evolucionar el estado y enviar actualizaciones de estado (step, estadísticas)
+                # pero SÍ evolucionar el estado y enviar actualizaciones cada X pasos
                 if not live_feed_enabled:
                     # Si live_feed está desactivado, evolucionar el estado sin calcular visualizaciones
-                    # pero SÍ enviar actualizaciones de estado para que el frontend sepa el progreso
+                    # pero SÍ enviar frames cada X pasos configurados
                     try:
                         g_state['motor'].evolve_internal_state()
                         updated_step = current_step + 1
                         g_state['simulation_step'] = updated_step
+                        
+                        # Obtener intervalo de pasos configurado (por defecto 10)
+                        steps_interval = g_state.get('steps_interval', 10)
+                        if 'steps_interval_counter' not in g_state:
+                            g_state['steps_interval_counter'] = 0
+                        if 'last_frame_sent_step' not in g_state:
+                            g_state['last_frame_sent_step'] = -1  # Para forzar primer frame
+                        
+                        steps_interval_counter = g_state.get('steps_interval_counter', 0)
+                        steps_interval_counter += 1
+                        g_state['steps_interval_counter'] = steps_interval_counter
+                        
+                        # Enviar frame cada X pasos configurados
+                        # También enviar frame si nunca se ha enviado uno (last_frame_sent_step == -1)
+                        should_send_frame = (steps_interval_counter >= steps_interval) or (g_state['last_frame_sent_step'] == -1)
+                        
+                        if should_send_frame:
+                            # Resetear contador
+                            g_state['steps_interval_counter'] = 0
+                            
+                            # Calcular visualización para este frame
+                            delta_psi = g_state['motor'].last_delta_psi if hasattr(g_state['motor'], 'last_delta_psi') else None
+                            viz_data = get_visualization_data(
+                                g_state['motor'].state.psi, 
+                                g_state.get('viz_type', 'density'),
+                                delta_psi=delta_psi,
+                                motor=g_state['motor']
+                            )
+                            
+                            if viz_data and isinstance(viz_data, dict):
+                                map_data = viz_data.get("map_data", [])
+                                if map_data and len(map_data) > 0:
+                                    frame_payload_raw = {
+                                        "step": updated_step,
+                                        "timestamp": asyncio.get_event_loop().time(),
+                                        "map_data": map_data,
+                                        "hist_data": viz_data.get("hist_data", {}),
+                                        "poincare_coords": viz_data.get("poincare_coords", []),
+                                        "phase_attractor": viz_data.get("phase_attractor"),
+                                        "flow_data": viz_data.get("flow_data"),
+                                        "phase_hsv_data": viz_data.get("phase_hsv_data"),
+                                        "complex_3d_data": viz_data.get("complex_3d_data"),
+                                        "simulation_info": {
+                                            "step": updated_step,
+                                            "is_paused": False,
+                                            "live_feed_enabled": False
+                                        }
+                                    }
+                                    
+                                    # Aplicar optimizaciones si están habilitadas
+                                    compression_enabled = g_state.get('data_compression_enabled', True)
+                                    downsample_factor = g_state.get('downsample_factor', 1)
+                                    
+                                    if compression_enabled or downsample_factor > 1:
+                                        frame_payload = await optimize_frame_payload(
+                                            frame_payload_raw,
+                                            enable_compression=compression_enabled,
+                                            downsample_factor=downsample_factor,
+                                            viz_type=g_state.get('viz_type', 'density')
+                                        )
+                                    else:
+                                        frame_payload = frame_payload_raw
+                                    
+                                    await broadcast({"type": "simulation_frame", "payload": frame_payload})
+                                    frame_count += 1
+                                    g_state['last_frame_sent_step'] = updated_step  # Marcar que se envió un frame
                         
                         # THROTTLE: Solo enviar actualización de estado cada STATE_UPDATE_INTERVAL segundos
                         # para evitar saturar el WebSocket con demasiados mensajes
@@ -203,18 +269,37 @@ async def simulation_loop():
                         if updated_step % 100 == 0:
                             await broadcast({
                                 "type": "simulation_log",
-                                "payload": f"[Simulación] Paso {updated_step} completado (live feed desactivado)"
+                                "payload": f"[Simulación] Paso {updated_step} completado (live feed desactivado, mostrando cada {steps_interval} pasos)"
                             })
                             
                     except Exception as e:
                         logging.error(f"Error evolucionando estado (live_feed desactivado): {e}", exc_info=True)
                     
-                    # Controlar velocidad
+                    # THROTTLE ADAPTATIVO: Ajustar según live_feed y velocidad objetivo
+                    # - Si live_feed está OFF: Permitir velocidades más altas sin límite rígido
+                    # - Si live_feed está ON: Usar throttle mínimo para evitar CPU spin excesivo
                     simulation_speed = g_state.get('simulation_speed', 1.0)
                     target_fps = g_state.get('target_fps', 10.0)
                     base_fps = target_fps * simulation_speed
-                    sleep_time = max(0.001, 1.0 / base_fps)
-                    await asyncio.sleep(sleep_time)
+                    
+                    # Calcular sleep time ideal
+                    ideal_sleep = 1.0 / base_fps if base_fps > 0 else 0.001
+                    
+                    # THROTTLE ADAPTATIVO:
+                    # - Live feed OFF: Permitir velocidades muy altas (mínimo yield para cooperar con event loop)
+                    # - Live feed ON: Usar throttle mínimo para evitar CPU spin excesivo
+                    if not live_feed_enabled:
+                        # Sin live feed: Permitir velocidades más altas, pero yield para cooperar con event loop
+                        # Solo usar sleep si el ideal sleep es > 1ms (velocidades razonables)
+                        if ideal_sleep > 0.001:
+                            await asyncio.sleep(ideal_sleep)
+                        else:
+                            # Velocidad muy alta: yield para permitir otros tasks, pero sin sleep
+                            await asyncio.sleep(0)  # Yield al event loop
+                    else:
+                        # Con live feed: Usar throttle mínimo para evitar CPU spin
+                        sleep_time = max(0.016, ideal_sleep)  # Mínimo 16ms cuando hay live feed
+                        await asyncio.sleep(sleep_time)
                     continue
                 
                 try:
@@ -330,12 +415,24 @@ async def simulation_loop():
                     await broadcast({"type": "simulation_frame", "payload": frame_payload})
                     frame_count += 1
                     
-                    # Logging ocasional para debug (cada 50 frames)
-                    if updated_step % 50 == 0:
-                        logging.info(f"✅ Frame {updated_step} enviado. Payload keys: {list(frame_payload.keys())}, map_data_size={len(frame_payload.get('map_data', []))}")
+                    # OPTIMIZACIÓN: Calcular FPS solo ocasionalmente (cada 60 frames = ~1 segundo a 60 FPS)
+                    # Evitar cálculos costosos en cada frame
+                    if frame_count % 60 == 0:
+                        last_frame_time = time.time()
+                        if frame_count > 60 and 'last_fps_calc_time' in g_state:
+                            delta_time = last_frame_time - g_state.get('last_fps_calc_time', last_frame_time)
+                            if delta_time > 0:
+                                g_state['current_fps'] = 60 / delta_time  # 60 frames / tiempo transcurrido
+                        g_state['last_fps_calc_time'] = last_frame_time
+                    g_state['last_frame_sent_time'] = time.time()
                     
-                    # Enviar log de simulación cada 10 pasos para no saturar
-                    if updated_step % 10 == 0:
+                    # Logging ocasional para debug (cada 100 frames para reducir overhead)
+                    if updated_step % 100 == 0:
+                        logging.debug(f"✅ Frame {updated_step} enviado. FPS: {g_state.get('current_fps', 0):.1f}")
+                    
+                    # OPTIMIZACIÓN: Enviar log de simulación con menor frecuencia (cada 100 pasos)
+                    # Reducir overhead de WebSocket
+                    if updated_step % 100 == 0:
                         await broadcast({
                             "type": "simulation_log",
                             "payload": f"[Simulación] Paso {updated_step} completado"
@@ -383,9 +480,23 @@ async def simulation_loop():
             target_fps = g_state.get('target_fps', 10.0)
             frame_skip = g_state.get('frame_skip', 0)
             
-            # Calcular delay basado en FPS objetivo y velocidad
+            # THROTTLE ADAPTATIVO: Ajustar según estado y velocidad objetivo
+            # - Live feed OFF: Permitir velocidades más altas sin límite rígido
+            # - Live feed ON: Usar throttle mínimo para evitar CPU spin excesivo
             base_fps = target_fps * simulation_speed
-            sleep_time = max(0.001, 1.0 / base_fps)  # Mínimo 1ms para no saturar
+            ideal_sleep = 1.0 / base_fps if base_fps > 0 else 0.001
+            
+            # Aplicar throttle adaptativo según live_feed
+            live_feed_enabled = g_state.get('live_feed_enabled', True)
+            if not live_feed_enabled and ideal_sleep < 0.001:
+                # Sin live feed + velocidad muy alta: yield sin sleep (cooperar con event loop)
+                sleep_time = 0
+            elif not live_feed_enabled:
+                # Sin live feed + velocidad razonable: usar sleep calculado (sin mínimo)
+                sleep_time = ideal_sleep
+            else:
+                # Con live feed: usar throttle mínimo para evitar CPU spin excesivo
+                sleep_time = max(0.016, ideal_sleep)  # Mínimo 16ms cuando hay live feed
             
             # Aplicar frame skip si está configurado
             if frame_skip > 0 and g_state.get('simulation_step', 0) % (frame_skip + 1) != 0:
@@ -397,7 +508,12 @@ async def simulation_loop():
                     except:
                         pass
             
-            await asyncio.sleep(sleep_time)
+            # Sleep adaptativo: usar yield si sleep_time es 0, sino usar sleep normal
+            if sleep_time > 0:
+                await asyncio.sleep(sleep_time)
+            else:
+                # Yield al event loop para permitir otros tasks (sin delay)
+                await asyncio.sleep(0)
     except (SystemExit, asyncio.CancelledError):
         # Shutdown graceful - no loguear como error
         logging.info("Bucle de simulación detenido (shutdown graceful)")
@@ -868,8 +984,12 @@ async def handle_load_experiment(args):
         else:
             g_state['roi_manager'] = ROIManager(grid_size=inference_grid_size)
         
-        # --- CORRECCIÓN: La simulación queda en pausa, el usuario debe iniciarla manualmente ---
+        # --- NOTA IMPORTANTE: La simulación queda en pausa después de cargar el modelo ---
+        # Esto es INTENCIONAL: el modelo se carga en memoria y queda listo para ejecutar,
+        # pero el usuario debe iniciarlo manualmente con 'play'.
+        # Cargar modelo ≠ Ejecutar simulación (son operaciones separadas)
         g_state['is_paused'] = True
+        g_state['live_feed_enabled'] = True  # Live feed habilitado por defecto al cargar modelo
         
         # Enviar frame inicial inmediatamente para mostrar el estado inicial
         # SOLO si live_feed está habilitado
@@ -987,7 +1107,6 @@ async def handle_reset(args):
     try:
         # Obtener el modo de inicialización de la configuración
         from ..utils import load_experiment_config
-        from . import config as global_cfg
         
         # Intentar obtener el modo de inicialización del experimento activo o usar el global
         initial_mode = getattr(global_cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')
@@ -1632,6 +1751,29 @@ async def handle_clear_snapshots(args):
         if ws:
             await send_notification(ws, f"Error al limpiar snapshots: {str(e)}", "error")
 
+async def handle_set_steps_interval(args):
+    """Configura el intervalo de pasos para mostrar frames cuando live feed está desactivado."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    
+    try:
+        steps_interval = args.get('steps_interval', 10)
+        if steps_interval < 1:
+            steps_interval = 1
+        if steps_interval > 1000:
+            steps_interval = 1000
+        
+        g_state['steps_interval'] = int(steps_interval)
+        g_state['steps_interval_counter'] = 0  # Resetear contador
+        
+        msg = f"✅ Intervalo de pasos configurado: cada {steps_interval} pasos"
+        logging.info(msg)
+        if ws:
+            await send_notification(ws, msg, "success")
+    except Exception as e:
+        logging.error(f"Error al configurar intervalo de pasos: {e}", exc_info=True)
+        if ws:
+            await send_notification(ws, f"Error al configurar intervalo: {str(e)}", "error")
+
 async def handle_set_snapshot_interval(args):
     """Configura el intervalo de captura de snapshots."""
     ws = g_state['websockets'].get(args.get('ws_id'))
@@ -1677,11 +1819,69 @@ async def handle_set_live_feed(args):
     enabled = args.get('enabled', True)
     g_state['live_feed_enabled'] = bool(enabled)
     
+    # Resetear contador de pasos cuando se activa/desactiva live feed
+    if 'steps_interval_counter' not in g_state:
+        g_state['steps_interval_counter'] = 0
+    if 'last_frame_sent_step' not in g_state:
+        g_state['last_frame_sent_step'] = -1  # Forzar envío de frame inicial
+    
     status_msg = "activado" if enabled else "desactivado"
     logging.info(f"Live feed {status_msg}. La simulación continuará ejecutándose {'sin calcular visualizaciones' if not enabled else 'y enviando datos en tiempo real'}.")
     
     if ws:
         await send_notification(ws, f"Live feed {status_msg}. {'La simulación corre sin calcular visualizaciones para mejor rendimiento.' if not enabled else 'Enviando datos en tiempo real.'}", "info")
+    
+    # Si se desactiva live feed, enviar un frame inicial inmediatamente para que el usuario vea algo
+    if not enabled and g_state.get('motor') and not g_state.get('is_paused', True):
+        try:
+            current_step = g_state.get('simulation_step', 0)
+            delta_psi = g_state['motor'].last_delta_psi if hasattr(g_state['motor'], 'last_delta_psi') else None
+            viz_data = get_visualization_data(
+                g_state['motor'].state.psi, 
+                g_state.get('viz_type', 'density'),
+                delta_psi=delta_psi,
+                motor=g_state['motor']
+            )
+            
+            if viz_data and isinstance(viz_data, dict):
+                map_data = viz_data.get("map_data", [])
+                if map_data and len(map_data) > 0:
+                    frame_payload_raw = {
+                        "step": current_step,
+                        "timestamp": asyncio.get_event_loop().time(),
+                        "map_data": map_data,
+                        "hist_data": viz_data.get("hist_data", {}),
+                        "poincare_coords": viz_data.get("poincare_coords", []),
+                        "phase_attractor": viz_data.get("phase_attractor"),
+                        "flow_data": viz_data.get("flow_data"),
+                        "phase_hsv_data": viz_data.get("phase_hsv_data"),
+                        "complex_3d_data": viz_data.get("complex_3d_data"),
+                        "simulation_info": {
+                            "step": current_step,
+                            "is_paused": False,
+                            "live_feed_enabled": False
+                        }
+                    }
+                    
+                    # Aplicar optimizaciones si están habilitadas
+                    compression_enabled = g_state.get('data_compression_enabled', True)
+                    downsample_factor = g_state.get('downsample_factor', 1)
+                    
+                    if compression_enabled or downsample_factor > 1:
+                        frame_payload = await optimize_frame_payload(
+                            frame_payload_raw,
+                            enable_compression=compression_enabled,
+                            downsample_factor=downsample_factor,
+                            viz_type=g_state.get('viz_type', 'density')
+                        )
+                    else:
+                        frame_payload = frame_payload_raw
+                    
+                    await broadcast({"type": "simulation_frame", "payload": frame_payload})
+                    g_state['last_frame_sent_step'] = current_step
+                    logging.info(f"Frame inicial enviado al desactivar live feed (paso {current_step})")
+        except Exception as e:
+            logging.warning(f"Error enviando frame inicial al desactivar live feed: {e}")
     
     # Enviar actualización a todos los clientes
     await broadcast({
@@ -1799,6 +1999,167 @@ async def handle_set_roi(args):
         "payload": roi_info
     })
 
+async def handle_inject_energy(args):
+    """Inyecta energía en el estado cuántico actual según el tipo especificado."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    motor = g_state.get('motor')
+    
+    if not motor:
+        msg = "⚠️ No hay modelo cargado. Carga un experimento primero."
+        logging.warning(msg)
+        if ws: await send_notification(ws, msg, "warning")
+        return
+    
+    if not motor.state or motor.state.psi is None:
+        msg = "⚠️ El modelo cargado no tiene un estado válido. Intenta reiniciar la simulación."
+        logging.warning(msg)
+        if ws: await send_notification(ws, msg, "warning")
+        return
+    
+    energy_type = args.get('type', 'primordial_soup')
+    
+    try:
+        psi = motor.state.psi  # Shape: [batch, channels, height, width] o [channels, height, width]
+        device = psi.device
+        grid_size = motor.grid_size
+        
+        # Asegurarnos de trabajar con el tensor correcto (sin batch si existe)
+        if psi.dim() == 4:  # [batch, channels, height, width]
+            psi = psi[0]  # Tomar el primer batch
+        # Ahora psi es [channels, height, width]
+        
+        channels, height, width = psi.shape[0], psi.shape[1], psi.shape[2]
+        center_x, center_y = width // 2, height // 2
+        
+        # Crear una copia modificable del estado
+        psi_new = psi.clone()
+        
+        if energy_type == 'primordial_soup':
+            # Nebulosa de gas aleatorio alrededor del centro
+            radius = min(20, grid_size // 4)
+            density = 0.3
+            
+            for x in range(max(0, center_x - radius), min(width, center_x + radius)):
+                for y in range(max(0, center_y - radius), min(height, center_y + radius)):
+                    dist = ((x - center_x)**2 + (y - center_y)**2)**0.5
+                    prob = density * torch.exp(torch.tensor(-dist / (radius/2), device=device))
+                    
+                    if torch.rand(1, device=device).item() < prob.item():
+                        # Inyectar ruido complejo aleatorio en todos los canales
+                        noise = (torch.randn(channels, device=device) + 1j * torch.randn(channels, device=device)) * 0.1
+                        psi_new[:, y, x] = psi_new[:, y, x] + noise
+            
+            logging.info(f"🧪 Sopa Primordial inyectada en el centro ({center_x}, {center_y})")
+            msg = "🧪 Sopa Primordial inyectada"
+            
+        elif energy_type == 'dense_monolith':
+            # Cubo denso y uniforme de energía
+            size = min(10, grid_size // 8)
+            intensity = 2.0
+            
+            for x in range(max(0, center_x - size), min(width, center_x + size)):
+                for y in range(max(0, center_y - size), min(height, center_y + size)):
+                    # Crear estado con intensidad alta
+                    psi_new[:, y, x] = (torch.randn(channels, device=device) + 1j * torch.randn(channels, device=device)) * intensity * 0.1
+            
+            logging.info(f"⬛ Monolito Denso inyectado en el centro ({center_x}, {center_y})")
+            msg = "⬛ Monolito Denso inyectado"
+            
+        elif energy_type == 'symmetric_seed':
+            # Patrón con simetría de espejo forzada
+            size = min(8, grid_size // 10)
+            intensity = 1.5
+            
+            # Generar patrón simétrico en cuadrante superior izquierdo
+            for x in range(center_x - size, center_x):
+                for y in range(center_y - size, center_y):
+                    # Crear estado base
+                    base_state = (torch.randn(channels, device=device) + 1j * torch.randn(channels, device=device)) * intensity * 0.1
+                    
+                    # Reflejar en los 4 cuadrantes
+                    dx, dy = center_x - x, center_y - y
+                    
+                    # Cuadrante 1 (original)
+                    if 0 <= center_x + dx < width and 0 <= center_y + dy < height:
+                        psi_new[:, center_y + dy, center_x + dx] = base_state
+                    # Cuadrante 2 (reflejado en X)
+                    if 0 <= center_x - dx < width and 0 <= center_y + dy < height:
+                        psi_new[:, center_y + dy, center_x - dx] = base_state
+                    # Cuadrante 3 (reflejado en Y)
+                    if 0 <= center_x + dx < width and 0 <= center_y - dy < height:
+                        psi_new[:, center_y - dy, center_x + dx] = base_state
+                    # Cuadrante 4 (reflejado en ambos)
+                    if 0 <= center_x - dx < width and 0 <= center_y - dy < height:
+                        psi_new[:, center_y - dy, center_x - dx] = base_state
+            
+            logging.info(f"🔬 Semilla Simétrica inyectada en el centro ({center_x}, {center_y})")
+            msg = "🔬 Semilla Simétrica inyectada"
+        else:
+            logging.warning(f"⚠️ Tipo de inyección desconocido: {energy_type}")
+            if ws: await send_notification(ws, f"⚠️ Tipo de inyección desconocido: {energy_type}", "warning")
+            return
+        
+        # Normalizar el estado para mantener la conservación de probabilidad
+        # Normalizar por canal
+        for c in range(channels):
+            channel_data = psi_new[c]
+            norm = torch.norm(channel_data)
+            if norm > 1e-10:  # Evitar división por cero
+                psi_new[c] = channel_data / norm
+        
+        # Restaurar la forma original si tenía batch dimension
+        if motor.state.psi.dim() == 4:
+            psi_new = psi_new.unsqueeze(0)
+        
+        # Actualizar el estado del motor
+        motor.state.psi = psi_new
+        
+        # Reiniciar el step para indicar que el estado ha cambiado
+        g_state['simulation_step'] = 0
+        
+        # Enviar frame actualizado si live_feed está habilitado
+        live_feed_enabled = g_state.get('live_feed_enabled', True)
+        if live_feed_enabled:
+            try:
+                delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
+                viz_type = g_state.get('viz_type', 'density')
+                viz_data = get_visualization_data(
+                    motor.state.psi, 
+                    viz_type,
+                    delta_psi=delta_psi,
+                    motor=motor
+                )
+                
+                if viz_data and isinstance(viz_data, dict):
+                    map_data = viz_data.get("map_data", [])
+                    if map_data and len(map_data) > 0:
+                        frame_payload_raw = {
+                            "step": 0,
+                            "timestamp": asyncio.get_event_loop().time(),
+                            "map_data": map_data,
+                            "hist_data": viz_data.get("hist_data", {}),
+                            "poincare_coords": viz_data.get("poincare_coords", []),
+                            "phase_attractor": viz_data.get("phase_attractor", {}),
+                            "flow_data": viz_data.get("flow_data", {}),
+                            "phase_hsv_data": viz_data.get("phase_hsv_data", {}),
+                            "complex_3d_data": viz_data.get("complex_3d_data", {}),
+                            "simulation_info": {
+                                "step": 0,
+                                "is_paused": g_state.get('is_paused', True),
+                                "live_feed_enabled": live_feed_enabled
+                            }
+                        }
+                        await broadcast({"type": "frame", "payload": frame_payload_raw})
+            except Exception as e:
+                logging.error(f"Error enviando frame después de inyección: {e}", exc_info=True)
+        
+        if ws: await send_notification(ws, msg, "success")
+        logging.info(f"✅ Inyección de energía '{energy_type}' completada exitosamente")
+        
+    except Exception as e:
+        logging.error(f"Error en handle_inject_energy: {e}", exc_info=True)
+        if ws: await send_notification(ws, f"Error al inyectar energía: {str(e)}", "error")
+
 async def handle_set_inference_config(args):
     """Configura parámetros de inferencia (requiere recargar experimento para algunos)."""
     ws = g_state['websockets'].get(args.get('ws_id'))
@@ -1811,7 +2172,6 @@ async def handle_set_inference_config(args):
     changes = []
     
     if grid_size is not None:
-        from . import config as global_cfg
         old_size = global_cfg.GRID_SIZE_INFERENCE
         new_size = int(grid_size)
         global_cfg.GRID_SIZE_INFERENCE = new_size
@@ -1830,14 +2190,12 @@ async def handle_set_inference_config(args):
             logging.info(f"ROI manager creado con grid_size: {new_size}")
     
     if initial_state_mode is not None:
-        from . import config as global_cfg
         old_mode = getattr(global_cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')
         global_cfg.INITIAL_STATE_MODE_INFERENCE = str(initial_state_mode)
         changes.append(f"Inicialización: {old_mode} → {initial_state_mode}")
         logging.info(f"Modo de inicialización configurado a: {initial_state_mode} (requiere recargar experimento)")
     
     if gamma_decay is not None:
-        from . import config as global_cfg
         old_gamma = getattr(global_cfg, 'GAMMA_DECAY', 0.01)
         global_cfg.GAMMA_DECAY = float(gamma_decay)
         changes.append(f"Gamma Decay: {old_gamma} → {gamma_decay}")
@@ -2091,6 +2449,7 @@ HANDLERS = {
         "set_fps": handle_set_fps,
         "set_frame_skip": handle_set_frame_skip,
         "set_live_feed": handle_set_live_feed,
+        "set_steps_interval": handle_set_steps_interval,
         "set_compression": handle_set_compression,
         "set_downsample": handle_set_downsample,
         "set_roi": handle_set_roi,
@@ -2114,7 +2473,8 @@ HANDLERS = {
         "pause": handle_pause, 
         "load_experiment": handle_load_experiment, 
         "reset": handle_reset,
-        "set_config": handle_set_inference_config
+        "set_config": handle_set_inference_config,
+        "inject_energy": handle_inject_energy
     },
     "system": {
         "refresh_experiments": handle_refresh_experiments

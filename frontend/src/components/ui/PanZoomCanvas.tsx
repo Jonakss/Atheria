@@ -1,11 +1,17 @@
 // frontend/src/components/PanZoomCanvas.tsx
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { usePanZoom } from '../../hooks/usePanZoom';
 import { CanvasOverlays, OverlayControls, OverlayConfig } from './CanvasOverlays';
-import { Button, Group, ActionIcon, Tooltip, Switch, Paper, Stack, Text } from '@mantine/core';
-import { IconZoomReset, IconSettings } from '@tabler/icons-react';
-import classes from './PanZoomCanvas.module.css';
+import { ZoomOut, Settings, Eye, EyeOff, Maximize2, Minimize2 } from 'lucide-react';
+import { Group } from '../../modules/Dashboard/components/Group';
+import { ActionIcon } from '../../modules/Dashboard/components/ActionIcon';
+import { Tooltip } from '../../modules/Dashboard/components/Tooltip';
+import { Switch } from '../../modules/Dashboard/components/Switch';
+import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
+import { Stack } from '../../modules/Dashboard/components/Stack';
+import { Text } from '../../modules/Dashboard/components/Text';
+import { Box } from '../../modules/Dashboard/components/Box';
 
 function getColor(value: number) {
     // Validar que value sea un número válido
@@ -67,72 +73,168 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     const [showOverlayControls, setShowOverlayControls] = useState(false);
     const [autoROIEnabled, setAutoROIEnabled] = useState(false);
     const lastROIUpdate = useRef<number>(0);
-    const ROIUpdateThrottle = 500; // Actualizar ROI máximo cada 500ms
-
-    // Sincronizar ROI automáticamente con la vista visible del canvas
-    useEffect(() => {
-        if (!autoROIEnabled || !canvasRef.current || !mapData || gridWidth === 0 || gridHeight === 0) return;
-        
-        const now = Date.now();
-        if (now - lastROIUpdate.current < ROIUpdateThrottle) return;
+    const roiUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const ROIUpdateThrottle = 300; // Throttle: mínimo tiempo entre actualizaciones (300ms)
+    const ROIDebounceDelay = 500; // Debounce: esperar 500ms después de la última interacción antes de actualizar
+    
+    // Estado para tooltip de información del punto
+    const [tooltipData, setTooltipData] = useState<{
+        x: number;
+        y: number;
+        gridX: number;
+        gridY: number;
+        value: number | null;
+        visible: boolean;
+    } | null>(null);
+    
+    // Handler para mover el mouse y mostrar información del punto
+    const handleCanvasMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+        if (!canvasRef.current || !mapData || gridWidth === 0 || gridHeight === 0) {
+            if (tooltipData) setTooltipData(null);
+            return;
+        }
         
         const canvas = canvasRef.current;
         const container = canvas.parentElement;
         if (!container) return;
         
         const containerRect = container.getBoundingClientRect();
-        const containerWidth = containerRect.width;
-        const containerHeight = containerRect.height;
+        const canvasRect = canvas.getBoundingClientRect();
         
-        if (containerWidth === 0 || containerHeight === 0) return;
-        
-        // El canvas está centrado en el contenedor con CSS
-        // El origen del transform (0,0) está en el centro del contenedor
-        // Después del scale(zoom) translate(pan.x, pan.y):
-        // - El punto (gridX, gridY) del canvas está en: (containerCenter + pan.x + gridX*zoom, containerCenter + pan.y + gridY*zoom)
-        // - Para convertir coordenadas del contenedor a coordenadas del grid:
-        //   * containerX = containerWidth/2 + pan.x + gridX*zoom
-        //   * gridX = (containerX - containerWidth/2 - pan.x) / zoom
-        
-        // Calcular qué región del contenedor está visible (toda la región visible)
-        // La esquina superior izquierda visible: (0, 0) en coordenadas del contenedor
-        // La esquina inferior derecha visible: (containerWidth, containerHeight)
+        // Coordenadas del mouse relativas al canvas
+        const mouseX = e.clientX - canvasRect.left;
+        const mouseY = e.clientY - canvasRect.top;
         
         // Convertir a coordenadas del grid
-        const topLeftX = (0 - containerWidth/2 - pan.x) / zoom;
-        const topLeftY = (0 - containerHeight/2 - pan.y) / zoom;
-        const bottomRightX = (containerWidth - containerWidth/2 - pan.x) / zoom;
-        const bottomRightY = (containerHeight - containerHeight/2 - pan.y) / zoom;
+        const containerWidth = containerRect.width;
+        const containerHeight = containerRect.height;
+        const mouseRelToCanvasCenterX = mouseX - containerWidth / 2;
+        const mouseRelToCanvasCenterY = mouseY - containerHeight / 2;
         
-        // El canvas está centrado, así que las coordenadas del grid son relativas al centro
-        // El centro del grid (gridWidth/2, gridHeight/2) está en el origen del transform
-        // Entonces: gridX = (containerX - containerWidth/2 - pan.x) / zoom + gridWidth/2
+        // Coordenadas del grid
+        const gridX = Math.floor((mouseRelToCanvasCenterX - pan.x) / zoom + gridWidth / 2);
+        const gridY = Math.floor((mouseRelToCanvasCenterY - pan.y) / zoom + gridHeight / 2);
         
-        const visibleX = Math.max(0, Math.floor((topLeftX + gridWidth/2)));
-        const visibleY = Math.max(0, Math.floor((topLeftY + gridHeight/2)));
-        const visibleRightX = Math.min(gridWidth, Math.ceil((bottomRightX + gridWidth/2)));
-        const visibleBottomY = Math.min(gridHeight, Math.ceil((bottomRightY + gridHeight/2)));
-        
-        const visibleWidth = Math.max(1, visibleRightX - visibleX);
-        const visibleHeight = Math.max(1, visibleBottomY - visibleY);
-        
-        // Solo actualizar ROI si la región visible es significativamente menor que el grid completo
-        // y si el zoom es > 1.1 (estamos haciendo zoom in)
-        const visibleRatio = (visibleWidth * visibleHeight) / (gridWidth * gridHeight);
-        if (zoom > 1.1 && visibleRatio < 0.9 && visibleWidth > 16 && visibleHeight > 16) {
-            lastROIUpdate.current = now;
-            sendCommand('simulation', 'set_roi', {
-                enabled: true,
-                x: visibleX,
-                y: visibleY,
-                width: visibleWidth,
-                height: visibleHeight
+        // Verificar si estamos dentro del grid
+        if (gridX >= 0 && gridX < gridWidth && gridY >= 0 && gridY < gridHeight) {
+            const value = mapData[gridY]?.[gridX];
+            const numValue = typeof value === 'number' && !isNaN(value) ? value : null;
+            
+            setTooltipData({
+                x: e.clientX,
+                y: e.clientY,
+                gridX,
+                gridY,
+                value: numValue,
+                visible: true
             });
-        } else if (zoom <= 1.1 || visibleRatio >= 0.9) {
-            // Si estamos en zoom out o mostrando más del 90%, desactivar ROI
-            lastROIUpdate.current = now;
-            sendCommand('simulation', 'set_roi', { enabled: false });
+        } else {
+            setTooltipData(null);
         }
+    }, [mapData, gridWidth, gridHeight, pan, zoom]);
+    
+    const handleCanvasMouseLeave = useCallback(() => {
+        setTooltipData(null);
+    }, []);
+
+    // Sincronizar ROI automáticamente con la vista visible del canvas
+    // Usa debounce para evitar actualizaciones excesivas durante pan/zoom activos
+    useEffect(() => {
+        if (!autoROIEnabled || !canvasRef.current || !mapData || gridWidth === 0 || gridHeight === 0) {
+            // Si ROI está desactivado, cancelar cualquier actualización pendiente
+            if (roiUpdateTimeoutRef.current) {
+                clearTimeout(roiUpdateTimeoutRef.current);
+                roiUpdateTimeoutRef.current = null;
+            }
+            // Desactivar ROI si estaba activo
+            if (autoROIEnabled === false && lastROIUpdate.current > 0) {
+                sendCommand('simulation', 'set_roi', { enabled: false });
+                lastROIUpdate.current = 0;
+            }
+            return;
+        }
+        
+        // Limpiar timeout anterior (debounce)
+        if (roiUpdateTimeoutRef.current) {
+            clearTimeout(roiUpdateTimeoutRef.current);
+        }
+        
+        // Crear nuevo timeout con debounce
+        roiUpdateTimeoutRef.current = setTimeout(() => {
+            const now = Date.now();
+            
+            // Verificar throttle (evitar actualizaciones demasiado frecuentes)
+            if (now - lastROIUpdate.current < ROIUpdateThrottle) {
+                return;
+            }
+            
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const container = canvas.parentElement;
+            if (!container) return;
+            
+            const containerRect = container.getBoundingClientRect();
+            const containerWidth = containerRect.width;
+            const containerHeight = containerRect.height;
+            
+            if (containerWidth === 0 || containerHeight === 0) return;
+            
+            // El canvas está centrado en el contenedor con CSS
+            // El origen del transform (0,0) está en el centro del contenedor
+            // Después del scale(zoom) translate(pan.x, pan.y):
+            // - El punto (gridX, gridY) del canvas está en: (containerCenter + pan.x + gridX*zoom, containerCenter + pan.y + gridY*zoom)
+            // - Para convertir coordenadas del contenedor a coordenadas del grid:
+            //   * containerX = containerWidth/2 + pan.x + gridX*zoom
+            //   * gridX = (containerX - containerWidth/2 - pan.x) / zoom
+            
+            // Calcular qué región del contenedor está visible (toda la región visible)
+            // La esquina superior izquierda visible: (0, 0) en coordenadas del contenedor
+            // La esquina inferior derecha visible: (containerWidth, containerHeight)
+            
+            // Convertir a coordenadas del grid
+            const topLeftX = (0 - containerWidth/2 - pan.x) / zoom;
+            const topLeftY = (0 - containerHeight/2 - pan.y) / zoom;
+            const bottomRightX = (containerWidth - containerWidth/2 - pan.x) / zoom;
+            const bottomRightY = (containerHeight - containerHeight/2 - pan.y) / zoom;
+            
+            // El canvas está centrado, así que las coordenadas del grid son relativas al centro
+            // El centro del grid (gridWidth/2, gridHeight/2) está en el origen del transform
+            // Entonces: gridX = (containerX - containerWidth/2 - pan.x) / zoom + gridWidth/2
+            
+            const visibleX = Math.max(0, Math.floor((topLeftX + gridWidth/2)));
+            const visibleY = Math.max(0, Math.floor((topLeftY + gridHeight/2)));
+            const visibleRightX = Math.min(gridWidth, Math.ceil((bottomRightX + gridWidth/2)));
+            const visibleBottomY = Math.min(gridHeight, Math.ceil((bottomRightY + gridHeight/2)));
+            
+            const visibleWidth = Math.max(1, visibleRightX - visibleX);
+            const visibleHeight = Math.max(1, visibleBottomY - visibleY);
+            
+            // Solo actualizar ROI si la región visible es significativamente menor que el grid completo
+            // y si el zoom es > 1.1 (estamos haciendo zoom in)
+            const visibleRatio = (visibleWidth * visibleHeight) / (gridWidth * gridHeight);
+            if (zoom > 1.1 && visibleRatio < 0.9 && visibleWidth > 16 && visibleHeight > 16) {
+                lastROIUpdate.current = now;
+                sendCommand('simulation', 'set_roi', {
+                    enabled: true,
+                    x: visibleX,
+                    y: visibleY,
+                    width: visibleWidth,
+                    height: visibleHeight
+                });
+            } else if (zoom <= 1.1 || visibleRatio >= 0.9) {
+                // Si estamos en zoom out o mostrando más del 90%, desactivar ROI
+                lastROIUpdate.current = now;
+                sendCommand('simulation', 'set_roi', { enabled: false });
+            }
+        }, ROIDebounceDelay); // Debounce: esperar 500ms después de la última interacción
+        
+        // Cleanup: cancelar timeout si el componente se desmonta o cambian las dependencias
+        return () => {
+            if (roiUpdateTimeoutRef.current) {
+                clearTimeout(roiUpdateTimeoutRef.current);
+                roiUpdateTimeoutRef.current = null;
+            }
+        };
     }, [pan, zoom, gridWidth, gridHeight, mapData, autoROIEnabled, sendCommand]);
 
     // Manejar wheel event con listener no pasivo para prevenir el comportamiento por defecto
@@ -438,60 +540,66 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
         }
     }, [dataToRender, simData, selectedViz, pan, zoom, historyFrame, gridWidth, gridHeight]);
 
+    // Atajos de teclado para vistas rápidas
+    useEffect(() => {
+        const handleKeyPress = (e: KeyboardEvent) => {
+            // Solo procesar si no estamos escribiendo en un input
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+                return;
+            }
+            
+            // Ctrl/Cmd + números para cambiar visualización rápidamente
+            if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '5') {
+                e.preventDefault();
+                const vizIndex = parseInt(e.key) - 1;
+                const vizOptions = ['density', 'phase', 'flow', 'spectral', 'poincare'];
+                if (vizOptions[vizIndex]) {
+                    sendCommand('simulation', 'set_viz', { viz_type: vizOptions[vizIndex] });
+                }
+            }
+            
+            // R para resetear vista
+            if (e.key === 'r' || e.key === 'R') {
+                if (!(e.ctrlKey || e.metaKey || e.altKey)) {
+                    e.preventDefault();
+                    resetView();
+                }
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyPress);
+        return () => window.removeEventListener('keydown', handleKeyPress);
+    }, [sendCommand, resetView]);
+    
     return (
-        <div className={classes.canvasContainer} style={{ position: 'relative' }}>
+        <Box 
+            className="relative w-full h-full"
+            onMouseMove={handleCanvasMouseMove}
+            onMouseLeave={handleCanvasMouseLeave}
+        >
             {(!dataToRender?.map_data && !simData?.map_data) && (
-                <div style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    textAlign: 'center',
-                    color: '#999',
-                    zIndex: 1,
-                    pointerEvents: 'none'
-                }}>
-                    <p style={{ margin: 0, fontSize: '1.1rem' }}>Esperando datos de simulación...</p>
-                    <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem' }}>
+                <Box className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center text-gray-500 z-10 pointer-events-none">
+                    <Text size="lg" className="block mb-2">Esperando datos de simulación...</Text>
+                    <Text size="sm" color="dimmed">
                         {inferenceStatus === 'running' 
                             ? 'Carga un modelo desde el panel lateral para ver la simulación'
                             : 'Inicia la simulación o carga un modelo para ver datos'}
-                    </p>
-                </div>
+                    </Text>
+                </Box>
             )}
 
             {simData && simData.simulation_info?.live_feed_enabled === false && (
-                <div style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    textAlign: 'center',
-                    color: '#999',
-                    zIndex: 1,
-                    pointerEvents: 'none', // Permitir interacción con el canvas
-                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                    padding: '1rem',
-                    borderRadius: '8px'
-                }}>
-                    <p style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold', color: '#fff' }}>Live Feed Pausado</p>
-                    <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem', color: '#ccc' }}>
+                <Box className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center text-gray-500 z-10 pointer-events-none bg-black/70 p-4 rounded-lg">
+                    <Text size="lg" weight="bold" className="block mb-2 text-white">Live Feed Pausado</Text>
+                    <Text size="sm" color="muted">
                         Simulación en ejecución (Paso: {simData.step || simData.simulation_info?.step || '...'})
-                    </p>
-                </div>
+                    </Text>
+                </Box>
             )}
             
             {/* Controles de overlay */}
-            <div style={{
-                position: 'absolute',
-                top: 10,
-                right: 10,
-                zIndex: 20,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8
-            }}>
-                <Group gap={4}>
+            <Box className="absolute top-2.5 right-2.5 z-20 flex flex-col gap-2">
+                <Group gap={1}>
                     <Tooltip label="Resetear vista">
                         <ActionIcon
                             variant="filled"
@@ -499,7 +607,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                             onClick={resetView}
                             size="sm"
                         >
-                            <IconZoomReset size={16} />
+                            <ZoomOut size={16} />
                         </ActionIcon>
                     </Tooltip>
                     <Tooltip label="Configurar overlays">
@@ -509,25 +617,20 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                             onClick={() => setShowOverlayControls(!showOverlayControls)}
                             size="sm"
                         >
-                            <IconSettings size={16} />
+                            <Settings size={16} />
                         </ActionIcon>
                     </Tooltip>
                 </Group>
                 
                 {showOverlayControls && (
-                    <div style={{ 
-                        position: 'absolute',
-                        top: 40,
-                        right: 0,
-                        zIndex: 21
-                    }}>
-                        <Paper p="sm" withBorder style={{ backgroundColor: 'var(--mantine-color-dark-7)' }}>
-                            <Stack gap="xs">
-                        <OverlayControls
-                            config={overlayConfig}
-                            onConfigChange={setOverlayConfig}
-                        />
-                                <div style={{ borderTop: '1px solid var(--mantine-color-dark-4)', paddingTop: '8px', marginTop: '4px' }}>
+                    <Box className="absolute top-10 right-0 z-30">
+                        <GlassPanel className="p-3">
+                            <Stack gap={2}>
+                                <OverlayControls
+                                    config={overlayConfig}
+                                    onConfigChange={setOverlayConfig}
+                                />
+                                <Box className="border-t border-white/10 pt-2 mt-1">
                                     <Switch
                                         label="ROI Automático"
                                         description="Sincronizar ROI con la vista visible (solo procesar lo que ves)"
@@ -536,20 +639,20 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                                         size="sm"
                                     />
                                     {autoROIEnabled && (
-                                        <Text size="xs" c="dimmed" mt={4}>
+                                        <Text size="xs" color="dimmed" className="mt-1 block">
                                             El ROI se actualiza automáticamente según el zoom y pan. Solo se procesa la región visible.
                                         </Text>
                                     )}
-                                </div>
+                                </Box>
                             </Stack>
-                        </Paper>
-                    </div>
+                        </GlassPanel>
+                    </Box>
                 )}
-            </div>
+            </Box>
             
             <canvas
                 ref={canvasRef}
-                className={classes.canvas}
+                className="absolute inset-0 w-full h-full"
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
@@ -572,6 +675,111 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                     roiInfo={simData?.roi_info || null}
                 />
             )}
-        </div>
+            
+            {/* Tooltip de información del punto (tipo Google Maps) */}
+            {tooltipData && tooltipData.visible && (
+                <div
+                    className="fixed z-[100] pointer-events-none"
+                    style={{
+                        left: `${Math.min(tooltipData.x + 10, window.innerWidth - 200)}px`,
+                        top: `${Math.max(tooltipData.y - 120, 10)}px`
+                    }}
+                >
+                    <GlassPanel className="p-2.5 shadow-xl border border-white/20 min-w-[160px]">
+                        <div className="text-[10px] space-y-1.5">
+                            <div className="flex items-center justify-between gap-3">
+                                <span className="text-gray-400 font-mono uppercase text-[9px] tracking-wider">Posición</span>
+                                <span className="text-gray-200 font-mono font-bold">
+                                    ({tooltipData.gridX}, {tooltipData.gridY})
+                                </span>
+                            </div>
+                            {tooltipData.value !== null && (
+                                <div className="flex items-center justify-between gap-3">
+                                    <span className="text-gray-400 font-mono uppercase text-[9px] tracking-wider">Valor</span>
+                                    <span className="text-emerald-400 font-mono font-bold">
+                                        {tooltipData.value.toFixed(4)}
+                                    </span>
+                                </div>
+                            )}
+                            {simData?.step !== undefined && (
+                                <div className="flex items-center justify-between gap-3">
+                                    <span className="text-gray-400 font-mono uppercase text-[9px] tracking-wider">Paso</span>
+                                    <span className="text-blue-400 font-mono font-bold">
+                                        {simData.step.toLocaleString()}
+                                    </span>
+                                </div>
+                            )}
+                            {zoom && (
+                                <div className="flex items-center justify-between gap-3">
+                                    <span className="text-gray-400 font-mono uppercase text-[9px] tracking-wider">Zoom</span>
+                                    <span className="text-amber-400 font-mono font-bold">
+                                        {zoom.toFixed(2)}x
+                                    </span>
+                                </div>
+                            )}
+                            {selectedViz && (
+                                <div className="flex items-center justify-between gap-3 pt-1 border-t border-white/10">
+                                    <span className="text-gray-400 font-mono uppercase text-[9px] tracking-wider">Vista</span>
+                                    <span className="text-purple-400 font-mono font-bold text-[9px]">
+                                        {selectedViz.toUpperCase()}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </GlassPanel>
+                </div>
+            )}
+            
+            {/* Indicador de atajos de teclado - Vistas Rápidas (siempre visible) */}
+            <Box className="absolute bottom-2.5 left-2.5 z-20 opacity-70 hover:opacity-100 transition-opacity">
+                <GlassPanel className="p-2.5">
+                    <div className="space-y-2">
+                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                            Vistas Rápidas
+                        </div>
+                        <div className="space-y-1.5 text-[10px]">
+                            <div className="flex items-center gap-2">
+                                <kbd className="px-1.5 py-0.5 bg-white/10 border border-white/20 rounded text-[9px] font-mono text-gray-300">
+                                    Ctrl+1
+                                </kbd>
+                                <span className="text-gray-500">Densidad</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <kbd className="px-1.5 py-0.5 bg-white/10 border border-white/20 rounded text-[9px] font-mono text-gray-300">
+                                    Ctrl+2
+                                </kbd>
+                                <span className="text-gray-500">Fase</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <kbd className="px-1.5 py-0.5 bg-white/10 border border-white/20 rounded text-[9px] font-mono text-gray-300">
+                                    Ctrl+3
+                                </kbd>
+                                <span className="text-gray-500">Flujo</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <kbd className="px-1.5 py-0.5 bg-white/10 border border-white/20 rounded text-[9px] font-mono text-gray-300">
+                                    Ctrl+4
+                                </kbd>
+                                <span className="text-gray-500">Espectral</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <kbd className="px-1.5 py-0.5 bg-white/10 border border-white/20 rounded text-[9px] font-mono text-gray-300">
+                                    Ctrl+5
+                                </kbd>
+                                <span className="text-gray-500">Poincaré</span>
+                            </div>
+                            <div className="pt-1.5 border-t border-white/10 mt-1.5">
+                                <div className="flex items-center gap-2">
+                                    <kbd className="px-1.5 py-0.5 bg-white/10 border border-white/20 rounded text-[9px] font-mono text-gray-300">
+                                        R
+                                    </kbd>
+                                    <span className="text-gray-500">Resetear vista</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </GlassPanel>
+            </Box>
+        </Box>
     );
 }

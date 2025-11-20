@@ -16,6 +16,7 @@
 ## 📓 Bitácoras
 
 - **[Log de Desarrollo AI](../40_Experiments/AI_DEV_LOG.md)** - Bitácora de desarrollo con IA
+- **[Log de Setup Fase 2](../40_Experiments/PHASE_2_SETUP_LOG.md)** - Setup del Motor Nativo C++
 
 ---
 
