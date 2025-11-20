@@ -1,16 +1,8 @@
 // frontend/src/components/ExperimentManager.tsx
 import { useState, useMemo } from 'react';
-import { 
-    Paper, Stack, Group, Text, Badge, Button, Modal, 
-    Table, ScrollArea, Tooltip, ActionIcon, Divider,
-    Card, Timeline, Alert, Select, Box
-} from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+import { Database, Info, Trash2, Check, Clock, ArrowRightLeft, X } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
-import { 
-    IconInfoCircle, IconTransfer, IconTrash, IconDownload,
-    IconChartLine, IconDatabase, IconX, IconCheck, IconClock
-} from '@tabler/icons-react';
+import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
 
 interface ExperimentNode {
     name: string;
@@ -22,10 +14,13 @@ interface ExperimentNode {
 
 export function ExperimentManager() {
     const { experimentsData, activeExperiment, setActiveExperiment, sendCommand } = useWebSocket();
-    const [opened, { open, close }] = useDisclosure(false);
+    const [opened, setOpened] = useState(false);
     const [selectedExp, setSelectedExp] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'list' | 'tree'>('tree');
     const [sortBy, setSortBy] = useState<'created' | 'updated' | 'name' | 'training_time'>('created');
+
+    const open = () => setOpened(true);
+    const close = () => setOpened(false);
 
     // Construir árbol de relaciones de transfer learning
     const experimentTree = useMemo(() => {
@@ -207,439 +202,458 @@ export function ExperimentManager() {
 
     return (
         <>
-            <Paper p="sm" withBorder>
-                <Group justify="space-between" mb="xs">
-                    <Group gap="xs">
-                        <IconDatabase size={16} />
-                        <Text size="sm" fw={600}>Gestión</Text>
-                        <Badge size="xs" variant="light" color="blue">
+            <GlassPanel className="p-3">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                        <Database size={14} className="text-gray-400" />
+                        <span className="text-xs font-bold text-gray-300">Gestión</span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border bg-blue-500/10 text-blue-400 border-blue-500/30">
                             {experimentsData?.length || 0}
-                        </Badge>
-                    </Group>
-                    <Group gap="xs">
-                        <Select
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <select
                             value={sortBy}
-                            onChange={(val) => val && setSortBy(val as 'created' | 'updated' | 'name' | 'training_time')}
-                            data={[
-                                { value: 'created', label: 'Fecha Creación' },
-                                { value: 'updated', label: 'Última Actualización' },
-                                { value: 'name', label: 'Nombre' },
-                                { value: 'training_time', label: 'Tiempo Entrenamiento' }
-                            ]}
-                            size="xs"
+                            onChange={(e) => setSortBy(e.target.value as 'created' | 'updated' | 'name' | 'training_time')}
+                            className="px-2 py-1 bg-white/5 border border-white/10 rounded text-[10px] text-gray-300 focus:outline-none focus:border-blue-500/50"
                             style={{ width: 140 }}
-                        />
-                        <Select
-                            value={viewMode}
-                            onChange={(val) => val && setViewMode(val as 'list' | 'tree')}
-                            data={[
-                                { value: 'list', label: 'Lista' },
-                                { value: 'tree', label: 'Árbol' }
-                            ]}
-                            size="xs"
-                            style={{ width: 80 }}
-                        />
-                        <ActionIcon
-                            size="sm"
-                            variant="light"
-                            onClick={() => sendCommand('system', 'refresh_experiments', {})}
                         >
-                            <IconCheck size={14} />
-                        </ActionIcon>
-                    </Group>
-                </Group>
+                            <option value="created">Fecha Creación</option>
+                            <option value="updated">Última Actualización</option>
+                            <option value="name">Nombre</option>
+                            <option value="training_time">Tiempo Entrenamiento</option>
+                        </select>
+                        <select
+                            value={viewMode}
+                            onChange={(e) => setViewMode(e.target.value as 'list' | 'tree')}
+                            className="px-2 py-1 bg-white/5 border border-white/10 rounded text-[10px] text-gray-300 focus:outline-none focus:border-blue-500/50"
+                            style={{ width: 80 }}
+                        >
+                            <option value="list">Lista</option>
+                            <option value="tree">Árbol</option>
+                        </select>
+                        <button
+                            onClick={() => sendCommand('system', 'refresh_experiments', {})}
+                            className="p-1.5 text-gray-400 hover:text-gray-200 hover:bg-white/5 rounded transition-all"
+                            title="Refrescar"
+                        >
+                            <Check size={12} />
+                        </button>
+                    </div>
+                </div>
 
-                <ScrollArea h={300}>
+                {/* Scrollable Content */}
+                <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
                     {viewMode === 'tree' ? (
-                        <Stack gap="xs">
+                        <div className="space-y-2">
                             {Object.entries(groupedExperiments).map(([root, exps]) => {
                                 const rootNode = experimentTreeSorted[root];
                                 const isActive = root === activeExperiment;
                                 
                                 return (
-                                    <Card key={root} withBorder p="xs" style={{ 
-                                        backgroundColor: isActive ? 'var(--mantine-color-blue-0)' : 'transparent'
-                                    }}>
-                                        <Stack gap="xs">
-                                            <Group justify="space-between" gap="xs">
-                                                <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
-                                                    <Badge 
-                                                        size="xs"
-                                                        color={rootNode.hasCheckpoint ? 'green' : 'orange'}
-                                                        variant="light"
-                                                    >
+                                    <GlassPanel 
+                                        key={root} 
+                                        className={`p-2 ${isActive ? 'bg-blue-500/5 border-blue-500/30' : ''}`}
+                                    >
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border shrink-0 ${
+                                                        rootNode.hasCheckpoint 
+                                                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
+                                                            : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                                    }`}>
                                                         {rootNode.hasCheckpoint ? '✓' : '○'}
-                                                    </Badge>
-                                                    <Box style={{ flex: 1, minWidth: 0 }}>
-                                                        <Text 
-                                                            size="xs" 
-                                                            fw={isActive ? 700 : 500}
-                                                            style={{ cursor: 'pointer' }}
-                                                            truncate="end"
+                                                    </span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div 
+                                                            className={`text-xs cursor-pointer truncate ${isActive ? 'font-bold text-blue-400' : 'font-medium text-gray-300'}`}
                                                             onClick={() => setActiveExperiment(root)}
                                                         >
                                                             {root}
-                                                        </Text>
+                                                        </div>
                                                         {(() => {
                                                             const exp = sortedExperiments.find(e => e.name === root);
                                                             if (!exp) return null;
                                                             const created = exp.created_at ? new Date(exp.created_at).toLocaleDateString() : '';
                                                             const trainingTime = exp.total_training_time ? formatTime(exp.total_training_time) : '';
                                                             return (
-                                                                <Text size="xs" c="dimmed" truncate="end">
+                                                                <div className="text-[10px] text-gray-500 truncate">
                                                                     {trainingTime ? `${created} • ${trainingTime}` : created}
-                                                                </Text>
+                                                                </div>
                                                             );
                                                         })()}
-                                                    </Box>
+                                                    </div>
                                                     {isActive && (
-                                                        <Badge size="xs" color="blue">Activo</Badge>
+                                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border bg-blue-500/10 text-blue-400 border-blue-500/30 shrink-0">
+                                                            Activo
+                                                        </span>
                                                     )}
-                                                </Group>
-                                                <Group gap={4}>
-                                                    <Tooltip label="Ver detalles">
-                                                        <ActionIcon
-                                                            size="xs"
-                                                            variant="subtle"
-                                                            onClick={() => handleViewDetails(root)}
-                                                        >
-                                                            <IconInfoCircle size={12} />
-                                                        </ActionIcon>
-                                                    </Tooltip>
-                                                    <Tooltip label="Eliminar experimento">
-                                                        <ActionIcon
-                                                            size="xs"
-                                                            variant="subtle"
-                                                            color="red"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDeleteExperiment(root);
-                                                            }}
-                                                        >
-                                                            <IconTrash size={12} />
-                                                        </ActionIcon>
-                                                    </Tooltip>
-                                                </Group>
-                                            </Group>
+                                                </div>
+                                                <div className="flex items-center gap-1 shrink-0">
+                                                    <button
+                                                        onClick={() => handleViewDetails(root)}
+                                                        className="p-1 text-gray-400 hover:text-gray-200 hover:bg-white/5 rounded transition-all"
+                                                        title="Ver detalles"
+                                                    >
+                                                        <Info size={12} />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteExperiment(root);
+                                                        }}
+                                                        className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-all"
+                                                        title="Eliminar experimento"
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </button>
+                                                </div>
+                                            </div>
                                             
                                             {exps.length > 1 && (
-                                                <Box pl="md" style={{ borderLeft: '2px solid var(--mantine-color-blue-6)' }}>
-                                                    <Stack gap={4}>
-                                                        {exps.slice(1).map((expName, idx) => {
+                                                <div className="pl-4 border-l-2 border-blue-500/30">
+                                                    <div className="space-y-1">
+                                                        {exps.slice(1).map((expName) => {
                                                             const node = experimentTreeSorted[expName];
                                                             const isChildActive = expName === activeExperiment;
                                                             
                                                             return (
-                                                                <Group key={expName} gap="xs" wrap="nowrap">
-                                                                    <IconTransfer size={12} color="var(--mantine-color-blue-6)" />
-                                                                    <Text 
-                                                                        size="xs" 
-                                                                        fw={isChildActive ? 600 : 400}
-                                                                        c={isChildActive ? 'blue' : undefined}
-                                                                        style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
-                                                                        truncate="end"
+                                                                <div key={expName} className="flex items-center gap-2">
+                                                                    <ArrowRightLeft size={10} className="text-blue-400 shrink-0" />
+                                                                    <div 
+                                                                        className={`text-xs flex-1 min-w-0 truncate cursor-pointer ${isChildActive ? 'font-bold text-blue-400' : 'font-normal text-gray-400'}`}
                                                                         onClick={() => setActiveExperiment(expName)}
                                                                     >
                                                                         {expName}
-                                                                    </Text>
+                                                                    </div>
                                                                     {node.hasCheckpoint && (
-                                                                        <Badge size="xs" color="green" variant="dot">✓</Badge>
+                                                                        <span className="px-1 py-0.5 rounded text-[10px] font-bold border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shrink-0">
+                                                                            ✓
+                                                                        </span>
                                                                     )}
-                                                                </Group>
+                                                                </div>
                                                             );
                                                         })}
-                                                    </Stack>
-                                                </Box>
+                                                    </div>
+                                                </div>
                                             )}
-                                        </Stack>
-                                    </Card>
+                                        </div>
+                                    </GlassPanel>
                                 );
                             })}
-                        </Stack>
+                        </div>
                     ) : (
-                        <Table verticalSpacing="xs">
-                            <Table.Thead>
-                                <Table.Tr>
-                                    <Table.Th style={{ fontSize: '0.7rem' }}>Nombre</Table.Th>
-                                    <Table.Th style={{ fontSize: '0.7rem' }}>Estado</Table.Th>
-                                    <Table.Th style={{ fontSize: '0.7rem' }}>Creado</Table.Th>
-                                    <Table.Th style={{ fontSize: '0.7rem' }}>Tiempo Entrenamiento</Table.Th>
-                                    <Table.Th style={{ fontSize: '0.7rem' }}>Transfer</Table.Th>
-                                    <Table.Th style={{ fontSize: '0.7rem' }}>Acciones</Table.Th>
-                                </Table.Tr>
-                            </Table.Thead>
-                            <Table.Tbody>
-                                {sortedExperiments.map(exp => {
-                                    const node = experimentTreeSorted[exp.name];
-                                    const isActive = exp.name === activeExperiment;
-                                    
-                                    return (
-                                        <Table.Tr 
-                                            key={exp.name}
-                                            style={{ 
-                                                backgroundColor: isActive ? 'var(--mantine-color-blue-0)' : 'transparent',
-                                                cursor: 'pointer'
-                                            }}
-                                            onClick={() => setActiveExperiment(exp.name)}
-                                        >
-                                            <Table.Td>
-                                                <Group gap="xs" wrap="nowrap">
-                                                    <Text size="xs" fw={isActive ? 700 : 500} style={{ flex: 1, minWidth: 0 }} truncate="end">
-                                                        {exp.name}
-                                                    </Text>
-                                                    {isActive && <Badge size="xs" color="blue">Activo</Badge>}
-                                                </Group>
-                                            </Table.Td>
-                                            <Table.Td>
-                                                <Badge 
-                                                    size="xs"
-                                                    color={exp.has_checkpoint ? 'green' : 'orange'}
-                                                    variant="light"
-                                                >
-                                                    {exp.has_checkpoint ? '✓' : '○'}
-                                                </Badge>
-                                            </Table.Td>
-                                            <Table.Td>
-                                                <Text size="xs" c="dimmed">
-                                                    {exp.created_at ? new Date(exp.created_at).toLocaleDateString() : 'N/A'}
-                                                </Text>
-                                            </Table.Td>
-                                            <Table.Td>
-                                                <Group gap={4}>
-                                                    <IconClock size={12} />
-                                                    <Text size="xs" c="dimmed">
-                                                        {exp.total_training_time ? formatTime(exp.total_training_time) : '0s'}
-                                                    </Text>
-                                                </Group>
-                                            </Table.Td>
-                                            <Table.Td>
-                                                {node.loadFrom ? (
-                                                    <Group gap={4} wrap="nowrap">
-                                                        <IconTransfer size={10} />
-                                                        <Text size="xs" c="dimmed" style={{ maxWidth: 100 }} truncate="end">
-                                                            {node.loadFrom}
-                                                        </Text>
-                                                    </Group>
-                                                ) : (
-                                                    <Text size="xs" c="dimmed">-</Text>
-                                                )}
-                                            </Table.Td>
-                                            <Table.Td>
-                                                <Group gap={4}>
-                                                    <Tooltip label="Ver detalles">
-                                                        <ActionIcon
-                                                            size="xs"
-                                                            variant="subtle"
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="border-b border-white/10">
+                                        <th className="text-[10px] font-bold text-gray-400 uppercase tracking-wider py-2 pr-4">Nombre</th>
+                                        <th className="text-[10px] font-bold text-gray-400 uppercase tracking-wider py-2 pr-4">Estado</th>
+                                        <th className="text-[10px] font-bold text-gray-400 uppercase tracking-wider py-2 pr-4">Creado</th>
+                                        <th className="text-[10px] font-bold text-gray-400 uppercase tracking-wider py-2 pr-4">Tiempo Entrenamiento</th>
+                                        <th className="text-[10px] font-bold text-gray-400 uppercase tracking-wider py-2 pr-4">Transfer</th>
+                                        <th className="text-[10px] font-bold text-gray-400 uppercase tracking-wider py-2">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {sortedExperiments.map(exp => {
+                                        const node = experimentTreeSorted[exp.name];
+                                        const isActive = exp.name === activeExperiment;
+                                        
+                                        return (
+                                            <tr 
+                                                key={exp.name}
+                                                className={`border-b border-white/5 cursor-pointer hover:bg-white/5 ${isActive ? 'bg-blue-500/5' : ''}`}
+                                                onClick={() => setActiveExperiment(exp.name)}
+                                            >
+                                                <td className="py-2 pr-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`text-xs flex-1 min-w-0 truncate ${isActive ? 'font-bold text-blue-400' : 'font-medium text-gray-300'}`}>
+                                                            {exp.name}
+                                                        </span>
+                                                        {isActive && (
+                                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border bg-blue-500/10 text-blue-400 border-blue-500/30 shrink-0">
+                                                                Activo
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="py-2 pr-4">
+                                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                                        exp.has_checkpoint 
+                                                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
+                                                            : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                                    }`}>
+                                                        {exp.has_checkpoint ? '✓' : '○'}
+                                                    </span>
+                                                </td>
+                                                <td className="py-2 pr-4">
+                                                    <span className="text-xs text-gray-500">
+                                                        {exp.created_at ? new Date(exp.created_at).toLocaleDateString() : 'N/A'}
+                                                    </span>
+                                                </td>
+                                                <td className="py-2 pr-4">
+                                                    <div className="flex items-center gap-1">
+                                                        <Clock size={10} className="text-gray-500" />
+                                                        <span className="text-xs text-gray-500">
+                                                            {exp.total_training_time ? formatTime(exp.total_training_time) : '0s'}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="py-2 pr-4">
+                                                    {node.loadFrom ? (
+                                                        <div className="flex items-center gap-1">
+                                                            <ArrowRightLeft size={10} className="text-gray-500" />
+                                                            <span className="text-xs text-gray-500 truncate max-w-[100px]">
+                                                                {node.loadFrom}
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-500">-</span>
+                                                    )}
+                                                </td>
+                                                <td className="py-2">
+                                                    <div className="flex items-center gap-1">
+                                                        <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 handleViewDetails(exp.name);
                                                             }}
+                                                            className="p-1 text-gray-400 hover:text-gray-200 hover:bg-white/5 rounded transition-all"
+                                                            title="Ver detalles"
                                                         >
-                                                            <IconInfoCircle size={12} />
-                                                        </ActionIcon>
-                                                    </Tooltip>
-                                                    <Tooltip label="Eliminar experimento">
-                                                        <ActionIcon
-                                                            size="xs"
-                                                            variant="subtle"
-                                                            color="red"
+                                                            <Info size={12} />
+                                                        </button>
+                                                        <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 handleDeleteExperiment(exp.name);
                                                             }}
+                                                            className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-all"
+                                                            title="Eliminar experimento"
                                                         >
-                                                            <IconTrash size={12} />
-                                                        </ActionIcon>
-                                                    </Tooltip>
-                                                </Group>
-                                            </Table.Td>
-                                        </Table.Tr>
-                                    );
-                                })}
-                            </Table.Tbody>
-                        </Table>
+                                                            <Trash2 size={12} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
-                </ScrollArea>
-            </Paper>
+                </div>
+            </GlassPanel>
 
             {/* Modal de detalles */}
-            <Modal
-                opened={opened}
-                onClose={close}
-                title={`Detalles: ${selectedExp}`}
-                size="lg"
-            >
-                {selectedExperiment && (
-                    <Stack gap="md">
-                        {/* Cadena de transfer learning */}
-                        {transferChain.length > 1 && (
-                            <Alert icon={<IconTransfer size={16} />} color="blue" variant="light">
-                                <Text size="sm" fw={500} mb="xs">Cadena de Transfer Learning:</Text>
-                                <Timeline active={transferChain.length - 1} bulletSize={12} lineWidth={2}>
-                                    {transferChain.map((expName, idx) => (
-                                        <Timeline.Item
-                                            key={expName}
-                                            bullet={idx === 0 ? <IconDatabase size={10} /> : <IconTransfer size={10} />}
-                                            title={expName}
-                                        >
-                                            {idx > 0 && (
-                                                <Text size="xs" c="dimmed">
-                                                    Transfer desde: {transferChain[idx - 1]}
-                                                </Text>
-                                            )}
-                                        </Timeline.Item>
-                                    ))}
-                                </Timeline>
-                            </Alert>
-                        )}
-
-                        {/* Información temporal */}
-                        {(() => {
-                            const exp = sortedExperiments.find(e => e.name === selectedExp);
-                            if (!exp) return null;
-                            
-                            return (
-                                <Paper p="md" withBorder>
-                                    <Text fw={600} mb="md">Información Temporal</Text>
-                                    <Table>
-                                        <Table.Tbody>
-                                            <Table.Tr>
-                                                <Table.Td><Text fw={500}>Creado:</Text></Table.Td>
-                                                <Table.Td>
-                                                    {exp.created_at ? new Date(exp.created_at).toLocaleString() : 'N/A'}
-                                                </Table.Td>
-                                            </Table.Tr>
-                                            <Table.Tr>
-                                                <Table.Td><Text fw={500}>Última Actualización:</Text></Table.Td>
-                                                <Table.Td>
-                                                    {exp.updated_at ? new Date(exp.updated_at).toLocaleString() : 'N/A'}
-                                                </Table.Td>
-                                            </Table.Tr>
-                                            <Table.Tr>
-                                                <Table.Td><Text fw={500}>Tiempo Total de Entrenamiento:</Text></Table.Td>
-                                                <Table.Td>
-                                                    <Group gap={4}>
-                                                        <IconClock size={14} />
-                                                        <Text>
-                                                            {exp.total_training_time ? formatTime(exp.total_training_time) : '0s'}
-                                                        </Text>
-                                                    </Group>
-                                                </Table.Td>
-                                            </Table.Tr>
-                                            {exp.last_training_time && (
-                                                <Table.Tr>
-                                                    <Table.Td><Text fw={500}>Última Sesión de Entrenamiento:</Text></Table.Td>
-                                                    <Table.Td>
-                                                        {new Date(exp.last_training_time).toLocaleString()}
-                                                    </Table.Td>
-                                                </Table.Tr>
-                                            )}
-                                        </Table.Tbody>
-                                    </Table>
-                                </Paper>
-                            );
-                        })()}
+            {opened && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
+                    {/* Backdrop */}
+                    <div 
+                        className="absolute inset-0 bg-black/80 backdrop-blur-sm pointer-events-auto"
+                        onClick={close}
+                    />
+                    
+                    {/* Modal */}
+                    <GlassPanel className="relative w-[600px] max-h-[80vh] pointer-events-auto flex flex-col overflow-hidden">
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
+                            <h2 className="text-sm font-bold text-gray-200">Detalles: {selectedExp}</h2>
+                            <button
+                                onClick={close}
+                                className="p-1.5 text-gray-400 hover:text-gray-200 transition-colors rounded hover:bg-white/5"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
                         
-                        {/* Información del experimento */}
-                        <Paper p="md" withBorder>
-                            <Text fw={600} mb="md">Configuración</Text>
-                            <Table>
-                                <Table.Tbody>
-                                    <Table.Tr>
-                                        <Table.Td><Text fw={500}>Arquitectura</Text></Table.Td>
-                                        <Table.Td>{selectedExperiment.config?.MODEL_ARCHITECTURE || 'N/A'}</Table.Td>
-                                    </Table.Tr>
-                                    <Table.Tr>
-                                        <Table.Td><Text fw={500}>d_state</Text></Table.Td>
-                                        <Table.Td>{selectedExperiment.config?.MODEL_PARAMS?.d_state || 'N/A'}</Table.Td>
-                                    </Table.Tr>
-                                    <Table.Tr>
-                                        <Table.Td><Text fw={500}>Hidden Channels</Text></Table.Td>
-                                        <Table.Td>{selectedExperiment.config?.MODEL_PARAMS?.hidden_channels || 'N/A'}</Table.Td>
-                                    </Table.Tr>
-                                    <Table.Tr>
-                                        <Table.Td><Text fw={500}>Learning Rate</Text></Table.Td>
-                                        <Table.Td>{selectedExperiment.config?.LR_RATE_M || 'N/A'}</Table.Td>
-                                    </Table.Tr>
-                                    <Table.Tr>
-                                        <Table.Td><Text fw={500}>Total Episodios</Text></Table.Td>
-                                        <Table.Td>{selectedExperiment.config?.TOTAL_EPISODES || 'N/A'}</Table.Td>
-                                    </Table.Tr>
-                                    <Table.Tr>
-                                        <Table.Td><Text fw={500}>Grid Size</Text></Table.Td>
-                                        <Table.Td>{selectedExperiment.config?.GRID_SIZE_TRAINING || 'N/A'}</Table.Td>
-                                    </Table.Tr>
-                                    <Table.Tr>
-                                        <Table.Td><Text fw={500}>Estado</Text></Table.Td>
-                                        <Table.Td>
-                                            <Badge 
-                                                color={selectedExperiment.hasCheckpoint ? 'green' : 'orange'}
-                                            >
-                                                {selectedExperiment.hasCheckpoint ? 'Entrenado' : 'Sin entrenar'}
-                                            </Badge>
-                                        </Table.Td>
-                                    </Table.Tr>
-                                    {selectedExperiment.loadFrom && (
-                                        <Table.Tr>
-                                            <Table.Td><Text fw={500}>Transfer Desde</Text></Table.Td>
-                                            <Table.Td>
-                                                <Group gap="xs">
-                                                    <IconTransfer size={14} />
-                                                    <Text>{selectedExperiment.loadFrom}</Text>
-                                                </Group>
-                                            </Table.Td>
-                                        </Table.Tr>
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
+                            {selectedExperiment && (
+                                <>
+                                    {/* Cadena de transfer learning */}
+                                    {transferChain.length > 1 && (
+                                        <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <ArrowRightLeft size={14} className="text-blue-400" />
+                                                <span className="text-xs font-bold text-blue-400">Cadena de Transfer Learning:</span>
+                                            </div>
+                                            <div className="space-y-2 pl-6 border-l-2 border-blue-500/30">
+                                                {transferChain.map((expName, idx) => (
+                                                    <div key={expName} className="relative">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`w-2 h-2 rounded-full ${idx === transferChain.length - 1 ? 'bg-blue-400' : 'bg-blue-500/50'}`} />
+                                                            <span className="text-xs font-medium text-gray-300">{expName}</span>
+                                                        </div>
+                                                        {idx > 0 && (
+                                                            <div className="text-[10px] text-gray-500 pl-4 mt-0.5">
+                                                                Transfer desde: {transferChain[idx - 1]}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
                                     )}
-                                    {selectedExperiment.children.length > 0 && (
-                                        <Table.Tr>
-                                            <Table.Td><Text fw={500}>Usado por</Text></Table.Td>
-                                            <Table.Td>
-                                                <Stack gap="xs">
-                                                    {selectedExperiment.children.map(child => (
-                                                        <Badge key={child} variant="dot" color="blue">
-                                                            {child}
-                                                        </Badge>
-                                                    ))}
-                                                </Stack>
-                                            </Table.Td>
-                                        </Table.Tr>
-                                    )}
-                                </Table.Tbody>
-                            </Table>
-                        </Paper>
 
-                        <Group justify="space-between">
-                            <Button 
-                                variant="light" 
-                                color="red"
-                                leftSection={<IconTrash size={16} />}
+                                    {/* Información temporal */}
+                                    {(() => {
+                                        const exp = sortedExperiments.find(e => e.name === selectedExp);
+                                        if (!exp) return null;
+                                        
+                                        return (
+                                            <GlassPanel className="p-4">
+                                                <h3 className="text-xs font-bold text-gray-300 mb-3 uppercase tracking-wider">Información Temporal</h3>
+                                                <table className="w-full">
+                                                    <tbody className="space-y-2">
+                                                        <tr>
+                                                            <td className="text-xs font-medium text-gray-400 py-1 pr-4">Creado:</td>
+                                                            <td className="text-xs text-gray-300 py-1">
+                                                                {exp.created_at ? new Date(exp.created_at).toLocaleString() : 'N/A'}
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td className="text-xs font-medium text-gray-400 py-1 pr-4">Última Actualización:</td>
+                                                            <td className="text-xs text-gray-300 py-1">
+                                                                {exp.updated_at ? new Date(exp.updated_at).toLocaleString() : 'N/A'}
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td className="text-xs font-medium text-gray-400 py-1 pr-4">Tiempo Total de Entrenamiento:</td>
+                                                            <td className="text-xs text-gray-300 py-1">
+                                                                <div className="flex items-center gap-1">
+                                                                    <Clock size={12} className="text-gray-500" />
+                                                                    <span>{exp.total_training_time ? formatTime(exp.total_training_time) : '0s'}</span>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                        {exp.last_training_time && (
+                                                            <tr>
+                                                                <td className="text-xs font-medium text-gray-400 py-1 pr-4">Última Sesión de Entrenamiento:</td>
+                                                                <td className="text-xs text-gray-300 py-1">
+                                                                    {new Date(exp.last_training_time).toLocaleString()}
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </GlassPanel>
+                                        );
+                                    })()}
+                                    
+                                    {/* Información del experimento */}
+                                    <GlassPanel className="p-4">
+                                        <h3 className="text-xs font-bold text-gray-300 mb-3 uppercase tracking-wider">Configuración</h3>
+                                        <table className="w-full">
+                                            <tbody>
+                                                <tr>
+                                                    <td className="text-xs font-medium text-gray-400 py-1 pr-4">Arquitectura</td>
+                                                    <td className="text-xs text-gray-300 py-1">{selectedExperiment.config?.MODEL_ARCHITECTURE || 'N/A'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="text-xs font-medium text-gray-400 py-1 pr-4">d_state</td>
+                                                    <td className="text-xs text-gray-300 py-1">{selectedExperiment.config?.MODEL_PARAMS?.d_state || 'N/A'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="text-xs font-medium text-gray-400 py-1 pr-4">Hidden Channels</td>
+                                                    <td className="text-xs text-gray-300 py-1">{selectedExperiment.config?.MODEL_PARAMS?.hidden_channels || 'N/A'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="text-xs font-medium text-gray-400 py-1 pr-4">Learning Rate</td>
+                                                    <td className="text-xs text-gray-300 py-1">{selectedExperiment.config?.LR_RATE_M || 'N/A'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="text-xs font-medium text-gray-400 py-1 pr-4">Total Episodios</td>
+                                                    <td className="text-xs text-gray-300 py-1">{selectedExperiment.config?.TOTAL_EPISODES || 'N/A'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="text-xs font-medium text-gray-400 py-1 pr-4">Grid Size</td>
+                                                    <td className="text-xs text-gray-300 py-1">{selectedExperiment.config?.GRID_SIZE_TRAINING || 'N/A'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="text-xs font-medium text-gray-400 py-1 pr-4">Estado</td>
+                                                    <td className="text-xs py-1">
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                                            selectedExperiment.hasCheckpoint 
+                                                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
+                                                                : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                                        }`}>
+                                                            {selectedExperiment.hasCheckpoint ? 'Entrenado' : 'Sin entrenar'}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                {selectedExperiment.loadFrom && (
+                                                    <tr>
+                                                        <td className="text-xs font-medium text-gray-400 py-1 pr-4">Transfer Desde</td>
+                                                        <td className="text-xs text-gray-300 py-1">
+                                                            <div className="flex items-center gap-1">
+                                                                <ArrowRightLeft size={12} className="text-gray-500" />
+                                                                <span>{selectedExperiment.loadFrom}</span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                                {selectedExperiment.children.length > 0 && (
+                                                    <tr>
+                                                        <td className="text-xs font-medium text-gray-400 py-1 pr-4">Usado por</td>
+                                                        <td className="text-xs py-1">
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {selectedExperiment.children.map(child => (
+                                                                    <span key={child} className="px-2 py-0.5 rounded text-[10px] font-medium border bg-blue-500/10 text-blue-400 border-blue-500/30">
+                                                                        {child}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </GlassPanel>
+                                </>
+                            )}
+                        </div>
+                        
+                        {/* Footer */}
+                        <div className="flex items-center justify-between p-4 border-t border-white/10 shrink-0 gap-3">
+                            <button
                                 onClick={() => {
                                     close();
-                                    handleDeleteExperiment(selectedExp!);
+                                    if (selectedExp) {
+                                        handleDeleteExperiment(selectedExp);
+                                    }
                                 }}
+                                className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-bold rounded transition-all"
                             >
+                                <Trash2 size={14} />
                                 Eliminar
-                            </Button>
-                            <Group>
-                                <Button variant="light" onClick={close}>
+                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={close}
+                                    className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 text-xs font-bold rounded transition-all"
+                                >
                                     Cerrar
-                                </Button>
-                                <Button 
+                                </button>
+                                <button
                                     onClick={() => {
                                         if (selectedExp) {
                                             setActiveExperiment(selectedExp);
                                         }
                                         close();
                                     }}
+                                    className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-300 text-xs font-bold rounded transition-all"
                                 >
                                     Seleccionar
-                                </Button>
-                            </Group>
-                        </Group>
-                    </Stack>
-                )}
-            </Modal>
+                                </button>
+                            </div>
+                        </div>
+                    </GlassPanel>
+                </div>
+            )}
         </>
     );
 }
-
