@@ -2558,8 +2558,8 @@ def setup_routes(app, serve_frontend=True):
         serve_frontend: Si True, sirve el frontend estático. Si False, solo WebSocket.
                        Por defecto True. Se puede desactivar con --no-frontend o variable de entorno ATHERIA_NO_FRONTEND=1
     """
-    PROJECT_ROOT = Path(__file__).parent.parent.resolve()
-    STATIC_FILES_ROOT = PROJECT_ROOT / 'frontend' / 'dist'
+    # Usar FRONTEND_DIST_PATH desde config para asegurar consistencia
+    STATIC_FILES_ROOT = Path(global_cfg.FRONTEND_DIST_PATH) if hasattr(global_cfg, 'FRONTEND_DIST_PATH') else Path(__file__).parent.parent.parent.resolve() / 'frontend' / 'dist'
     
     # Siempre agregar la ruta WebSocket (debe tener prioridad absoluta)
     # Esto permite que el servidor funcione aunque no tenga el frontend construido

@@ -31,9 +31,12 @@ related: [[30_Components/00_COMPONENTS_MOC]], [[40_Experiments/00_EXPERIMENTS_MO
 
 ## 📅 Planificación
 
-- [[ROADMAP_PHASE_1]] - Plan de desarrollo inicial
-- [[ROADMAP_PHASE_2]] - Plan de desarrollo avanzado
-- [[ROADMAP_PHASE_3]] - Optimización de visualización y UX ← **Actual**
+- [[ROADMAP_PHASE_1]] - Plan de desarrollo inicial - 🟢 ~80% completado
+- [[ROADMAP_PHASE_2]] - Motor Nativo C++ - 🟡 ~70% completado
+- [[ROADMAP_PHASE_3]] - Optimización de visualización y UX - 🟢 ~95% completado
+- **Fase 4:** (No documentada) - ⚪ No iniciado
+
+**Ver:** [[40_Experiments/PHASE_STATUS_REPORT|Informe de Estado de Fases]] para detalles completos
 
 ---
 
