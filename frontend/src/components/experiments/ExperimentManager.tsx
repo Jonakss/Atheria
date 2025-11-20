@@ -242,7 +242,7 @@ export function ExperimentManager() {
     };
 
     const selectedExperiment = selectedExp ? experimentTreeSorted[selectedExp] : null;
-    const transferChain = selectedExp ? getTransferChain(selectedExp) : [];
+    const transferChain = selectedExp ? getTransferChain(selectedExp, experimentTree) : [];
 
     return (
         <>
