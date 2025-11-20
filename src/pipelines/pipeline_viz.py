@@ -60,16 +60,27 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
     
     # OPTIMIZACIÓN CUDA: Calcular en GPU primero, luego mover a CPU una sola vez
     # Esto evita múltiples sincronizaciones CUDA costosas
-    with torch.no_grad():  # No necesitamos gradientes para visualización
-        density = torch.sum(psi.abs()**2, dim=-1)
+    device = psi.device if isinstance(psi, torch.Tensor) else torch.device('cpu')
+    is_cuda = device.type == 'cuda'
+    
+    # OPTIMIZACIÓN: Usar inference_mode si está disponible (PyTorch 1.9+)
+    # inference_mode es más rápido que no_grad() para operaciones que no necesitan grads
+    use_inference_mode = hasattr(torch, 'inference_mode')
+    
+    if use_inference_mode:
+        inference_context = torch.inference_mode()
+    else:
+        inference_context = torch.no_grad()
+    
+    with inference_context:  # Más rápido que no_grad() para inferencia pura
+        # Calcular todo en GPU vectorizado
+        psi_abs_sq = psi.abs()**2  # |ψ|²
+        density = torch.sum(psi_abs_sq, dim=-1)
         
-        # Calcular fase en GPU
+        # Calcular fase en GPU (vectorizado)
         if psi.shape[-1] > 0:
-            # Usar el primer canal para la fase (más visible)
-            phase_single = torch.angle(psi[..., 0])
-            # Alternativa: promedio de todas las fases ponderado por densidad
-            phase_weighted = torch.angle(psi)
             # Calcular promedio circular de fases en GPU (más eficiente)
+            phase_weighted = torch.angle(psi)
             phase_cos = torch.cos(phase_weighted).mean(dim=-1)
             phase_sin = torch.sin(phase_weighted).mean(dim=-1)
             phase = torch.atan2(phase_sin, phase_cos)
@@ -78,28 +89,89 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
             if phase.ndim > 2:
                 phase = phase[..., 0]
         
+        # Calcular partes real e imaginaria (ya en GPU)
         real_part = psi.real
         imag_part = psi.imag
         
         # Calcular energía total (suma de |ψ|² sobre todos los canales)
-        energy = torch.sum(psi.abs()**2, dim=-1)
+        energy = density  # Ya calculado arriba
     
     # OPTIMIZACIÓN: Mover todos los datos a CPU en un solo paso (una sincronización)
     # Usar .detach() para evitar problemas con el grafo computacional
     # Mantener cálculos en GPU el mayor tiempo posible antes de convertir a numpy
-    device = psi.device if isinstance(psi, torch.Tensor) else torch.device('cpu')
-    is_cuda = device.type == 'cuda'
-    
     # Si estamos en CUDA, sincronizar una sola vez al final
     if is_cuda:
-        torch.cuda.synchronize()  # Asegurar que todos los cálculos GPU terminen antes de copiar
+        # Asegurar que todos los cálculos GPU terminen antes de copiar
+        torch.cuda.synchronize()
     
     # Mover todo a CPU en batch (una sola sincronización CUDA)
-    density = density.detach().cpu().numpy()
-    phase = phase.detach().cpu().numpy() if isinstance(phase, torch.Tensor) else phase
-    real_part = real_part.detach().cpu().numpy() if isinstance(real_part, torch.Tensor) else real_part
-    imag_part = imag_part.detach().cpu().numpy() if isinstance(imag_part, torch.Tensor) else imag_part
-    energy = energy.detach().cpu().numpy()
+    # OPTIMIZACIÓN: Usar .contiguous() antes de .numpy() para mejor rendimiento
+    # Verificar si ya son numpy arrays (puede pasar con motor nativo que ya convierte)
+    # CRÍTICO: Usar try-except para manejar casos donde isinstance() puede fallar o objetos híbridos
+    try:
+        if isinstance(density, torch.Tensor) and hasattr(density, 'detach'):
+            density = density.detach().contiguous().cpu().numpy()
+        elif not isinstance(density, np.ndarray):
+            density = np.array(density)
+    except (AttributeError, TypeError) as e:
+        logging.warning(f"Error convirtiendo density: {e}, intentando np.array()")
+        try:
+            density = np.array(density)
+        except Exception as e2:
+            logging.error(f"Error crítico convirtiendo density: {e2}")
+            raise
+    
+    try:
+        if isinstance(phase, torch.Tensor) and hasattr(phase, 'detach'):
+            phase = phase.detach().contiguous().cpu().numpy()
+        elif not isinstance(phase, np.ndarray):
+            phase = np.array(phase)
+    except (AttributeError, TypeError) as e:
+        logging.warning(f"Error convirtiendo phase: {e}, intentando np.array()")
+        try:
+            phase = np.array(phase)
+        except Exception as e2:
+            logging.error(f"Error crítico convirtiendo phase: {e2}")
+            raise
+    
+    try:
+        if isinstance(real_part, torch.Tensor) and hasattr(real_part, 'detach'):
+            real_part = real_part.detach().contiguous().cpu().numpy()
+        elif not isinstance(real_part, np.ndarray):
+            real_part = np.array(real_part)
+    except (AttributeError, TypeError) as e:
+        logging.warning(f"Error convirtiendo real_part: {e}, intentando np.array()")
+        try:
+            real_part = np.array(real_part)
+        except Exception as e2:
+            logging.error(f"Error crítico convirtiendo real_part: {e2}")
+            raise
+    
+    try:
+        if isinstance(imag_part, torch.Tensor) and hasattr(imag_part, 'detach'):
+            imag_part = imag_part.detach().contiguous().cpu().numpy()
+        elif not isinstance(imag_part, np.ndarray):
+            imag_part = np.array(imag_part)
+    except (AttributeError, TypeError) as e:
+        logging.warning(f"Error convirtiendo imag_part: {e}, intentando np.array()")
+        try:
+            imag_part = np.array(imag_part)
+        except Exception as e2:
+            logging.error(f"Error crítico convirtiendo imag_part: {e2}")
+            raise
+    
+    try:
+        if isinstance(energy, torch.Tensor) and hasattr(energy, 'detach'):
+            energy = energy.detach().contiguous().cpu().numpy()
+        elif not isinstance(energy, np.ndarray):
+            energy = np.array(energy)
+    except (AttributeError, TypeError) as e:
+        logging.warning(f"Error convirtiendo energy: {e}, intentando np.array()")
+        try:
+            energy = np.array(energy)
+        except Exception as e2:
+            logging.error(f"Error crítico convirtiendo energy: {e2}")
+            raise
     
     # Calcular gradiente espacial (magnitud del gradiente)
     # OPTIMIZACIÓN: Calcular gradiente en GPU si es posible, luego mover a CPU
@@ -196,7 +268,6 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
             max_entropy = np.log(psi.shape[-1])
             map_data = entropy / (max_entropy + 1e-10)
         except Exception as e:
-            import logging
             logging.warning(f"Error calculando entropía: {e}")
             map_data = density
     elif viz_type == 'coherence':
@@ -221,7 +292,6 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
             coherence = np.abs(inner_product) / (norm_psi * norm_shifted + 1e-10)  # (H, W)
             map_data = coherence
         except Exception as e:
-            import logging
             logging.warning(f"Error calculando coherencia: {e}")
             map_data = density
     elif viz_type == 'channel_activity':
@@ -243,7 +313,6 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
             else:
                 map_data = density
         except Exception as e:
-            import logging
             logging.warning(f"Error calculando actividad de canales: {e}")
             map_data = density
     else:
@@ -463,7 +532,6 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
             else:
                 result["flow_data"] = None
         except Exception as e:
-            import logging
             logging.warning(f"Error calculando datos de flujo: {e}")
             result["flow_data"] = None
     else:
