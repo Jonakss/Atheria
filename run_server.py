@@ -61,6 +61,23 @@ async def save_state_before_shutdown():
 
 # --- Ejecutar el Servidor ---
 if __name__ == "__main__":
+    import argparse
+    
+    # Parsear argumentos de línea de comandos
+    parser = argparse.ArgumentParser(description="Servidor Aetheria")
+    parser.add_argument('--no-frontend', action='store_true', 
+                       help='No servir el frontend estático, solo WebSocket API')
+    parser.add_argument('--port', type=int, default=None,
+                       help='Puerto del servidor (por defecto: desde config)')
+    parser.add_argument('--host', type=str, default=None,
+                       help='Host del servidor (por defecto: desde config)')
+    args = parser.parse_args()
+    
+    # Configurar variable de entorno si --no-frontend
+    if args.no_frontend:
+        os.environ['ATHERIA_NO_FRONTEND'] = '1'
+        log.info("Frontend desactivado (--no-frontend). Solo WebSocket API disponible.")
+    
     log.info("Pasando el control a 'pipeline_server.main()'.")
     
     # Variables globales para almacenar el event loop y el shutdown event
@@ -111,7 +128,9 @@ if __name__ == "__main__":
         main_loop = asyncio.get_running_loop()
         
         try:
-            await pipeline_server.main(shutdown_event)
+            # Pasar configuración de frontend al servidor
+            serve_frontend = not args.no_frontend if hasattr(args, 'no_frontend') else None
+            await pipeline_server.main(shutdown_event, serve_frontend=serve_frontend)
         except asyncio.CancelledError:
             log.info("Tareas canceladas durante shutdown.")
         except Exception as e:

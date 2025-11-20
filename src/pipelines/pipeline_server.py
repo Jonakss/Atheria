@@ -2549,7 +2549,15 @@ HANDLERS = {
 
 # --- Configuración de la App aiohttp ---
 
-def setup_routes(app):
+def setup_routes(app, serve_frontend=True):
+    """
+    Configura las rutas del servidor.
+    
+    Args:
+        app: Aplicación web de aiohttp
+        serve_frontend: Si True, sirve el frontend estático. Si False, solo WebSocket.
+                       Por defecto True. Se puede desactivar con --no-frontend o variable de entorno ATHERIA_NO_FRONTEND=1
+    """
     PROJECT_ROOT = Path(__file__).parent.parent.resolve()
     STATIC_FILES_ROOT = PROJECT_ROOT / 'frontend' / 'dist'
     
@@ -2557,10 +2565,23 @@ def setup_routes(app):
     # Esto permite que el servidor funcione aunque no tenga el frontend construido
     app.router.add_get("/ws", websocket_handler)
     
+    # Si se desactiva el frontend o no existe, servir solo mensaje informativo
+    if not serve_frontend:
+        logging.info("Frontend desactivado. Servidor funcionará solo con WebSocket (--no-frontend).")
+        async def serve_info(request):
+            return web.Response(
+                text="Aetheria Server está funcionando. WebSocket disponible en /ws\n\n"
+                     "Frontend desactivado. Solo API WebSocket disponible.",
+                content_type='text/plain'
+            )
+        app.router.add_get('/', serve_info)
+        return
+    
     # Verificar si el frontend existe
     if not STATIC_FILES_ROOT.exists() or not (STATIC_FILES_ROOT / 'index.html').exists():
         logging.warning(f"Directorio de frontend '{STATIC_FILES_ROOT}' no encontrado o incompleto.")
         logging.warning("El servidor funcionará solo con WebSocket. Para servir el frontend, ejecuta 'npm run build' en la carpeta 'frontend'.")
+        logging.warning("O usa --no-frontend para desactivar explícitamente el frontend.")
         
         # Servir una respuesta simple en la raíz para indicar que el servidor está funcionando
         async def serve_info(request):
@@ -2694,9 +2715,24 @@ async def on_shutdown(app):
     
     logging.info("Cierre ordenado completado.")
 
-async def main(shutdown_event=None):
-    """Función principal para configurar e iniciar el servidor web."""
+async def main(shutdown_event=None, serve_frontend=None):
+    """
+    Función principal para configurar e iniciar el servidor web.
+    
+    Args:
+        shutdown_event: Evento de asyncio para señalizar shutdown (opcional)
+        serve_frontend: Si True, sirve el frontend estático. Si None, auto-detecta desde variable de entorno.
+                       Por defecto True si no se especifica.
+    """
     app = web.Application()
+    
+    # Determinar si servir frontend
+    # 1. Si se pasa explícitamente, usar ese valor
+    # 2. Si no, verificar variable de entorno ATHERIA_NO_FRONTEND
+    # 3. Por defecto, servir frontend (True)
+    if serve_frontend is None:
+        import os
+        serve_frontend = os.environ.get('ATHERIA_NO_FRONTEND', '').lower() not in ('1', 'true', 'yes')
     
     # Configurar middleware para manejar proxies reversos (como Lightning AI)
     # Esto permite que el servidor funcione correctamente detrás de un proxy
@@ -2711,7 +2747,7 @@ async def main(shutdown_event=None):
     
     app.middlewares.append(proxy_middleware)
     
-    setup_routes(app)
+    setup_routes(app, serve_frontend=serve_frontend)
     
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
