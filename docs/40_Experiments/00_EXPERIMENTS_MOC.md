@@ -33,6 +33,7 @@
 ## 📈 Benchmarks y Rendimiento
 
 - **[Benchmark de Almacenamiento de Tensores](../40_Experiments/BENCHMARK_TENSOR_STORAGE.md)** - Comparación de almacenamiento
+- **[Benchmark Python vs Native](../40_Experiments/BENCHMARK_PYTHON_VS_NATIVE.md)** - Comparación de rendimiento Python vs C++ Nativo
 - **[EXP_006: Optimización de Transferencia](../40_Experiments/EXP_006_DATA_TRANSFER_OPTIMIZATION.md)** - Optimización de transferencia de datos
 - **[EXP_007: Verificación de Spatial Indexing](../40_Experiments/EXP_007_SPATIAL_INDEXING_VERIFICATION.md)** - Verificación de códigos Morton
 

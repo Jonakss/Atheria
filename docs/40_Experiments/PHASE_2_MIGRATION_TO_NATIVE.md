@@ -200,7 +200,8 @@ python -c "import torch; print(torch.__version__)"
 - [ ] Probar con modelos reales usando `test_native_engine.py`
 - [ ] Verificar que funciona en producción (cargar desde frontend)
 - [ ] Optimizar conversión disperso ↔ denso
-- [ ] Crear benchmarks y documentar resultados
+- [x] Crear script de benchmark (`scripts/benchmark_python_vs_native.py`)
+- [ ] Ejecutar benchmarks y documentar resultados
 - [ ] Resolver cualquier issue de compatibilidad
 - [ ] Documentar diferencias de comportamiento (si las hay)
 
