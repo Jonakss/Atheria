@@ -1,6 +1,6 @@
 // frontend/src/components/ui/LabSider.tsx
 import React, { useState } from 'react';
-import { Play, Pause, RefreshCw, Upload, Plug, Power, ArrowRightLeft, ChevronRight, FlaskConical, Brain, BarChart3, Settings } from 'lucide-react';
+import { Play, Pause, RefreshCw, Upload, ArrowRightLeft, ChevronRight, FlaskConical, Brain, BarChart3 } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { modelOptions, vizOptions } from '../../utils/vizOptions';
 import { ExperimentManager } from '../experiments/ExperimentManager';
