@@ -10,13 +10,30 @@ export const MetricsBar: React.FC = () => {
   const [collapsedWidgets, setCollapsedWidgets] = useState<Set<string>>(new Set()); // Widgets individuales colapsados
   
   // Calcular métricas reales desde simData
+  // Usar JSON.stringify para crear una dependencia estable de map_data
+  const mapDataString = useMemo(() => {
+    if (!simData?.map_data) return null;
+    try {
+      return JSON.stringify(simData.map_data);
+    } catch {
+      return null;
+    }
+  }, [simData?.map_data]);
+  
   const vacuumEnergy = useMemo(() => {
-    if (!isConnected || !simData?.map_data) return 'N/A';
+    if (!isConnected || !mapDataString) return 'N/A';
+    
+    let mapData: number[][];
+    try {
+      mapData = JSON.parse(mapDataString);
+    } catch {
+      return 'N/A';
+    }
     
     // Energía de vacío = promedio de |psi|² multiplicado por factor de conversión
     let sum = 0;
     let count = 0;
-    for (const row of simData.map_data) {
+    for (const row of mapData) {
       if (Array.isArray(row)) {
         for (const val of row) {
           if (typeof val === 'number' && !isNaN(val) && isFinite(val)) {
@@ -31,16 +48,23 @@ export const MetricsBar: React.FC = () => {
     const avgEnergy = sum / count;
     const vacuumEnergyValue = avgEnergy * 0.0042; // Factor de conversión
     return vacuumEnergyValue.toFixed(4);
-  }, [simData?.map_data, isConnected]);
+  }, [mapDataString, isConnected]);
 
   // Entropía Local = Entropía de Shannon calculada desde map_data
   const localEntropy = useMemo(() => {
-    if (!isConnected || !simData?.map_data) return 'N/A';
+    if (!isConnected || !mapDataString) return 'N/A';
+    
+    let mapData: number[][];
+    try {
+      mapData = JSON.parse(mapDataString);
+    } catch {
+      return 'N/A';
+    }
     
     // Calcular entropía de Shannon: H = -Σ p_i * log2(p_i)
     // Donde p_i es la probabilidad normalizada de cada valor
     const flatData: number[] = [];
-    for (const row of simData.map_data) {
+    for (const row of mapData) {
       if (Array.isArray(row)) {
         for (const val of row) {
           if (typeof val === 'number' && !isNaN(val) && isFinite(val)) {
@@ -79,13 +103,19 @@ export const MetricsBar: React.FC = () => {
     }
     
     return entropy.toFixed(4);
-  }, [simData?.map_data, isConnected]);
+  }, [mapDataString, isConnected]);
   
   // Simetría IONQ = Simetría espacial calculada desde map_data
   const ionqSymmetry = useMemo(() => {
-    if (!isConnected || !simData?.map_data) return 'N/A';
+    if (!isConnected || !mapDataString) return 'N/A';
     
-    const mapData = simData.map_data;
+    let mapData: number[][];
+    try {
+      mapData = JSON.parse(mapDataString);
+    } catch {
+      return 'N/A';
+    }
+    
     const height = mapData.length;
     const width = mapData[0]?.length || 0;
     
@@ -130,7 +160,7 @@ export const MetricsBar: React.FC = () => {
     const avgSymmetry = totalSymmetry / 2;
     
     return Math.max(0, Math.min(1, avgSymmetry)).toFixed(4);
-  }, [simData?.map_data, isConnected]);
+  }, [mapDataString, isConnected]);
   
   // Decaimiento = Gamma decay rate del sistema (de simData o config)
   const decayRate = useMemo(() => {
