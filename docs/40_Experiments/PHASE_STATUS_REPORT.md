@@ -173,7 +173,7 @@
    - ⏳ Benchmark completo Python vs C++
 
 2. **Fase 1:**
-   - ⏳ Conectar EpochDetector al dashboard
+   - ✅ Conectar EpochDetector al dashboard - **COMPLETADO**
 
 3. **Fase 3:**
    - ⏳ Sistema de historial/buffer completo
@@ -183,6 +183,14 @@
    - ⏳ Documentar Fase 4
    - ⏳ Integrar quadtree/octree en motor de simulación (opcional)
    - ⏳ Exportación automática de modelos a TorchScript
+
+### Tareas Pendientes (Baja Prioridad - Al Final de la Cola)
+
+5. **UX y Visualización:**
+   - ⏳ **Selector de visualización 2D/3D explícito** - Agregar control UI para cambiar entre `PanZoomCanvas` (2D) y `HolographicViewer` (3D)
+     - Actualmente: Cambio basado en `selectedViz === 'holographic' || selectedViz === '3d'`
+     - Propuesta: Botón/toggle en Toolbar o PhysicsInspector para alternar entre 2D/3D
+     - Estado actual: Lógica implementada pero sin control explícito de usuario
 
 ---
 
