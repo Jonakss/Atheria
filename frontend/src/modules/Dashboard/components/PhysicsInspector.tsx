@@ -30,9 +30,12 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
         color: 'text-gray-500',
         bgColor: 'bg-gray-500/10',
         borderColor: 'border-gray-500/20',
-        dotColor: 'bg-gray-500'
+        dotColor: 'bg-gray-500',
+        device: 'N/A'
       };
     }
+    
+    const deviceLabel = compileStatus?.device_str?.toUpperCase() || 'N/A'; // CORREGIDO: usar device_str
     
     if (compileStatus?.is_native) {
       return {
@@ -41,7 +44,8 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
         color: 'text-emerald-400',
         bgColor: 'bg-emerald-500/10',
         borderColor: 'border-emerald-500/30',
-        dotColor: 'bg-emerald-500'
+        dotColor: 'bg-emerald-500',
+        device: deviceLabel
       };
     } else if (compileStatus?.is_compiled) {
       return {
@@ -50,7 +54,8 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
         color: 'text-blue-400',
         bgColor: 'bg-blue-500/10',
         borderColor: 'border-blue-500/30',
-        dotColor: 'bg-blue-500'
+        dotColor: 'bg-blue-500',
+        device: deviceLabel
       };
     } else {
       return {
@@ -59,7 +64,8 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
         color: 'text-amber-400',
         bgColor: 'bg-amber-500/10',
         borderColor: 'border-amber-500/30',
-        dotColor: 'bg-amber-500'
+        dotColor: 'bg-amber-500',
+        device: deviceLabel
       };
     }
   }, [compileStatus, connectionStatus]);
@@ -130,9 +136,9 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
                 <span className={`text-xs font-mono ${engineInfo.color} font-semibold`}>
                   {engineInfo.label}
                 </span>
-                {compileStatus?.device && (
+                {engineInfo.device && engineInfo.device !== 'N/A' && (
                   <span className="text-[9px] text-gray-500 uppercase">
-                    {compileStatus.device}
+                    {engineInfo.device}
                   </span>
                 )}
               </div>

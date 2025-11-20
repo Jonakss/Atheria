@@ -1166,7 +1166,7 @@ async def handle_load_experiment(args):
                 "is_native": True,
                 "model_name": "Native Engine (C++)",
                 "compiles_enabled": True,
-                "device": device_str  # CPU/CUDA
+                "device_str": device_str  # CPU/CUDA - CORREGIDO: usar device_str en lugar de device
             }
         else:
             # Motor Python: obtener device del motor o usar global
@@ -1181,7 +1181,7 @@ async def handle_load_experiment(args):
                 "is_native": False,
                 "model_name": model.__class__.__name__ if hasattr(model, '__class__') else "Unknown",
                 "compiles_enabled": getattr(model, '_compiles', True) if hasattr(model, '_compiles') else True,
-                "device": device_str  # CPU/CUDA
+                "device_str": device_str  # CPU/CUDA - CORREGIDO: usar device_str en lugar de device
             }
         
         if ws: await send_notification(ws, f"✅ Modelo '{exp_name}' cargado exitosamente. Presiona 'Iniciar' para comenzar la simulación.", "success")

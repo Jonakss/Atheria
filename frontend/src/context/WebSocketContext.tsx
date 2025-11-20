@@ -106,7 +106,7 @@ interface CompileStatus {
     is_native: boolean;  // ← INDICADOR DE MOTOR NATIVO
     model_name: string;
     compiles_enabled: boolean;
-    device?: string;  // CPU/CUDA
+    device_str?: string;  // CPU/CUDA - CORREGIDO: usar device_str para consistencia
 }
 
 interface WebSocketContextType {

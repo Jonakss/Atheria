@@ -27,7 +27,7 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
   const getSystemStatus = () => {
     if (connectionStatus === 'connected') {
       // Mostrar dispositivo (CPU/CUDA) y tipo de motor
-      const device = compileStatus?.device?.toUpperCase() || 'CPU';
+      const device = compileStatus?.device_str?.toUpperCase() || 'CPU'; // CORREGIDO: usar device_str
       const isNative = compileStatus?.is_native || false;
       const isCompiled = compileStatus?.is_compiled || false;
       
