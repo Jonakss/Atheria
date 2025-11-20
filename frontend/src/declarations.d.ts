@@ -4,3 +4,11 @@ declare module '*.module.css' {
 }
 
 declare module 'react-dom/client';
+
+interface ImportMetaEnv {
+  readonly APP_VERSION?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
