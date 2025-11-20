@@ -36,14 +36,14 @@ export const EPOCH_CONFIGS = [
     description: "Interacciones moleculares y enlaces",
     gammaDecay: 0.03,
     vizType: "flow",
-    color: "emerald"
+    color: "teal"
   },
   {
     label: "GRAVEDAD",
     description: "Estructuras gravitatorias y acumulación",
     gammaDecay: 0.05,
     vizType: "spectral",
-    color: "amber"
+    color: "pink"
   },
   {
     label: "BIOLOGÍA",
@@ -73,8 +73,8 @@ export const EpochBadge: React.FC<EpochBadgeProps> = ({ era, current, onClick })
   const colorClasses = {
     purple: { active: 'bg-purple-500/10 border-purple-500/40 text-purple-400', dot: 'bg-purple-400' },
     blue: { active: 'bg-blue-500/10 border-blue-500/40 text-blue-400', dot: 'bg-blue-400' },
-    emerald: { active: 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400', dot: 'bg-emerald-400' },
-    amber: { active: 'bg-amber-500/10 border-amber-500/40 text-amber-400', dot: 'bg-amber-400' },
+    teal: { active: 'bg-teal-500/10 border-teal-500/40 text-teal-400', dot: 'bg-teal-400' },
+    pink: { active: 'bg-pink-500/10 border-pink-500/40 text-pink-400', dot: 'bg-pink-400' },
     green: { active: 'bg-green-500/10 border-green-500/40 text-green-400', dot: 'bg-green-400' }
   };
   
@@ -119,7 +119,7 @@ export const EpochBadge: React.FC<EpochBadgeProps> = ({ era, current, onClick })
             <div className="space-y-1 pt-2 border-t border-white/10">
               <div className="flex items-center justify-between text-[10px]">
                 <span className="text-gray-500">Gamma Decay:</span>
-                <span className="text-emerald-400 font-mono">{config.gammaDecay.toFixed(3)}</span>
+                <span className="text-teal-400 font-mono">{config.gammaDecay.toFixed(3)}</span>
               </div>
               <div className="flex items-center justify-between text-[10px]">
                 <span className="text-gray-500">Visualización:</span>

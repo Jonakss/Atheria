@@ -67,10 +67,10 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
       return {
         engineText: 'Engine::CONNECTING',
         statusText: 'Status::CONNECTING',
-        dotColor: 'bg-amber-400',
-        textColor: 'text-amber-400',
+        dotColor: 'bg-pink-400',
+        textColor: 'text-pink-400',
         pulse: true,
-        shadow: 'shadow-[0_0_8px_rgba(251,191,36,0.4)]'
+        shadow: 'shadow-glow-pink'
       };
     } else {
       return {
@@ -107,10 +107,10 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
       return {
         type: 'native' as const,
         label: 'NATIVO (C++)',
-        color: 'text-emerald-400',
-        bgColor: 'bg-emerald-500/10',
-        borderColor: 'border-emerald-500/30',
-        dotColor: 'bg-emerald-500',
+        color: 'text-teal-400',
+        bgColor: 'bg-teal-500/10',
+        borderColor: 'border-teal-500/30',
+        dotColor: 'bg-teal-500',
         device: deviceLabel,
         version: compileStatus?.native_version || compileStatus?.wrapper_version || null
       };
@@ -129,10 +129,10 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
       return {
         type: 'python' as const,
         label: 'PYTHON',
-        color: 'text-amber-400',
-        bgColor: 'bg-amber-500/10',
-        borderColor: 'border-amber-500/30',
-        dotColor: 'bg-amber-500',
+        color: 'text-teal-300',
+        bgColor: 'bg-teal-500/10',
+        borderColor: 'border-teal-500/30',
+        dotColor: 'bg-teal-400',
         device: deviceLabel,
         version: compileStatus?.python_version || null
       };
@@ -145,9 +145,9 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
   const fpsColor = useMemo(() => {
     if (fps === 0) return 'text-gray-500';
     if (fps < 5) return 'text-red-400';
-    if (fps < 15) return 'text-amber-400';
-    if (fps < 30) return 'text-yellow-400';
-    return 'text-emerald-400';
+    if (fps < 15) return 'text-pink-400';
+    if (fps < 30) return 'text-pink-300';
+    return 'text-teal-400';
   }, [fps]);
 
   // Función para cambiar de motor

@@ -91,7 +91,7 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
           <div className="space-y-1.5">
             <div className="flex justify-between text-[10px]">
               <span className="text-gray-400">Ruido Térmico</span>
-              <span className="font-mono text-amber-400/80 bg-amber-900/10 px-1.5 rounded border border-amber-500/10">{thermalNoise.toFixed(3)}</span>
+              <span className="font-mono text-pink-400/80 bg-pink-900/10 px-1.5 rounded border border-pink-500/10">{thermalNoise.toFixed(3)}</span>
             </div>
             {/* Slider usando input range HTML5 nativo para mejor UX */}
             <input
