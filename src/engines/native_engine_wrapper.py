@@ -63,16 +63,20 @@ class NativeEngineWrapper:
     denso (grid) usado por el frontend.
     """
     
-    def __init__(self, grid_size: int, d_state: int, device: str = "cpu", cfg=None):
+    def __init__(self, grid_size: int, d_state: int, device: str = None, cfg=None):
         """
         Inicializa el wrapper del motor nativo.
         
         Args:
             grid_size: Tamaño del grid para visualización (debe coincidir con inference_grid_size)
             d_state: Dimensión del estado cuántico
-            device: Dispositivo ('cpu' o 'cuda')
+            device: Dispositivo ('cpu', 'cuda', o None para auto-detección)
             cfg: Configuración del experimento (opcional)
         """
+        # Si device es None, usar auto-detección desde config
+        if device is None:
+            from src import config as global_cfg
+            device = global_cfg.get_native_device()
         # Verificar disponibilidad del módulo
         # Intentar importar el módulo si no está disponible pero hay problema de CUDA
         if not NATIVE_AVAILABLE and _native_cuda_issue and device == "cpu":

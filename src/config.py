@@ -66,6 +66,81 @@ def get_device():
     return _DEVICE
 DEVICE = get_device()
 
+# --- Configuración del Motor Nativo C++ ---
+# Parámetro para forzar el device del motor nativo:
+# - "auto": Detectar automáticamente el mejor disponible (GPU si está disponible, sino CPU)
+# - "cpu": Forzar CPU
+# - "cuda": Forzar CUDA/GPU (fallará si no está disponible)
+NATIVE_ENGINE_DEVICE = os.environ.get('ATHERIA_NATIVE_DEVICE', 'auto').lower()
+
+def get_native_engine_device() -> str:
+    """
+    Obtiene el device para el motor nativo C++.
+    
+    Si NATIVE_ENGINE_DEVICE es "auto", detecta automáticamente el mejor disponible.
+    Si es "cpu" o "cuda", retorna ese valor directamente.
+    
+    Returns:
+        str: 'cpu' o 'cuda'
+    """
+    if NATIVE_ENGINE_DEVICE == 'auto':
+        # Detectar automáticamente el mejor disponible
+        # Intentar CUDA primero, luego CPU como fallback
+        cuda_available = False
+        try:
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', category=UserWarning)
+                warnings.filterwarnings('ignore', category=RuntimeWarning)
+                if hasattr(torch.cuda, 'is_available'):
+                    cuda_available = torch.cuda.is_available()
+                    if cuda_available:
+                        try:
+                            device_count = torch.cuda.device_count()
+                            if device_count == 0:
+                                cuda_available = False
+                        except (RuntimeError, AttributeError):
+                            cuda_available = False
+        except Exception:
+            cuda_available = False
+        
+        selected_device = "cuda" if cuda_available else "cpu"
+        if cuda_available:
+            logging.info(f"Motor nativo: Auto-detectado CUDA (mejor disponible)")
+        else:
+            logging.info(f"Motor nativo: Auto-detectado CPU (CUDA no disponible)")
+        return selected_device
+    elif NATIVE_ENGINE_DEVICE in ('cpu', 'cuda'):
+        # Forzar device específico
+        if NATIVE_ENGINE_DEVICE == 'cuda':
+            # Verificar que CUDA está disponible si se fuerza
+            try:
+                if not torch.cuda.is_available():
+                    logging.warning(f"⚠️ Se forzó CUDA pero no está disponible. Usando CPU como fallback.")
+                    return 'cpu'
+                device_count = torch.cuda.device_count()
+                if device_count == 0:
+                    logging.warning(f"⚠️ Se forzó CUDA pero no hay dispositivos disponibles. Usando CPU como fallback.")
+                    return 'cpu'
+            except Exception as e:
+                logging.warning(f"⚠️ Error verificando CUDA: {e}. Usando CPU como fallback.")
+                return 'cpu'
+        logging.info(f"Motor nativo: Device forzado a {NATIVE_ENGINE_DEVICE.upper()}")
+        return NATIVE_ENGINE_DEVICE
+    else:
+        # Valor inválido, usar auto
+        logging.warning(f"⚠️ Valor inválido para NATIVE_ENGINE_DEVICE: '{NATIVE_ENGINE_DEVICE}'. Usando 'auto'.")
+        return get_native_engine_device.__wrapped__() if hasattr(get_native_engine_device, '__wrapped__') else 'cpu'
+
+# Variable global para el device del motor nativo (se inicializa en primera llamada)
+_NATIVE_ENGINE_DEVICE = None
+
+def get_native_device():
+    """Función helper para obtener el device del motor nativo (con caché)."""
+    global _NATIVE_ENGINE_DEVICE
+    if _NATIVE_ENGINE_DEVICE is None:
+        _NATIVE_ENGINE_DEVICE = get_native_engine_device()
+    return _NATIVE_ENGINE_DEVICE
+
 # --- Directorios y Servidor ---
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 EXPERIMENTS_DIR = os.path.join(OUTPUT_DIR, "experiments")
