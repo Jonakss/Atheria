@@ -1027,8 +1027,19 @@ async def handle_load_experiment(args):
         is_native = False
         
         if use_native_engine and has_checkpoint:
+            # Verificar si el módulo nativo está disponible antes de intentar importarlo
             try:
-                from ..engines.native_engine_wrapper import NativeEngineWrapper
+                # Intentar importar el módulo nativo para verificar disponibilidad
+                import atheria_core
+                native_module_available = True
+            except (ImportError, OSError, RuntimeError) as native_import_error:
+                native_module_available = False
+                # Solo loguear como debug, no como warning, porque es esperado si no está compilado
+                logging.debug(f"Módulo nativo atheria_core no disponible: {native_import_error}. Usando motor Python.")
+            
+            if native_module_available:
+                try:
+                    from ..engines.native_engine_wrapper import NativeEngineWrapper
                 
                 # Buscar modelo JIT (exportado a TorchScript)
                 from ..utils import get_latest_jit_model
@@ -1128,9 +1139,13 @@ async def handle_load_experiment(args):
                         logging.warning(f"⚠️ Error al inicializar motor nativo: {e}. Usando motor Python como fallback.", exc_info=True)
                         if ws: await send_notification(ws, f"⚠️ Error en motor nativo, usando Python: {str(e)[:50]}...", "warning")
                         motor = None
-            except Exception as e:
-                logging.warning(f"⚠️ Error en la inicialización del motor nativo: {e}. Usando motor Python como fallback.", exc_info=True)
-                if ws: await send_notification(ws, f"⚠️ Error inicializando motor nativo: {str(e)[:50]}...", "warning")
+                except Exception as e:
+                    logging.warning(f"⚠️ Error en la inicialización del motor nativo: {e}. Usando motor Python como fallback.", exc_info=True)
+                    if ws: await send_notification(ws, f"⚠️ Error en motor nativo, usando Python: {str(e)[:50]}...", "warning")
+                    motor = None
+            else:
+                # Módulo nativo no disponible - usar motor Python directamente
+                logging.debug(f"Módulo nativo no disponible, usando motor Python")
                 motor = None
         
         # Fallback: usar motor Python tradicional
