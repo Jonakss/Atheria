@@ -51,29 +51,32 @@ export function ExperimentManager() {
 
     // Encontrar la raíz de un experimento (el primero en la cadena)
     // Protección contra ciclos para evitar stack overflow
-    const findRoot = (expName: string, visited: Set<string> = new Set()): string => {
-        // Si ya visitamos este nodo, hay un ciclo - retornar el nodo actual
-        if (visited.has(expName)) {
-            console.warn(`⚠️ Ciclo detectado en transfer learning para "${expName}". Retornando nodo actual.`);
-            return expName;
-        }
-        
-        const node = experimentTree[expName];
-        if (!node || !node.loadFrom) return expName;
-        
-        // Agregar a visitados y continuar recursión
-        visited.add(expName);
-        return findRoot(node.loadFrom, visited);
-    };
+    // Esta función debe ser memoizada y usar el árbol correcto
+    const findRoot = useMemo(() => {
+        return (expName: string, tree: Record<string, ExperimentNode>, visited: Set<string> = new Set()): string => {
+            // Si ya visitamos este nodo, hay un ciclo - retornar el nodo actual
+            if (visited.has(expName)) {
+                console.warn(`⚠️ Ciclo detectado en transfer learning para "${expName}". Retornando nodo actual.`);
+                return expName;
+            }
+            
+            const node = tree[expName];
+            if (!node || !node.loadFrom) return expName;
+            
+            // Agregar a visitados y continuar recursión
+            visited.add(expName);
+            return findRoot(node.loadFrom, tree, visited);
+        };
+    }, [experimentTree]);
 
     // Obtener toda la cadena de transfer learning
     // Protección contra ciclos para evitar stack overflow
-    const getTransferChain = (expName: string): string[] => {
+    const getTransferChain = (expName: string, tree: Record<string, ExperimentNode>): string[] => {
         const chain: string[] = [];
         const visited = new Set<string>();
         let current = expName;
         
-        while (current && experimentTree[current]) {
+        while (current && tree[current]) {
             // Si ya visitamos este nodo, hay un ciclo - romper el bucle
             if (visited.has(current)) {
                 console.warn(`⚠️ Ciclo detectado en transfer learning para "${expName}". Cadena truncada.`);
@@ -82,7 +85,7 @@ export function ExperimentManager() {
             
             visited.add(current);
             chain.unshift(current);
-            current = experimentTree[current].loadFrom || '';
+            current = tree[current].loadFrom || '';
             
             // Protección adicional: límite máximo de longitud de cadena
             if (chain.length > 100) {
@@ -151,8 +154,24 @@ export function ExperimentManager() {
     const groupedExperiments = useMemo(() => {
         const groups: Record<string, string[]> = {};
         
+        // Función helper para encontrar raíz usando el árbol ordenado
+        const findRootInTree = (expName: string, visited: Set<string> = new Set()): string => {
+            // Si ya visitamos este nodo, hay un ciclo - retornar el nodo actual
+            if (visited.has(expName)) {
+                console.warn(`⚠️ Ciclo detectado en transfer learning para "${expName}". Retornando nodo actual.`);
+                return expName;
+            }
+            
+            const node = experimentTreeSorted[expName];
+            if (!node || !node.loadFrom) return expName;
+            
+            // Agregar a visitados y continuar recursión
+            visited.add(expName);
+            return findRootInTree(node.loadFrom, visited);
+        };
+        
         Object.keys(experimentTreeSorted).forEach(expName => {
-            const root = findRoot(expName);
+            const root = findRootInTree(expName);
             if (!groups[root]) {
                 groups[root] = [];
             }
