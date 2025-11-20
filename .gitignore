@@ -8,6 +8,9 @@ __pycache__/
 *.pyd
 *.dylib
 
+# PERMITIR .so en src/ pero ignorar en raíz
+!/src/*.so
+
 # Distribution / packaging
 .Python
 build/
@@ -30,14 +33,15 @@ share/python-wheels/
 MANIFEST
 
 # PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+#  Usually these files are written by a Python script before PyInstaller
+#  builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
 
 # Installer logs
 pip-log.txt
-pip-delete-this-directory.txt
+pip-log-*.txt
+*.log
 
 # Unit test / coverage reports
 htmlcov/
@@ -108,7 +112,7 @@ ath_venv/
 
 # Spyder project settings
 .spyderproject
-.spyderworkspace
+.spyperserverproject
 
 # Rope project settings
 .ropeproject
@@ -143,20 +147,4 @@ frontend/node_modules/
 
 # CMake build artifacts
 build/
-cmake-build-*/
-CMakeCache.txt
-CMakeFiles/
-*.cmake
-!CMakeLists.txt
-*.ninja
-compile_commands.json
-
-# C++ build artifacts
-*.o
-*.a
-*.so.*
-src/cpp_core/*.so
-src/cpp_core/build/
-
-# Archivos temporales de pip/redirección de salida
-=*
+local_install/
