@@ -171,7 +171,7 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
           </div>
           <div className="flex flex-col leading-none">
             <span className="text-xs font-bold text-gray-200 tracking-wide">
-              ATHERIA<span className="text-blue-500">_LAB</span>
+              ATHERIA<span className="text-teal-400">_LAB</span>
             </span>
             <span className="text-[8px] text-gray-600 font-mono uppercase mt-0.5" title={`Frontend: ${getFormattedVersion()}`}>{getFormattedVersion()}</span>
           </div>

@@ -35,31 +35,49 @@ Data / Numbers: font-mono (Monospace obligatoria para datos).
 
 Semántica (Status Colors)
 
-Primary (Acción/Selección): Blue/Cyan
+Paleta Principal: Teal & Pink (Inspirada en infografía moderna)
 
-Texto: text-blue-400
+Primary (Acción/Selección): Teal (verde azulado)
 
-Fondo sutil: bg-blue-500/10
+Texto: text-teal-400
 
-Glow: shadow-[0_0_15px_rgba(59,130,246,0.2)]
+Fondo sutil: bg-teal-500/10
 
-Success (Estable): Emerald
+Borde activo: border-teal-500/40
 
-Texto: text-emerald-400
+Glow: shadow-glow-teal o shadow-[0_0_15px_rgba(20,184,166,0.4)]
 
-Indicador: bg-emerald-500
+Secondary (Energía/Vacío): Pink/Rosa
 
-Warning (Inestable/Transición): Amber
+Texto: text-pink-400
+
+Fondo sutil: bg-pink-500/10
+
+Borde activo: border-pink-500/40
+
+Glow: shadow-glow-pink o shadow-[0_0_15px_rgba(236,72,153,0.4)]
+
+Gradientes: bg-gradient-teal-pink (para efectos especiales)
+
+Success (Estable): Teal más oscuro
+
+Texto: text-teal-600
+
+Indicador: bg-teal-500
+
+Warning (Inestable/Transición): Amber (mantener para transiciones)
 
 Texto: text-amber-400
 
-Critical (Error/Colapso): Rose
+Critical (Error/Colapso): Pink más intenso
 
-Texto: text-rose-400
+Texto: text-pink-600
 
-Physics (Energía/Vacío): Purple
+Physics (Energía/Vacío): Gradiente Teal→Pink
 
-Texto: text-purple-400
+Texto: text-teal-400 (con efectos de gradiente opcionales)
+
+Glow combinado: shadow-glow-gradient
 
 2. Componentes Core (Building Blocks)
 
@@ -93,7 +111,7 @@ Botones cuadrados para barras laterales.
 
 Normal: text-gray-600 hover:text-gray-300 hover:bg-white/5
 
-Activo: bg-blue-500/10 text-blue-400 + Indicador de borde izquierdo (border-l-2 border-blue-500).
+Activo: bg-teal-500/10 text-teal-400 + Indicador de borde izquierdo (border-l-2 border-teal-500) + shadow-glow-teal.
 
 D. EpochBadge (Estado del Sistema)
 
@@ -101,7 +119,7 @@ Etiquetas pequeñas tipo "pill".
 
 Estilo: text-[10px] font-mono font-medium tracking-wider px-3 py-1 rounded border.
 
-Activo: bg-blue-500/10 border-blue-500/40 text-blue-400.
+Activo: bg-teal-500/10 border-teal-500/40 text-teal-400 + shadow-glow-teal.
 
 Inactivo: bg-white/5 border-white/5 text-gray-600.
 
