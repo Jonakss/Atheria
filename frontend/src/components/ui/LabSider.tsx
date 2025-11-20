@@ -49,6 +49,7 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
     const [episodesToAdd, setEpisodesToAdd] = useState(100);
     const [transferFromExperiment, setTransferFromExperiment] = useState<string | null>(null);
     const [gammaDecay, setGammaDecay] = useState(0.01);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     
     // Estados para configuración de inferencia (movidos desde SettingsPanel)
     const [gridSizeInference, setGridSizeInference] = useState<number>(() => {
@@ -143,7 +144,8 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
         
         const exp = experimentsData?.find(e => e.name === activeExperiment);
         if (exp && !exp.has_checkpoint) {
-            alert('⚠️ Este experimento no tiene checkpoints. Debes entrenarlo primero antes de continuar.');
+            setErrorMessage('⚠️ Este experimento no tiene checkpoints. Debes entrenarlo primero antes de continuar.');
+            setTimeout(() => setErrorMessage(null), 5000); // Ocultar después de 5 segundos
             return;
         }
         
@@ -450,6 +452,15 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
                             {activeExperiment && (
                                 <div className="space-y-3 p-3 bg-white/5 border border-white/10 rounded">
                                     <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Continuar: {activeExperiment}</div>
+                                    
+                                    {/* Mensaje de error */}
+                                    {errorMessage && (
+                                        <div className="p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-[10px] text-yellow-400 flex items-center gap-2 animate-in fade-in duration-200">
+                                            <X size={12} className="cursor-pointer" onClick={() => setErrorMessage(null)} />
+                                            <span>{errorMessage}</span>
+                                        </div>
+                                    )}
+                                    
                                     <div>
                                         <label className="block text-[10px] text-gray-400 mb-1 uppercase">Episodios a Añadir</label>
                                         <input

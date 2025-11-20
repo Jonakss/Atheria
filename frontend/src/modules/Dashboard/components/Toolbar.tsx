@@ -42,9 +42,8 @@ export const Toolbar: React.FC = () => {
   
   const currentStep = isConnected ? (simData?.step ?? simData?.simulation_info?.step ?? 0) : 0;
   
-  // Calcular FPS solo si está conectado y hay datos
-  // TODO: Calcular FPS real desde timestamps en el futuro
-  const fps = isConnected && simData ? 118 : null;
+  // Obtener FPS real desde simulation_info
+  const fps = isConnected ? (simData?.simulation_info?.fps ?? 0) : null;
   
   // Calcular número de partículas solo si está conectado y hay datos
   const particleCount = useMemo(() => {
@@ -112,9 +111,38 @@ export const Toolbar: React.FC = () => {
         
         <div className="w-px h-4 bg-white/10 mx-2" />
         
-        <div className="flex flex-col px-2">
+        <div 
+          className="flex flex-col px-2 cursor-help"
+          title={(() => {
+            const initialStep = simData?.simulation_info?.initial_step ?? 0;
+            const checkpointStep = simData?.simulation_info?.checkpoint_step ?? 0;
+            const checkpointEpisode = simData?.simulation_info?.checkpoint_episode ?? 0;
+            if (checkpointStep > 0) {
+              return `Iniciado desde paso ${checkpointStep.toLocaleString()} (checkpoint episodio ${checkpointEpisode})`;
+            }
+            return initialStep > 0 ? `Iniciado desde paso ${initialStep.toLocaleString()}` : 'Paso inicial: 0';
+          })()}
+        >
           <span className="text-[8px] text-gray-500 uppercase font-bold">Paso Actual</span>
-          <span className="text-xs font-mono text-gray-200">{currentStep.toLocaleString()}</span>
+          <span className="text-xs font-mono text-gray-200">
+            {(() => {
+              const initialStep = simData?.simulation_info?.initial_step ?? 0;
+              const totalSteps = currentStep;
+              const relativeSteps = totalSteps - initialStep;
+              
+              // Mostrar "total - relativo" si hay un step inicial
+              if (initialStep > 0) {
+                return (
+                  <>
+                    <span>{totalSteps.toLocaleString()}</span>
+                    <span className="text-gray-500 mx-1">-</span>
+                    <span className="text-teal-400">{relativeSteps.toLocaleString()}</span>
+                  </>
+                );
+              }
+              return totalSteps.toLocaleString();
+            })()}
+          </span>
         </div>
       </GlassPanel>
 
@@ -122,8 +150,8 @@ export const Toolbar: React.FC = () => {
       <GlassPanel className="pointer-events-auto flex items-center px-3 py-1 gap-3">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-bold text-gray-500">FPS</span>
-          <span className={`text-xs font-mono ${fps !== null ? 'text-teal-400' : 'text-gray-600'}`}>
-            {fps !== null ? fps : 'N/A'}
+          <span className={`text-xs font-mono ${fps !== null && fps > 0 ? 'text-teal-400' : 'text-gray-600'}`}>
+            {fps !== null && fps > 0 ? fps.toFixed(1) : 'N/A'}
           </span>
         </div>
         <div className="w-px h-3 bg-white/10" />

@@ -360,6 +360,10 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         setExperimentsData(payload.experiments);
                         setTrainingStatus(payload.training_status);
                         setInferenceStatus(payload.inference_status);
+                        // Si hay compile_status en el estado inicial, establecerlo
+                        if (payload.compile_status) {
+                            setCompileStatus(payload.compile_status as CompileStatus);
+                        }
                         break;
                     case 'experiments_updated':
                         // Actualizar lista de experimentos cuando se crea/elimina un experimento

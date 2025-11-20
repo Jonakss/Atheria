@@ -161,13 +161,9 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
       return;
     }
     
-    if (!compileStatus?.model_name || compileStatus.model_name === 'None') {
-      console.warn('⚠️ No se puede cambiar de motor: no hay modelo cargado');
-      setEngineDropdownOpen(false);
-      return;
-    }
-    
-    const currentIsNative = compileStatus.is_native || false;
+    // Permitir cambiar de motor incluso sin modelo cargado
+    // Si no hay modelo, simplemente cambiar la preferencia para cuando se cargue uno
+    const currentIsNative = compileStatus?.is_native || false;
     const targetIsNative = targetEngine === 'native';
     
     // Solo cambiar si es diferente al actual
@@ -266,13 +262,13 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
           {/* Badge del Engine (clickeable para cambiar) */}
           <div className="relative">
             <button
-              onClick={() => connectionStatus === 'connected' && compileStatus?.model_name && compileStatus.model_name !== 'None' && setEngineDropdownOpen(!engineDropdownOpen)}
+              onClick={() => connectionStatus === 'connected' && setEngineDropdownOpen(!engineDropdownOpen)}
               className={`flex items-center gap-2 px-2 py-1 bg-white/5 rounded border ${engineInfo.borderColor} transition-all ${
-                connectionStatus === 'connected' && compileStatus?.model_name && compileStatus.model_name !== 'None' 
+                connectionStatus === 'connected'
                   ? 'hover:bg-white/10 cursor-pointer' 
                   : 'cursor-default'
               }`}
-              title={connectionStatus === 'connected' && compileStatus?.model_name && compileStatus.model_name !== 'None' ? 'Cambiar motor de simulación' : 'Motor de simulación'}
+              title={connectionStatus === 'connected' ? 'Cambiar motor de simulación' : 'Motor de simulación'}
             >
               <div className={`w-1.5 h-1.5 rounded-full ${engineInfo.dotColor} ${
                 connectionStatus === 'connected' && compileStatus?.is_native ? 'animate-pulse' : ''
@@ -280,13 +276,13 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
               <span className={`text-[10px] font-mono ${engineInfo.color} tracking-wide`}>
                 {systemStatus.engineText}
               </span>
-              {connectionStatus === 'connected' && compileStatus?.model_name && compileStatus.model_name !== 'None' && (
+              {connectionStatus === 'connected' && (
                 <ChevronDown size={10} className={`text-gray-500 transition-transform ${engineDropdownOpen ? 'rotate-180' : ''}`} />
               )}
             </button>
           
             {/* Dropdown para cambiar motor */}
-            {engineDropdownOpen && connectionStatus === 'connected' && compileStatus?.model_name && compileStatus.model_name !== 'None' && (
+            {engineDropdownOpen && connectionStatus === 'connected' && (
               <div className="absolute top-full left-0 mt-1 z-50 min-w-[220px]">
                 <div className="bg-[#0a0a0a] border border-white/20 rounded shadow-xl p-2 space-y-1">
                   <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1">
@@ -294,7 +290,7 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
                   </div>
                   
                   {/* Opción: Motor Nativo (C++) */}
-                  {(!compileStatus?.is_native) && (
+                  {(!compileStatus?.is_native || !compileStatus?.model_name || compileStatus.model_name === 'None') && (
                     <button
                       onClick={() => handleSwitchEngine('native')}
                       className="w-full flex items-center justify-between px-3 py-2 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 rounded text-[10px] text-teal-400 transition-all"
@@ -310,7 +306,7 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
                   )}
                   
                   {/* Opción: Motor Python */}
-                  {(compileStatus?.is_native) && (
+                  {(compileStatus?.is_native || !compileStatus?.model_name || compileStatus.model_name === 'None') && (
                     <button
                       onClick={() => handleSwitchEngine('python')}
                       className="w-full flex items-center justify-between px-3 py-2 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 rounded text-[10px] text-teal-400 transition-all"
