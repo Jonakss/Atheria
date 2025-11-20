@@ -167,16 +167,12 @@ async def simulation_loop():
             if not is_paused and motor:
                 current_step = g_state.get('simulation_step', 0)
                 
-                # OPTIMIZACIÓN CRÍTICA: Si live_feed está desactivado, NO procesar visualizaciones
-                # pero SÍ evolucionar el estado y enviar actualizaciones cada X pasos
+                # OPTIMIZACIÓN CRÍTICA: Si live_feed está desactivado, ejecutar múltiples pasos rápidamente
+                # y solo mostrar frames cada X pasos configurados (sin ralentizar la simulación)
                 if not live_feed_enabled:
-                    # Si live_feed está desactivado, evolucionar el estado sin calcular visualizaciones
-                    # pero SÍ enviar frames cada X pasos configurados
+                    # Si live_feed está desactivado, ejecutar múltiples pasos en cada iteración
+                    # para maximizar velocidad, pero solo mostrar cada X pasos
                     try:
-                        g_state['motor'].evolve_internal_state()
-                        updated_step = current_step + 1
-                        g_state['simulation_step'] = updated_step
-                        
                         # Obtener intervalo de pasos configurado (por defecto 10)
                         steps_interval = g_state.get('steps_interval', 10)
                         if 'steps_interval_counter' not in g_state:
@@ -184,8 +180,38 @@ async def simulation_loop():
                         if 'last_frame_sent_step' not in g_state:
                             g_state['last_frame_sent_step'] = -1  # Para forzar primer frame
                         
+                        # Ejecutar múltiples pasos en cada iteración (hasta steps_interval o más)
+                        # Esto permite que la simulación corra a máxima velocidad
+                        steps_to_execute = steps_interval  # Ejecutar tantos pasos como el intervalo configurado
+                        
+                        # Medir tiempo para calcular FPS basado en pasos reales
+                        steps_start_time = time.time()
+                        
+                        for _ in range(steps_to_execute):
+                            g_state['motor'].evolve_internal_state()
+                            updated_step = current_step + 1
+                            g_state['simulation_step'] = updated_step
+                            current_step = updated_step
+                        
+                        steps_execution_time = time.time() - steps_start_time
+                        
+                        # Calcular FPS basado en pasos reales ejecutados
+                        steps_per_second = steps_to_execute / steps_execution_time if steps_execution_time > 0 else 0
+                        
+                        # Actualizar FPS en g_state (promediado con anterior)
+                        if 'current_fps' not in g_state or 'fps_samples' not in g_state:
+                            g_state['current_fps'] = steps_per_second
+                            g_state['fps_samples'] = [steps_per_second]
+                        else:
+                            # Promediar con últimos valores para suavizar
+                            g_state['fps_samples'].append(steps_per_second)
+                            if len(g_state['fps_samples']) > 10:  # Mantener solo últimos 10
+                                g_state['fps_samples'].pop(0)
+                            g_state['current_fps'] = sum(g_state['fps_samples']) / len(g_state['fps_samples'])
+                        
+                        # Actualizar contador para frames
                         steps_interval_counter = g_state.get('steps_interval_counter', 0)
-                        steps_interval_counter += 1
+                        steps_interval_counter += steps_to_execute
                         g_state['steps_interval_counter'] = steps_interval_counter
                         
                         # Enviar frame cada X pasos configurados
@@ -221,7 +247,8 @@ async def simulation_loop():
                                         "simulation_info": {
                                             "step": updated_step,
                                             "is_paused": False,
-                                            "live_feed_enabled": False
+                                            "live_feed_enabled": False,
+                                            "fps": g_state.get('current_fps', 0.0)
                                         }
                                     }
                                     
@@ -257,7 +284,8 @@ async def simulation_loop():
                                 "simulation_info": {
                                     "step": updated_step,
                                     "is_paused": False,
-                                    "live_feed_enabled": False
+                                    "live_feed_enabled": False,
+                                    "fps": g_state.get('current_fps', 0.0)
                                 }
                                 # No incluir map_data, hist_data, etc. para ahorrar ancho de banda
                             }
