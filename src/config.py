@@ -241,8 +241,10 @@ def get_native_device():
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 EXPERIMENTS_DIR = os.path.join(OUTPUT_DIR, "experiments")
 TRAINING_CHECKPOINTS_DIR = os.path.join(OUTPUT_DIR, "training_checkpoints")
+LOGS_DIR = os.path.join(OUTPUT_DIR, "logs")  # Directorio para logs de Tensorboard
 os.makedirs(EXPERIMENTS_DIR, exist_ok=True)
 os.makedirs(TRAINING_CHECKPOINTS_DIR, exist_ok=True)
+os.makedirs(LOGS_DIR, exist_ok=True)
 LAB_SERVER_HOST = '0.0.0.0'
 LAB_SERVER_PORT = 8000
 

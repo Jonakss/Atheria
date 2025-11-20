@@ -7,6 +7,7 @@ import { ExperimentManager } from '../experiments/ExperimentManager';
 import { CheckpointManager } from '../training/CheckpointManager';
 import { ExperimentInfo } from '../experiments/ExperimentInfo';
 import { TransferLearningWizard } from '../experiments/TransferLearningWizard';
+import { TrainingCanvas } from '../training/TrainingCanvas';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
 
 type LabSection = 'inference' | 'training' | 'analysis';
@@ -20,7 +21,7 @@ interface LabSiderProps {
 
 export function LabSider({ activeSection: externalActiveSection, onSectionChange, isCollapsed = false, onToggleCollapse }: LabSiderProps) {
     const { 
-        sendCommand, experimentsData, trainingStatus, trainingProgress, 
+        sendCommand, experimentsData, trainingStatus, trainingProgress, trainingSnapshots,
         inferenceStatus, connectionStatus, connect, disconnect, selectedViz, setSelectedViz,
         activeExperiment, setActiveExperiment, compileStatus
     } = useWebSocket();
@@ -437,6 +438,14 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
                     {/* SECCIÓN: ENTRENAMIENTO */}
                     {activeSection === 'training' && (
                         <div className="space-y-4">
+                            {/* Canvas de Snapshots de Entrenamiento */}
+                            {trainingStatus === 'running' && (
+                                <div className="mb-4">
+                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Snapshots de Entrenamiento</div>
+                                    <TrainingCanvas width={360} height={360} />
+                                </div>
+                            )}
+                            
                             {/* Continuar Entrenamiento */}
                             {activeExperiment && (
                                 <div className="space-y-3 p-3 bg-white/5 border border-white/10 rounded">

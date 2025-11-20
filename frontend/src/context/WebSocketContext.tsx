@@ -101,6 +101,19 @@ interface TrainingProgress {
     avg_reward?: number;
 }
 
+interface TrainingSnapshot {
+    episode: number;
+    step?: number;
+    map_data: number[][];
+    timestamp?: number;
+    loss?: number;
+    metrics?: {
+        survival?: number;
+        symmetry?: number;
+        complexity?: number;
+    };
+}
+
 interface CompileStatus {
     is_compiled: boolean;
     is_native: boolean;  // ← INDICADOR DE MOTOR NATIVO
@@ -130,6 +143,7 @@ interface WebSocketContextType {
     setActiveExperiment: (name: string | null) => void;
     ws: WebSocket | null; // Exponer WebSocket para escuchar mensajes personalizados
     snapshotCount: number; // Contador de snapshots capturados
+    trainingSnapshots: TrainingSnapshot[]; // Snapshots de entrenamiento
     serverConfig: ServerConfig; // Configuración del servidor
     updateServerConfig: (config: Partial<ServerConfig>) => void; // Actualizar configuración
     compileStatus: CompileStatus | null; // Estado de compilación/motor
@@ -162,6 +176,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
     const [activeExperiment, setActiveExperiment] = useState<string | null>(null);
     const [snapshotCount, setSnapshotCount] = useState<number>(0);
+    const [trainingSnapshots, setTrainingSnapshots] = useState<TrainingSnapshot[]>([]);
     const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'running' | 'completed' | 'cancelled' | 'error'>('idle');
     const [analysisType, setAnalysisType] = useState<'universe_atlas' | 'cell_chemistry' | null>(null);
     const [compileStatus, setCompileStatus] = useState<CompileStatus | null>(null);
@@ -354,6 +369,21 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         break;
                     case 'training_status_update':
                         setTrainingStatus(payload.status);
+                        // Limpiar snapshots cuando el entrenamiento termina (opcional)
+                        // if (payload.status === 'idle') {
+                        //     setTrainingSnapshots([]);
+                        // }
+                        break;
+                    case 'training_snapshot':
+                        // Agregar nuevo snapshot de entrenamiento
+                        if (payload.snapshot) {
+                            setTrainingSnapshots(prev => {
+                                const newSnapshot: TrainingSnapshot = payload.snapshot;
+                                // Mantener máximo 50 snapshots para evitar acumulación excesiva
+                                const updated = [...prev, newSnapshot].slice(-50);
+                                return updated;
+                            });
+                        }
                         break;
                     case 'inference_status_update':
                         setInferenceStatus(payload.status);
@@ -563,6 +593,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         setActiveExperiment,
         ws: ws.current, // Exponer WebSocket para mensajes personalizados
         snapshotCount,
+        trainingSnapshots,
         serverConfig,
         updateServerConfig,
         compileStatus, // Estado de compilación/motor (indica si es nativo)
