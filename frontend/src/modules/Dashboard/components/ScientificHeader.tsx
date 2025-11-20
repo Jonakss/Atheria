@@ -40,23 +40,23 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
       console.log(`🔍 ScientificHeader - device=${device}, isNative=${isNative}, isCompiled=${isCompiled}`);
       
       let text = device;
-      let dotColor = device === 'CUDA' ? 'bg-emerald-500' : 'bg-blue-500';
-      let textColor = device === 'CUDA' ? 'text-emerald-500' : 'text-blue-500';
+      let dotColor = device === 'CUDA' ? 'bg-teal-500' : 'bg-teal-400';
+      let textColor = device === 'CUDA' ? 'text-teal-400' : 'text-teal-300';
       let pulse = false;
       let shadow = '';
       
       if (isNative) {
         text = `${device} (SPARSE)`;
-        dotColor = device === 'CUDA' ? 'bg-emerald-500' : 'bg-emerald-400';
-        textColor = device === 'CUDA' ? 'text-emerald-500' : 'text-emerald-400';
+        dotColor = device === 'CUDA' ? 'bg-teal-500' : 'bg-teal-400';
+        textColor = device === 'CUDA' ? 'text-teal-400' : 'text-teal-300';
         pulse = true;
-        shadow = 'shadow-[0_0_8px_rgba(16,185,129,0.4)]';
+        shadow = 'shadow-glow-teal';
       } else if (isCompiled) {
         text = `${device} (COMPILED)`;
-        dotColor = 'bg-blue-500';
-        textColor = 'text-blue-500';
+        dotColor = 'bg-teal-500';
+        textColor = 'text-teal-400';
         pulse = true;
-        shadow = 'shadow-[0_0_8px_rgba(59,130,246,0.4)]';
+        shadow = 'shadow-glow-teal';
       }
       
       return { 
@@ -119,10 +119,10 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
       return {
         type: 'compiled' as const,
         label: 'COMPILADO (PyTorch)',
-        color: 'text-blue-400',
-        bgColor: 'bg-blue-500/10',
-        borderColor: 'border-blue-500/30',
-        dotColor: 'bg-blue-500',
+        color: 'text-teal-400',
+        bgColor: 'bg-teal-500/10',
+        borderColor: 'border-teal-500/30',
+        dotColor: 'bg-teal-500',
         device: deviceLabel,
         version: null
       };
@@ -199,11 +199,11 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
                 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full transition-all"
                 style={{
                   top: `${(currentEpoch / 5) * 100}%`,
-                  backgroundColor: 'rgba(59, 130, 246, 0.6)',
-                  boxShadow: '0 0 4px rgba(59, 130, 246, 0.8)'
+                  backgroundColor: 'rgba(20, 184, 166, 0.6)',
+                  boxShadow: '0 0 4px rgba(20, 184, 166, 0.8)'
                 }}
               />
-              <div className="w-full h-full bg-gradient-to-b from-blue-500/20 via-purple-500/20 to-green-500/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="w-full h-full bg-gradient-to-b from-teal-500/20 via-pink-500/20 to-teal-400/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
             </button>
           )}
           
