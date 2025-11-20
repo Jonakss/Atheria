@@ -188,10 +188,23 @@ async def simulation_loop():
                         # Medir tiempo para calcular FPS basado en pasos reales
                         steps_start_time = time.time()
                         
+                        motor = g_state['motor']
+                        motor_type = g_state.get('motor_type', 'unknown')
+                        motor_is_native = g_state.get('motor_is_native', False)
+                        
+                        # Verificar qué motor se está usando (logging cada 1000 pasos)
+                        if updated_step % 1000 == 0 and updated_step > 0:
+                            # Verificar tipo real del motor
+                            actual_is_native = hasattr(motor, 'native_engine') if motor else False
+                            actual_type = "native" if actual_is_native else "python"
+                            if actual_type != motor_type:
+                                logging.warning(f"⚠️ Inconsistencia detectada en paso {updated_step}: motor_type en g_state={motor_type}, pero motor real={actual_type}")
+                            else:
+                                logging.info(f"✅ Paso {updated_step}: Usando motor {motor_type} (confirmado)")
+                        
                         for _ in range(steps_to_execute):
-                            motor = g_state['motor']
-                        if motor:
-                            motor.evolve_internal_state()
+                            if motor:
+                                motor.evolve_internal_state()
                             updated_step = current_step + 1
                             g_state['simulation_step'] = updated_step
                             current_step = updated_step
@@ -1090,13 +1103,10 @@ async def handle_load_experiment(args):
         # Verificar si es motor nativo
         if is_native and hasattr(motor, 'native_engine'):
             logging.info(f"✅ Motor nativo confirmado: tiene native_engine")
+            logging.info(f"🚀 MOTOR NATIVO ACTIVO: device={device_str}, grid_size={inference_grid_size}")
         elif not is_native:
             logging.info(f"✅ Motor Python confirmado")
-        
-        # Guardar información sobre el tipo de motor para verificación
-        motor_type = "native" if is_native else "python"
-        g_state['motor_type'] = motor_type
-        logging.info(f"✅ Motor almacenado en g_state: tipo={motor_type}, device={device_str}, is_native={is_native}")
+            logging.info(f"🐍 MOTOR PYTHON ACTIVO: device={device_str}, grid_size={inference_grid_size}")
         
         # Actualizar ROI manager con el tamaño correcto del grid
         from ..managers.roi_manager import ROIManager
@@ -1222,6 +1232,12 @@ async def handle_load_experiment(args):
             }
         })
         logging.info(f"Modelo '{exp_name}' cargado por [{args['ws_id']}]. Simulación en pausa, esperando inicio manual.")
+        
+        # Logging adicional para verificación (ya se hizo arriba, pero para confirmar)
+        if is_native:
+            logging.info(f"🚀 MOTOR NATIVO LISTO: device={device_str}, grid_size={inference_grid_size}")
+        else:
+            logging.info(f"🐍 MOTOR PYTHON LISTO: device={device_str}, grid_size={inference_grid_size}")
 
     except Exception as e:
         logging.error(f"Error crítico cargando experimento '{exp_name}': {e}", exc_info=True)
