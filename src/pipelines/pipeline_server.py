@@ -1153,7 +1153,15 @@ async def handle_load_experiment(args):
                             # Cargar modelo JIT en el motor nativo
                             if motor.load_model(jit_path):
                                 is_native = True
-                                logging.info(f"✅ Motor nativo (C++) cargado exitosamente con modelo JIT")
+                                # Obtener versión del motor nativo después de cargar el modelo
+                                try:
+                                    if hasattr(motor, 'native_version'):
+                                        native_version_loaded = motor.native_version
+                                    else:
+                                        native_version_loaded = "unknown"
+                                except:
+                                    native_version_loaded = "unknown"
+                                logging.info(f"✅ Motor nativo (C++) cargado exitosamente con modelo JIT (version={native_version_loaded})")
                                 if ws: await send_notification(ws, f"⚡ Motor nativo cargado (250-400x más rápido)", "success")
                             else:
                                 logging.warning(f"⚠️ Error al cargar modelo JIT en motor nativo. Usando motor Python como fallback.")
@@ -1316,8 +1324,14 @@ async def handle_load_experiment(args):
             device_str = motor.device_str if hasattr(motor, 'device_str') else 'cpu'
             
             # Obtener versiones del motor nativo
+            # NativeEngineWrapper ya está importado en el bloque anterior si is_native es True
+            try:
+                from ..engines.native_engine_wrapper import NativeEngineWrapper as NativeEngineWrapperClass
+                wrapper_version = getattr(NativeEngineWrapperClass, 'VERSION', None) or "unknown"
+            except ImportError:
+                wrapper_version = "unknown"
+            
             native_version = getattr(motor, 'native_version', None) or "unknown"
-            wrapper_version = getattr(NativeEngineWrapper, 'VERSION', None) or "unknown"
             
             compile_status = {
                 "is_compiled": True,  # Motor nativo siempre está "compilado"
