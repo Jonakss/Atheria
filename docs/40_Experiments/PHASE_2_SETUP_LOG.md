@@ -145,3 +145,25 @@ Estas advertencias no afectan la funcionalidad del módulo.
 **Estado:** ✅ Fase 2 - Setup COMPLETADO  
 **Siguiente:** Migración de Datos y Pruebas con Tensores Reales
 
+---
+
+## 🐛 Issues Conocidos (2024-12-XX)
+
+### Error de Shape en Motor Nativo C++
+
+**Problema:** Error al ejecutar simulación con motor nativo:
+```
+RuntimeError: output with shape [4, 1, 1] doesn't match the broadcast shape [1, 4, 1, 1]
+```
+
+**Causa:** Desajuste de dimensiones en operaciones de tensores en `Engine::step_native()`.
+- El motor espera tensores con shape `[1, H, W, d_state]` pero recibe `[d_state, 1, 1]` en algún punto.
+- Posible problema en procesamiento de batches o extracción de patches 3x3.
+
+**Solución Pendiente:**
+- Revisar `sparse_engine.cpp::step_native()` para verificar shapes de tensores.
+- Verificar que el procesamiento de batches mantenga las dimensiones correctas.
+- Añadir validación de shapes antes de operaciones críticas.
+
+**Estado:** ⏳ Pendiente de revisión y corrección
+
