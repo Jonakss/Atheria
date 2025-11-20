@@ -23,19 +23,34 @@ python3 scripts/benchmark_python_vs_native.py \
     --steps 100 \
     --device cpu
 
-# Opciones:
-# --experiment: Nombre del experimento (requerido)
-# --steps: Número de pasos a ejecutar (default: 100)
-# --warmup: Pasos de warm-up (default: 10)
-# --device: Device (cpu/cuda) - default: auto-detección
-# --output: Ruta del reporte (default: benchmark_report_EXPERIMENT.md)
+# Ejemplo con más pasos y GPU
+python3 scripts/benchmark_python_vs_native.py \
+    --experiment UNET_32ch_D5_LR2e-5 \
+    --steps 500 \
+    --device cuda \
+    --output benchmark_report_unet.md
 ```
+
+### Opciones
+
+- `--experiment`: Nombre del experimento (requerido)
+- `--steps`: Número de pasos a ejecutar (default: 100)
+- `--warmup`: Pasos de warm-up (default: 10)
+- `--device`: Device (`cpu`/`cuda`) - default: auto-detección
+- `--output`: Ruta del reporte (default: `benchmark_report_EXPERIMENT.md`)
 
 ### Requisitos
 
-1. **Experimento con checkpoint**: El experimento debe tener al menos un checkpoint guardado
-2. **Motor nativo compilado**: El módulo `atheria_core` debe estar compilado
-3. **Modelo TorchScript**: El motor nativo requiere un modelo exportado a TorchScript (se exporta automáticamente si no existe)
+1. **Experimento con checkpoint**: El experimento debe tener al menos un checkpoint guardado en `output/checkpoints/EXPERIMENT_NAME/`
+2. **Configuración del experimento**: Debe existir `output/experiments/EXPERIMENT_NAME/config.json`
+3. **Motor nativo compilado**: El módulo `atheria_core` debe estar compilado (ver `docs/40_Experiments/PHASE_2_SETUP_LOG.md`)
+4. **Modelo TorchScript**: El motor nativo requiere un modelo exportado a TorchScript (se exporta automáticamente si no existe usando la función mejorada)
+
+### Notas Importantes
+
+- **Exportación automática mejorada**: Si no existe un modelo TorchScript, el benchmark lo exportará automáticamente usando el tamaño completo del grid de inferencia (no patches pequeños), crucial para modelos UNet.
+- **Manejo de memoria**: El script limpia memoria entre benchmarks para obtener mediciones precisas.
+- **Warm-up**: Los pasos de warm-up permiten que el motor "se caliente" antes de medir rendimiento real.
 
 ## 📋 Métricas Medidas
 
