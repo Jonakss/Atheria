@@ -50,20 +50,45 @@ export function ExperimentManager() {
     }, [experimentsData]);
 
     // Encontrar la raíz de un experimento (el primero en la cadena)
-    const findRoot = (expName: string): string => {
+    // Protección contra ciclos para evitar stack overflow
+    const findRoot = (expName: string, visited: Set<string> = new Set()): string => {
+        // Si ya visitamos este nodo, hay un ciclo - retornar el nodo actual
+        if (visited.has(expName)) {
+            console.warn(`⚠️ Ciclo detectado en transfer learning para "${expName}". Retornando nodo actual.`);
+            return expName;
+        }
+        
         const node = experimentTree[expName];
         if (!node || !node.loadFrom) return expName;
-        return findRoot(node.loadFrom);
+        
+        // Agregar a visitados y continuar recursión
+        visited.add(expName);
+        return findRoot(node.loadFrom, visited);
     };
 
     // Obtener toda la cadena de transfer learning
+    // Protección contra ciclos para evitar stack overflow
     const getTransferChain = (expName: string): string[] => {
         const chain: string[] = [];
+        const visited = new Set<string>();
         let current = expName;
         
         while (current && experimentTree[current]) {
+            // Si ya visitamos este nodo, hay un ciclo - romper el bucle
+            if (visited.has(current)) {
+                console.warn(`⚠️ Ciclo detectado en transfer learning para "${expName}". Cadena truncada.`);
+                break;
+            }
+            
+            visited.add(current);
             chain.unshift(current);
             current = experimentTree[current].loadFrom || '';
+            
+            // Protección adicional: límite máximo de longitud de cadena
+            if (chain.length > 100) {
+                console.warn(`⚠️ Cadena de transfer learning muy larga para "${expName}". Cadena truncada.`);
+                break;
+            }
         }
         
         return chain;
