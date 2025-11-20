@@ -992,20 +992,32 @@ async def handle_load_experiment(args):
                     logging.info(f"Modelo JIT no encontrado para '{exp_name}'. Exportando automáticamente...")
                     if ws: await send_notification(ws, f"📦 Exportando modelo a TorchScript...", "info")
                     
+                    # Definir device_str antes del try para que esté disponible en caso de error
+                    import torch
+                    device_str = "cuda" if torch.cuda.is_available() else "cpu"
+                    device = torch.device(device_str)
+                    
                     try:
                         # MEJORA: Usar función mejorada de test_native_engine.py que maneja mejor
                         # el tamaño completo del grid y modelos ConvLSTM
                         import sys
+                        import importlib.util
                         scripts_dir = Path(__file__).parent.parent / "scripts"
-                        if str(scripts_dir) not in sys.path:
-                            sys.path.insert(0, str(scripts_dir))
-                        from test_native_engine import export_model_to_torchscript
+                        test_native_path = scripts_dir / "test_native_engine.py"
+                        
+                        if not test_native_path.exists():
+                            raise ImportError(f"No se encontró test_native_engine.py en {scripts_dir}")
+                        
+                        # Cargar módulo dinámicamente
+                        spec = importlib.util.spec_from_file_location("test_native_engine", test_native_path)
+                        test_native_module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(test_native_module)
+                        export_model_to_torchscript = test_native_module.export_model_to_torchscript
                         
                         # El modelo ya está cargado (línea 936), usarlo directamente
                         # Asegurar que el modelo esté en modo evaluación y en el dispositivo correcto
-                        import torch
-                        device_str = "cuda" if torch.cuda.is_available() else "cpu"
-                        device = torch.device(device_str)
+                        model.eval()
+                        model.to(device)
                         model.eval()
                         model.to(device)
                         
@@ -1071,6 +1083,10 @@ async def handle_load_experiment(args):
         # Fallback: usar motor Python tradicional
         if motor is None:
             logging.info(f"Usando motor Python tradicional (Aetheria_Motor)")
+            # Asegurar que device_str esté definido para motor Python
+            if 'device_str' not in locals():
+                import torch
+                device_str = "cuda" if torch.cuda.is_available() else "cpu"
             motor = Aetheria_Motor(model, inference_grid_size, d_state, global_cfg.DEVICE, cfg=config)
             
             # Compilar modelo para optimización de inferencia (solo para motor Python)
@@ -1085,8 +1101,14 @@ async def handle_load_experiment(args):
             except Exception as e:
                 logging.warning(f"⚠️ No se pudo compilar el modelo: {e}. Continuando sin compilación.")
         
+        # Asegurar que device_str esté definido antes de usarlo
+        if 'device_str' not in locals():
+            import torch
+            device_str = "cuda" if torch.cuda.is_available() else "cpu"
+        
         g_state['motor'] = motor
         g_state['simulation_step'] = 0
+        g_state['active_experiment'] = exp_name  # Guardar experimento activo
         
         # Guardar información sobre el tipo de motor para verificación
         motor_type = "native" if is_native else "python"
@@ -1242,6 +1264,68 @@ async def handle_load_experiment(args):
     except Exception as e:
         logging.error(f"Error crítico cargando experimento '{exp_name}': {e}", exc_info=True)
         if ws: await send_notification(ws, f"Error al cargar '{exp_name}': {str(e)}", "error")
+
+async def handle_unload_model(args):
+    """Descarga el modelo cargado y limpia el estado."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    motor = g_state.get('motor')
+    
+    if not motor:
+        if ws: await send_notification(ws, "⚠️ No hay modelo cargado para descargar.", "warning")
+        return
+    
+    try:
+        # Limpiar motor y estado
+        experiment_name = g_state.get('active_experiment', 'Unknown')
+        
+        # Limpiar memoria del motor
+        if hasattr(motor, 'state') and motor.state:
+            if hasattr(motor.state, 'psi') and motor.state.psi is not None:
+                del motor.state.psi
+        if hasattr(motor, 'native_engine'):
+            # Motor nativo: limpiar
+            try:
+                motor.native_engine.clear()
+            except:
+                pass
+        del motor
+        
+        # Limpiar g_state
+        g_state['motor'] = None
+        g_state['simulation_step'] = 0
+        g_state['motor_type'] = None
+        g_state['motor_is_native'] = False
+        g_state['active_experiment'] = None
+        g_state['is_paused'] = True
+        
+        # Limpiar snapshots y otros datos
+        if 'snapshots' in g_state:
+            g_state['snapshots'].clear()
+        if 'simulation_history' in g_state:
+            g_state['simulation_history'].clear()
+        
+        # Limpiar cache de CUDA si está disponible
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
+        logging.info(f"✅ Modelo '{experiment_name}' descargado y memoria limpiada")
+        if ws: await send_notification(ws, f"✅ Modelo descargado. Memoria limpiada.", "success")
+        
+        # Enviar actualización de estado
+        await broadcast({
+            "type": "inference_status_update",
+            "payload": {
+                "status": "paused",
+                "model_loaded": False,
+                "experiment_name": None,
+                "compile_status": None
+            }
+        })
+        
+    except Exception as e:
+        logging.error(f"Error descargando modelo: {e}", exc_info=True)
+        if ws: await send_notification(ws, f"⚠️ Error al descargar modelo: {str(e)[:50]}...", "error")
 
 async def handle_reset(args):
     """Reinicia el estado de la simulación al estado inicial."""
