@@ -1114,10 +1114,7 @@ async def handle_load_experiment(args):
         # Fallback: usar motor Python tradicional
         if motor is None:
             logging.info(f"Usando motor Python tradicional (Aetheria_Motor)")
-            # Asegurar que device_str esté definido para motor Python
-            if 'device_str' not in locals():
-                import torch
-                device_str = "cuda" if torch.cuda.is_available() else "cpu"
+            # device_str ya está definido al inicio de la función
             motor = Aetheria_Motor(model, inference_grid_size, d_state, global_cfg.DEVICE, cfg=config)
             
             # Compilar modelo para optimización de inferencia (solo para motor Python)
