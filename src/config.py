@@ -107,6 +107,7 @@ def get_device():
                                         cuda_available = False
                                         cuda_error = str(e)
                                 except Exception as e:
+                                    # Captura cualquier otra excepción al crear tensor CUDA
                                     logging.warning(f"⚠️ Error verificando CUDA: {e}")
                                     cuda_available = False
                                     cuda_error = str(e)
