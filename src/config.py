@@ -3,35 +3,30 @@ import os
 import logging
 import warnings
 
+# --- Silenciar warnings ANTES de importar torch ---
+# Los warnings de CUDA se emiten durante la importación de torch,
+# por lo que debemos configurar los filtros primero
+warnings.filterwarnings('ignore', message='.*cudagraph.*', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*CUDA graph.*', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*CUDA initialization.*', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*cudaGetDeviceCount.*', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*invalid device ordinal.*', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*Unexpected error from.*', category=UserWarning)
+
 # --- Ruta Base del Proyecto ---
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIST_PATH = os.path.join(PROJECT_ROOT, "frontend", "dist")
 
-# --- Silenciar warnings de CUDA graph de PyTorch ---
+# --- Importar torch con warnings silenciados ---
 # Estos warnings son informativos y no afectan la funcionalidad
 # PyTorch intenta optimizar con CUDA graphs pero algunas operaciones no son capturables
+# El error 101 (invalid device ordinal) es común cuando CUDA no está disponible correctamente
 import torch
 
 # Configurar logging de PyTorch para reducir mensajes de CUDA graph
 # Los mensajes de "cudagraph partition" son informativos y esperados cuando
 # torch.compile encuentra operaciones no capturables (como torch.cat dinámico)
-try:
-    # Silenciar mensajes de partición de CUDA graph vía variables de entorno
-    import os
-    # PYTORCH_CUDA_ALLOC_CONF no silencia estos mensajes, pero podemos usar logging
-    # Los mensajes vienen directamente del backend de C++ y no se pueden silenciar fácilmente
-    # Sin embargo, son informativos y no afectan el rendimiento o funcionalidad
-    pass
-except Exception:
-    pass
-
-# Configurar filtros de warnings para Python warnings relacionados
-warnings.filterwarnings('ignore', message='.*cudagraph.*', category=UserWarning)
-warnings.filterwarnings('ignore', message='.*CUDA graph.*', category=UserWarning)
-# Silenciar warnings de inicialización de CUDA (Error 101: invalid device ordinal)
-warnings.filterwarnings('ignore', message='.*CUDA initialization.*', category=UserWarning)
-warnings.filterwarnings('ignore', message='.*cudaGetDeviceCount.*', category=UserWarning)
-warnings.filterwarnings('ignore', message='.*invalid device ordinal.*', category=UserWarning)
+# Los warnings ya fueron silenciados antes de importar torch
 
 # --- Setup y Constantes de Control ---
 _DEVICE = None
