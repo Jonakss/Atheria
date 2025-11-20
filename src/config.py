@@ -104,10 +104,6 @@ def get_native_engine_device() -> str:
             cuda_available = False
         
         selected_device = "cuda" if cuda_available else "cpu"
-        if cuda_available:
-            logging.info(f"Motor nativo: Auto-detectado CUDA (mejor disponible)")
-        else:
-            logging.info(f"Motor nativo: Auto-detectado CPU (CUDA no disponible)")
         return selected_device
     elif NATIVE_ENGINE_DEVICE in ('cpu', 'cuda'):
         # Forzar device específico
