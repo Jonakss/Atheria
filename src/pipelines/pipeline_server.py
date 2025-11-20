@@ -16,6 +16,7 @@ from .pipeline_viz import get_visualization_data
 from ..model_loader import load_model
 from ..engines.qca_engine import Aetheria_Motor, QuantumState
 from ..analysis.analysis import analyze_universe_atlas, analyze_cell_chemistry, calculate_phase_map_metrics
+from ..physics.analysis.EpochDetector import EpochDetector
 
 # Configuración de logging - Reducir verbosidad en producción
 # INFO para eventos importantes, DEBUG para detalles del bucle de simulación
@@ -222,6 +223,24 @@ async def simulation_loop():
                             # Resetear contador
                             g_state['steps_interval_counter'] = 0
                             
+                            # Detectar época periódicamente (cada 50 pasos para no saturar)
+                            epoch_detector = g_state.get('epoch_detector')
+                            if epoch_detector and updated_step % 50 == 0:
+                                try:
+                                    psi_tensor = g_state['motor'].state.psi
+                                    if psi_tensor is not None:
+                                        # Analizar estado y determinar época
+                                        metrics = epoch_detector.analyze_state(psi_tensor)
+                                        epoch = epoch_detector.determine_epoch(metrics)
+                                        g_state['current_epoch'] = epoch
+                                        g_state['epoch_metrics'] = {
+                                            'energy': float(metrics.get('energy', 0)),
+                                            'clustering': float(metrics.get('clustering', 0)),
+                                            'symmetry': float(metrics.get('symmetry', 0))
+                                        }
+                                except Exception as e:
+                                    logging.debug(f"Error detectando época: {e}")
+                            
                             # Calcular visualización para este frame
                             delta_psi = g_state['motor'].last_delta_psi if hasattr(g_state['motor'], 'last_delta_psi') else None
                             viz_data = get_visualization_data(
@@ -248,7 +267,9 @@ async def simulation_loop():
                                             "step": updated_step,
                                             "is_paused": False,
                                             "live_feed_enabled": False,
-                                            "fps": g_state.get('current_fps', 0.0)
+                                            "fps": g_state.get('current_fps', 0.0),
+                                            "epoch": g_state.get('current_epoch', 0),
+                                            "epoch_metrics": g_state.get('epoch_metrics', {})
                                         }
                                     }
                                     
@@ -285,7 +306,9 @@ async def simulation_loop():
                                     "step": updated_step,
                                     "is_paused": False,
                                     "live_feed_enabled": False,
-                                    "fps": g_state.get('current_fps', 0.0)
+                                    "fps": g_state.get('current_fps', 0.0),
+                                    "epoch": g_state.get('current_epoch', 0),
+                                    "epoch_metrics": g_state.get('epoch_metrics', {})
                                 }
                                 # No incluir map_data, hist_data, etc. para ahorrar ancho de banda
                             }
@@ -342,6 +365,26 @@ async def simulation_loop():
                         await asyncio.sleep(0.1)
                         continue
                     
+                    # Detectar época periódicamente (cada 50 pasos para no saturar)
+                    epoch_detector = g_state.get('epoch_detector')
+                    if epoch_detector:
+                        current_step = g_state.get('simulation_step', 0)
+                        if current_step % 50 == 0:
+                            try:
+                                psi_tensor = g_state['motor'].state.psi
+                                if psi_tensor is not None:
+                                    # Analizar estado y determinar época
+                                    metrics = epoch_detector.analyze_state(psi_tensor)
+                                    epoch = epoch_detector.determine_epoch(metrics)
+                                    g_state['current_epoch'] = epoch
+                                    g_state['epoch_metrics'] = {
+                                        'energy': float(metrics.get('energy', 0)),
+                                        'clustering': float(metrics.get('clustering', 0)),
+                                        'symmetry': float(metrics.get('symmetry', 0))
+                                    }
+                            except Exception as e:
+                                logging.debug(f"Error detectando época: {e}")
+                    
                     # --- CALCULAR VISUALIZACIONES SOLO SI LIVE_FEED ESTÁ ACTIVO ---
                     # Optimización: Usar inference_mode para mejor rendimiento GPU
                     # Obtener delta_psi si está disponible para visualizaciones de flujo
@@ -385,7 +428,9 @@ async def simulation_loop():
                             "step": updated_step,
                             "is_paused": False,
                             "live_feed_enabled": live_feed_enabled,
-                            "fps": g_state.get('current_fps', 0.0)
+                            "fps": g_state.get('current_fps', 0.0),
+                            "epoch": g_state.get('current_epoch', 0),
+                            "epoch_metrics": g_state.get('epoch_metrics', {})
                         }
                     }
                     
@@ -834,6 +879,10 @@ async def handle_load_experiment(args):
     try:
         logging.info(f"Intentando cargar el experimento '{exp_name}' para [{args['ws_id']}]...")
         if ws: await send_notification(ws, f"Cargando modelo '{exp_name}'...", "info")
+        
+        # Inicializar EpochDetector si no existe
+        if 'epoch_detector' not in g_state:
+            g_state['epoch_detector'] = EpochDetector()
         
         # OPTIMIZACIÓN DE MEMORIA: Liberar motor anterior antes de cargar uno nuevo
         old_motor = g_state.get('motor')

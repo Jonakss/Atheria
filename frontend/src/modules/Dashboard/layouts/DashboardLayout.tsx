@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ScientificHeader } from '../components/ScientificHeader';
 import { NavigationSidebar } from '../components/NavigationSidebar';
 import { PhysicsInspector } from '../components/PhysicsInspector';
@@ -18,12 +18,22 @@ type LabSection = 'inference' | 'training' | 'analysis';
 
 export const DashboardLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('lab');
-  const [currentEpoch, setCurrentEpoch] = useState(2); // Era de Partículas - PARTÍCULAS está activa
   const [labPanelOpen, setLabPanelOpen] = useState(true); // Panel de laboratorio visible por defecto
   const [labPanelCollapsed, setLabPanelCollapsed] = useState(false); // Panel de laboratorio colapsado
   const [activeLabSection, setActiveLabSection] = useState<LabSection>('inference'); // Sub-sección activa de Lab
   const [physicsInspectorCollapsed, setPhysicsInspectorCollapsed] = useState(false); // Inspector físico colapsado
   const { simData, selectedViz, connectionStatus, sendCommand, setSelectedViz } = useWebSocket();
+  
+  // Obtener época detectada del backend
+  const detectedEpoch = useMemo(() => simData?.simulation_info?.epoch ?? 2, [simData?.simulation_info?.epoch]);
+  const [currentEpoch, setCurrentEpoch] = useState(detectedEpoch);
+  
+  // Sincronizar época cuando cambie desde el backend
+  useEffect(() => {
+    if (detectedEpoch !== undefined && detectedEpoch !== currentEpoch) {
+      setCurrentEpoch(detectedEpoch);
+    }
+  }, [detectedEpoch, currentEpoch]);
   
   // Handler para cambio de época - aplicar configuración automáticamente
   const handleEpochChange = (epoch: number) => {

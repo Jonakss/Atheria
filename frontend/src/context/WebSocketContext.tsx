@@ -73,6 +73,12 @@ interface SimData {
         live_feed_enabled?: boolean;
         gamma_decay?: number;
         fps?: number;
+        epoch?: number;
+        epoch_metrics?: {
+            energy?: number;
+            clustering?: number;
+            symmetry?: number;
+        };
     };
     phase_attractor?: any;
     flow_data?: {
