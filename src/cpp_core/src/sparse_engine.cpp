@@ -131,7 +131,27 @@ int64_t Engine::step_native() {
                 std::vector<torch::jit::IValue> inputs;
                 inputs.push_back(batch_input);
                 
-                torch::Tensor batch_output = model_.forward(inputs).toTensor();
+                // Manejar diferentes tipos de modelos:
+                // - UNet normal: devuelve solo un Tensor
+                // - UNetConvLSTM: devuelve una tupla (delta_psi, h_next, c_next)
+                torch::Tensor batch_output;
+                auto output_ivalue = model_.forward(inputs);
+                
+                // Verificar si el output es una tupla o un tensor
+                if (output_ivalue.isTuple()) {
+                    // Modelo ConvLSTM: extraer el primer elemento (delta_psi)
+                    auto output_tuple = output_ivalue.toTuple();
+                    if (output_tuple->elements().size() > 0) {
+                        batch_output = output_tuple->elements()[0].toTensor();
+                    } else {
+                        throw std::runtime_error("Modelo devolvió tupla vacía");
+                    }
+                } else if (output_ivalue.isTensor()) {
+                    // Modelo UNet normal: solo tensor
+                    batch_output = output_ivalue.toTensor();
+                } else {
+                    throw std::runtime_error("Modelo devolvió tipo inesperado (no tensor ni tupla)");
+                }
                 
                 // Procesar salida del modelo
                 // El modelo devuelve [batch, 2*d_state, grid_size, grid_size] (mismo tamaño que input)
