@@ -952,22 +952,15 @@ async def handle_load_experiment(args):
                 # Si tenemos modelo JIT, usar motor nativo
                 if jit_path and os.path.exists(jit_path):
                     try:
-                        # Detectar device: preferir CUDA si está disponible, sino CPU
-                        # El motor nativo verificará internamente si CUDA está realmente disponible
-                        import torch
-                        if torch.cuda.is_available():
-                            device_str = "cuda"
-                            logging.info("✅ CUDA detectado - usando GPU para motor nativo")
-                        else:
-                            device_str = "cpu"
-                            logging.info("⚠️ CUDA no disponible - usando CPU para motor nativo")
-                        
+                        # Usar auto-detección del device (configurado en config.py)
+                        # Si device=None, usa auto-detección desde config.get_native_device()
                         motor = NativeEngineWrapper(
                             grid_size=inference_grid_size,
                             d_state=d_state,
-                            device=device_str,
+                            device=None,  # None = auto-detección desde config
                             cfg=config
                         )
+                        logging.info(f"✅ Motor nativo inicializado con device: {motor.device_str}")
                         
                         # Cargar modelo JIT en el motor nativo
                         if motor.load_model(jit_path):
