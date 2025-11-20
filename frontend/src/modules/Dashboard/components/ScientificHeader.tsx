@@ -376,18 +376,18 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
           onClick={handleConnectDisconnect}
           className={`w-7 h-7 rounded flex items-center justify-center transition-all relative group border ${
             connectionStatus === 'connected'
-              ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/20'
+              ? 'bg-teal-500/10 border-teal-500/50 text-teal-400 hover:bg-teal-500/20'
               : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:bg-gray-700 hover:text-gray-300'
           }`}
           title={connectionStatus === 'connected' ? 'Desconectar' : 'Conectar'}
         >
           {connectionStatus === 'connected' ? (
-            <Power size={14} strokeWidth={2.5} className="text-emerald-400" />
+            <Power size={14} strokeWidth={2.5} className="text-teal-400" />
           ) : (
             <Plug size={14} strokeWidth={2.5} className="text-gray-400" />
           )}
           {connectionStatus === 'connected' && (
-            <div className="absolute inset-0 rounded bg-emerald-500/20 animate-pulse" />
+            <div className="absolute inset-0 rounded bg-teal-500/20 animate-pulse" />
           )}
         </button>
       </div>

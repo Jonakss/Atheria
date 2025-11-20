@@ -389,13 +389,13 @@ export const MetricsBar: React.FC = () => {
                     className={`flex items-center gap-2 font-mono ${
                       expanded ? 'text-[10px]' : 'text-xs'
                     } ${
-                      isError ? 'text-red-500/80' : isInfo ? 'text-emerald-500/80' : 'text-blue-500/80'
+                      isError ? 'text-red-500/80' : isInfo ? 'text-teal-500/80' : 'text-blue-500/80'
                     }`}
                   >
                     <span className={`rounded-full shrink-0 ${
                       expanded ? 'w-1 h-1' : 'w-1.5 h-1.5'
                     } ${
-                      isError ? 'bg-red-500' : isInfo ? 'bg-emerald-500' : 'bg-blue-500'
+                      isError ? 'bg-red-500' : isInfo ? 'bg-teal-500' : 'bg-blue-500'
                     }`} />
                     <span className={expanded ? 'truncate' : ''}>
                       {expanded 
