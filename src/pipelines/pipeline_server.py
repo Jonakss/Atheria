@@ -969,18 +969,37 @@ async def handle_load_experiment(args):
             logging.info(f"INITIAL_STATE_MODE_INFERENCE no encontrado en config, usando valor por defecto: {config.INITIAL_STATE_MODE_INFERENCE}")
         
         checkpoint_path = get_latest_checkpoint(exp_name)
-        if not checkpoint_path:
-            msg = f"⚠️ El experimento '{exp_name}' no tiene checkpoints entrenados. Primero debes entrenar el modelo antes de poder cargarlo para inferencia."
-            logging.warning(msg)
-            if ws: await send_notification(ws, msg, "warning")
-            return
+        model = None
+        state_dict = None
         
-        model, state_dict = load_model(config, checkpoint_path)
-        if model is None:
-            msg = f"❌ Error al cargar el modelo desde el checkpoint. Verifica que el checkpoint no esté corrupto."
-            logging.error(msg)
-            if ws: await send_notification(ws, msg, "error")
-            return
+        if checkpoint_path:
+            # Cargar modelo desde checkpoint (modelo entrenado)
+            model, state_dict = load_model(config, checkpoint_path)
+            if model is None:
+                msg = f"❌ Error al cargar el modelo desde el checkpoint. Verifica que el checkpoint no esté corrupto."
+                logging.error(msg)
+                if ws: await send_notification(ws, msg, "error")
+                return
+            logging.info(f"✅ Modelo cargado desde checkpoint: {checkpoint_path}")
+        else:
+            # No hay checkpoint: crear modelo nuevo sin pesos entrenados
+            logging.info(f"⚠️ El experimento '{exp_name}' no tiene checkpoints. Creando modelo nuevo sin pesos entrenados.")
+            if ws: await send_notification(ws, f"⚠️ Sin checkpoint. Iniciando con modelo nuevo (ruido aleatorio).", "info")
+            
+            try:
+                from ..model_loader import create_new_model
+                model = create_new_model(config)
+                if model is None:
+                    msg = f"❌ Error al crear el modelo desde la configuración."
+                    logging.error(msg)
+                    if ws: await send_notification(ws, msg, "error")
+                    return
+                logging.info(f"✅ Modelo nuevo creado desde configuración (sin pesos entrenados)")
+            except Exception as e:
+                msg = f"❌ Error al crear modelo nuevo: {str(e)}"
+                logging.error(msg, exc_info=True)
+                if ws: await send_notification(ws, msg, "error")
+                return
         
         # Asegurar que el modelo esté en modo evaluación para inferencia
         model.eval()
@@ -999,12 +1018,15 @@ async def handle_load_experiment(args):
         # --- INTEGRACIÓN DEL MOTOR NATIVO (C++) ---
         # Intentar usar el motor nativo de alto rendimiento si está disponible
         # El motor nativo es 250-400x más rápido que el motor Python
+        # NOTA: Solo usar motor nativo si hay checkpoint (modelo entrenado)
+        # Si no hay checkpoint, usar motor Python con modelo sin entrenar
         use_native_engine = getattr(global_cfg, 'USE_NATIVE_ENGINE', True)  # Por defecto True
+        has_checkpoint = checkpoint_path is not None
         
         motor = None
         is_native = False
         
-        if use_native_engine:
+        if use_native_engine and has_checkpoint:
             try:
                 from ..engines.native_engine_wrapper import NativeEngineWrapper
                 
