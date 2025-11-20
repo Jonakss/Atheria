@@ -31,38 +31,108 @@ import torch
 # --- Setup y Constantes de Control ---
 _DEVICE = None
 def get_device():
+    """
+    Detecta y retorna el mejor dispositivo disponible (CUDA si está disponible, sino CPU).
+    
+    Mejoras:
+    - Intenta forzar CUDA si está disponible pero falló la detección inicial
+    - Manejo robusto de errores CUDA runtime
+    - Logging detallado para debugging
+    """
     global _DEVICE
     if _DEVICE is None:
+        # Permitir forzar device desde variable de entorno
+        forced_device = os.environ.get('ATHERIA_FORCE_DEVICE', '').lower()
+        if forced_device in ('cuda', 'cpu'):
+            logging.info(f"Device forzado por ATHERIA_FORCE_DEVICE: {forced_device}")
+            _DEVICE = torch.device(forced_device)
+            return _DEVICE
+        
         # Intentar detectar CUDA con manejo de errores robusto
         cuda_available = False
+        cuda_error = None
+        
         try:
-            # Silenciar warnings durante la detección de CUDA
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=UserWarning)
-                warnings.filterwarnings('ignore', category=RuntimeWarning)
-                # Intentar acceder a CUDA de forma segura
-                if hasattr(torch.cuda, 'is_available'):
-                    cuda_available = torch.cuda.is_available()
-                    # Verificar que realmente podemos usar CUDA (no solo que está disponible)
-                    if cuda_available:
-                        try:
-                            # Intentar obtener el device count para verificar que funciona
+            # Verificar si CUDA está disponible según PyTorch
+            if hasattr(torch.cuda, 'is_available'):
+                # Primera verificación: torch.cuda.is_available()
+                try:
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings('ignore', category=UserWarning)
+                        warnings.filterwarnings('ignore', category=RuntimeWarning)
+                        cuda_available = torch.cuda.is_available()
+                except Exception as e:
+                    logging.debug(f"Error llamando torch.cuda.is_available(): {e}")
+                    cuda_available = False
+                    cuda_error = str(e)
+                
+                # Segunda verificación: Intentar obtener device_count
+                if cuda_available:
+                    try:
+                        with warnings.catch_warnings():
+                            warnings.filterwarnings('ignore', category=UserWarning)
+                            warnings.filterwarnings('ignore', category=RuntimeWarning)
                             device_count = torch.cuda.device_count()
                             if device_count == 0:
+                                logging.warning("⚠️ CUDA disponible pero no hay dispositivos disponibles (device_count=0)")
                                 cuda_available = False
-                        except (RuntimeError, AttributeError):
-                            # Si falla al obtener device count, CUDA no es usable
+                                cuda_error = "No CUDA devices found"
+                            else:
+                                # Tercera verificación: Intentar crear un tensor en CUDA
+                                try:
+                                    test_tensor = torch.zeros(1, device='cuda')
+                                    del test_tensor
+                                    torch.cuda.empty_cache()
+                                    logging.info(f"✅ CUDA verificado exitosamente: {device_count} dispositivo(s) disponible(s)")
+                                    cuda_available = True
+                                except RuntimeError as e:
+                                    error_str = str(e)
+                                    if '101' in error_str or 'invalid device ordinal' in error_str:
+                                        logging.warning(f"⚠️ CUDA disponible pero error 101 (invalid device ordinal). Verifica drivers de CUDA.")
+                                        logging.info("💡 Intentando forzar CUDA:0...")
+                                        # Intentar forzar CUDA:0
+                                        try:
+                                            os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+                                            test_tensor = torch.zeros(1, device='cuda:0')
+                                            del test_tensor
+                                            torch.cuda.empty_cache()
+                                            cuda_available = True
+                                            logging.info("✅ CUDA:0 funciona después de forzar CUDA_VISIBLE_DEVICES=0")
+                                        except Exception as e2:
+                                            logging.warning(f"⚠️ CUDA:0 tampoco funciona: {e2}")
+                                            cuda_available = False
+                                            cuda_error = f"Error 101: {error_str}"
+                                    else:
+                                        logging.warning(f"⚠️ Error al crear tensor CUDA: {e}")
+                                        cuda_available = False
+                                        cuda_error = str(e)
+                        except (RuntimeError, AttributeError) as e:
+                            error_str = str(e)
+                            if '101' not in error_str:
+                                logging.warning(f"⚠️ Error obteniendo device_count: {e}")
                             cuda_available = False
+                            cuda_error = str(e)
         except Exception as e:
             # Si hay cualquier error, usar CPU como fallback
             logging.debug(f"Error detectando CUDA: {e}. Usando CPU como fallback.")
             cuda_available = False
+            cuda_error = str(e)
         
-        _DEVICE = torch.device("cuda" if cuda_available else "cpu")
+        # Decidir device final
         if cuda_available:
-            logging.info(f"Dispositivo PyTorch inicializado: {_DEVICE}")
+            _DEVICE = torch.device("cuda")
+            logging.info(f"🚀 Dispositivo PyTorch inicializado: {_DEVICE} ({torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'N/A'})")
         else:
-            logging.info(f"Dispositivo PyTorch inicializado: {_DEVICE} (CUDA no disponible o falló la inicialización)")
+            _DEVICE = torch.device("cpu")
+            if cuda_error and '101' in cuda_error:
+                logging.warning(f"⚠️ Dispositivo PyTorch inicializado: {_DEVICE}")
+                logging.warning(f"   CUDA no disponible debido a: Error 101 (invalid device ordinal)")
+                logging.info("💡 Soluciones posibles:")
+                logging.info("   1. Verificar drivers de CUDA: nvidia-smi")
+                logging.info("   2. Verificar que PyTorch esté compilado con CUDA: python -c 'import torch; print(torch.version.cuda)'")
+                logging.info("   3. Intentar forzar device: export ATHERIA_FORCE_DEVICE=cuda")
+            else:
+                logging.info(f"💻 Dispositivo PyTorch inicializado: {_DEVICE} (CUDA no disponible o falló la inicialización)")
     return _DEVICE
 DEVICE = get_device()
 
@@ -85,25 +155,50 @@ def get_native_engine_device() -> str:
     """
     if NATIVE_ENGINE_DEVICE == 'auto':
         # Detectar automáticamente el mejor disponible
-        # Intentar CUDA primero, luego CPU como fallback
+        # Usar la misma lógica que get_device() pero sin crear tensor
         cuda_available = False
+        cuda_error = None
+        
         try:
             with warnings.catch_warnings():
                 warnings.filterwarnings('ignore', category=UserWarning)
                 warnings.filterwarnings('ignore', category=RuntimeWarning)
                 if hasattr(torch.cuda, 'is_available'):
-                    cuda_available = torch.cuda.is_available()
-                    if cuda_available:
-                        try:
-                            device_count = torch.cuda.device_count()
-                            if device_count == 0:
-                                cuda_available = False
-                        except (RuntimeError, AttributeError):
-                            cuda_available = False
-        except Exception:
+                    try:
+                        cuda_available = torch.cuda.is_available()
+                        if cuda_available:
+                            # Verificar que realmente funciona
+                            try:
+                                device_count = torch.cuda.device_count()
+                                if device_count > 0:
+                                    # Intentar crear un tensor pequeño para verificar que funciona
+                                    test_tensor = torch.zeros(1, device='cuda')
+                                    del test_tensor
+                                    torch.cuda.empty_cache()
+                                    cuda_available = True
+                                    logging.info(f"✅ Motor nativo: CUDA detectado ({device_count} dispositivo(s))")
+                                else:
+                                    cuda_available = False
+                                    cuda_error = "No CUDA devices found"
+                            except RuntimeError as e:
+                                error_str = str(e)
+                                if '101' in error_str or 'invalid device ordinal' in error_str:
+                                    cuda_available = False
+                                    cuda_error = "Error 101: invalid device ordinal"
+                                    logging.warning("⚠️ Motor nativo: CUDA disponible pero error 101. Usando CPU.")
+                                else:
+                                    cuda_available = False
+                                    cuda_error = str(e)
+                    except Exception as e:
+                        cuda_available = False
+                        cuda_error = str(e)
+        except Exception as e:
             cuda_available = False
+            cuda_error = str(e)
         
         selected_device = "cuda" if cuda_available else "cpu"
+        if not cuda_available and cuda_error and '101' in cuda_error:
+            logging.info("💡 Motor nativo: Para forzar CUDA usa: export ATHERIA_NATIVE_DEVICE=cuda")
         return selected_device
     elif NATIVE_ENGINE_DEVICE in ('cpu', 'cuda'):
         # Forzar device específico

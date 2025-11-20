@@ -132,15 +132,36 @@ class NativeEngineWrapper:
                     error_msg += " (Problema de CUDA runtime - intenta usar device='cpu')"
                 raise ImportError(error_msg + " Usa el motor Python como fallback.")
         
-        # Si hay problema de CUDA runtime, forzar CPU mode independientemente del device solicitado
+        # Si hay problema de CUDA runtime, verificar si se puede usar CPU mode
         if _native_cuda_issue:
             if device == "cuda":
-                logging.warning("⚠️ Problema de CUDA runtime detectado. Forzando CPU mode para motor nativo.")
-            device = "cpu"
-            # Asegurar que CUDA_VISIBLE_DEVICES esté deshabilitado
-            import os
-            os.environ['CUDA_VISIBLE_DEVICES'] = ''
-            logging.info("✅ CUDA_VISIBLE_DEVICES='' configurado para evitar problemas de CUDA runtime")
+                logging.warning("⚠️ Problema de CUDA runtime detectado al importar atheria_core.")
+                logging.info("💡 Intentando usar CPU mode para motor nativo...")
+                # Intentar CPU mode en lugar de fallar
+                device = "cpu"
+                # Asegurar que CUDA_VISIBLE_DEVICES esté deshabilitado para evitar conflictos
+                import os
+                original_cuda_visible = os.environ.get('CUDA_VISIBLE_DEVICES', None)
+                os.environ['CUDA_VISIBLE_DEVICES'] = ''
+                try:
+                    # Verificar que el motor funciona en CPU mode
+                    test_engine = atheria_core_module.Engine(d_state=1, device='cpu')
+                    del test_engine
+                    logging.info("✅ Motor nativo funciona en CPU mode")
+                except Exception as e:
+                    logging.error(f"❌ Motor nativo también falla en CPU mode: {e}")
+                    raise ImportError(f"Motor nativo no disponible (ni CUDA ni CPU): {e}")
+                finally:
+                    # Restaurar CUDA_VISIBLE_DEVICES
+                    if original_cuda_visible is not None:
+                        os.environ['CUDA_VISIBLE_DEVICES'] = original_cuda_visible
+                    elif 'CUDA_VISIBLE_DEVICES' in os.environ:
+                        del os.environ['CUDA_VISIBLE_DEVICES']
+        
+        # Verificar que device es válido antes de inicializar
+        if device not in ('cpu', 'cuda'):
+            logging.warning(f"⚠️ Device '{device}' no válido. Usando 'cpu'.")
+            device = 'cpu'
         
         self.grid_size = int(grid_size)
         self.d_state = int(d_state)
@@ -148,9 +169,25 @@ class NativeEngineWrapper:
         self.device = torch.device(device)
         self.cfg = cfg
         
-        # Inicializar motor nativo con el tamaño del grid
-        # El grid_size se usa para construir inputs del modelo con el tamaño correcto
-        self.native_engine = atheria_core_module.Engine(d_state=d_state, device=device, grid_size=grid_size)
+        # Intentar inicializar motor nativo con manejo robusto de errores
+        try:
+            # Inicializar motor nativo con el tamaño del grid
+            # El grid_size se usa para construir inputs del modelo con el tamaño correcto
+            self.native_engine = atheria_core_module.Engine(d_state=d_state, device=device, grid_size=grid_size)
+            logging.info(f"✅ Motor nativo C++ inicializado (device={device}, grid_size={grid_size})")
+        except RuntimeError as e:
+            error_str = str(e)
+            if device == 'cuda' and ('cuda' in error_str.lower() or '101' in error_str):
+                logging.warning(f"⚠️ Error inicializando motor nativo en CUDA: {e}")
+                logging.info("💡 Intentando fallback a CPU...")
+                # Intentar CPU mode como fallback
+                device = 'cpu'
+                self.device_str = device
+                self.device = torch.device(device)
+                self.native_engine = atheria_core_module.Engine(d_state=d_state, device='cpu', grid_size=grid_size)
+                logging.info("✅ Motor nativo inicializado en CPU mode (fallback desde CUDA)")
+            else:
+                raise
         
         # Estado cuántico para compatibilidad (denso)
         # El motor nativo usa formato disperso, pero necesitamos denso para visualización
