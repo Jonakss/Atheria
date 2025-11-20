@@ -72,10 +72,12 @@ Se mejoró la detección y manejo de problemas de CUDA runtime en `native_engine
 
 ## Próximos Pasos
 
-1. ✅ Corregir tamaño de input mínimo (5x5 → 64x64)
-2. ⏳ Implementar uso de tamaño completo del grid desde configuración
-3. ⏳ Optimizar para reducir uso de memoria cuando se usa grid completo
-4. 🔄 Considerar re-entrenamiento con arquitectura compatible con patches
+1. ✅ Corregir tamaño de input mínimo (5x5 → tamaño completo del grid)
+2. ✅ Implementar uso de tamaño completo del grid desde configuración (agregar grid_size al constructor)
+3. ✅ Usar grid_size_ en build_batch_input() para construir inputs del tamaño correcto
+4. ⏳ Optimizar para reducir uso de memoria cuando se usa grid completo
+5. 🔄 Considerar re-entrenamiento con arquitectura compatible con patches (futuro)
+6. ⏳ Probar con modelos reales en CPU y GPU
 
 ## Referencias
 
