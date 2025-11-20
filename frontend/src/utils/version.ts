@@ -3,7 +3,6 @@
  * La versión se inyecta desde package.json durante el build.
  */
 
-// @ts-ignore - Vite inyecta esta variable
 export const APP_VERSION: string = import.meta.env.APP_VERSION || '4.0.2';
 
 // Formatear versión para mostrar en UI (ej: 4.0.2 -> Ver. 4.0.2-RC)
