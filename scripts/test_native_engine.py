@@ -50,19 +50,46 @@ def export_model_to_torchscript(model, device, output_path, grid_size=64, d_stat
     logger.info(f"Exportando modelo a TorchScript...")
     logger.info(f"  Input shape: {example_input.shape}")
     logger.info(f"  Device: {device}")
+    logger.info(f"  Model type: {model.__class__.__name__}")
     
     try:
-        # Intentar usar torch.jit.script primero (más optimizado)
+        # Verificar que el modelo puede hacer forward con el ejemplo de entrada
+        logger.info("  Verificando forward pass...")
+        with torch.no_grad():
+            try:
+                output = model(example_input)
+                logger.info(f"  Forward pass exitoso. Output shape: {output.shape if hasattr(output, 'shape') else 'N/A'}")
+            except Exception as forward_error:
+                logger.error(f"  ❌ Error en forward pass: {forward_error}", exc_info=True)
+                return None
+        
+        # Intentar usar torch.jit.trace primero (más compatible con modelos que tienen memoria)
+        traced_model = None
         try:
-            logger.info("  Intentando torch.jit.script...")
-            with torch.no_grad():
-                traced_model = torch.jit.script(model)
-        except Exception as script_error:
-            logger.warning(f"  torch.jit.script falló: {script_error}")
             logger.info("  Intentando torch.jit.trace...")
-            # Fallback a torch.jit.trace (más compatible)
             with torch.no_grad():
-                traced_model = torch.jit.trace(model, example_input)
+                # Para modelos con memoria (ConvLSTM), necesitamos asegurar que no haya estados persistentes
+                if hasattr(model, 'reset_hidden_state'):
+                    model.reset_hidden_state()
+                
+                # Intentar trace con ejemplo de entrada
+                traced_model = torch.jit.trace(model, example_input, strict=False)
+                logger.info("  ✅ torch.jit.trace exitoso")
+        except Exception as trace_error:
+            logger.warning(f"  torch.jit.trace falló: {trace_error}")
+            # Intentar torch.jit.script como fallback (puede fallar con modelos complejos)
+            try:
+                logger.info("  Intentando torch.jit.script...")
+                with torch.no_grad():
+                    traced_model = torch.jit.script(model)
+                logger.info("  ✅ torch.jit.script exitoso")
+            except Exception as script_error:
+                logger.error(f"  ❌ torch.jit.script también falló: {script_error}", exc_info=True)
+                return None
+        
+        if traced_model is None:
+            logger.error("  ❌ No se pudo exportar el modelo con ningún método")
+            return None
         
         # Guardar modelo exportado
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
