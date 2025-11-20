@@ -199,53 +199,88 @@ class NativeEngineWrapper:
         Convierte el estado disperso del motor nativo a formato denso (grid)
         para compatibilidad con el frontend.
         
+        OPTIMIZACIÓN: Solo actualizar regiones activas cuando sea posible.
         El motor nativo almacena partículas dispersas, pero el frontend necesita
         un grid denso. Iteramos sobre todo el grid y obtenemos el estado desde
         el motor nativo (que genera vacío automáticamente si no hay partícula).
         """
-        # Inicializar grid denso
+        # Inicializar grid denso si no existe
         if self.state.psi is None:
             self.state.psi = torch.zeros(
                 1, self.grid_size, self.grid_size, self.d_state,
                 dtype=torch.complex64, device=self.device
             )
         
-        # Iterar sobre todo el grid y obtener estado desde motor nativo
-        # El motor nativo genera vacío automáticamente con HarmonicVacuum
+        # OPTIMIZACIÓN: Usar batching más grande y procesamiento vectorizado cuando sea posible
         try:
-            # Para optimizar, podríamos iterar solo sobre coordenadas activas
-            # pero por simplicidad, iteramos sobre todo el grid
-            # (puede optimizarse después si es necesario)
-            BATCH_SIZE = 100  # Procesar en batches para mejor rendimiento
+            # Obtener lista de coordenadas activas del motor nativo si está disponible
+            # Si no está disponible, iterar sobre todo el grid
+            active_coords = None
+            try:
+                # Intentar obtener coordenadas activas (si el motor nativo lo expone)
+                if hasattr(self.native_engine, 'get_active_coords'):
+                    active_coords = self.native_engine.get_active_coords()
+            except:
+                pass
             
-            coords_list = []
-            for y in range(self.grid_size):
-                for x in range(self.grid_size):
-                    coords_list.append(atheria_core.Coord3D(x, y, 0))
-            
-            # Obtener estados en batch
-            for i in range(0, len(coords_list), BATCH_SIZE):
-                batch_coords = coords_list[i:i+BATCH_SIZE]
-                for coord in batch_coords:
-                    try:
-                        state_tensor = self.native_engine.get_state_at(coord)
-                        
-                        # Si el tensor tiene la forma correcta, copiarlo al grid denso
-                        if state_tensor.shape == (self.d_state,):
-                            # Mover a dispositivo correcto
-                            if state_tensor.is_cuda and self.device.type == 'cpu':
-                                state_tensor = state_tensor.cpu()
-                            elif not state_tensor.is_cuda and self.device.type == 'cuda':
-                                state_tensor = state_tensor.cuda()
+            if active_coords is None or len(active_coords) == 0:
+                # No hay coordenadas activas o método no disponible - iterar sobre todo el grid
+                # OPTIMIZACIÓN: Usar batch más grande para mejor rendimiento
+                BATCH_SIZE = 500  # Aumentado de 100 a 500 para mejor rendimiento
+                
+                coords_list = [
+                    atheria_core.Coord3D(x, y, 0)
+                    for y in range(self.grid_size)
+                    for x in range(self.grid_size)
+                ]
+                
+                # Procesar en batches más grandes
+                for i in range(0, len(coords_list), BATCH_SIZE):
+                    batch_coords = coords_list[i:i+BATCH_SIZE]
+                    for coord in batch_coords:
+                        try:
+                            state_tensor = self.native_engine.get_state_at(coord)
                             
-                            # Copiar al estado denso (batch, H, W, d_state)
-                            self.state.psi[0, coord.y, coord.x] = state_tensor
-                    except Exception as e:
-                        logging.debug(f"Error obteniendo estado en ({coord.x}, {coord.y}): {e}")
+                            # Verificar shape antes de copiar
+                            if state_tensor.shape == (self.d_state,):
+                                # Mover a dispositivo correcto si es necesario
+                                if state_tensor.device != self.device:
+                                    state_tensor = state_tensor.to(self.device)
+                                
+                                # Copiar al estado denso (batch, H, W, d_state)
+                                self.state.psi[0, coord.y, coord.x] = state_tensor
+                        except Exception as e:
+                            logging.debug(f"Error obteniendo estado en ({coord.x}, {coord.y}): {e}")
+            else:
+                # OPTIMIZACIÓN: Solo actualizar coordenadas activas (mucho más rápido)
+                # Procesar solo las partículas activas
+                BATCH_SIZE = 1000  # Batch más grande para coordenadas activas
+                
+                for i in range(0, len(active_coords), BATCH_SIZE):
+                    batch_coords = active_coords[i:i+BATCH_SIZE]
+                    for coord in batch_coords:
+                        try:
+                            state_tensor = self.native_engine.get_state_at(coord)
+                            
+                            if state_tensor.shape == (self.d_state,):
+                                # Mover a dispositivo correcto si es necesario
+                                if state_tensor.device != self.device:
+                                    state_tensor = state_tensor.to(self.device)
+                                
+                                # Copiar solo coordenadas activas
+                                if 0 <= coord.y < self.grid_size and 0 <= coord.x < self.grid_size:
+                                    self.state.psi[0, coord.y, coord.x] = state_tensor
+                        except Exception as e:
+                            logging.debug(f"Error obteniendo estado en ({coord.x}, {coord.y}): {e}")
                         
         except Exception as e:
             logging.warning(f"Error convirtiendo estado disperso a denso: {e}")
-            # En caso de error, mantener grid vacío (ya inicializado)
+            # En caso de error, mantener grid actual o inicializar vacío
+            if self.state.psi is None:
+                self.state.psi = torch.zeros(
+                    1, self.grid_size, self.grid_size, self.d_state,
+                    dtype=torch.complex64, device=self.device
+                )
     
     def get_model_for_params(self):
         """Retorna el modelo para acceso a parámetros (compatibilidad)."""
