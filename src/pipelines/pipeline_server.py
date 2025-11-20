@@ -1005,10 +1005,6 @@ async def handle_load_experiment(args):
                         logging.warning(f"⚠️ Error al inicializar motor nativo: {e}. Usando motor Python como fallback.", exc_info=True)
                         if ws: await send_notification(ws, f"⚠️ Error en motor nativo, usando Python: {str(e)[:50]}...", "warning")
                         motor = None
-                    except Exception as e:
-                        logging.warning(f"⚠️ Error al inicializar motor nativo: {e}. Usando motor Python como fallback.", exc_info=True)
-                        if ws: await send_notification(ws, f"⚠️ Error en motor nativo, usando Python: {str(e)[:50]}...", "warning")
-                        motor = None
             except Exception as e:
                 logging.warning(f"⚠️ Error en la inicialización del motor nativo: {e}. Usando motor Python como fallback.", exc_info=True)
                 if ws: await send_notification(ws, f"⚠️ Error inicializando motor nativo: {str(e)[:50]}...", "warning")

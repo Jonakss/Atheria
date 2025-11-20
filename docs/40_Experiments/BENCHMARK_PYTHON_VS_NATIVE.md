@@ -141,6 +141,36 @@ El script genera un reporte en Markdown con:
 
 ---
 
-**Estado:** ⏳ Benchmark creado, pendiente de ejecución  
-**Última actualización:** 2024-11-20
+## 🚨 Estado Actual
+
+**Estado:** ⏳ Benchmark creado, pendiente de ejecución
+
+### Por Qué el Motor Nativo No Se Usa Automáticamente
+
+El motor nativo C++ está **disponible** (`NATIVE_AVAILABLE = True`), pero requiere:
+
+1. **Modelo TorchScript exportado**: El motor nativo necesita un modelo exportado a `.pt` (TorchScript)
+2. **Exportación automática**: El servidor intenta exportar automáticamente cuando carga un experimento, pero puede fallar si:
+   - No hay checkpoint disponible
+   - El modelo no es compatible con TorchScript
+   - Hay errores en la exportación
+
+### Cómo Forzar el Uso del Motor Nativo
+
+1. **Exportar modelo manualmente**:
+   ```bash
+   python scripts/test_native_engine.py --experiment EXPERIMENT_NAME --export-only
+   ```
+
+2. **Verificar si hay modelo JIT**:
+   ```bash
+   ls output/torchscript_models/EXPERIMENT_NAME/model.pt
+   ```
+
+3. **Revisar logs del servidor** cuando cargas un experimento para ver si exporta el modelo automáticamente.
+
+---
+
+**Última actualización:** 2024-11-20  
+**Próximo paso:** Ejecutar benchmark cuando haya modelos disponibles
 
