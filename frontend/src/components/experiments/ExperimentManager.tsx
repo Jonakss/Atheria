@@ -676,6 +676,48 @@ export function ExperimentManager() {
                                                         </td>
                                                     </tr>
                                                 )}
+                                                {/* Información del motor y dispositivo */}
+                                                <tr>
+                                                    <td className="text-xs font-medium text-gray-400 py-1 pr-4">Motor</td>
+                                                    <td className="text-xs py-1">
+                                                        {(() => {
+                                                            const exp = sortedExperiments.find(e => e.name === selectedExp);
+                                                            const useNative = exp?.config?.USE_NATIVE_ENGINE;
+                                                            if (useNative) {
+                                                                return (
+                                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                                                                        ⚡ Nativo (C++)
+                                                                    </span>
+                                                                );
+                                                            } else {
+                                                                return (
+                                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-amber-500/10 text-amber-400 border-amber-500/30">
+                                                                        🐍 Python
+                                                                    </span>
+                                                                );
+                                                            }
+                                                        })()}
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="text-xs font-medium text-gray-400 py-1 pr-4">Dispositivo</td>
+                                                    <td className="text-xs py-1">
+                                                        {(() => {
+                                                            const exp = sortedExperiments.find(e => e.name === selectedExp);
+                                                            const device = exp?.config?.TRAINING_DEVICE || 'cpu';
+                                                            const isCuda = device.toLowerCase() === 'cuda';
+                                                            return (
+                                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                                                    isCuda 
+                                                                        ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' 
+                                                                        : 'bg-gray-500/10 text-gray-400 border-gray-500/30'
+                                                                }`}>
+                                                                    {isCuda ? '🎮 CUDA (Gráfica)' : '💻 CPU'}
+                                                                </span>
+                                                            );
+                                                        })()}
+                                                    </td>
+                                                </tr>
                                             </tbody>
                                         </table>
                                     </GlassPanel>

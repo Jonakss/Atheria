@@ -43,6 +43,11 @@ async def create_experiment_handler(args):
         from ..utils import check_and_create_dir
         from .. import config as global_cfg
         
+        # Detectar dispositivo (CPU/CUDA) y motor disponible
+        import torch
+        device_str = "cuda" if torch.cuda.is_available() else "cpu"
+        use_native_engine = getattr(global_cfg, 'USE_NATIVE_ENGINE', True)
+        
         exp_config = {
             "EXPERIMENT_NAME": exp_name,
             "MODEL_ARCHITECTURE": model_arch,
@@ -53,7 +58,10 @@ async def create_experiment_handler(args):
             "MODEL_PARAMS": args.get("MODEL_PARAMS", {}),
             "LOAD_FROM_EXPERIMENT": args.get("LOAD_FROM_EXPERIMENT"),  # Para transfer learning
             "GAMMA_DECAY": args.get("GAMMA_DECAY", getattr(global_cfg, 'GAMMA_DECAY', 0.01)),  # Término Lindbladian (decaimiento)
-            "INITIAL_STATE_MODE_INFERENCE": args.get("INITIAL_STATE_MODE_INFERENCE", getattr(global_cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise'))  # Modo de inicialización del estado
+            "INITIAL_STATE_MODE_INFERENCE": args.get("INITIAL_STATE_MODE_INFERENCE", getattr(global_cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')),  # Modo de inicialización del estado
+            # Información del motor y dispositivo
+            "TRAINING_DEVICE": device_str,  # CPU o CUDA (gráfica)
+            "USE_NATIVE_ENGINE": use_native_engine  # Si se intentó usar motor nativo
         }
         check_and_create_dir(exp_config)
         

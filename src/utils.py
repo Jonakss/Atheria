@@ -77,6 +77,9 @@ def get_experiment_list():
                             'LOAD_FROM_EXPERIMENT': config_data.get('LOAD_FROM_EXPERIMENT', None),
                             'D_STATE': config_data.get('MODEL_PARAMS', {}).get('d_state') if isinstance(config_data.get('MODEL_PARAMS'), dict) else config_data.get('D_STATE', 8),
                             'HIDDEN_CHANNELS': config_data.get('MODEL_PARAMS', {}).get('hidden_channels') if isinstance(config_data.get('MODEL_PARAMS'), dict) else config_data.get('HIDDEN_CHANNELS', 32),
+                            # Información del motor y dispositivo
+                            'TRAINING_DEVICE': config_data.get('TRAINING_DEVICE', 'cpu'),  # CPU o CUDA
+                            'USE_NATIVE_ENGINE': config_data.get('USE_NATIVE_ENGINE', False),  # Si se intentó usar motor nativo
                         }
                     })
             except json.JSONDecodeError:

@@ -121,6 +121,41 @@ export function ExperimentInfo() {
                     </div>
                 </div>
                 
+                {/* Información del Motor y Dispositivo */}
+                <div className="space-y-1.5">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Motor y Dispositivo</span>
+                    <div className="pl-4 grid grid-cols-2 gap-3">
+                        <div>
+                            <span className="text-[10px] text-gray-500 block">Motor</span>
+                            {config.USE_NATIVE_ENGINE ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 inline-block">
+                                    ⚡ Nativo (C++)
+                                </span>
+                            ) : (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-amber-500/10 text-amber-400 border-amber-500/30 inline-block">
+                                    🐍 Python
+                                </span>
+                            )}
+                        </div>
+                        <div>
+                            <span className="text-[10px] text-gray-500 block">Dispositivo</span>
+                            {(() => {
+                                const device = config.TRAINING_DEVICE || 'cpu';
+                                const isCuda = device.toLowerCase() === 'cuda';
+                                return (
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border inline-block ${
+                                        isCuda 
+                                            ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' 
+                                            : 'bg-gray-500/10 text-gray-400 border-gray-500/30'
+                                    }`}>
+                                        {isCuda ? '🎮 CUDA (Gráfica)' : '💻 CPU'}
+                                    </span>
+                                );
+                            })()}
+                        </div>
+                    </div>
+                </div>
+                
                 {/* Entrenamiento */}
                 {config.TOTAL_EPISODES && (
                     <div className="space-y-1.5">
