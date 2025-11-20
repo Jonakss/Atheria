@@ -126,9 +126,16 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
               <div className={`w-2 h-2 rounded-full ${engineInfo.dotColor} ${
                 connectionStatus === 'connected' && compileStatus?.is_native ? 'animate-pulse' : ''
               }`} />
-              <span className={`text-xs font-mono ${engineInfo.color} font-semibold`}>
-                {engineInfo.label}
-              </span>
+              <div className="flex flex-col">
+                <span className={`text-xs font-mono ${engineInfo.color} font-semibold`}>
+                  {engineInfo.label}
+                </span>
+                {compileStatus?.device && (
+                  <span className="text-[9px] text-gray-500 uppercase">
+                    {compileStatus.device}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 

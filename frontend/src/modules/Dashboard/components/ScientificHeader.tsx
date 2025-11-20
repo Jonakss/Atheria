@@ -25,29 +25,38 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
   
   // Determinar estado del sistema según connectionStatus y compileStatus
   const getSystemStatus = () => {
-    if (connectionStatus === 'connected' && compileStatus?.is_native) {
+    if (connectionStatus === 'connected') {
+      // Mostrar dispositivo (CPU/CUDA) y tipo de motor
+      const device = compileStatus?.device?.toUpperCase() || 'CPU';
+      const isNative = compileStatus?.is_native || false;
+      const isCompiled = compileStatus?.is_compiled || false;
+      
+      let text = device;
+      let dotColor = device === 'CUDA' ? 'bg-emerald-500' : 'bg-blue-500';
+      let textColor = device === 'CUDA' ? 'text-emerald-500' : 'text-blue-500';
+      let pulse = false;
+      let shadow = '';
+      
+      if (isNative) {
+        text = `${device} (SPARSE)`;
+        dotColor = device === 'CUDA' ? 'bg-emerald-500' : 'bg-emerald-400';
+        textColor = device === 'CUDA' ? 'text-emerald-500' : 'text-emerald-400';
+        pulse = true;
+        shadow = 'shadow-[0_0_8px_rgba(16,185,129,0.4)]';
+      } else if (isCompiled) {
+        text = `${device} (COMPILED)`;
+        dotColor = 'bg-blue-500';
+        textColor = 'text-blue-500';
+        pulse = true;
+        shadow = 'shadow-[0_0_8px_rgba(59,130,246,0.4)]';
+      }
+      
       return { 
-        text: 'SPARSE_ENGINE::READY', 
-        dotColor: 'bg-emerald-500',
-        textColor: 'text-emerald-500',
-        pulse: true,
-        shadow: 'shadow-[0_0_8px_rgba(16,185,129,0.4)]'
-      };
-    } else if (connectionStatus === 'connected' && compileStatus?.is_compiled) {
-      return { 
-        text: 'PYTORCH_ENGINE::READY', 
-        dotColor: 'bg-blue-500',
-        textColor: 'text-blue-500',
-        pulse: true,
-        shadow: 'shadow-[0_0_8px_rgba(59,130,246,0.4)]'
-      };
-    } else if (connectionStatus === 'connected') {
-      return { 
-        text: 'ENGINE::CONNECTED', 
-        dotColor: 'bg-blue-400',
-        textColor: 'text-blue-400',
-        pulse: false,
-        shadow: ''
+        text, 
+        dotColor,
+        textColor,
+        pulse,
+        shadow
       };
     } else if (connectionStatus === 'connecting') {
       return { 
