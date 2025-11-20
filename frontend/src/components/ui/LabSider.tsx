@@ -338,30 +338,72 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
                                 <div className="space-y-3">
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
-                                            <label className="block text-[10px] text-gray-400 uppercase">Transfer Learning (Opcional)</label>
+                                            <label className="block text-[10px] text-gray-400 uppercase">
+                                                Transfer Learning {transferFromExperiment && <span className="text-blue-400">(Activo)</span>}
+                                            </label>
                                             <button
                                                 onClick={() => setTransferWizardOpened(true)}
                                                 disabled={!isConnected}
                                                 className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 text-[10px] font-bold rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                                title="Abrir wizard de transfer learning"
+                                                title="Abrir wizard avanzado de transfer learning"
                                             >
                                                 <ArrowRightLeft size={10} />
-                                                Wizard
+                                                Wizard Avanzado
                                             </button>
                                         </div>
-                                        <select
-                                            value={transferFromExperiment || ''}
-                                            onChange={(e) => setTransferFromExperiment(e.target.value || null)}
-                                            disabled={!isConnected}
-                                            className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
-                                        >
-                                            <option value="">Ninguno (desde cero)</option>
-                                            {experimentsData?.filter(exp => exp.has_checkpoint).map(exp => (
-                                                <option key={exp.name} value={exp.name}>
-                                                    {exp.name}
-                                                </option>
-                                            ))}
-                                        </select>
+                                        
+                                        {/* Selector mejorado con información visual */}
+                                        <div className="relative">
+                                            <select
+                                                value={transferFromExperiment || ''}
+                                                onChange={(e) => setTransferFromExperiment(e.target.value || null)}
+                                                disabled={!isConnected}
+                                                className={`w-full px-3 py-1.5 bg-white/5 border rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50 ${
+                                                    transferFromExperiment 
+                                                        ? 'border-blue-500/30 bg-blue-500/5' 
+                                                        : 'border-white/10'
+                                                }`}
+                                            >
+                                                <option value="">🚀 Nuevo (desde cero)</option>
+                                                {experimentsData?.filter(exp => exp.has_checkpoint).map(exp => (
+                                                    <option key={exp.name} value={exp.name}>
+                                                        📦 {exp.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            
+                                            {/* Indicador visual cuando hay transfer activo */}
+                                            {transferFromExperiment && (
+                                                <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                                                    <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        
+                                        {/* Información del modelo base seleccionado */}
+                                        {transferFromExperiment && (() => {
+                                            const baseExp = experimentsData?.find(exp => exp.name === transferFromExperiment);
+                                            if (!baseExp) return null;
+                                            
+                                            return (
+                                                <div className="mt-2 p-2 bg-blue-500/5 border border-blue-500/20 rounded text-[10px]">
+                                                    <div className="flex items-center gap-1 mb-1">
+                                                        <ArrowRightLeft size={10} className="text-blue-400" />
+                                                        <span className="font-semibold text-blue-400">Modelo Base:</span>
+                                                    </div>
+                                                    <div className="space-y-0.5 text-gray-400">
+                                                        <div><span className="text-gray-500">Arquitectura:</span> {baseExp.config?.MODEL_ARCHITECTURE || 'N/A'}</div>
+                                                        <div><span className="text-gray-500">Grid:</span> {baseExp.config?.GRID_SIZE_TRAINING || 'N/A'} | <span className="text-gray-500">LR:</span> {(baseExp.config?.LR_RATE_M || 0).toExponential(2)}</div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => setTransferFromExperiment(null)}
+                                                        className="mt-1.5 text-[9px] text-red-400 hover:text-red-300 underline"
+                                                    >
+                                                        ✕ Quitar transfer learning
+                                                    </button>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-2">
