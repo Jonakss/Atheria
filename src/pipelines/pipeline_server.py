@@ -914,6 +914,10 @@ async def handle_load_experiment(args):
         if ws: await send_notification(ws, "Nombre de experimento no proporcionado.", "error")
         return
 
+    # Inicializar device_str al inicio para evitar UnboundLocalError
+    import torch
+    device_str = "cuda" if torch.cuda.is_available() else "cpu"
+
     try:
         logging.info(f"Intentando cargar el experimento '{exp_name}' para [{args['ws_id']}]...")
         if ws: await send_notification(ws, f"Cargando modelo '{exp_name}'...", "info")
@@ -1013,9 +1017,7 @@ async def handle_load_experiment(args):
                     logging.info(f"Modelo JIT no encontrado para '{exp_name}'. Exportando automáticamente...")
                     if ws: await send_notification(ws, f"📦 Exportando modelo a TorchScript...", "info")
                     
-                    # Definir device_str antes del try para que esté disponible en caso de error
-                    import torch
-                    device_str = "cuda" if torch.cuda.is_available() else "cpu"
+                    # device_str ya está definido al inicio de la función
                     device = torch.device(device_str)
                     
                     try:
@@ -1023,11 +1025,19 @@ async def handle_load_experiment(args):
                         # el tamaño completo del grid y modelos ConvLSTM
                         import sys
                         import importlib.util
-                        scripts_dir = Path(__file__).parent.parent / "scripts"
+                        from pathlib import Path
+                        
+                        # Obtener el directorio raíz del proyecto
+                        project_root = Path(__file__).parent.parent.parent
+                        scripts_dir = project_root / "scripts"
                         test_native_path = scripts_dir / "test_native_engine.py"
                         
                         if not test_native_path.exists():
                             raise ImportError(f"No se encontró test_native_engine.py en {scripts_dir}")
+                        
+                        # Agregar el directorio scripts al path para que las importaciones funcionen
+                        if str(scripts_dir) not in sys.path:
+                            sys.path.insert(0, str(scripts_dir))
                         
                         # Cargar módulo dinámicamente
                         spec = importlib.util.spec_from_file_location("test_native_engine", test_native_path)
