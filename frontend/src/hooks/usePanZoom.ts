@@ -43,17 +43,17 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
             return { pan: { x: 0, y: 0 }, zoom: 1 };
         }
 
-        // Tamaño objetivo: mostrar 256 unidades del grid (o todo si es menor)
-        const targetUnits = 256;
-        const unitsToShowX = Math.min(targetUnits, gridWidth);
-        const unitsToShowY = Math.min(targetUnits, gridHeight);
-        
-        // Calcular zoom para que las unidades objetivo ocupen el contenedor
+        // OPTIMIZACIÓN: Siempre mostrar TODO el grid, hacer zoom out si es necesario
+        // Calcular zoom para que TODO el grid quepa en el contenedor
         // El canvas tiene dimensiones gridWidth x gridHeight píxeles (1 píxel = 1 unidad del grid)
-        // Queremos que `unitsToShowX` unidades ocupen `containerWidth` píxeles del contenedor
-        const zoomX = containerWidth / unitsToShowX;
-        const zoomY = containerHeight / unitsToShowY;
-        const initialZoom = Math.min(zoomX, zoomY);
+        // Queremos que TODO el grid (gridWidth unidades) quepa en `containerWidth` píxeles
+        // Zoom = containerSize / gridSize (si grid es mayor que container, zoom será < 1, es decir, zoom out)
+        const zoomX = containerWidth / gridWidth;
+        const zoomY = containerHeight / gridHeight;
+        const initialZoom = Math.min(zoomX, zoomY); // Usar el menor para asegurar que todo quepa
+        
+        // Aplicar margen de seguridad (90% para dejar un poco de espacio)
+        const initialZoomWithMargin = initialZoom * 0.9;
 
         // El canvas está posicionado con left: 50%, top: 50%, marginLeft: -gridWidth/2, marginTop: -gridHeight/2
         // Esto centra el canvas en el contenedor
@@ -89,11 +89,11 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
         //   * Entonces: gridWidth/2 * zoom + pan.x = 0, por lo tanto pan.x = -gridWidth/2 * zoom
         
         const initialPan = {
-            x: -gridWidth / 2 * initialZoom,
-            y: -gridHeight / 2 * initialZoom
+            x: -gridWidth / 2 * initialZoomWithMargin,
+            y: -gridHeight / 2 * initialZoomWithMargin
         };
 
-        return { pan: initialPan, zoom: initialZoom };
+        return { pan: initialPan, zoom: initialZoomWithMargin };
     }, [canvasRef, gridWidth, gridHeight]);
 
     // Inicializar vista cuando cambia el tamaño del grid
@@ -147,13 +147,10 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
         }
         
         // Calcular límites de zoom
-        // Zoom mínimo: mostrar todo el grid o al menos 256 unidades
-        const targetUnits = 256;
-        const unitsToShowX = Math.min(targetUnits, gridWidth);
-        const unitsToShowY = Math.min(targetUnits, gridHeight);
-        const minZoomX = containerWidth / unitsToShowX;
-        const minZoomY = containerHeight / unitsToShowY;
-        const minZoom = Math.min(minZoomX, minZoomY) * 0.9; // 90% para dejar margen
+        // Zoom mínimo: mostrar TODO el grid con margen de seguridad
+        const minZoomX = containerWidth / gridWidth;
+        const minZoomY = containerHeight / gridHeight;
+        const minZoom = Math.min(minZoomX, minZoomY) * 0.9; // 90% para dejar margen (zoom out si es necesario)
         
         // Zoom máximo: permitir zoom hasta 20x o hasta que 1 unidad = 10 píxeles
         const maxZoom = Math.max(20, Math.min(containerWidth / 10, containerHeight / 10));

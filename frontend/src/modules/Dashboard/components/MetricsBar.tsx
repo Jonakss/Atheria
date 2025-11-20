@@ -10,17 +10,55 @@ export const MetricsBar: React.FC = () => {
   const [collapsedWidgets, setCollapsedWidgets] = useState<Set<string>>(new Set()); // Widgets individuales colapsados
   
   // Calcular métricas reales desde simData
-  // Usar JSON.stringify para crear una dependencia estable de map_data
-  // Acceder directamente a map_data para evitar problemas de referencia
-  const mapDataRef = simData?.map_data;
+  // Usar ref para almacenar el último valor válido y evitar stack overflow
+  const mapDataRef = useRef<string | null>(null);
+  const mapDataLastHash = useRef<number>(0);
+  
+  // Calcular hash simple del map_data para detectar cambios sin JSON.stringify costoso
+  const mapDataHash = useMemo(() => {
+    const mapData = simData?.map_data;
+    if (!mapData || !Array.isArray(mapData) || mapData.length === 0) return 0;
+    
+    // Hash simple: longitud + algunos valores clave
+    let hash = mapData.length;
+    if (mapData[0] && Array.isArray(mapData[0])) {
+      hash = hash * 31 + mapData[0].length;
+      // Incluir algunos valores para detectar cambios reales
+      if (mapData[0].length > 0) {
+        hash = hash * 31 + (typeof mapData[0][0] === 'number' ? Math.floor(mapData[0][0] * 1000) : 0);
+      }
+      if (mapData.length > 0 && mapData[mapData.length - 1] && Array.isArray(mapData[mapData.length - 1])) {
+        const lastRow = mapData[mapData.length - 1];
+        if (lastRow.length > 0) {
+          hash = hash * 31 + (typeof lastRow[lastRow.length - 1] === 'number' ? Math.floor(lastRow[lastRow.length - 1] * 1000) : 0);
+        }
+      }
+    }
+    return hash;
+  }, [simData?.map_data?.length, simData?.map_data?.[0]?.length]);
+  
+  // Solo actualizar mapDataString si el hash cambió
   const mapDataString = useMemo(() => {
-    if (!mapDataRef) return null;
-    try {
-      return JSON.stringify(mapDataRef);
-    } catch {
+    if (mapDataHash === 0 || mapDataHash === mapDataLastHash.current) {
+      return mapDataRef.current;
+    }
+    
+    mapDataLastHash.current = mapDataHash;
+    const mapData = simData?.map_data;
+    if (!mapData) {
+      mapDataRef.current = null;
       return null;
     }
-  }, [mapDataRef]);
+    
+    try {
+      const str = JSON.stringify(mapData);
+      mapDataRef.current = str;
+      return str;
+    } catch {
+      mapDataRef.current = null;
+      return null;
+    }
+  }, [mapDataHash, simData?.map_data]);
   
   const vacuumEnergy = useMemo(() => {
     if (!isConnected || !mapDataString) return 'N/A';
