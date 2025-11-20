@@ -418,14 +418,15 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         }
                         break;
                     case 'training_log':
-                        // OPTIMIZACIÓN: Limitar tamaño de logs para evitar memory leaks (últimos 1000 logs)
+                        // OPTIMIZACIÓN DE MEMORIA: Limitar tamaño de logs para evitar memory leaks
+                        const MAX_LOGS_TRAINING = 500; // Reducido de 1000 a 500 para ahorrar memoria
                         setTrainingLog(prev => {
                             const newLogs = [...prev, payload];
-                            return newLogs.slice(-1000); // Mantener solo últimos 1000
+                            return newLogs.slice(-MAX_LOGS_TRAINING); // Mantener solo últimos N logs
                         });
                         setAllLogs(prev => {
                             const newLogs = [...prev, payload];
-                            return newLogs.slice(-1000); // Mantener solo últimos 1000
+                            return newLogs.slice(-MAX_LOGS_TRAINING); // Mantener solo últimos N logs
                         });
                         break;
                     case 'simulation_log':
