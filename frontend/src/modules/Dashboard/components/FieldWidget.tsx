@@ -29,16 +29,34 @@ export const FieldWidget: React.FC<FieldWidgetProps> = ({
   isCollapsed,
   onToggleCollapse
 }) => {
+  // Estabilizar referencia de fieldData usando JSON.stringify para evitar re-renders infinitos
+  const fieldDataString = useMemo(() => {
+    if (!fieldData) return null;
+    try {
+      return JSON.stringify(fieldData);
+    } catch {
+      return null;
+    }
+  }, [fieldData]);
+
   // Preparar datos para mini visualización (muestrear para rendimiento)
   const visualizationData = useMemo(() => {
-    if (!fieldData || isCollapsed) return null;
+    if (!fieldDataString || isCollapsed) return null;
+    
+    // Parsear datos estables
+    let parsedData: number[] | number[][];
+    try {
+      parsedData = JSON.parse(fieldDataString);
+    } catch {
+      return null;
+    }
     
     // Si es array 2D, aplanar
     let flatData: number[] = [];
-    if (Array.isArray(fieldData)) {
-      if (Array.isArray(fieldData[0])) {
+    if (Array.isArray(parsedData)) {
+      if (Array.isArray(parsedData[0])) {
         // Array 2D: aplanar
-        for (const row of fieldData) {
+        for (const row of parsedData) {
           if (Array.isArray(row)) {
             const filteredRow = row.filter((v: any) => typeof v === 'number' && !isNaN(v)) as number[];
             flatData = [...flatData, ...filteredRow];
@@ -46,7 +64,7 @@ export const FieldWidget: React.FC<FieldWidgetProps> = ({
         }
       } else {
         // Array 1D
-        flatData = (fieldData as number[]).filter((v: any) => typeof v === 'number' && !isNaN(v));
+        flatData = (parsedData as number[]).filter((v: any) => typeof v === 'number' && !isNaN(v));
       }
     }
     
@@ -66,7 +84,7 @@ export const FieldWidget: React.FC<FieldWidgetProps> = ({
     const max = Math.max(...sampled);
     const range = max - min || 1;
     return sampled.map(v => (v - min) / range);
-  }, [fieldData, isCollapsed]);
+  }, [fieldDataString, isCollapsed]);
 
   // Calcular estadísticas para gráfico
   const stats = useMemo(() => {

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { FieldWidget } from './FieldWidget';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { ChevronUp, ChevronDown } from 'lucide-react';
@@ -11,14 +11,16 @@ export const MetricsBar: React.FC = () => {
   
   // Calcular métricas reales desde simData
   // Usar JSON.stringify para crear una dependencia estable de map_data
+  // Acceder directamente a map_data para evitar problemas de referencia
+  const mapDataRef = simData?.map_data;
   const mapDataString = useMemo(() => {
-    if (!simData?.map_data) return null;
+    if (!mapDataRef) return null;
     try {
-      return JSON.stringify(simData.map_data);
+      return JSON.stringify(mapDataRef);
     } catch {
       return null;
     }
-  }, [simData?.map_data]);
+  }, [mapDataRef]);
   
   const vacuumEnergy = useMemo(() => {
     if (!isConnected || !mapDataString) return 'N/A';
@@ -163,24 +165,69 @@ export const MetricsBar: React.FC = () => {
   }, [mapDataString, isConnected]);
   
   // Decaimiento = Gamma decay rate del sistema (de simData o config)
+  // Usar una dependencia estable para evitar re-renders infinitos
+  const gammaDecayValue = simData?.simulation_info?.gamma_decay ?? null;
+  const gammaDecayString = useMemo(() => {
+    if (gammaDecayValue === null) return null;
+    return String(gammaDecayValue);
+  }, [gammaDecayValue]);
+  
   const decayRate = useMemo(() => {
-    if (!isConnected) return 'N/A';
+    if (!isConnected || gammaDecayString === null) return 'N/A';
     
     // Intentar obtener gamma_decay de simData.simulation_info o usar valor por defecto
-    const gammaDecay = simData?.simulation_info?.gamma_decay || 0.01;
+    const gammaDecay = parseFloat(gammaDecayString) || 0.01;
     // Convertir a rad/s (factor de conversión)
     const decayValue = gammaDecay * 0.012; // Factor de conversión
     return decayValue < 0.001 ? decayValue.toExponential(1) : decayValue.toFixed(4);
-  }, [simData?.simulation_info, isConnected]);
+  }, [gammaDecayString, isConnected]);
 
   // Filtrar logs recientes (últimos 2) - solo mensajes de texto
-  const recentLogs = useMemo(() => {
-    if (!allLogs || allLogs.length === 0) return [];
-    
-    // Filtrar solo logs de texto (string)
-    const textLogs = allLogs.filter(log => typeof log === 'string' && log.trim().length > 0);
-    return textLogs.slice(-2);
-  }, [allLogs]);
+  // Usar useRef para mantener una referencia estable y evitar re-renders infinitos
+  const logsRef = useRef<string[]>([]);
+  const logsLengthRef = useRef<number>(0);
+  
+  useEffect(() => {
+    if (allLogs && allLogs.length !== logsLengthRef.current) {
+      logsLengthRef.current = allLogs.length;
+      // Filtrar solo logs de texto (string)
+      const textLogs = allLogs.filter(log => typeof log === 'string' && log.trim().length > 0);
+      logsRef.current = textLogs.slice(-2);
+    }
+  }, [allLogs?.length]); // Solo depender de la longitud para evitar re-renders infinitos
+  
+  const recentLogs = logsRef.current;
+
+  // Estabilizar referencias de fieldData usando mapDataString como base
+  // Solo parsear cuando mapDataString cambie realmente
+  const mapDataStable = useMemo(() => {
+    if (!mapDataString) return undefined;
+    try {
+      return JSON.parse(mapDataString) as number[][];
+    } catch {
+      return undefined;
+    }
+  }, [mapDataString]);
+
+  // Estabilizar flow_data usando JSON.stringify para crear dependencia estable
+  const flowDataString = useMemo(() => {
+    const flowMag = simData?.flow_data?.magnitude;
+    if (!flowMag) return null;
+    try {
+      return JSON.stringify(flowMag);
+    } catch {
+      return null;
+    }
+  }, [simData?.flow_data?.magnitude]);
+
+  const flowMagnitudeStable = useMemo(() => {
+    if (!flowDataString) return undefined;
+    try {
+      return JSON.parse(flowDataString) as number[][];
+    } catch {
+      return undefined;
+    }
+  }, [flowDataString]);
 
   return (
     <div className={`mt-auto z-30 border-t border-white/10 bg-[#050505]/95 backdrop-blur-sm transition-all duration-300 ease-in-out relative ${
@@ -214,7 +261,7 @@ export const MetricsBar: React.FC = () => {
             value={vacuumEnergy}
             unit="EV"
             status="good"
-            fieldData={simData?.map_data} // Datos del campo de densidad
+            fieldData={mapDataStable} // Usar referencia estable
             fieldType="energy"
             isCollapsed={collapsedWidgets.has('vacuum_energy')}
             onToggleCollapse={() => {
@@ -234,7 +281,7 @@ export const MetricsBar: React.FC = () => {
             value={localEntropy}
             unit="BITS"
             status="neutral"
-            fieldData={simData?.map_data} // Usar map_data para calcular distribución
+            fieldData={mapDataStable} // Usar referencia estable
             fieldType="density"
             isCollapsed={collapsedWidgets.has('local_entropy')}
             onToggleCollapse={() => {
@@ -254,7 +301,7 @@ export const MetricsBar: React.FC = () => {
             value={ionqSymmetry}
             unit="IDX"
             status="good"
-            fieldData={simData?.map_data} // Usar map_data para visualizar simetría
+            fieldData={mapDataStable} // Usar referencia estable
             fieldType="phase"
             isCollapsed={collapsedWidgets.has('ionq_symmetry')}
             onToggleCollapse={() => {
@@ -274,7 +321,7 @@ export const MetricsBar: React.FC = () => {
             value={decayRate}
             unit="RAD/S"
             status="warning"
-            fieldData={simData?.flow_data?.magnitude} // Usar magnitud de flujo como proxy de decaimiento
+            fieldData={flowMagnitudeStable} // Usar referencia estable
             fieldType="flow"
             isCollapsed={collapsedWidgets.has('decay_rate')}
             onToggleCollapse={() => {
