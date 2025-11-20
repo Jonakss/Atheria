@@ -175,37 +175,8 @@ export function LabSider() {
     ];
 
     return (
-        <div className="h-full flex flex-col bg-[#080808] text-gray-300">
-            {/* Header - Design System */}
-            <div className="h-12 border-b border-white/10 bg-[#0a0a0a] flex items-center justify-between px-4 shrink-0">
-                <span className="text-xs font-bold text-gray-200 tracking-wide">LABORATORIO</span>
-                <button
-                    onClick={handleConnectDisconnect}
-                    disabled={connectionStatus === 'connecting'}
-                    className={`flex items-center gap-2 px-2 py-1 rounded text-[10px] font-bold border transition-all ${
-                        connectionStatus === 'connected'
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
-                            : connectionStatus === 'connecting'
-                            ? 'bg-gray-500/10 text-gray-500 border-gray-500/30 cursor-wait opacity-50'
-                            : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10'
-                    }`}
-                    title={
-                        connectionStatus === 'connected' ? 'Desconectar' :
-                        connectionStatus === 'connecting' ? 'Conectando...' :
-                        'Conectar al servidor'
-                    }
-                >
-                    {connectionStatus === 'connected' ? (
-                        <Power size={14} />
-                    ) : connectionStatus === 'connecting' ? (
-                        <div className="w-2 h-2 rounded-full border-2 border-gray-500 border-t-transparent animate-spin" />
-                    ) : (
-                        <Plug size={12} />
-                    )}
-                </button>
-            </div>
-
-            {/* Layout: Sidebar Vertical + Contenido */}
+        <div className="h-full w-full flex flex-col text-gray-300">
+            {/* Layout: Sidebar Vertical + Contenido - Sin header duplicado, integrado con dashboard */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Sidebar Vertical de Secciones - Similar a NavigationSidebar */}
                 <aside className="w-12 border-r border-white/5 bg-[#050505] flex flex-col items-center py-3 gap-2 shrink-0">
