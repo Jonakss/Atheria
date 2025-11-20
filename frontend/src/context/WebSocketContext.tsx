@@ -359,7 +359,11 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         setInferenceStatus(payload.status);
                         // Almacenar compile_status si está disponible
                         if (payload.compile_status) {
-                            setCompileStatus(payload.compile_status as CompileStatus);
+                            const newCompileStatus = payload.compile_status as CompileStatus;
+                            console.log('📥 WebSocketContext - Recibido compile_status:', JSON.stringify(newCompileStatus, null, 2));
+                            setCompileStatus(newCompileStatus);
+                        } else {
+                            console.warn('⚠️ WebSocketContext - inference_status_update sin compile_status. Payload completo:', payload);
                         }
                         break;
                     case 'simulation_frame':
