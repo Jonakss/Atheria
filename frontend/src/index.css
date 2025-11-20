@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 /* Custom scrollbar for dark theme */
 @layer utilities {
@@ -16,5 +14,87 @@
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.15);
+  }
+  
+  /* Dark theme for select dropdowns - FORZAR TEMA OSCURO */
+  select {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    color: rgb(209, 213, 219) !important; /* text-gray-300 */
+    border-color: rgba(255, 255, 255, 0.1) !important;
+  }
+  
+  select:focus {
+    outline: none !important;
+    border-color: rgba(59, 130, 246, 0.5) !important; /* border-blue-500/50 */
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.5) !important;
+  }
+  
+  select:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+  }
+  
+  /* Opciones del dropdown - FORZAR TEMA OSCURO */
+  select option {
+    background-color: #0a0a0a !important; /* bg-[#0a0a0a] */
+    color: rgb(209, 213, 219) !important; /* text-gray-300 */
+    padding: 8px 12px !important;
+  }
+  
+  /* Firefox específico - las opciones tienen fondo blanco por defecto */
+  select option:checked {
+    background-color: rgba(59, 130, 246, 0.2) !important; /* bg-blue-500/20 */
+    color: rgb(147, 197, 253) !important; /* text-blue-300 */
+  }
+  
+  /* Chrome/Safari específico - el dropdown nativo puede tener fondo blanco */
+  select:not([multiple]) option {
+    background-color: #0a0a0a !important;
+    color: rgb(209, 213, 219) !important;
+  }
+  
+  /* Hover state para opciones (no todos los navegadores lo soportan) */
+  select option:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+  }
+  
+  /* Select múltiple */
+  select[multiple] option:checked {
+    background-color: rgba(59, 130, 246, 0.3) !important;
+    color: rgb(147, 197, 253) !important;
+  }
+  
+  /* Custom slider thumb styles */
+  .slider-thumb::-webkit-slider-thumb {
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgb(209, 213, 219);
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s;
+  }
+  
+  .slider-thumb::-webkit-slider-thumb:hover {
+    background: rgb(255, 255, 255);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+  }
+  
+  .slider-thumb::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgb(209, 213, 219);
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s;
+  }
+  
+  .slider-thumb::-moz-range-thumb:hover {
+    background: rgb(255, 255, 255);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
   }
 }

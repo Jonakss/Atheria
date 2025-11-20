@@ -1,6 +1,5 @@
 // frontend/src/context/WebSocketContext.tsx
 import { createContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
-import { notifications } from '@mantine/notifications';
 import { decompressIfNeeded, decodeBinaryFrame, processDecodedPayload } from '../utils/dataDecompression';
 
 /**
@@ -69,9 +68,10 @@ interface SimData {
     step?: number | null;
     timestamp?: number;
     simulation_info?: {
-    step?: number;
+        step?: number;
         is_paused?: boolean;
         live_feed_enabled?: boolean;
+        gamma_decay?: number;
     };
     phase_attractor?: any;
     flow_data?: {
@@ -418,11 +418,22 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         }
                         break;
                     case 'training_log':
-                        setTrainingLog(prev => [...prev, payload]);
-                        setAllLogs(prev => [...prev, payload]);
+                        // OPTIMIZACIÓN: Limitar tamaño de logs para evitar memory leaks (últimos 1000 logs)
+                        setTrainingLog(prev => {
+                            const newLogs = [...prev, payload];
+                            return newLogs.slice(-1000); // Mantener solo últimos 1000
+                        });
+                        setAllLogs(prev => {
+                            const newLogs = [...prev, payload];
+                            return newLogs.slice(-1000); // Mantener solo últimos 1000
+                        });
                         break;
                     case 'simulation_log':
-                        setAllLogs(prev => [...prev, payload]);
+                        // OPTIMIZACIÓN: Limitar tamaño de logs para evitar memory leaks (últimos 1000 logs)
+                        setAllLogs(prev => {
+                            const newLogs = [...prev, payload];
+                            return newLogs.slice(-1000); // Mantener solo últimos 1000
+                        });
                         break;
                     case 'training_progress':
                         setTrainingProgress(payload);
@@ -430,12 +441,9 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                     case 'notification':
                         // Mostrar notificación del servidor
                         const { status, message } = payload;
-                        notifications.show({
-                            title: status === 'error' ? 'Error' : status === 'warning' ? 'Advertencia' : status === 'success' ? 'Éxito' : 'Información',
-                            message: message,
-                            color: status === 'error' ? 'red' : status === 'warning' ? 'orange' : status === 'success' ? 'green' : 'blue',
-                            autoClose: status === 'error' ? 5000 : 3000,
-                        });
+                        const title = status === 'error' ? 'Error' : status === 'warning' ? 'Advertencia' : status === 'success' ? 'Éxito' : 'Información';
+                        console.log(`[${title}] ${message}`);
+                        // TODO: Implementar sistema de notificaciones con Tailwind
                         break;
                     case 'snapshot_count':
                         // Actualizar contador de snapshots
@@ -447,28 +455,9 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         setAnalysisType(payload.type || null);
                         break;
                     case 'live_feed_status_update':
-                        // Cuando se desactiva el live feed, limpiar datos de visualización
-                        // para evitar mostrar datos antiguos
-                        if (!payload.enabled) {
-                            setSimData(prev => {
-                                if (!prev) return prev;
-                                // Mantener solo step, timestamp y simulation_info
-                                // Limpiar todos los datos de visualización
-                                return {
-                                    step: prev.step,
-                                    timestamp: prev.timestamp,
-                                    simulation_info: prev.simulation_info,
-                                    // Limpiar datos de visualización
-                                    map_data: undefined,
-                                    hist_data: undefined,
-                                    poincare_coords: undefined,
-                                    phase_attractor: undefined,
-                                    flow_data: undefined,
-                                    phase_hsv_data: undefined,
-                                    complex_3d_data: undefined
-                                };
-                            });
-                        }
+                        // Sincronizar estado del live feed
+                        // NO limpiar datos aquí - el backend enviará un frame inicial si es necesario
+                        setLiveFeedEnabledState(payload.enabled ?? true);
                         break;
                     case 'history_files_list':
                         // Lista de archivos de historia recibida

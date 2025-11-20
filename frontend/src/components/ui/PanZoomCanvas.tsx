@@ -1,5 +1,5 @@
 // frontend/src/components/PanZoomCanvas.tsx
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { usePanZoom } from '../../hooks/usePanZoom';
 import { CanvasOverlays, OverlayControls, OverlayConfig } from './CanvasOverlays';
@@ -67,6 +67,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
         showCoordinates: false,
         showQuadtree: false,
         showStats: false,
+        showToroidalBorders: false, // Por defecto oculto, pero disponible para verificar conectividad
         gridSize: 10,
         quadtreeThreshold: 0.01
     });
@@ -455,8 +456,22 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 const saturation = hsvData.saturation || mapData.map(() => mapData[0].map(() => 1));
                 const value = hsvData.value || mapData;
                 
-                for (let y = 0; y < gridHeight; y++) {
-                    for (let x = 0; x < gridWidth; x++) {
+                // RENDERIZADO ADAPTATIVO SEGÚN ZOOM (LOD) - Igual que visualización normal
+                const maxZoomForQuality = 2.0;
+                const minQuality = 0.25;
+                const maxQuality = 1.0;
+                
+                let renderQuality = maxQuality;
+                if (zoom > maxZoomForQuality) {
+                    const qualityDrop = (zoom - maxZoomForQuality) / (5.0 - maxZoomForQuality);
+                    renderQuality = Math.max(minQuality, maxQuality - qualityDrop * (maxQuality - minQuality));
+                }
+                
+                const sampleStep = Math.max(1, Math.floor(1 / renderQuality));
+                
+                // Renderizar con muestreo adaptativo
+                for (let y = 0; y < gridHeight; y += sampleStep) {
+                    for (let x = 0; x < gridWidth; x += sampleStep) {
                         if (!hue[y] || typeof hue[y][x] === 'undefined') continue;
                         const h = hue[y][x] * 360; // Convertir a grados [0, 360]
                         const s = saturation[y]?.[x] ?? 1.0;
@@ -476,21 +491,33 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                         else { r = c; g = 0; b = x_h; }
                         
                         ctx.fillStyle = `rgb(${Math.round((r + m) * 255)}, ${Math.round((g + m) * 255)}, ${Math.round((b + m) * 255)})`;
-                        ctx.fillRect(x, y, 1, 1);
+                        // Dibujar bloque de píxeles (más grande cuando hay downsampling)
+                        ctx.fillRect(x, y, sampleStep, sampleStep);
                     }
                 }
             } else {
                 // Visualización normal con colormap
+                // OPTIMIZACIÓN: Usar muestreo para cálculos de estadísticas (reducir de O(N²) a O(samples))
+                // En grids grandes (>256x256), calcular estadísticas solo sobre un subconjunto
+                const STAT_SAMPLE_SIZE = 10000; // Máximo de muestras para calcular estadísticas
+                const totalCells = gridWidth * gridHeight;
+                const needsSampling = totalCells > STAT_SAMPLE_SIZE;
+                const statSampleStep = needsSampling ? Math.max(1, Math.floor(Math.sqrt(totalCells / STAT_SAMPLE_SIZE))) : 1;
+                
                 // Calcular estadísticas para normalización robusta (usa percentiles para evitar outliers)
                 const values: number[] = [];
-                for (let y = 0; y < gridHeight; y++) {
-                    for (let x = 0; x < gridWidth; x++) {
+                const targetSampleCount = Math.min(STAT_SAMPLE_SIZE, totalCells);
+                
+                for (let y = 0; y < gridHeight; y += statSampleStep) {
+                    for (let x = 0; x < gridWidth; x += statSampleStep) {
                         if (!mapData[y] || typeof mapData[y][x] === 'undefined') continue;
                         const val = mapData[y][x];
                         if (typeof val === 'number' && !isNaN(val) && isFinite(val)) {
                             values.push(val);
+                            if (values.length >= targetSampleCount) break;
                         }
                     }
+                    if (values.length >= targetSampleCount) break;
                 }
                 
                 if (values.length === 0) {
@@ -498,27 +525,62 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                     return;
                 }
                 
-                // Ordenar valores para calcular percentiles
-                values.sort((a, b) => a - b);
-                const minVal = values[0];
-                const maxVal = values[values.length - 1];
+                // OPTIMIZACIÓN: Ordenar solo si tenemos suficientes valores para percentiles
+                // Para muestras pequeñas, usar min/max directo (más rápido)
+                let rangeMin: number, rangeMax: number, range: number;
                 
-                // Usar percentiles para normalización robusta (evita que un outlier comprima todo)
-                // Percentil 1% como mínimo y 99% como máximo para visualizaciones con outliers
-                const p1Index = Math.floor(values.length * 0.01);
-                const p99Index = Math.floor(values.length * 0.99);
-                const robustMin = values[p1Index] || minVal;
-                const robustMax = values[p99Index] || maxVal;
+                if (values.length < 100) {
+                    // Para muestras pequeñas, usar min/max directo (más rápido, O(N))
+                    rangeMin = Math.min(...values);
+                    rangeMax = Math.max(...values);
+                    range = rangeMax - rangeMin || 1;
+                } else {
+                    // Para muestras grandes, calcular percentiles (más robusto, O(N log N))
+                    values.sort((a, b) => a - b);
+                    const minVal = values[0];
+                    const maxVal = values[values.length - 1];
+                    
+                    // Usar percentiles para normalización robusta (evita que un outlier comprima todo)
+                    // Percentil 1% como mínimo y 99% como máximo para visualizaciones con outliers
+                    const p1Index = Math.floor(values.length * 0.01);
+                    const p99Index = Math.floor(values.length * 0.99);
+                    const robustMin = values[p1Index] || minVal;
+                    const robustMax = values[p99Index] || maxVal;
+                    
+                    // Si hay mucha diferencia entre min/max y los percentiles, usar percentiles
+                    // Esto es especialmente útil para FFT/spectral que tiene picos extremos
+                    const useRobust = (maxVal - minVal) > (robustMax - robustMin) * 2;
+                    rangeMin = useRobust ? robustMin : minVal;
+                    rangeMax = useRobust ? robustMax : maxVal;
+                    range = rangeMax - rangeMin || 1;
+                }
                 
-                // Si hay mucha diferencia entre min/max y los percentiles, usar percentiles
-                // Esto es especialmente útil para FFT/spectral que tiene picos extremos
-                const useRobust = (maxVal - minVal) > (robustMax - robustMin) * 2;
-                const rangeMin = useRobust ? robustMin : minVal;
-                const rangeMax = useRobust ? robustMax : maxVal;
-                const range = rangeMax - rangeMin || 1;
+                // RENDERIZADO ADAPTATIVO SEGÚN ZOOM (LOD)
+                // Zoom alto (> 2.0x) = menor calidad (más rápido)
+                // Zoom bajo (< 1.0x) = calidad completa
+                // Interpolación suave entre calidades
+                const maxZoomForQuality = 2.0; // Zoom máximo para calidad completa
+                const minQuality = 0.25; // Calidad mínima (25% de píxeles)
+                const maxQuality = 1.0; // Calidad máxima (100% de píxeles)
                 
-                for (let y = 0; y < gridHeight; y++) {
-                    for (let x = 0; x < gridWidth; x++) {
+                // Calcular factor de calidad basado en zoom
+                // Zoom 1.0x = calidad 100%
+                // Zoom > 2.0x = calidad degradada progresivamente
+                let renderQuality = maxQuality;
+                if (zoom > maxZoomForQuality) {
+                    // Degradar calidad progresivamente después de 2.0x
+                    const qualityDrop = (zoom - maxZoomForQuality) / (5.0 - maxZoomForQuality); // Interpolación hasta zoom 5.0x
+                    renderQuality = Math.max(minQuality, maxQuality - qualityDrop * (maxQuality - minQuality));
+                }
+                
+                // Calcular paso de muestreo basado en calidad
+                // renderQuality = 1.0 => sampleStep = 1 (todos los píxeles)
+                // renderQuality = 0.25 => sampleStep = 4 (1 de cada 4 píxeles)
+                const sampleStep = Math.max(1, Math.floor(1 / renderQuality));
+                
+                // Renderizar con muestreo adaptativo
+                for (let y = 0; y < gridHeight; y += sampleStep) {
+                    for (let x = 0; x < gridWidth; x += sampleStep) {
                         // Validar que mapData[y] existe y tiene el elemento x
                         if (!mapData[y] || typeof mapData[y][x] === 'undefined') {
                             continue;
@@ -533,7 +595,9 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                         // Clipear valores fuera del rango robusto (saturar en los extremos)
                         normalizedValue = Math.max(0, Math.min(1, normalizedValue));
                         ctx.fillStyle = getColor(normalizedValue);
-                        ctx.fillRect(x, y, 1, 1);
+                        
+                        // Dibujar bloque de píxeles (más grande cuando hay downsampling)
+                        ctx.fillRect(x, y, sampleStep, sampleStep);
                     }
                 }
             }
@@ -665,7 +729,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
             />
             
             {/* Overlays */}
-            {(overlayConfig.showGrid || overlayConfig.showCoordinates || overlayConfig.showQuadtree || overlayConfig.showStats) && (
+            {(overlayConfig.showGrid || overlayConfig.showCoordinates || overlayConfig.showQuadtree || overlayConfig.showStats || overlayConfig.showToroidalBorders) && (
                 <CanvasOverlays
                     canvasRef={canvasRef}
                     mapData={mapData}
@@ -701,7 +765,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                                     </span>
                                 </div>
                             )}
-                            {simData?.step !== undefined && (
+                            {simData?.step !== undefined && simData.step !== null && (
                                 <div className="flex items-center justify-between gap-3">
                                     <span className="text-gray-400 font-mono uppercase text-[9px] tracking-wider">Paso</span>
                                     <span className="text-blue-400 font-mono font-bold">

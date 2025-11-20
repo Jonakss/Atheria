@@ -138,26 +138,46 @@ int64_t Engine::step_native() {
                 
                 for (size_t j = 0; j < batch_coords.size(); j++) {
                     // Extraer salida del centro del patch
-                    torch::Tensor delta_real = batch_output[j].slice(0, 0, d_state_).slice(1, 1, 2).slice(2, 1, 2).squeeze();
-                    torch::Tensor delta_imag = batch_output[j].slice(0, d_state_, 2*d_state_).slice(1, 1, 2).slice(2, 1, 2).squeeze();
-                    // Crear tensor complejo usando torch::complex
-                    // torch::complex espera tensores reales y devuelve un tensor complejo
+                    // batch_output shape: [batch, 2*d_state, 3, 3]
+                    // Extraer el centro [batch, :, 1, 1]
+                    torch::Tensor output_center = batch_output[j].select(1, 1).select(1, 1); // [2*d_state]
+                    
+                    // Dividir en real e imag: [0:d_state] es real, [d_state:2*d_state] es imag
+                    torch::Tensor delta_real = output_center.slice(0, 0, d_state_);
+                    torch::Tensor delta_imag = output_center.slice(0, d_state_, 2 * d_state_);
+                    
+                    // Crear tensor complejo
                     torch::Tensor delta_complex = torch::complex(delta_real, delta_imag);
                     
-                    // Aplicar delta al estado actual
-                    torch::Tensor new_state = batch_current_states[j] + delta_complex;
+                    // Obtener estado actual (puede ser complejo o real)
+                    torch::Tensor current_state = batch_current_states[j];
+                    if (!current_state.is_complex()) {
+                        // Convertir a complejo si no lo es
+                        current_state = torch::complex(current_state, torch::zeros_like(current_state));
+                    }
                     
-                    // Normalizar si es necesario
-                    float norm = torch::sum(torch::abs(new_state).pow(2)).item<float>();
+                    // Aplicar delta al estado actual (evolución unitaria)
+                    torch::Tensor new_state = current_state + delta_complex;
+                    
+                    // Aplicar término Lindbladian (decaimiento) si es necesario
+                    // Por ahora omitimos gamma_decay en C++ (puede agregarse después)
+                    
+                    // Normalizar para mantener conservación de probabilidad
+                    torch::Tensor abs_squared = torch::abs(new_state).pow(2);
+                    float norm = torch::sum(abs_squared).item<float>();
                     if (norm > 1e-6f) {
                         new_state = new_state / std::sqrt(norm);
                     }
                     
-                    // Almacenar en el siguiente mapa
-                    next_matter_map.insert_tensor(batch_coords[j], new_state);
-                    
-                    // Activar vecinos
-                    update_active_region({batch_coords[j]}, next_active_region);
+                    // Filtrar estados con energía muy baja (limpiar vacío)
+                    float energy = norm;
+                    if (energy > 0.01f) { // Umbral de existencia
+                        // Almacenar en el siguiente mapa
+                        next_matter_map.insert_tensor(batch_coords[j], new_state);
+                        
+                        // Activar vecinos
+                        update_active_region({batch_coords[j]}, next_active_region);
+                    }
                 }
                 
                 // Limpiar batch

@@ -137,26 +137,26 @@ def run_training_pipeline(exp_cfg: SimpleNamespace, checkpoint_path: str | None 
         _run_v4_training_loop(trainer, exp_cfg)
     else:
         # QC_Trainer_v3 usa la interfaz tradicional - necesita el motor creado
-    # 2. Inicializar el Motor Aetheria
-    # Pasar exp_cfg para que el motor tenga acceso a GAMMA_DECAY (término Lindbladian)
-    motor = Aetheria_Motor(ley_M, exp_cfg.GRID_SIZE_TRAINING, exp_cfg.MODEL_PARAMS.d_state, device, cfg=exp_cfg)
+        # 2. Inicializar el Motor Aetheria
+        # Pasar exp_cfg para que el motor tenga acceso a GAMMA_DECAY (término Lindbladian)
+        motor = Aetheria_Motor(ley_M, exp_cfg.GRID_SIZE_TRAINING, exp_cfg.MODEL_PARAMS.d_state, device, cfg=exp_cfg)
 
-    # 3. Compilar el modelo si es compatible
-    if getattr(ley_M, '_compiles', True):
-        motor.compile_model()
-    else:
-        logging.info(f"El modelo '{exp_cfg.MODEL_ARCHITECTURE}' ha deshabilitado torch.compile(). Se ejecutará sin compilar.")
-    
-    # Usar get_model_for_params() para acceder a los parámetros correctamente
-    # (maneja el caso cuando el modelo está compilado)
-    model_for_params = motor.get_model_for_params()
-    num_params = sum(p.numel() for p in model_for_params.parameters() if p.requires_grad)
+        # 3. Compilar el modelo si es compatible
+        if getattr(ley_M, '_compiles', True):
+            motor.compile_model()
+        else:
+            logging.info(f"El modelo '{exp_cfg.MODEL_ARCHITECTURE}' ha deshabilitado torch.compile(). Se ejecutará sin compilar.")
+        
+        # Usar get_model_for_params() para acceder a los parámetros correctamente
+        # (maneja el caso cuando el modelo está compilado)
+        model_for_params = motor.get_model_for_params()
+        num_params = sum(p.numel() for p in model_for_params.parameters() if p.requires_grad)
         print(f"Motor y Ley-M ({exp_cfg.MODEL_ARCHITECTURE}) inicializados (V3). Cuadrícula: {exp_cfg.GRID_SIZE_TRAINING}x{exp_cfg.GRID_SIZE_TRAINING}.")
-    print(f"Parámetros Entrenables: {num_params}")
+        print(f"Parámetros Entrenables: {num_params}")
 
         # Inicializar el Entrenador V3
-    trainer = QC_Trainer_v3(motor, exp_cfg.LR_RATE_M, global_cfg, exp_cfg)
-    trainer.run_training_loop()
+        trainer = QC_Trainer_v3(motor, exp_cfg.LR_RATE_M, global_cfg, exp_cfg)
+        trainer.run_training_loop()
 
     logging.info("Pipeline de entrenamiento finalizado.")
 
@@ -218,43 +218,82 @@ def _run_v4_training_loop(trainer: QC_Trainer_v4, exp_cfg: SimpleNamespace):
     logging.info(f"Iniciando bucle de entrenamiento V4. Episodios: {start_episode} a {total_episodes}")
     training_start_time = time.time()
     
+    # Sistema Smart Save: Seguimiento del mejor checkpoint
+    best_combined_metric = float('inf')  # Menor es mejor
+    last_loss = 0.0
+    last_metrics = {}
+    
     try:
         for episode in range(start_episode, total_episodes):
             try:
                 loss, metrics = trainer.train_episode(episode)
+                last_loss = loss
+                last_metrics = metrics
+                
+                # Calcular métrica combinada para determinar si es el mejor
+                survival = metrics.get('survival', 0.0)
+                symmetry = metrics.get('symmetry', 0.0)
+                combined_metric = (10.0 * survival) + (5.0 * symmetry)  # Misma ponderación que en loss_function_evolutionary
+                
+                # Determinar si este es el mejor checkpoint hasta ahora
+                is_best = combined_metric < best_combined_metric
+                if is_best:
+                    best_combined_metric = combined_metric
                 
                 # Log cada 10 episodios
                 if episode % 10 == 0:
+                    best_marker = " ⭐ BEST" if is_best else ""
                     logging.info(
                         f"Episodio {episode}/{total_episodes} | "
                         f"Loss: {loss:.6f} | "
-                        f"Survival: {metrics.get('survival', 0):.6f} | "
-                        f"Symmetry: {metrics.get('symmetry', 0):.6f} | "
-                        f"Complexity: {metrics.get('complexity', 0):.6f}"
+                        f"Survival: {survival:.6f} | Symmetry: {symmetry:.6f} | "
+                        f"Complexity: {metrics.get('complexity', 0):.6f} | "
+                        f"Combined: {combined_metric:.6f}{best_marker}"
                     )
                     print(
                         f"Episodio {episode}/{total_episodes} | "
                         f"Loss: {loss:.6f} | "
-                        f"Survival: {metrics.get('survival', 0):.6f} | "
-                        f"Symmetry: {metrics.get('symmetry', 0):.6f} | "
-                        f"Complexity: {metrics.get('complexity', 0):.6f}",
+                        f"Survival: {survival:.6f} | Symmetry: {symmetry:.6f} | "
+                        f"Complexity: {metrics.get('complexity', 0):.6f} | "
+                        f"Combined: {combined_metric:.6f}{best_marker}",
                         flush=True
                     )
                 
                 # Guardar checkpoint periódicamente
                 if (episode + 1) % save_every == 0:
-                    trainer.save_checkpoint(episode, is_best=False)
+                    trainer.save_checkpoint(
+                        episode,
+                        current_metrics=metrics,
+                        current_loss=loss,
+                        is_best=is_best
+                    )
                     
             except KeyboardInterrupt:
                 logging.info("Entrenamiento interrumpido por el usuario.")
-                trainer.save_checkpoint(episode, is_best=False)
+                # Guardar checkpoint con las últimas métricas disponibles
+                trainer.save_checkpoint(
+                    episode,
+                    current_metrics=last_metrics,
+                    current_loss=last_loss,
+                    is_best=False
+                )
                 raise
             except Exception as e:
                 logging.error(f"Error en episodio {episode}: {e}", exc_info=True)
                 continue
         
-        # Guardar checkpoint final
-        trainer.save_checkpoint(total_episodes - 1, is_best=False)
+        # Guardar checkpoint final (usar métricas del último episodio)
+        final_survival = last_metrics.get('survival', 0.0)
+        final_symmetry = last_metrics.get('symmetry', 0.0)
+        final_combined = (10.0 * final_survival) + (5.0 * final_symmetry)
+        is_final_best = final_combined < best_combined_metric
+        
+        trainer.save_checkpoint(
+            total_episodes - 1,
+            current_metrics=last_metrics,
+            current_loss=last_loss,
+            is_best=is_final_best
+        )
         
         # Actualizar tiempo de entrenamiento en config
         training_duration = time.time() - training_start_time
@@ -285,5 +324,11 @@ def _run_v4_training_loop(trainer: QC_Trainer_v4, exp_cfg: SimpleNamespace):
     except KeyboardInterrupt:
         training_duration = time.time() - training_start_time
         logging.info("Entrenamiento interrumpido. Guardando checkpoint final...")
-        trainer.save_checkpoint(episode, is_best=False)
+        # Guardar checkpoint con las últimas métricas disponibles
+        trainer.save_checkpoint(
+            episode,
+            current_metrics=last_metrics,
+            current_loss=last_loss,
+            is_best=False
+        )
         raise

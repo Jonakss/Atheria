@@ -40,8 +40,8 @@ async def create_experiment_handler(args):
             return
         
         # Guardar la configuración del experimento ANTES de iniciar el entrenamiento
-        from .utils import check_and_create_dir
-        from . import config as global_cfg
+        from ..utils import check_and_create_dir
+        from .. import config as global_cfg
         
         exp_config = {
             "EXPERIMENT_NAME": exp_name,
@@ -182,7 +182,7 @@ async def create_experiment_handler(args):
             if ws: await send_notification(ws, f"✅ Entrenamiento para '{exp_name}' completado exitosamente.", "success")
             
             # Actualizar la lista de experimentos para reflejar los nuevos checkpoints
-            from .utils import get_experiment_list
+            from ..utils import get_experiment_list
             try:
                 updated_experiments = get_experiment_list()
                 await broadcast({
@@ -218,7 +218,7 @@ async def handle_continue_experiment(args):
     
     try:
         # Cargar la configuración del experimento guardada
-        from .utils import load_experiment_config, get_latest_checkpoint
+        from ..utils import load_experiment_config, get_latest_checkpoint
         config = load_experiment_config(exp_name)
         if not config:
             msg = f"❌ No se encontró la configuración para '{exp_name}'. Asegúrate de que el experimento existe."
@@ -272,7 +272,7 @@ async def handle_continue_experiment(args):
         
         # Convertir MODEL_PARAMS de SimpleNamespace a dict para JSON
         # Usar la función recursiva de utils para manejar casos anidados
-        from .utils import sns_to_dict_recursive
+        from ..utils import sns_to_dict_recursive
         if hasattr(config, 'MODEL_PARAMS') and config.MODEL_PARAMS is not None:
             model_params = config.MODEL_PARAMS
             continue_args['MODEL_PARAMS'] = sns_to_dict_recursive(model_params)
@@ -435,7 +435,7 @@ async def handle_load_experiment(args):
         logging.info(f"Intentando cargar el experimento '{exp_name}' para [{args['ws_id']}]...")
         if ws: await send_notification(ws, f"Cargando modelo '{exp_name}'...", "info")
         
-        from .utils import load_experiment_config, get_latest_checkpoint
+        from ..utils import load_experiment_config, get_latest_checkpoint
         from . import config as global_cfg
         from .model_loader import load_model
         from ..engines.qca_engine import Aetheria_Motor
@@ -572,7 +572,7 @@ async def handle_reset(args):
     
     try:
         # Obtener el modo de inicialización de la configuración
-        from .utils import load_experiment_config
+        from ..utils import load_experiment_config
         from . import config as global_cfg
         from ..engines.qca_engine import QuantumState
         
@@ -636,7 +636,7 @@ async def handle_reset(args):
 async def handle_refresh_experiments(args):
     """Refresca la lista de experimentos y la envía a todos los clientes conectados."""
     try:
-        from .utils import get_experiment_list
+        from ..utils import get_experiment_list
         experiments = get_experiment_list()
         await broadcast({
             "type": "experiments_updated",

@@ -224,13 +224,57 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
     const handleWheel = useCallback((e: React.WheelEvent) => {
         if (e.deltaY !== 0) {
             e.preventDefault();
+            
+            // Calcular el punto del mouse en coordenadas del canvas antes del zoom
+            if (!canvasRef.current || !gridWidth || !gridHeight) return;
+            
+            const canvas = canvasRef.current;
+            const container = canvas.parentElement;
+            if (!container) return;
+            
+            const containerRect = container.getBoundingClientRect();
+            const containerWidth = containerRect.width;
+            const containerHeight = containerRect.height;
+            
+            // Coordenadas del mouse relativas al centro del contenedor
+            // El canvas está centrado con CSS, así que el punto (0,0) del canvas está en el centro del contenedor
+            const mouseX = e.clientX - containerRect.left;
+            const mouseY = e.clientY - containerRect.top;
+            const mouseRelToCenterX = mouseX - containerWidth / 2;
+            const mouseRelToCenterY = mouseY - containerHeight / 2;
+            
+            // Convertir el punto del mouse a coordenadas del canvas (antes del zoom)
+            // Con transform: scale(zoom) translate(pan.x, pan.y) y transformOrigin: '0 0':
+            // Un punto del canvas (canvasX, canvasY) se transforma a:
+            //   (canvasX * zoom + pan.x, canvasY * zoom + pan.y) en coordenadas relativas al centro del contenedor
+            // Inversamente, para un punto del mouse (mouseRelToCenterX, mouseRelToCenterY):
+            //   canvasX = (mouseRelToCenterX - pan.x) / zoom
+            //   canvasY = (mouseRelToCenterY - pan.y) / zoom
+            const canvasX = (mouseRelToCenterX - pan.x) / zoom;
+            const canvasY = (mouseRelToCenterY - pan.y) / zoom;
+            
+            // Aplicar zoom
             const zoomFactor = 1.1;
             const newZoom = e.deltaY < 0 ? zoom * zoomFactor : zoom / zoomFactor;
-            const constrained = constrainPanZoom(pan, newZoom);
+            const constrainedZoom = Math.max(0.1, Math.min(newZoom, 50));
+            
+            // Calcular nuevo pan para mantener el punto del canvas fijo bajo el mouse
+            // Después del nuevo zoom, queremos que el punto (canvasX, canvasY) siga estando bajo el mouse:
+            //   mouseRelToCenterX = canvasX * constrainedZoom + newPanX
+            //   Por lo tanto: newPanX = mouseRelToCenterX - canvasX * constrainedZoom
+            // Sustituyendo canvasX:
+            //   newPanX = mouseRelToCenterX - ((mouseRelToCenterX - pan.x) / zoom) * constrainedZoom
+            //   newPanX = mouseRelToCenterX - (mouseRelToCenterX - pan.x) * (constrainedZoom / zoom)
+            //   newPanX = mouseRelToCenterX * (1 - constrainedZoom / zoom) + pan.x * (constrainedZoom / zoom)
+            const zoomRatio = constrainedZoom / zoom;
+            const newPanX = mouseRelToCenterX * (1 - zoomRatio) + pan.x * zoomRatio;
+            const newPanY = mouseRelToCenterY * (1 - zoomRatio) + pan.y * zoomRatio;
+            
+            const constrained = constrainPanZoom({ x: newPanX, y: newPanY }, constrainedZoom);
             setZoom(constrained.zoom);
             setPan(constrained.pan);
         }
-    }, [zoom, pan, constrainPanZoom]);
+    }, [zoom, pan, constrainPanZoom, canvasRef, gridWidth, gridHeight]);
 
     return {
         pan,

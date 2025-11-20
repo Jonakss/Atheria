@@ -66,6 +66,14 @@ related: [[10_core/00_CORE_MOC]], [[40_Experiments/00_EXPERIMENTS_MOC]]
 ## 🛠️ Herramientas
 
 - [[EXPERIMENT_LOGGER_BRIEF]] - Sistema de logging
+- [[Logging_Optimization]] - Optimización de logs en Pipeline Server
+
+---
+
+## 🎨 Componentes UI (Fase 3)
+
+- [[UI_Components_Migration]] - Migración de Mantine a Tailwind CSS
+- [[Logging_Optimization]] - Optimización de verbosidad de logs
 
 ---
 

@@ -40,12 +40,22 @@ export function ExperimentInfo() {
                     <div className="flex items-center gap-2 flex-wrap">
                         <Brain size={16} className="text-blue-400" />
                         <span className="text-sm font-bold text-blue-400">{activeExperiment}</span>
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1 ${
                             experiment.has_checkpoint 
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
+                                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-[0_0_8px_rgba(16,185,129,0.3)]' 
                                 : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
                         }`}>
-                            {experiment.has_checkpoint ? '✓ Entrenado' : '○ Sin entrenar'}
+                            {experiment.has_checkpoint ? (
+                                <>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                    <span>Checkpoint Disponible</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                    <span>Sin Checkpoint</span>
+                                </>
+                            )}
                         </span>
                         {compileStatus?.is_native && (
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-blue-500/10 text-blue-400 border-blue-500/30">

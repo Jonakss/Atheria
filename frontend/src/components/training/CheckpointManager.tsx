@@ -1,20 +1,16 @@
-// frontend/src/components/CheckpointManager.tsx
+// frontend/src/components/training/CheckpointManager.tsx
 import { useState, useEffect, useMemo } from 'react';
-import { 
-    Paper, Stack, Group, Text, Badge, Button, Modal, 
-    Table, ScrollArea, Tooltip, ActionIcon, Divider,
-    Card, Alert, TextInput, Textarea, 
-    Tabs, Progress, Center, Menu
-} from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { 
-    IconDownload, IconTrash, IconInfoCircle, IconFile,
-    IconClock, IconX, IconEdit, IconBook,
-    IconSearch, IconStar, IconDotsVertical,
-    IconRefresh
-} from '@tabler/icons-react';
-import { notifications } from '@mantine/notifications';
+    Download, Trash2, Info, FileText, Clock, X, Edit, BookOpen,
+    Search, Star, MoreVertical, RefreshCw
+} from 'lucide-react';
+import { Modal } from '../../modules/Dashboard/components/Modal';
+import { Tabs, TabList, Tab, TabPanel } from '../../modules/Dashboard/components/Tabs';
+import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../modules/Dashboard/components/Table';
+import { Badge } from '../../modules/Dashboard/components/Badge';
+import { Alert } from '../../modules/Dashboard/components/Alert';
+import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
 
 interface CheckpointInfo {
     filename: string;
@@ -28,12 +24,12 @@ interface ExperimentNote {
     id: string;
     timestamp: number;
     content: string;
-    checkpoint?: string; // Checkpoint asociado
+    checkpoint?: string;
 }
 
 export function CheckpointManager() {
     const { activeExperiment, sendCommand, experimentsData } = useWebSocket();
-    const [opened, { open, close }] = useDisclosure(false);
+    const [opened, setOpened] = useState(false);
     const [checkpoints, setCheckpoints] = useState<CheckpointInfo[]>([]);
     const [notes, setNotes] = useState<ExperimentNote[]>([]);
     const [newNote, setNewNote] = useState('');
@@ -41,6 +37,7 @@ export function CheckpointManager() {
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<string>('checkpoints');
+    const [menuOpen, setMenuOpen] = useState<string | null>(null);
 
     // Cargar checkpoints y notas cuando se abre el modal
     useEffect(() => {
@@ -51,21 +48,14 @@ export function CheckpointManager() {
     }, [opened, activeExperiment]);
 
     useEffect(() => {
-        // Escuchar eventos de checkpoints actualizados
         const handleCheckpointsUpdate = (event: CustomEvent) => {
             setCheckpoints(event.detail || []);
             setLoading(false);
             if (event.detail && event.detail.length > 0) {
-                notifications.show({
-                    title: 'Checkpoints actualizados',
-                    message: `Se encontraron ${event.detail.length} checkpoints`,
-                    color: 'green',
-                    autoClose: 2000,
-                });
+                console.log(`✅ Checkpoints actualizados: ${event.detail.length} encontrados`);
             }
         };
         
-        // Escuchar cambio de pestaña
         const handleSwitchToNotes = () => {
             setActiveTab('notes');
         };
@@ -116,22 +106,12 @@ export function CheckpointManager() {
         saveNotes([...notes, note]);
         setNewNote('');
         setSelectedCheckpoint(null);
-        notifications.show({
-            title: 'Nota agregada',
-            message: 'La nota se ha guardado correctamente',
-            color: 'green',
-            autoClose: 2000,
-        });
+        console.log('✅ Nota agregada correctamente');
     };
 
     const deleteNote = (noteId: string) => {
         saveNotes(notes.filter(n => n.id !== noteId));
-        notifications.show({
-            title: 'Nota eliminada',
-            message: 'La nota se ha eliminado correctamente',
-            color: 'blue',
-            autoClose: 2000,
-        });
+        console.log('✅ Nota eliminada correctamente');
     };
 
     const deleteCheckpoint = (checkpointName: string) => {
@@ -149,14 +129,8 @@ export function CheckpointManager() {
                 EXPERIMENT_NAME: activeExperiment,
                 CHECKPOINT_NAME: checkpointName
             });
-            // Recargar después de un breve delay
             setTimeout(() => loadCheckpoints(), 500);
-            notifications.show({
-                title: 'Checkpoint eliminado',
-                message: `Se está eliminando ${checkpointName}`,
-                color: 'orange',
-                autoClose: 2000,
-            });
+            console.log(`✅ Checkpoint "${checkpointName}" eliminado`);
         }
     };
 
@@ -182,7 +156,6 @@ export function CheckpointManager() {
         return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
-    // Filtrar checkpoints según búsqueda
     const filteredCheckpoints = useMemo(() => {
         if (!searchQuery.trim()) return checkpoints;
         const query = searchQuery.toLowerCase();
@@ -208,437 +181,434 @@ export function CheckpointManager() {
         if (!activeExperiment) return;
         if (window.confirm(`¿Estás seguro de eliminar los checkpoints antiguos de "${activeExperiment}"? Se mantendrán los 5 más recientes y el mejor.`)) {
              sendCommand('experiment', 'cleanup_checkpoints', { EXPERIMENT_NAME: activeExperiment });
-             // Recargar después de un breve delay
              setTimeout(() => loadCheckpoints(), 1000);
         }
     };
 
     return (
         <>
-            <Button
-                variant="light"
-                size="sm"
-                leftSection={<IconFile size={14} />}
-                onClick={open}
+            <button
+                onClick={() => setOpened(true)}
                 disabled={!activeExperiment}
-                fullWidth
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-gray-300 rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
+                <FileText size={14} />
                 Gestionar Checkpoints
-            </Button>
+            </button>
 
             <Modal
                 opened={opened}
-                onClose={close}
+                onClose={() => setOpened(false)}
                 title={
-                    <Group gap="xs">
-                        <IconFile size={20} />
-                        <Text fw={600}>Checkpoints y Notas</Text>
+                    <div className="flex items-center gap-2">
+                        <FileText size={16} />
+                        <span>Checkpoints y Notas</span>
                         {activeExperiment && (
-                            <Badge variant="light" size="lg">
+                            <Badge variant="light" size="sm">
                                 {activeExperiment}
                             </Badge>
                         )}
-                    </Group>
+                    </div>
                 }
                 size="xl"
-                styles={{ body: { padding: 'var(--mantine-spacing-md)' } }}
+                closeOnClickOutside={true}
             >
                 {activeExperiment && checkpoints.length > 0 && (
-                     <Alert 
+                    <Alert 
                         variant="light" 
                         color="blue" 
                         title="Estado del Almacenamiento" 
-                        icon={<IconInfoCircle size={16} />}
-                        style={{ marginBottom: '1rem' }}
+                        icon={<Info size={16} />}
+                        className="mb-4"
                     >
-                        <Group justify="space-between" align="center">
-                            <Text size="sm">
-                                Total ocupado: <b>{formatFileSize(totalSize)}</b> en {checkpoints.length} checkpoints.
-                            </Text>
-                            <Button 
-                                size="xs" 
-                                variant="subtle" 
-                                color="red" 
-                                leftSection={<IconTrash size={14} />}
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs">
+                                Total ocupado: <strong>{formatFileSize(totalSize)}</strong> en {checkpoints.length} checkpoints.
+                            </span>
+                            <button 
                                 onClick={handleCleanup}
+                                className="flex items-center gap-1.5 px-2 py-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-bold rounded transition-all"
                             >
+                                <Trash2 size={12} />
                                 Limpiar antiguos
-                            </Button>
-                        </Group>
+                            </button>
+                        </div>
                     </Alert>
                 )}
 
-                <Tabs value={activeTab} onChange={(value) => value && setActiveTab(value)}>
-                    <Tabs.List>
-                        <Tabs.Tab 
-                            value="checkpoints" 
-                            leftSection={<IconFile size={16} />}
-                        >
-                            Checkpoints
-                            {checkpoints.length > 0 && (
-                                <Badge size="xs" variant="filled" ml={8}>
+                <Tabs value={activeTab} onTabChange={(value) => setActiveTab(value || 'checkpoints')}>
+                    <TabList>
+                        <Tab 
+                            value="checkpoints"
+                            label="Checkpoints"
+                            icon={<FileText size={14} />}
+                            rightSection={checkpoints.length > 0 ? (
+                                <Badge size="xs" variant="filled" color="blue">
                                     {checkpoints.length}
                                 </Badge>
-                            )}
-                        </Tabs.Tab>
-                        <Tabs.Tab 
-                            value="notes" 
-                            leftSection={<IconBook size={16} />}
-                        >
-                            Notas
-                            {notes.length > 0 && (
-                                <Badge size="xs" variant="filled" ml={8}>
+                            ) : undefined}
+                        />
+                        <Tab 
+                            value="notes"
+                            label="Notas"
+                            icon={<BookOpen size={14} />}
+                            rightSection={notes.length > 0 ? (
+                                <Badge size="xs" variant="filled" color="blue">
                                     {notes.length}
                                 </Badge>
-                            )}
-                        </Tabs.Tab>
-                    </Tabs.List>
+                            ) : undefined}
+                        />
+                    </TabList>
 
-                    <Tabs.Panel value="checkpoints" pt="md">
-                        <Stack gap="md">
+                    <TabPanel value="checkpoints">
+                        <div className="space-y-4">
                             {/* Información del experimento */}
                             {currentExperiment && (
-                                <Card withBorder p="md" style={{ backgroundColor: 'var(--mantine-color-dark-7)' }}>
-                                    <Stack gap="xs">
-                                        <Group justify="space-between">
-                                            <Group gap="xs">
-                                                <Text fw={600} size="sm">Experimento</Text>
+                                <GlassPanel className="p-3 bg-[#0a0a0a]">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-bold text-gray-300">Experimento</span>
                                                 <Badge 
                                                     color={currentExperiment.has_checkpoint ? 'green' : 'orange'}
                                                     variant="light"
+                                                    size="sm"
                                                 >
                                                     {currentExperiment.has_checkpoint ? '✓ Entrenado' : '○ Sin entrenar'}
                                                 </Badge>
-                                            </Group>
-                                        </Group>
-                                        <Group gap="md">
-                                            <Text size="xs" c="dimmed">
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <span className="text-[10px] text-gray-500">
                                                 <strong>Arquitectura:</strong> {currentExperiment.config?.MODEL_ARCHITECTURE || 'N/A'}
-                                    </Text>
-                                        </Group>
-                                    </Stack>
-                                </Card>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </GlassPanel>
                             )}
 
                             {/* Estadísticas rápidas */}
                             {checkpoints.length > 0 && (
-                                <Group grow>
-                                    <Card withBorder p="sm" style={{ backgroundColor: 'var(--mantine-color-dark-7)' }}>
-                                        <Stack gap={4} align="center">
-                                            <Text size="xs" c="dimmed">Total Checkpoints</Text>
-                                            <Text size="xl" fw={700}>{checkpoints.length}</Text>
-                                        </Stack>
-                                    </Card>
+                                <div className="grid grid-cols-4 gap-2">
+                                    <GlassPanel className="p-2 bg-[#0a0a0a]">
+                                        <div className="text-center space-y-1">
+                                            <div className="text-[10px] text-gray-500">Total Checkpoints</div>
+                                            <div className="text-lg font-bold text-gray-200">{checkpoints.length}</div>
+                                        </div>
+                                    </GlassPanel>
                                     {bestCheckpoint && (
-                                        <Card withBorder p="sm" style={{ backgroundColor: 'var(--mantine-color-green-9)', opacity: 0.2 }}>
-                                            <Stack gap={4} align="center">
-                                                <Group gap={4}>
-                                                    <IconStar size={14} />
-                                                    <Text size="xs" c="dimmed">Mejor</Text>
-                                                </Group>
-                                                <Text size="xl" fw={700}>Ep. {bestCheckpoint.episode}</Text>
-                                            </Stack>
-                                        </Card>
+                                        <GlassPanel className="p-2 bg-emerald-500/20">
+                                            <div className="text-center space-y-1">
+                                                <div className="flex items-center justify-center gap-1 text-[10px] text-gray-500">
+                                                    <Star size={12} />
+                                                    <span>Mejor</span>
+                                                </div>
+                                                <div className="text-lg font-bold text-emerald-400">Ep. {bestCheckpoint.episode}</div>
+                                            </div>
+                                        </GlassPanel>
                                     )}
                                     {latestCheckpoint && (
-                                        <Card withBorder p="sm" style={{ backgroundColor: 'var(--mantine-color-dark-7)' }}>
-                                            <Stack gap={4} align="center">
-                                                <Text size="xs" c="dimmed">Último</Text>
-                                                <Text size="xl" fw={700}>Ep. {latestCheckpoint.episode}</Text>
-                                            </Stack>
-                                        </Card>
+                                        <GlassPanel className="p-2 bg-[#0a0a0a]">
+                                            <div className="text-center space-y-1">
+                                                <div className="text-[10px] text-gray-500">Último</div>
+                                                <div className="text-lg font-bold text-gray-200">Ep. {latestCheckpoint.episode}</div>
+                                            </div>
+                                        </GlassPanel>
                                     )}
-                                    <Card withBorder p="sm" style={{ backgroundColor: 'var(--mantine-color-dark-7)' }}>
-                                        <Stack gap={4} align="center">
-                                            <Text size="xs" c="dimmed">Tamaño Total</Text>
-                                            <Text size="lg" fw={600}>{formatFileSize(totalSize)}</Text>
-                                        </Stack>
-                                    </Card>
-                                </Group>
+                                    <GlassPanel className="p-2 bg-[#0a0a0a]">
+                                        <div className="text-center space-y-1">
+                                            <div className="text-[10px] text-gray-500">Tamaño Total</div>
+                                            <div className="text-sm font-bold text-gray-200">{formatFileSize(totalSize)}</div>
+                                        </div>
+                                    </GlassPanel>
+                                </div>
                             )}
 
                             {/* Barra de búsqueda y acciones */}
-                            <Group justify="space-between">
-                                <TextInput
-                                    placeholder="Buscar por nombre o episodio..."
-                                    leftSection={<IconSearch size={16} />}
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    style={{ flex: 1 }}
-                                    size="sm"
-                                />
-                                <Button
-                                    size="sm"
-                                    variant="light"
-                                    leftSection={<IconRefresh size={16} />}
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1 relative">
+                                    <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500" />
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar por nombre o episodio..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full pl-8 pr-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500/50"
+                                    />
+                                </div>
+                                <button
                                     onClick={loadCheckpoints}
-                                    loading={loading}
+                                    disabled={loading}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-gray-300 rounded transition-all disabled:opacity-50"
                                 >
+                                    <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
                                     Actualizar
-                                </Button>
-                            </Group>
+                                </button>
+                            </div>
 
                             {loading && checkpoints.length === 0 && (
-                                <Center p="xl">
-                                    <Stack align="center" gap="md">
-                                        <Progress value={100} animated />
-                                        <Text size="sm" c="dimmed">Cargando checkpoints...</Text>
-                                    </Stack>
-                                </Center>
+                                <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                                    <div className="w-full h-1 bg-gray-800 rounded-full overflow-hidden">
+                                        <div className="h-full bg-blue-500 animate-pulse" style={{ width: '100%' }} />
+                                    </div>
+                                    <span className="text-xs text-gray-500">Cargando checkpoints...</span>
+                                </div>
                             )}
 
                             {!loading && checkpoints.length === 0 && (
-                                <Paper p="xl" withBorder>
-                                    <Stack align="center" gap="md">
-                                        <IconFile size={64} color="var(--mantine-color-gray-6)" />
-                                        <Text c="dimmed" ta="center" fw={500}>
-                                            No hay checkpoints disponibles
-                                        </Text>
-                                        <Text size="xs" c="dimmed" ta="center">
-                                            Los checkpoints se guardan automáticamente durante el entrenamiento.
-                                            <br />
-                                            Inicia un entrenamiento para generar checkpoints.
-                                        </Text>
-                                    </Stack>
-                                </Paper>
+                                <GlassPanel className="p-8 border border-white/10">
+                                    <div className="flex flex-col items-center space-y-4">
+                                        <FileText size={48} className="text-gray-600" />
+                                        <div className="text-center">
+                                            <div className="text-xs font-bold text-gray-500 mb-1">
+                                                No hay checkpoints disponibles
+                                            </div>
+                                            <div className="text-[10px] text-gray-600 text-center">
+                                                Los checkpoints se guardan automáticamente durante el entrenamiento.
+                                                <br />
+                                                Inicia un entrenamiento para generar checkpoints.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </GlassPanel>
                             )}
 
                             {!loading && filteredCheckpoints.length === 0 && checkpoints.length > 0 && (
-                                <Alert icon={<IconSearch size={16} />} color="yellow" variant="light">
+                                <Alert icon={<Search size={16} />} color="yellow" variant="light">
                                     No se encontraron checkpoints que coincidan con "{searchQuery}"
                                 </Alert>
                             )}
 
                             {!loading && filteredCheckpoints.length > 0 && (
-                                <ScrollArea h={450}>
-                                        <Table highlightOnHover>
-                                        <Table.Thead>
-                                            <Table.Tr>
-                                                <Table.Th style={{ width: 100 }}>Estado</Table.Th>
-                                                <Table.Th style={{ width: 100 }}>Episodio</Table.Th>
-                                                <Table.Th>Archivo</Table.Th>
-                                                <Table.Th style={{ width: 100 }}>Tamaño</Table.Th>
-                                                <Table.Th style={{ width: 150 }}>Modificado</Table.Th>
-                                                <Table.Th style={{ width: 120 }}>Acciones</Table.Th>
-                                            </Table.Tr>
-                                        </Table.Thead>
-                                        <Table.Tbody>
+                                <div className="h-[450px] overflow-y-auto custom-scrollbar">
+                                    <Table highlightOnHover>
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableTh style={{ width: 100 }}>Estado</TableTh>
+                                                <TableTh style={{ width: 100 }}>Episodio</TableTh>
+                                                <TableTh>Archivo</TableTh>
+                                                <TableTh style={{ width: 100 }}>Tamaño</TableTh>
+                                                <TableTh style={{ width: 150 }}>Modificado</TableTh>
+                                                <TableTh style={{ width: 120 }}>Acciones</TableTh>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
                                             {filteredCheckpoints
                                                 .sort((a, b) => b.episode - a.episode)
-                                                    .map((ckpt) => (
-                                                    <Table.Tr 
+                                                .map((ckpt) => (
+                                                    <TableRow 
                                                         key={ckpt.filename}
                                                         style={{ 
-                                                        backgroundColor: ckpt.is_best 
-                                                            ? 'var(--mantine-color-green-9)' 
-                                                            : undefined,
-                                                        opacity: ckpt.is_best ? 0.15 : 1
+                                                            backgroundColor: ckpt.is_best ? 'rgba(34, 197, 94, 0.15)' : undefined,
+                                                            opacity: ckpt.is_best ? 1 : 1
                                                         }}
                                                     >
-                                                    <Table.Td>
-                                                                {ckpt.is_best ? (
-                                                            <Badge 
-                                                                size="sm" 
-                                                                color="green" 
-                                                                leftSection={<IconStar size={12} />}
-                                                                variant="filled"
-                                                            >
-                                                                        Mejor
-                                                                    </Badge>
-                                                                ) : (
-                                                                    <Badge size="sm" color="gray" variant="light">
-                                                                        Normal
-                                                                    </Badge>
+                                                        <TableTd>
+                                                            {ckpt.is_best ? (
+                                                                <Badge 
+                                                                    size="sm" 
+                                                                    color="green" 
+                                                                    leftSection={<Star size={10} />}
+                                                                    variant="filled"
+                                                                >
+                                                                    Mejor
+                                                                </Badge>
+                                                            ) : (
+                                                                <Badge size="sm" color="gray" variant="light">
+                                                                    Normal
+                                                                </Badge>
                                                             )}
-                                                    </Table.Td>
-                                                    <Table.Td>
-                                                        <Text size="sm" fw={ckpt.is_best ? 700 : 500}>
+                                                        </TableTd>
+                                                        <TableTd>
+                                                            <span className={`text-xs ${ckpt.is_best ? 'font-bold' : 'font-medium'}`}>
                                                                 {ckpt.episode}
-                                                            </Text>
-                                                        </Table.Td>
-                                                        <Table.Td>
-                                                            <Group gap="xs" wrap="nowrap">
-                                                                <IconFile size={14} />
-                                                            <Tooltip label={ckpt.filename}>
-                                                                <Text size="sm" style={{ maxWidth: 250 }} truncate="end">
+                                                            </span>
+                                                        </TableTd>
+                                                        <TableTd>
+                                                            <div className="flex items-center gap-2">
+                                                                <FileText size={12} className="text-gray-500" />
+                                                                <span className="text-xs max-w-[250px] truncate" title={ckpt.filename}>
                                                                     {ckpt.filename}
-                                                                </Text>
-                                                            </Tooltip>
-                                                            </Group>
-                                                    </Table.Td>
-                                                    <Table.Td>
-                                                        <Text size="sm">{formatFileSize(ckpt.size)}</Text>
-                                                    </Table.Td>
-                                                    <Table.Td>
-                                                        <Group gap={4} wrap="nowrap">
-                                                                <IconClock size={12} />
-                                                        <Text size="xs" c="dimmed">{formatDate(ckpt.modified)}</Text>
-                                                            </Group>
-                                                    </Table.Td>
-                                                    <Table.Td>
-                                                        <Group gap={4}>
-                                                            <Menu shadow="md" width={200}>
-                                                                <Menu.Target>
-                                                                    <ActionIcon variant="light" size="sm">
-                                                                        <IconDotsVertical size={14} />
-                                                                    </ActionIcon>
-                                                                </Menu.Target>
-                                                                <Menu.Dropdown>
-                                                                    <Menu.Item
-                                                                        leftSection={<IconDownload size={14} />}
-                                                                        onClick={() => {
-                                                                            sendCommand('experiment', 'download_checkpoint', {
-                                                                                EXPERIMENT_NAME: activeExperiment,
-                                                                                CHECKPOINT_NAME: ckpt.filename
-                                                                            });
-                                                                            notifications.show({
-                                                                                title: 'Descarga iniciada',
-                                                                                message: `Descargando ${ckpt.filename}`,
-                                                                                color: 'blue',
-                                                                                autoClose: 2000,
-                                                                            });
-                                                                        }}
-                                                                    >
-                                                                        Descargar
-                                                                    </Menu.Item>
-                                                                    <Menu.Item
-                                                                        leftSection={<IconEdit size={14} />}
-                                                                    onClick={() => {
-                                                                        setSelectedCheckpoint(ckpt.filename);
-                                                                            setActiveTab('notes');
-                                                                    }}
+                                                                </span>
+                                                            </div>
+                                                        </TableTd>
+                                                        <TableTd>
+                                                            <span className="text-xs">{formatFileSize(ckpt.size)}</span>
+                                                        </TableTd>
+                                                        <TableTd>
+                                                            <div className="flex items-center gap-1">
+                                                                <Clock size={10} className="text-gray-500" />
+                                                                <span className="text-[10px] text-gray-500">{formatDate(ckpt.modified)}</span>
+                                                            </div>
+                                                        </TableTd>
+                                                        <TableTd>
+                                                            <div className="relative flex items-center gap-1">
+                                                                <button
+                                                                    onClick={() => setMenuOpen(menuOpen === ckpt.filename ? null : ckpt.filename)}
+                                                                    className="p-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded transition-colors"
                                                                 >
-                                                                        Agregar nota
-                                                                    </Menu.Item>
-                                                                    <Menu.Divider />
-                                                                    <Menu.Item
-                                                                        leftSection={<IconTrash size={14} />}
-                                                                    color="red"
-                                                                    onClick={() => deleteCheckpoint(ckpt.filename)}
-                                                                >
-                                                                        Eliminar
-                                                                    </Menu.Item>
-                                                                </Menu.Dropdown>
-                                                            </Menu>
-                                                        </Group>
-                                                    </Table.Td>
-                                                </Table.Tr>
-                                            ))}
-                                        </Table.Tbody>
+                                                                    <MoreVertical size={12} />
+                                                                </button>
+                                                                {menuOpen === ckpt.filename && (
+                                                                    <div className="absolute right-0 top-8 z-10 w-48 bg-[#0a0a0a] border border-white/10 rounded shadow-lg">
+                                                                        <div className="p-1 space-y-1">
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    sendCommand('experiment', 'download_checkpoint', {
+                                                                                        EXPERIMENT_NAME: activeExperiment,
+                                                                                        CHECKPOINT_NAME: ckpt.filename
+                                                                                    });
+                                                                                    setMenuOpen(null);
+                                                                                    console.log(`✅ Descargando ${ckpt.filename}`);
+                                                                                }}
+                                                                                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-gray-300 hover:bg-white/5 rounded transition-colors"
+                                                                            >
+                                                                                <Download size={12} />
+                                                                                Descargar
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setSelectedCheckpoint(ckpt.filename);
+                                                                                    setActiveTab('notes');
+                                                                                    setMenuOpen(null);
+                                                                                }}
+                                                                                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-gray-300 hover:bg-white/5 rounded transition-colors"
+                                                                            >
+                                                                                <Edit size={12} />
+                                                                                Agregar nota
+                                                                            </button>
+                                                                            <div className="h-px bg-white/10 my-1" />
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    deleteCheckpoint(ckpt.filename);
+                                                                                    setMenuOpen(null);
+                                                                                }}
+                                                                                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                                                            >
+                                                                                <Trash2 size={12} />
+                                                                                Eliminar
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </TableTd>
+                                                    </TableRow>
+                                                ))}
+                                        </TableBody>
                                     </Table>
-                                </ScrollArea>
+                                </div>
                             )}
-                        </Stack>
-                    </Tabs.Panel>
+                        </div>
+                    </TabPanel>
 
-                    <Tabs.Panel value="notes" pt="md">
-                        <Stack gap="md">
-                            <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light">
-                                <Text size="sm">
+                    <TabPanel value="notes">
+                        <div className="space-y-4">
+                            <Alert icon={<Info size={16} />} color="blue" variant="light">
+                                <span className="text-xs">
                                     Documenta observaciones sobre checkpoints específicos o el experimento en general.
                                     Las notas se guardan localmente en tu navegador.
-                                </Text>
+                                </span>
                             </Alert>
                             
                             {selectedCheckpoint && (
                                 <Alert 
-                                    icon={<IconFile size={16} />} 
+                                    icon={<FileText size={16} />} 
                                     color="yellow" 
                                     variant="light"
                                     withCloseButton
                                     onClose={() => setSelectedCheckpoint(null)}
                                 >
-                            <Group justify="space-between">
-                                    <Text size="sm">
-                                        <strong>Checkpoint seleccionado:</strong> {selectedCheckpoint}
-                                            </Text>
-                                    </Group>
-                                        </Alert>
-                                    )}
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs">
+                                            <strong>Checkpoint seleccionado:</strong> {selectedCheckpoint}
+                                        </span>
+                                    </div>
+                                </Alert>
+                            )}
                             
-                            <Group>
-                                    <Textarea
+                            <div className="flex flex-col gap-2">
+                                <textarea
                                     placeholder="Escribe una nota sobre este checkpoint o experimento..."
-                                        value={newNote}
+                                    value={newNote}
                                     onChange={(e) => setNewNote(e.target.value)}
-                                    minRows={3}
-                                    style={{ flex: 1 }}
-                                    />
-                            </Group>
+                                    rows={3}
+                                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 resize-none"
+                                />
+                            </div>
                             
-                            <Group>
-                                <Button
+                            <div className="flex items-center gap-2">
+                                <button
                                     onClick={addNote}
                                     disabled={!newNote.trim()}
-                                    leftSection={<IconEdit size={14} />}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 text-xs font-bold rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                            Agregar Nota
-                                        </Button>
+                                    <Edit size={12} />
+                                    Agregar Nota
+                                </button>
                                 {selectedCheckpoint && (
-                                    <Button
-                                        variant="light"
+                                    <button
                                         onClick={() => setSelectedCheckpoint(null)}
-                                        leftSection={<IconX size={14} />}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-gray-300 rounded transition-all"
                                     >
+                                        <X size={12} />
                                         Limpiar Selección
-                                    </Button>
+                                    </button>
                                 )}
-                                    </Group>
+                            </div>
 
-                            <Divider label="Notas guardadas" labelPosition="center" />
+                            <div className="h-px bg-white/10 my-2" />
 
                             {notes.length === 0 ? (
-                                <Paper p="xl" withBorder>
-                                    <Stack align="center" gap="md">
-                                        <IconBook size={64} color="var(--mantine-color-gray-6)" />
-                                        <Text c="dimmed" ta="center" fw={500}>
-                                            No hay notas aún
-                                        </Text>
-                                        <Text size="xs" c="dimmed" ta="center">
-                                            Agrega una nota para documentar tus observaciones sobre el experimento o checkpoints específicos.
-                                        </Text>
-                                    </Stack>
-                                </Paper>
+                                <GlassPanel className="p-8 border border-white/10">
+                                    <div className="flex flex-col items-center space-y-4">
+                                        <BookOpen size={48} className="text-gray-600" />
+                                        <div className="text-center">
+                                            <div className="text-xs font-bold text-gray-500 mb-1">
+                                                No hay notas aún
+                                            </div>
+                                            <div className="text-[10px] text-gray-600 text-center">
+                                                Agrega una nota para documentar tus observaciones sobre el experimento o checkpoints específicos.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </GlassPanel>
                             ) : (
-                                <ScrollArea h={450}>
-                                    <Stack gap="md">
-                                        {notes
-                                            .sort((a, b) => b.timestamp - a.timestamp)
-                                            .map((note) => (
-                                            <Card key={note.id} withBorder p="md" style={{ backgroundColor: 'var(--mantine-color-dark-7)' }}>
-                                                <Stack gap="xs">
-                                                    <Group justify="space-between">
-                                                        <Group gap="xs">
-                                                            <IconClock size={14} />
-                                                            <Text size="xs" c="dimmed">
-                                                            {new Date(note.timestamp).toLocaleString()}
-                                                        </Text>
+                                <div className="h-[450px] overflow-y-auto custom-scrollbar space-y-2">
+                                    {notes
+                                        .sort((a, b) => b.timestamp - a.timestamp)
+                                        .map((note) => (
+                                            <GlassPanel key={note.id} className="p-3 bg-[#0a0a0a]">
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            <Clock size={12} className="text-gray-500" />
+                                                            <span className="text-[10px] text-gray-500">
+                                                                {new Date(note.timestamp).toLocaleString()}
+                                                            </span>
                                                             {note.checkpoint && (
-                                                                <Badge size="xs" variant="light" color="blue" leftSection={<IconFile size={10} />}>
+                                                                <Badge size="xs" variant="light" color="blue" leftSection={<FileText size={8} />}>
                                                                     {note.checkpoint}
                                                                 </Badge>
                                                             )}
-                                                        </Group>
-                                                        <ActionIcon
-                                                            size="sm"
-                                                            variant="light"
-                                                            color="red"
+                                                        </div>
+                                                        <button
                                                             onClick={() => deleteNote(note.id)}
+                                                            className="p-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 rounded transition-colors"
                                                         >
-                                                            <IconTrash size={14} />
-                                                        </ActionIcon>
-                                                    </Group>
-                                                    <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                                                            <Trash2 size={12} />
+                                                        </button>
+                                                    </div>
+                                                    <div className="text-xs whitespace-pre-wrap">
                                                         {note.content}
-                                                    </Text>
-                                                </Stack>
-                                            </Card>
+                                                    </div>
+                                                </div>
+                                            </GlassPanel>
                                         ))}
-                                    </Stack>
-                                </ScrollArea>
+                                </div>
                             )}
-                        </Stack>
-                    </Tabs.Panel>
+                        </div>
+                    </TabPanel>
                 </Tabs>
             </Modal>
         </>

@@ -28,16 +28,23 @@ torch::Tensor HarmonicVacuum::get_fluctuation(const Coord3D& coord, int64_t step
     // Guardar semilla anterior
     auto prev_seed = torch::globalContext().defaultGenerator(device_).current_seed();
     
-    // Establecer nueva semilla
+    // Establecer nueva semilla determinista
     torch::manual_seed(static_cast<int64_t>(seed));
     
-    // Generar ruido
-    torch::Tensor noise = torch::randn({d_state_}, options) * 0.001f;
+    // Generar ruido complejo (similar a Python: complex_noise mode)
+    // Python usa: noise = randn * strength; real = cos(noise); imag = sin(noise)
+    const float complex_noise_strength = 0.1f;
+    torch::Tensor noise = torch::randn({d_state_}, options) * complex_noise_strength;
+    
+    // Convertir a complejo usando cos y sin (como en Python)
+    torch::Tensor real = torch::cos(noise);
+    torch::Tensor imag = torch::sin(noise);
+    torch::Tensor complex_state = torch::complex(real, imag);
     
     // Restaurar semilla anterior
     torch::manual_seed(prev_seed);
     
-    return noise;
+    return complex_state;
 }
 
 } // namespace atheria

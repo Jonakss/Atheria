@@ -11,14 +11,38 @@ import { PanZoomCanvas } from '../../../components/ui/PanZoomCanvas';
 import HolographicViewer from '../../../components/visualization/HolographicViewer';
 import { LabSider } from '../../../components/ui/LabSider';
 import { useWebSocket } from '../../../hooks/useWebSocket';
+import { EPOCH_CONFIGS } from '../components/EpochBadge';
 
 type TabType = 'lab' | 'analysis' | 'history' | 'logs';
+type LabSection = 'inference' | 'training' | 'analysis';
 
 export const DashboardLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('lab');
   const [currentEpoch, setCurrentEpoch] = useState(2); // Era de Partículas - PARTÍCULAS está activa
   const [labPanelOpen, setLabPanelOpen] = useState(true); // Panel de laboratorio visible por defecto
-  const { simData, selectedViz, connectionStatus } = useWebSocket();
+  const [labPanelCollapsed, setLabPanelCollapsed] = useState(false); // Panel de laboratorio colapsado
+  const [activeLabSection, setActiveLabSection] = useState<LabSection>('inference'); // Sub-sección activa de Lab
+  const [physicsInspectorCollapsed, setPhysicsInspectorCollapsed] = useState(false); // Inspector físico colapsado
+  const { simData, selectedViz, connectionStatus, sendCommand, setSelectedViz } = useWebSocket();
+  
+  // Handler para cambio de época - aplicar configuración automáticamente
+  const handleEpochChange = (epoch: number) => {
+    setCurrentEpoch(epoch);
+    const config = EPOCH_CONFIGS[epoch];
+    
+    if (config && connectionStatus === 'connected') {
+      // Cambiar gamma decay
+      sendCommand('inference', 'set_config', {
+        gamma_decay: config.gammaDecay
+      });
+      
+      // Cambiar tipo de visualización
+      if (config.vizType && config.vizType !== selectedViz) {
+        setSelectedViz(config.vizType);
+        sendCommand('simulation', 'set_viz', { viz_type: config.vizType });
+      }
+    }
+  };
 
   // Obtener datos del mapa para renderizado
   const mapData = simData?.map_data;
@@ -104,8 +128,8 @@ export const DashboardLayout: React.FC = () => {
   return (
     <div className="h-screen bg-[#020202] text-gray-300 font-sans selection:bg-blue-500/30 overflow-hidden flex flex-col">
       
-      {/* Header: Barra de Comando Técnica */}
-      <ScientificHeader currentEpoch={currentEpoch} onEpochChange={setCurrentEpoch} />
+              {/* Header: Barra de Comando Técnica */}
+              <ScientificHeader currentEpoch={currentEpoch} onEpochChange={handleEpochChange} />
 
       {/* Contenedor Principal */}
       <div className="flex-1 flex overflow-hidden">
@@ -122,15 +146,23 @@ export const DashboardLayout: React.FC = () => {
               setLabPanelOpen(false);
             }
           }}
-          labPanelOpen={labPanelOpen}
+          labPanelOpen={labPanelOpen && !labPanelCollapsed}
+          activeLabSection={activeLabSection}
+          onLabSectionChange={(section) => setActiveLabSection(section)}
         />
 
-        {/* Panel de Laboratorio (Experimentos/Entrenamiento) - Visible por defecto */}
-        {/* Integrado directamente sin wrapper adicional */}
+        {/* Panel de Laboratorio (Experimentos/Entrenamiento) - Colapsable como drawer */}
         {labPanelOpen && (
-          <div className="w-[380px] border-r border-white/10 bg-[#080808] flex flex-col z-50 shrink-0 overflow-hidden">
-            <LabSider />
-          </div>
+          <aside className={`flex-col border-r border-white/10 bg-[#080808] z-40 shrink-0 transition-all duration-300 ${
+            labPanelCollapsed ? 'w-12' : 'w-[380px]'
+          } flex overflow-hidden relative`}>
+            <LabSider 
+              activeSection={activeLabSection} 
+              onSectionChange={setActiveLabSection}
+              isCollapsed={labPanelCollapsed}
+              onToggleCollapse={() => setLabPanelCollapsed(!labPanelCollapsed)}
+            />
+          </aside>
         )}
 
         {/* Área de Trabajo (Viewport + Paneles Flotantes) */}
@@ -147,9 +179,12 @@ export const DashboardLayout: React.FC = () => {
           <MetricsBar />
         </main>
 
-        {/* Panel Lateral Derecho (Inspector y Controles) */}
+        {/* Panel Lateral Derecho (Inspector y Controles) - Colapsible */}
         {/* Design System: w-72 (288px) o w-80 (320px) - usando w-72 según mockup */}
-        <PhysicsInspector />
+        <PhysicsInspector 
+          isCollapsed={physicsInspectorCollapsed}
+          onToggleCollapse={() => setPhysicsInspectorCollapsed(!physicsInspectorCollapsed)}
+        />
       </div>
     </div>
   );

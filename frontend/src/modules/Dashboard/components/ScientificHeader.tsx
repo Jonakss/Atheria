@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Aperture } from 'lucide-react';
+import { Settings, Aperture, Power, Plug, ChevronRight, ChevronLeft } from 'lucide-react';
 import { EpochBadge } from './EpochBadge';
 import { SettingsPanel } from './SettingsPanel';
 import { useWebSocket } from '../../../hooks/useWebSocket';
@@ -12,7 +12,16 @@ interface ScientificHeaderProps {
 
 export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch, onEpochChange }) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const { connectionStatus, compileStatus } = useWebSocket();
+  const [epochsExpanded, setEpochsExpanded] = useState(false); // Badges colapsados por defecto
+  const { connectionStatus, compileStatus, connect, disconnect } = useWebSocket();
+  
+  const handleConnectDisconnect = () => {
+    if (connectionStatus === 'connected') {
+      disconnect();
+    } else {
+      connect();
+    }
+  };
   
   // Determinar estado del sistema según connectionStatus y compileStatus
   const getSystemStatus = () => {
@@ -80,16 +89,57 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
         {/* Separador Vertical */}
         <div className="h-4 w-px bg-white/10" />
 
-        {/* Timeline de Épocas (Tabs interactivos) - Design System: gap-0.5 según mockup */}
-        <div className="flex items-center gap-0.5">
-          {[0, 1, 2, 3, 4, 5].map(e => (
-            <EpochBadge 
-              key={e}
-              era={e} 
-              current={currentEpoch}
-              onClick={() => onEpochChange?.(e)}
-            />
-          ))}
+        {/* Timeline de Épocas (Tabs interactivos) - Colapsable */}
+        <div 
+          className="relative flex items-center"
+          onMouseEnter={() => setEpochsExpanded(true)}
+          onMouseLeave={() => setEpochsExpanded(false)}
+        >
+          {/* Barra fina cuando está colapsado */}
+          {!epochsExpanded && (
+            <button
+              onClick={() => setEpochsExpanded(true)}
+              onMouseEnter={() => setEpochsExpanded(true)}
+              className="w-1 h-8 bg-white/10 hover:w-2 hover:bg-white/30 rounded-full transition-all duration-300 cursor-pointer group relative"
+              title="Expandir épocas - Click o hover para mostrar"
+            >
+              {/* Indicador de época activa en la barra */}
+              <div 
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full transition-all"
+                style={{
+                  top: `${(currentEpoch / 5) * 100}%`,
+                  backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                  boxShadow: '0 0 4px rgba(59, 130, 246, 0.8)'
+                }}
+              />
+              <div className="w-full h-full bg-gradient-to-b from-blue-500/20 via-purple-500/20 to-green-500/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+            </button>
+          )}
+          
+          {/* Badges de época cuando está expandido */}
+          {epochsExpanded && (
+            <div className="flex items-center gap-0.5 animate-in slide-in-from-left-2 duration-200">
+              {[0, 1, 2, 3, 4, 5].map(e => (
+                <EpochBadge 
+                  key={e}
+                  era={e} 
+                  current={currentEpoch}
+                  onClick={() => onEpochChange?.(e)}
+                />
+              ))}
+              {/* Botón para colapsar */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEpochsExpanded(false);
+                }}
+                className="ml-1 p-1 text-gray-500 hover:text-gray-300 transition-colors"
+                title="Colapsar épocas"
+              >
+                <ChevronLeft size={12} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -114,7 +164,26 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
         >
           <Settings size={16} />
         </button>
-        <div className="w-6 h-6 rounded bg-gray-800 border border-gray-700 flex items-center justify-center text-[10px] text-gray-400 font-bold">JS</div>
+        
+        {/* Botón Conectar/Desconectar */}
+        <button
+          onClick={handleConnectDisconnect}
+          className={`w-7 h-7 rounded flex items-center justify-center transition-all relative group border ${
+            connectionStatus === 'connected'
+              ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/20'
+              : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:bg-gray-700 hover:text-gray-300'
+          }`}
+          title={connectionStatus === 'connected' ? 'Desconectar' : 'Conectar'}
+        >
+          {connectionStatus === 'connected' ? (
+            <Power size={14} strokeWidth={2.5} className="text-emerald-400" />
+          ) : (
+            <Plug size={14} strokeWidth={2.5} className="text-gray-400" />
+          )}
+          {connectionStatus === 'connected' && (
+            <div className="absolute inset-0 rounded bg-emerald-500/20 animate-pulse" />
+          )}
+        </button>
       </div>
       
       {/* Panel de Configuración */}

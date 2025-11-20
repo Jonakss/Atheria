@@ -1,12 +1,25 @@
 import React, { useState } from 'react';
-import { Settings, Zap, ChevronRight, MoreHorizontal, AlertCircle, Microscope } from 'lucide-react';
+import { Settings, Zap, ChevronRight, MoreHorizontal, AlertCircle, Microscope, ChevronLeft } from 'lucide-react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 
-export const PhysicsInspector: React.FC = () => {
+interface PhysicsInspectorProps {
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
+
+export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({ 
+  isCollapsed = false, 
+  onToggleCollapse 
+}) => {
   const { sendCommand, simData, allLogs } = useWebSocket();
   const [gammaDecay, setGammaDecay] = useState(0.015);
   const [thermalNoise, setThermalNoise] = useState(0.002);
   const [selectedLayer, setSelectedLayer] = useState(0);
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
+  
+  // Usar prop externo si está disponible, sino usar estado interno
+  const collapsed = onToggleCollapse !== undefined ? isCollapsed : internalCollapsed;
+  const handleToggle = onToggleCollapse || (() => setInternalCollapsed(!internalCollapsed));
 
   const layers = ['Densidad (Scalar)', 'Fase (Complex)', 'Flujo (Vector)', 'Chunks (Meta)'];
 
@@ -29,14 +42,23 @@ export const PhysicsInspector: React.FC = () => {
   const recentLogs = allLogs?.slice(-2) || [];
 
   return (
-    <aside className="w-72 border-l border-white/10 bg-[#080808] flex flex-col z-40 shrink-0">
-      {/* Título Panel */}
-      <div className="h-10 border-b border-white/5 flex items-center justify-between px-4 bg-[#0a0a0a]">
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Inspector Físico</span>
-        <MoreHorizontal size={14} className="text-gray-600 cursor-pointer hover:text-gray-400" />
+    <aside className={`${collapsed ? 'w-10' : 'w-72'} border-l border-white/10 bg-[#080808] flex flex-col z-40 shrink-0 flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden`} style={{ minWidth: collapsed ? '2.5rem' : '18rem', maxWidth: collapsed ? '2.5rem' : '18rem' }}>
+      {/* Título Panel - Con botón de colapsar */}
+      <div className="h-10 border-b border-white/5 flex items-center justify-between px-4 bg-[#0a0a0a] shrink-0">
+        {!collapsed && (
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Inspector Físico</span>
+        )}
+        <button
+          onClick={handleToggle}
+          className="w-6 h-6 flex items-center justify-center text-gray-600 hover:text-gray-300 hover:bg-white/5 rounded transition-all"
+          title={collapsed ? 'Expandir Inspector' : 'Colapsar Inspector'}
+        >
+          {collapsed ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+        </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-8 custom-scrollbar">
+      {!collapsed && (
+      <div className="flex-1 overflow-y-auto p-4 space-y-8" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
         
         {/* Sección: Parámetros Globales */}
         <div className="space-y-3">
@@ -50,18 +72,19 @@ export const PhysicsInspector: React.FC = () => {
               <span className="text-gray-400">Gamma (Disipación)</span>
               <span className="font-mono text-gray-200 bg-white/5 px-1.5 rounded">{gammaDecay.toFixed(3)}</span>
             </div>
-            <div className="h-1 w-full bg-gray-800 rounded-full overflow-hidden cursor-pointer hover:bg-gray-700 transition-colors">
-              <div 
-                className="h-full bg-gray-500 cursor-pointer"
-                style={{ width: `${(gammaDecay / 0.1) * 100}%` }}
-                onClick={(e) => {
-                  const rect = e.currentTarget.parentElement!.getBoundingClientRect();
-                  const x = e.clientX - rect.left;
-                  const newValue = (x / rect.width) * 0.1;
-                  handleGammaChange(Math.max(0, Math.min(0.1, newValue)));
-                }}
-              />
-            </div>
+            {/* Slider usando input range HTML5 nativo para mejor UX */}
+            <input
+              type="range"
+              min="0"
+              max="0.1"
+              step="0.001"
+              value={gammaDecay}
+              onChange={(e) => handleGammaChange(parseFloat(e.target.value))}
+              className="w-full h-1 bg-gray-800 rounded-full appearance-none cursor-pointer slider-thumb"
+              style={{
+                background: `linear-gradient(to right, rgb(107, 114, 128) 0%, rgb(107, 114, 128) ${(gammaDecay / 0.1) * 100}%, rgb(31, 41, 55) ${(gammaDecay / 0.1) * 100}%, rgb(31, 41, 55) 100%)`
+              }}
+            />
           </div>
 
           {/* Control Slider Refinado - Thermal Noise */}
@@ -70,18 +93,19 @@ export const PhysicsInspector: React.FC = () => {
               <span className="text-gray-400">Ruido Térmico</span>
               <span className="font-mono text-amber-400/80 bg-amber-900/10 px-1.5 rounded border border-amber-500/10">{thermalNoise.toFixed(3)}</span>
             </div>
-            <div className="h-1 w-full bg-gray-800 rounded-full overflow-hidden cursor-pointer hover:bg-gray-700 transition-colors">
-              <div 
-                className="h-full bg-amber-600 cursor-pointer"
-                style={{ width: `${(thermalNoise / 0.01) * 100}%` }}
-                onClick={(e) => {
-                  const rect = e.currentTarget.parentElement!.getBoundingClientRect();
-                  const x = e.clientX - rect.left;
-                  const newValue = (x / rect.width) * 0.01;
-                  handleThermalNoiseChange(Math.max(0, Math.min(0.01, newValue)));
-                }}
-              />
-            </div>
+            {/* Slider usando input range HTML5 nativo para mejor UX */}
+            <input
+              type="range"
+              min="0"
+              max="0.01"
+              step="0.0001"
+              value={thermalNoise}
+              onChange={(e) => handleThermalNoiseChange(parseFloat(e.target.value))}
+              className="w-full h-1 bg-gray-800 rounded-full appearance-none cursor-pointer slider-thumb"
+              style={{
+                background: `linear-gradient(to right, rgb(217, 119, 6) 0%, rgb(217, 119, 6) ${(thermalNoise / 0.01) * 100}%, rgb(31, 41, 55) ${(thermalNoise / 0.01) * 100}%, rgb(31, 41, 55) 100%)`
+              }}
+            />
           </div>
         </div>
 
@@ -155,21 +179,9 @@ export const PhysicsInspector: React.FC = () => {
         )}
 
       </div>
+      )}
 
-      {/* Footer del Sidebar */}
-      <div className="p-3 border-t border-white/5 bg-[#080808]">
-        <button 
-          className="w-full py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold rounded border border-white/5 transition-all flex items-center justify-center gap-2"
-          onClick={() => sendCommand('simulation', 'capture_snapshot', {})}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
-          </svg>
-          CAPTURAR ESTADO
-        </button>
-      </div>
+      {/* Footer del Sidebar - Removido botón duplicado (está en MetricsBar) */}
     </aside>
   );
 };

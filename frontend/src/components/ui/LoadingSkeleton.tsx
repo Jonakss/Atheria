@@ -1,7 +1,6 @@
 // frontend/src/components/ui/LoadingSkeleton.tsx
 import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
-import { useMantineColorScheme } from '@mantine/core';
 
 interface LoadingSkeletonProps {
     count?: number;
@@ -18,9 +17,9 @@ export function LoadingSkeleton({
     circle = false,
     className 
 }: LoadingSkeletonProps) {
-    const { colorScheme } = useMantineColorScheme();
-    const baseColor = colorScheme === 'dark' ? '#2c2e33' : '#e9ecef';
-    const highlightColor = colorScheme === 'dark' ? '#373a40' : '#f8f9fa';
+    // Design System: Usar colores oscuros siempre (Atheria usa dark theme)
+    const baseColor = '#080808'; // Design System: #080808
+    const highlightColor = '#0a0a0a'; // Design System: #0a0a0a
 
     return (
         <SkeletonTheme baseColor={baseColor} highlightColor={highlightColor}>
@@ -72,7 +71,7 @@ export function TableSkeleton({ rows = 5, columns = 4 }: { rows?: number; column
     return (
         <div>
             {/* Header */}
-            <div style={{ display: 'flex', gap: '1rem', padding: '0.5rem 0', borderBottom: '1px solid var(--mantine-color-dark-4)' }}>
+            <div style={{ display: 'flex', gap: '1rem', padding: '0.5rem 0', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
                 {Array.from({ length: columns }).map((_, i) => (
                     <LoadingSkeleton key={i} height={16} width="100%" />
                 ))}

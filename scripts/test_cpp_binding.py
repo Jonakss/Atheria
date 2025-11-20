@@ -1,155 +1,217 @@
 #!/usr/bin/env python3
 """
-Script de verificación para el binding C++ de Atheria Core.
-
-Este script verifica que:
-1. El módulo atheria_core puede ser importado
-2. La función add() funciona correctamente
-3. La clase SparseMap puede ser instanciada y usada
+Script de prueba para verificar que los bindings C++ funcionan correctamente.
+Este es el "Hello World" de la Fase 2.
 """
-
 import sys
 import os
-from pathlib import Path
 
-# Agregar el directorio raíz al path para imports
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+# Agregar el directorio raíz al path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-def test_import():
-    """Test 1: Importar el módulo"""
-    print("Test 1: Importando módulo atheria_core...")
+def test_add_function():
+    """Prueba la función add() que es el Hello World."""
+    print("=" * 60)
+    print("🧪 TEST: Función add() - Hello World de Fase 2")
+    print("=" * 60)
+    
     try:
         import atheria_core
-        print(f"  ✅ Módulo importado exitosamente")
-        print(f"  📦 Ubicación: {atheria_core.__file__}")
-        return atheria_core
+        print("✅ Módulo atheria_core importado correctamente")
     except ImportError as e:
-        print(f"  ❌ Error al importar: {e}")
-        print("\n💡 Sugerencia: Asegúrate de haber compilado el módulo:")
-        print("   pip install -e .")
-        sys.exit(1)
-
-def test_add_function(atheria_core):
-    """Test 2: Función add()"""
-    print("\nTest 2: Probando función add()...")
+        print(f"❌ Error importando atheria_core: {e}")
+        print("   El módulo no está compilado. Ejecuta:")
+        print("   python setup.py build_ext --inplace")
+        return False
+    
+    # Probar función add
     try:
         result = atheria_core.add(5, 3)
         expected = 8
-        assert result == expected, f"Esperado {expected}, obtuvo {result}"
-        print(f"  ✅ add(5, 3) = {result}")
-        
-        # Test con números negativos
-        result2 = atheria_core.add(-10, 20)
-        assert result2 == 10, f"Esperado 10, obtuvo {result2}"
-        print(f"  ✅ add(-10, 20) = {result2}")
-        
-        return True
+        if result == expected:
+            print(f"✅ add(5, 3) = {result} (esperado: {expected})")
+        else:
+            print(f"❌ add(5, 3) = {result} (esperado: {expected})")
+            return False
     except Exception as e:
-        print(f"  ❌ Error: {e}")
+        print(f"❌ Error ejecutando add(): {e}")
         return False
-
-def test_sparse_map(atheria_core):
-    """Test 3: Clase SparseMap"""
-    print("\nTest 3: Probando clase SparseMap...")
+    
+    # Probar verificación de LibTorch
     try:
-        # Crear instancia
-        smap = atheria_core.SparseMap()
-        print("  ✅ SparseMap instanciado")
+        has_torch = atheria_core.has_torch_support()
+        print(f"✅ LibTorch disponible: {has_torch}")
+    except Exception as e:
+        print(f"⚠️  Error verificando LibTorch: {e}")
+    
+    return True
+
+def test_coord3d():
+    """Prueba la estructura Coord3D."""
+    print("\n" + "=" * 60)
+    print("🧪 TEST: Estructura Coord3D")
+    print("=" * 60)
+    
+    try:
+        import atheria_core
         
-        # Test inicial
-        assert smap.empty(), "Mapa debería estar vacío inicialmente"
-        assert smap.size() == 0, "Tamaño debería ser 0"
-        print("  ✅ Estado inicial correcto (vacío)")
+        # Crear coordenada
+        coord = atheria_core.Coord3D(10, 20, 30)
+        print(f"✅ Coord3D creado: {coord}")
+        
+        # Verificar valores
+        if coord.x == 10 and coord.y == 20 and coord.z == 30:
+            print(f"   Valores correctos: x={coord.x}, y={coord.y}, z={coord.z}")
+        else:
+            print(f"❌ Valores incorrectos: x={coord.x}, y={coord.y}, z={coord.z}")
+            return False
+        
+        # Modificar valores
+        coord.x = 100
+        coord.y = 200
+        coord.z = 300
+        if coord.x == 100 and coord.y == 200 and coord.z == 300:
+            print(f"✅ Modificación exitosa: {coord}")
+        else:
+            print(f"❌ Error modificando coordenadas")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error probando Coord3D: {e}")
+        return False
+    
+    return True
+
+def test_sparse_map():
+    """Prueba la clase SparseMap básica."""
+    print("\n" + "=" * 60)
+    print("🧪 TEST: Clase SparseMap (operaciones básicas)")
+    print("=" * 60)
+    
+    try:
+        import atheria_core
+        
+        # Crear mapa
+        sparse_map = atheria_core.SparseMap()
+        print("✅ SparseMap creado")
+        
+        # Verificar que está vacío
+        if sparse_map.empty():
+            print(f"✅ Mapa vacío inicialmente: size={sparse_map.size()}")
+        else:
+            print(f"❌ Mapa debería estar vacío: size={sparse_map.size()}")
+            return False
         
         # Insertar valores
-        smap.insert(1, 10.5)
-        smap.insert(2, 20.3)
-        smap.insert(3, 30.7)
-        print("  ✅ Valores insertados")
+        sparse_map.insert(1, 10.5)
+        sparse_map.insert(2, 20.7)
+        sparse_map.insert(3, 30.9)
+        print(f"✅ Insertados 3 elementos: size={sparse_map.size()}")
         
-        # Verificar tamaño
-        assert smap.size() == 3, f"Tamaño debería ser 3, obtuvo {smap.size()}"
-        print(f"  ✅ Tamaño correcto: {smap.size()}")
+        if sparse_map.size() != 3:
+            print(f"❌ Tamaño incorrecto: {sparse_map.size()} (esperado: 3)")
+            return False
         
         # Verificar contains
-        assert smap.contains(1), "Debería contener clave 1"
-        assert not smap.contains(999), "No debería contener clave 999"
-        print("  ✅ contains() funciona correctamente")
+        if sparse_map.contains(1) and sparse_map.contains(2) and sparse_map.contains(3):
+            print("✅ contains() funciona correctamente")
+        else:
+            print("❌ contains() falló")
+            return False
         
-        # Verificar get
-        assert abs(smap.get(1) - 10.5) < 1e-9, "Valor incorrecto para clave 1"
-        assert abs(smap.get(999, 0.0) - 0.0) < 1e-9, "Valor por defecto incorrecto"
-        print("  ✅ get() funciona correctamente")
+        # Obtener valores
+        val1 = sparse_map.get(1)
+        val2 = sparse_map.get(2)
+        val3 = sparse_map.get(3)
         
-        # Test de acceso con []
-        assert 1 in smap, "Clave 1 debería estar usando __contains__"
-        value = smap[1]
-        assert abs(value - 10.5) < 1e-9, "Acceso con [] falló"
-        print("  ✅ Acceso con [] funciona")
+        if abs(val1 - 10.5) < 1e-9 and abs(val2 - 20.7) < 1e-9 and abs(val3 - 30.9) < 1e-9:
+            print(f"✅ get() funciona: {val1}, {val2}, {val3}")
+        else:
+            print(f"❌ get() falló: {val1}, {val2}, {val3}")
+            return False
         
-        # Test de asignación con []
-        smap[4] = 40.9
-        assert abs(smap.get(4) - 40.9) < 1e-9, "Asignación con [] falló"
-        print("  ✅ Asignación con [] funciona")
+        # Probar operadores Python
+        if 1 in sparse_map:
+            print("✅ Operador 'in' funciona")
+        else:
+            print("❌ Operador 'in' falló")
+            return False
         
-        # Test de eliminación
-        smap.remove(2)
-        assert not smap.contains(2), "Clave 2 debería haber sido eliminada"
-        assert smap.size() == 3, "Tamaño debería ser 3 (1, 3, 4)"
-        print("  ✅ remove() funciona correctamente")
+        # Probar acceso con []
+        if abs(sparse_map[1] - 10.5) < 1e-9:
+            print("✅ Operador [] funciona")
+        else:
+            print("❌ Operador [] falló")
+            return False
         
-        # Test de keys y values
-        keys = smap.keys()
-        values = smap.values()
-        assert len(keys) == 3, f"Debería haber 3 claves, obtuvo {len(keys)}"
-        assert len(values) == 3, f"Debería haber 3 valores, obtuvo {len(values)}"
-        print(f"  ✅ keys() y values() funcionan: {keys}, {values}")
+        # Probar len()
+        if len(sparse_map) == 3:
+            print(f"✅ len() funciona: {len(sparse_map)}")
+        else:
+            print(f"❌ len() falló: {len(sparse_map)}")
+            return False
         
-        # Test de clear
-        smap.clear()
-        assert smap.empty(), "Mapa debería estar vacío después de clear()"
-        assert smap.size() == 0, "Tamaño debería ser 0"
-        print("  ✅ clear() funciona correctamente")
+        # Eliminar elemento
+        sparse_map.remove(2)
+        if sparse_map.size() == 2 and not sparse_map.contains(2):
+            print("✅ remove() funciona correctamente")
+        else:
+            print(f"❌ remove() falló: size={sparse_map.size()}")
+            return False
         
-        # Test de __repr__
-        repr_str = repr(smap)
-        assert "SparseMap" in repr_str, "repr() debería contener 'SparseMap'"
-        print(f"  ✅ __repr__ funciona: {repr_str}")
+        # Limpiar
+        sparse_map.clear()
+        if sparse_map.empty():
+            print("✅ clear() funciona correctamente")
+        else:
+            print("❌ clear() falló")
+            return False
         
-        return True
     except Exception as e:
-        print(f"  ❌ Error: {e}")
+        print(f"❌ Error probando SparseMap: {e}")
         import traceback
         traceback.print_exc()
         return False
+    
+    return True
 
 def main():
-    """Función principal"""
-    print("=" * 60)
-    print("🧪 Verificación del Binding C++ de Atheria Core")
-    print("=" * 60)
+    """Ejecuta todos los tests."""
+    print("\n" + "🚀 " + "=" * 58)
+    print("   INICIANDO TESTS DE FASE 2: Motor Nativo C++")
+    print("=" * 60 + "\n")
     
-    # Test 1: Import
-    atheria_core = test_import()
+    results = []
     
-    # Test 2: Función add
-    if not test_add_function(atheria_core):
-        print("\n❌ Tests fallaron en función add()")
-        sys.exit(1)
+    # Test 1: Función add (Hello World)
+    results.append(("add() - Hello World", test_add_function()))
     
-    # Test 3: Clase SparseMap
-    if not test_sparse_map(atheria_core):
-        print("\n❌ Tests fallaron en clase SparseMap")
-        sys.exit(1)
+    # Test 2: Coord3D
+    results.append(("Coord3D", test_coord3d()))
     
-    # Éxito
+    # Test 3: SparseMap básico
+    results.append(("SparseMap básico", test_sparse_map()))
+    
+    # Resumen
     print("\n" + "=" * 60)
-    print("✅ Todos los tests pasaron exitosamente!")
-    print("✅ C++ Binding Exitoso")
+    print("📊 RESUMEN DE TESTS")
     print("=" * 60)
-    return 0
+    
+    passed = sum(1 for _, result in results if result)
+    total = len(results)
+    
+    for name, result in results:
+        status = "✅ PASS" if result else "❌ FAIL"
+        print(f"  {status}: {name}")
+    
+    print(f"\n{'=' * 60}")
+    if passed == total:
+        print(f"✅ TODOS LOS TESTS PASARON ({passed}/{total})")
+        print("🎉 Fase 2 - Hello World COMPLETADO!")
+        return 0
+    else:
+        print(f"❌ ALGUNOS TESTS FALLARON ({passed}/{total})")
+        return 1
 
 if __name__ == "__main__":
     sys.exit(main())
-

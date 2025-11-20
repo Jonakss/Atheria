@@ -18,9 +18,15 @@ Eres un Ingeniero de Física Digital y Experto en IA trabajando en el proyecto A
     - **Componentes:** Crea componentes grandes como **Módulos** en `frontend/src/modules/` (ej: `HolographicViewer`).
     - **Rendimiento:** Usa `useMemo`, `useCallback` y evita re-renders innecesarios en el canvas 3D (Three.js).
 
-4.  **Documentación Viva:**
+4.  **Documentación Viva (RAG + Obsidian):**
+    - **CRÍTICO:** Todo concepto, experimento, decisión de diseño o conocimiento importante DEBE documentarse para RAG (Retrieval Augmented Generation) y Obsidian.
     - Si creas una nueva funcionalidad, genera su documentación en `docs/30_Components/` usando el template `docs/99_Templates/Component_Template.md`.
     - Registra cambios importantes o resultados de experimentos en `docs/40_Experiments/AI_DEV_LOG.md`.
+    - **Conceptos Nuevos:** Documenta en `docs/20_Concepts/` con explicaciones claras, relaciones con otros conceptos, y ejemplos de uso.
+    - **Decisiones de Diseño:** Explica POR QUÉ se tomó una decisión, no solo QUÉ se hizo. Esto es crucial para el RAG futuro.
+    - **Experimentos:** Registra hipótesis, metodología, resultados y conclusiones en `docs/40_Experiments/`.
+    - **Formato Obsidian:** Usa enlaces `[[archivo]]` para conectar conceptos relacionados. Los archivos Markdown son compatibles con Obsidian.
+    - **MOC (Map of Content):** Actualiza los archivos `00_*_MOC.md` cuando agregues nuevas entradas.
 
 5.  **Terminología Prohibida vs. Correcta:**
     - ❌ Grid -> ✅ Chunk / Hash Map (en contexto de motor disperso).
@@ -42,3 +48,5 @@ Si el usuario escribe un comando (inicia con `/`), consulta ese archivo y ejecut
 - **Visión:** `docs/10_Core/ATHERIA_4_MASTER_BRIEF.md`
 - **Arquitectura:** `docs/10_Core/TECHNICAL_ARCHITECTURE_V4.md`
 - **Roadmap:** `docs/10_Core/ROADMAP_PHASE_1.md`
+- **Obsidian Setup:** `docs/OBSIDIAN_SETUP.md`
+- **AI Dev Log:** `docs/40_Experiments/AI_DEV_LOG.md`

@@ -1,12 +1,41 @@
 // frontend/src/components/CanvasOverlays.tsx
 import { useRef, useEffect } from 'react';
-import { Box, Stack, Text, Switch, Select } from '@mantine/core';
+import { Box } from '../../modules/Dashboard/components/Box';
+import { Stack } from '../../modules/Dashboard/components/Stack';
+import { Text } from '../../modules/Dashboard/components/Text';
+import { Switch } from '../../modules/Dashboard/components/Switch';
+import { Select } from '../../modules/Dashboard/components/Select';
+
+// Helper para obtener color de un valor normalizado [0,1]
+function getColor(value: number): string {
+    if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) {
+        return 'rgb(68, 1, 84)'; // Color por defecto
+    }
+    
+    const colors = [
+        [68, 1, 84], [72, 40, 120], [62, 74, 137], [49, 104, 142],
+        [38, 130, 142], [31, 158, 137], [53, 183, 121], [109, 205, 89],
+        [180, 222, 44], [253, 231, 37], [255, 200, 0], [255, 150, 0],
+        [255, 100, 0], [255, 50, 0], [255, 0, 0]
+    ];
+    
+    const normalizedValue = Math.max(0, Math.min(1, value));
+    const i = Math.min(Math.max(Math.floor(normalizedValue * (colors.length - 1)), 0), colors.length - 1);
+    const c = colors[i];
+    
+    if (!c || !Array.isArray(c) || c.length < 3) {
+        return 'rgb(68, 1, 84)';
+    }
+    
+    return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+}
 
 export interface OverlayConfig {
     showGrid: boolean;
     showCoordinates: boolean;
     showQuadtree: boolean;
     showStats: boolean;
+    showToroidalBorders: boolean; // Mostrar bordes toroidales (conectividad de bordes)
     gridSize: number;
     quadtreeThreshold: number;
 }
@@ -176,16 +205,32 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config, roiInfo 
                 // Visualizar estructura quadtree (regiones con datos significativos)
                 const threshold = Math.max(0.0001, config.quadtreeThreshold); // Asegurar threshold mínimo
                 
-                // Calcular profundidad máxima según tamaño del grid
-                let maxDepth = 8; // Profundidad máxima por defecto
-                if (totalCells > 128 * 128) {
-                    maxDepth = 6; // Reducir para grids grandes
-                } else if (totalCells > 64 * 64) {
-                    maxDepth = 7;
-                }
+                // CALCULAR NIVEL DE DETALLE (LOD) SEGÚN EL ZOOM
+                // Zoom alto = más detalle (más profundidad, regiones más pequeñas)
+                // Zoom bajo = menos detalle (menos profundidad, regiones más grandes)
+                const baseMaxDepth = 8; // Profundidad base por defecto
+                const baseMinRegionSize = Math.max(2, Math.min(8, Math.floor(Math.sqrt(totalCells) / 32)));
                 
-                // Tamaño mínimo de región para subdividir (evitar subdivisiones innecesarias)
-                const minRegionSize = Math.max(2, Math.min(8, Math.floor(Math.sqrt(totalCells) / 32)));
+                // Ajustar profundidad máxima según zoom
+                // Zoom 1.0 = profundidad base reducida (menos detalle)
+                // Zoom > 2.0 = profundidad máxima (máximo detalle)
+                // Interpolación logarítmica para suavizar la transición
+                const zoomFactor = Math.max(0.5, Math.min(2.0, zoom)); // Limitar zoom entre 0.5x y 2.0x
+                const depthMultiplier = Math.log(zoomFactor + 0.5) / Math.log(2.5); // Escala logarítmica 0-1
+                
+                let maxDepth = Math.floor(baseMaxDepth * (0.5 + depthMultiplier * 0.5)); // Entre 50% y 100% de profundidad base
+                if (totalCells > 128 * 128) {
+                    maxDepth = Math.max(4, Math.floor(maxDepth * 0.75)); // Reducir más para grids grandes
+                } else if (totalCells > 64 * 64) {
+                    maxDepth = Math.max(5, Math.floor(maxDepth * 0.875));
+                }
+                maxDepth = Math.max(4, Math.min(10, maxDepth)); // Limitar entre 4 y 10
+                
+                // Ajustar tamaño mínimo de región según zoom
+                // Zoom alto = regiones más pequeñas (más detalle)
+                // Zoom bajo = regiones más grandes (menos detalle)
+                const regionSizeMultiplier = 1 / Math.max(0.5, zoomFactor); // Inversamente proporcional al zoom
+                const minRegionSize = Math.max(1, Math.floor(baseMinRegionSize * regionSizeMultiplier));
                 
                 // Si hay ROI activa, solo procesar la región visible
                 const roiBounds = roiInfo?.enabled ? {
@@ -215,8 +260,10 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config, roiInfo 
                     const width = maxX - minX;
                     const height = maxY - minY;
                     
-                    // Si la región es muy pequeña, no subdividir más
-                    if (width < minRegionSize || height < minRegionSize) {
+                    // Si la región es muy pequeña según el LOD actual, no subdividir más
+                    // El tamaño mínimo se ajusta según el zoom (más zoom = regiones más pequeñas visibles)
+                    const currentMinSize = minRegionSize / zoom; // Ajustar según zoom actual
+                    if (width < currentMinSize || height < currentMinSize) {
                         // Verificar si tiene datos significativos en esta región pequeña
                         let hasData = false;
                         for (let y = Math.floor(minY); y < Math.ceil(maxY) && y < gridHeight; y++) {
@@ -263,7 +310,10 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config, roiInfo 
                         ctx.strokeRect(minX, minY, width, height);
                         
                         // Subdividir si la región es suficientemente grande y no hemos alcanzado la profundidad máxima
-                        if (width > minRegionSize * 2 && height > minRegionSize * 2 && depth < maxDepth) {
+                        // Subdividir si la región es suficientemente grande y no hemos alcanzado la profundidad máxima
+                        // El tamaño mínimo para subdividir se ajusta según el zoom (más zoom = subdivisiones más pequeñas)
+                        const subdivisionThreshold = currentMinSize * 2; // Usar el tamaño mínimo ajustado al zoom
+                        if (width > subdivisionThreshold && height > subdivisionThreshold && depth < maxDepth) {
                             const midX = (minX + maxX) / 2;
                             const midY = (minY + maxY) / 2;
                             
@@ -282,6 +332,133 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config, roiInfo 
                 } else {
                 drawQuadtree(0, 0, gridWidth, gridHeight, 0);
                 }
+            }
+        }
+        
+        // Bordes Toroidales overlay - Mostrar dónde se conectan los bordes
+        if (config.showToroidalBorders) {
+            ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)'; // Color naranja visible
+            ctx.lineWidth = Math.max(1, 2 / (baseScale * zoom)); // Línea más gruesa, ajustada al zoom
+            
+            // Dibujar bordes del grid con estilo especial para indicar conectividad toroidal
+            // Borde superior e inferior (conectan)
+            ctx.setLineDash([5, 5]); // Línea punteada para indicar conectividad
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(gridWidth, 0);
+            ctx.moveTo(0, gridHeight);
+            ctx.lineTo(gridWidth, gridHeight);
+            ctx.stroke();
+            
+            // Borde izquierdo y derecho (conectan)
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, gridHeight);
+            ctx.moveTo(gridWidth, 0);
+            ctx.lineTo(gridWidth, gridHeight);
+            ctx.stroke();
+            
+            // Restaurar línea sólida
+            ctx.setLineDash([]);
+            
+            // Mostrar indicadores visuales en las esquinas para indicar que se conectan
+            // Esquina superior izquierda conecta con inferior derecha
+            // Esquina superior derecha conecta con inferior izquierda
+            const cornerSize = Math.max(2, 4 / (baseScale * zoom));
+            ctx.fillStyle = 'rgba(255, 100, 0, 0.6)';
+            
+            // Esquinas con indicador de conectividad
+            // Superior izquierda
+            ctx.fillRect(0, 0, cornerSize, cornerSize);
+            // Superior derecha
+            ctx.fillRect(gridWidth - cornerSize, 0, cornerSize, cornerSize);
+            // Inferior izquierda
+            ctx.fillRect(0, gridHeight - cornerSize, cornerSize, cornerSize);
+            // Inferior derecha
+            ctx.fillRect(gridWidth - cornerSize, gridHeight - cornerSize, cornerSize, cornerSize);
+            
+                // Opcional: Mostrar pequeña copia "wrap" de los bordes para visualizar conectividad
+            // Solo cuando el zoom es suficiente para verlo claramente
+            if (zoom > 1.5 && baseScale * zoom > 0.5 && mapData) {
+                // Calcular rango de valores para normalización
+                let minVal = Infinity;
+                let maxVal = -Infinity;
+                for (let y = 0; y < gridHeight; y++) {
+                    for (let x = 0; x < gridWidth; x++) {
+                        const val = mapData[y]?.[x];
+                        if (typeof val === 'number' && isFinite(val)) {
+                            minVal = Math.min(minVal, val);
+                            maxVal = Math.max(maxVal, val);
+                        }
+                    }
+                }
+                const range = maxVal - minVal || 1;
+                
+                const wrapWidth = Math.min(5, gridWidth * 0.05); // 5% del ancho o máximo 5 celdas
+                const wrapHeight = Math.min(5, gridHeight * 0.05); // 5% del alto o máximo 5 celdas
+                const wrapAlpha = 0.3;
+                
+                // Helper para normalizar valor y obtener color
+                const getNormalizedColor = (val: number): string => {
+                    const normalized = (val - minVal) / range;
+                    return getColor(normalized);
+                };
+                
+                // Copia del borde superior en la parte inferior (para mostrar que se conectan)
+                if (mapData[0]) {
+                    ctx.globalAlpha = wrapAlpha;
+                    for (let x = 0; x < Math.min(wrapWidth, gridWidth); x++) {
+                        const sourceY = 0;
+                        const targetY = gridHeight - wrapHeight;
+                        if (mapData[sourceY] && typeof mapData[sourceY][x] === 'number') {
+                            const value = mapData[sourceY][x];
+                            ctx.fillStyle = getNormalizedColor(value);
+                            ctx.fillRect(x, targetY, 1, wrapHeight);
+                        }
+                    }
+                    ctx.globalAlpha = 1.0;
+                }
+                
+                // Copia del borde inferior en la parte superior
+                if (mapData[gridHeight - 1]) {
+                    ctx.globalAlpha = wrapAlpha;
+                    for (let x = 0; x < Math.min(wrapWidth, gridWidth); x++) {
+                        const sourceY = gridHeight - 1;
+                        const targetY = 0;
+                        if (mapData[sourceY] && typeof mapData[sourceY][x] === 'number') {
+                            const value = mapData[sourceY][x];
+                            ctx.fillStyle = getNormalizedColor(value);
+                            ctx.fillRect(x, targetY, 1, wrapHeight);
+                        }
+                    }
+                    ctx.globalAlpha = 1.0;
+                }
+                
+                // Copia del borde izquierdo en la parte derecha
+                ctx.globalAlpha = wrapAlpha;
+                for (let y = 0; y < Math.min(wrapHeight, gridHeight); y++) {
+                    const sourceX = 0;
+                    const targetX = gridWidth - wrapWidth;
+                    if (mapData[y] && typeof mapData[y][sourceX] === 'number') {
+                        const value = mapData[y][sourceX];
+                        ctx.fillStyle = getNormalizedColor(value);
+                        ctx.fillRect(targetX, y, wrapWidth, 1);
+                    }
+                }
+                ctx.globalAlpha = 1.0;
+                
+                // Copia del borde derecho en la parte izquierda
+                ctx.globalAlpha = wrapAlpha;
+                for (let y = 0; y < Math.min(wrapHeight, gridHeight); y++) {
+                    const sourceX = gridWidth - 1;
+                    const targetX = 0;
+                    if (mapData[y] && typeof mapData[y][sourceX] === 'number') {
+                        const value = mapData[y][sourceX];
+                        ctx.fillStyle = getNormalizedColor(value);
+                        ctx.fillRect(targetX, y, wrapWidth, 1);
+                    }
+                }
+                ctx.globalAlpha = 1.0;
             }
         }
         
@@ -409,8 +586,8 @@ interface OverlayControlsProps {
 
 export function OverlayControls({ config, onConfigChange }: OverlayControlsProps) {
     return (
-        <Stack gap="xs" p="sm" style={{ backgroundColor: 'var(--mantine-color-dark-8)', borderRadius: '4px' }}>
-            <Text size="xs" fw={600}>Overlays</Text>
+        <Stack gap={2} className="p-3 bg-[#080808] rounded">
+            <Text size="xs" weight="bold">Overlays</Text>
             
             <Switch
                 label="Grid"
@@ -440,9 +617,17 @@ export function OverlayControls({ config, onConfigChange }: OverlayControlsProps
                 size="xs"
             />
             
+            <Switch
+                label="Bordes Toroidales"
+                description="Mostrar bordes toroidales (indica dónde se conectan los bordes del grid)"
+                checked={config.showToroidalBorders}
+                onChange={(e) => onConfigChange({ ...config, showToroidalBorders: e.currentTarget.checked })}
+                size="xs"
+            />
+            
             {config.showGrid && (
-                <Box>
-                    <Text size="xs" c="dimmed" mb={4}>Tamaño Grid</Text>
+                <Box className="mt-2">
+                    <Text size="xs" color="dimmed" className="block mb-1">Tamaño Grid</Text>
                     <Select
                         value={config.gridSize.toString()}
                         onChange={(val) => onConfigChange({ ...config, gridSize: parseInt(val || '10') })}
@@ -458,8 +643,8 @@ export function OverlayControls({ config, onConfigChange }: OverlayControlsProps
             )}
             
             {config.showQuadtree && (
-                <Box>
-                    <Text size="xs" c="dimmed" mb={4}>Threshold Quadtree</Text>
+                <Box className="mt-2">
+                    <Text size="xs" color="dimmed" className="block mb-1">Threshold Quadtree</Text>
                     <Select
                         value={config.quadtreeThreshold.toString()}
                         onChange={(val) => onConfigChange({ ...config, quadtreeThreshold: parseFloat(val || '0.01') })}
@@ -476,4 +661,6 @@ export function OverlayControls({ config, onConfigChange }: OverlayControlsProps
         </Stack>
     );
 }
+
+
 

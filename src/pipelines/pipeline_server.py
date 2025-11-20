@@ -17,15 +17,16 @@ from ..model_loader import load_model
 from ..engines.qca_engine import Aetheria_Motor, QuantumState
 from ..analysis.analysis import analyze_universe_atlas, analyze_cell_chemistry, calculate_phase_map_metrics
 
-# Configuración de logging para ver claramente lo que pasa en el servidor
+# Configuración de logging - Reducir verbosidad en producción
+# INFO para eventos importantes, DEBUG para detalles del bucle de simulación
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(module)s] - %(message)s')
 
 # --- WEBSOCKET HANDLER ---
 async def websocket_handler(request):
     """Maneja las conexiones WebSocket entrantes."""
-    # Logging para debugging en entornos con proxy
+    # Logging para debugging en entornos con proxy (solo debug para reducir verbosidad)
     client_ip = request.headers.get('X-Forwarded-For', request.remote)
-    logging.info(f"Intento de conexión WebSocket desde {client_ip}")
+    logging.debug(f"Intento de conexión WebSocket desde {client_ip}")
     
     ws = web.WebSocketResponse()
     
@@ -47,7 +48,7 @@ async def websocket_handler(request):
     
     ws_id = str(uuid.uuid4())
     g_state['websockets'][ws_id] = ws
-    logging.info(f"Nueva conexión WebSocket: {ws_id}")
+    logging.debug(f"Nueva conexión WebSocket: {ws_id}")
     
     # Enviar estado inicial al cliente
     experiments = get_experiment_list()
@@ -81,7 +82,7 @@ async def websocket_handler(request):
                     args = data.get('args', {})
                     args['ws_id'] = ws_id
                     
-                    logging.info(f"Comando recibido: {scope}.{command} de [{ws_id}]")
+                    logging.debug(f"Comando recibido: {scope}.{command} de [{ws_id}]")
                     
                     # Buscar y ejecutar el handler correspondiente
                     if scope in HANDLERS and command in HANDLERS[scope]:
@@ -128,14 +129,14 @@ async def websocket_handler(request):
             except (RuntimeError, ConnectionResetError, ConnectionError, OSError) as e:
                 # WebSocket ya estaba cerrado o no fue preparado - esto es normal
                 logging.debug(f"WebSocket {ws_id} ya estaba cerrado o no preparado: {type(e).__name__}")
-        logging.info(f"Conexión WebSocket cerrada: {ws_id}")
+        logging.debug(f"Conexión WebSocket cerrada: {ws_id}")
     
     return ws
 
 # Reemplaza esta función en tu src/pipeline_server.py
 async def simulation_loop():
     """Bucle principal que evoluciona el estado y difunde los datos de visualización."""
-    logging.info("Iniciando bucle de simulación (actualmente en pausa).")
+    logging.debug("Iniciando bucle de simulación.")
     import time
     last_diagnostic_log = 0
     frame_count = 0
@@ -149,10 +150,10 @@ async def simulation_loop():
             motor = g_state.get('motor')
             live_feed_enabled = g_state.get('live_feed_enabled', True)
             
-            # Log de diagnóstico ocasional (cada 5 segundos aproximadamente)
+            # Log de diagnóstico ocasional (cada 30 segundos aproximadamente - reducido para menos verbosidad)
             current_time = time.time()
-            if current_time - last_diagnostic_log > 5:
-                logging.info(f"🔍 Diagnóstico: is_paused={is_paused}, motor={'✓' if motor else '✗'}, live_feed={live_feed_enabled}, step={g_state.get('simulation_step', 0)}, frames_enviados={frame_count}")
+            if current_time - last_diagnostic_log > 30:
+                logging.debug(f"🔍 Diagnóstico: is_paused={is_paused}, motor={'✓' if motor else '✗'}, live_feed={live_feed_enabled}, step={g_state.get('simulation_step', 0)}, frames_enviados={frame_count}")
                 last_diagnostic_log = current_time
             
             if motor is None and not is_paused:

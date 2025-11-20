@@ -52,14 +52,23 @@ Ventaja: Los tensores nunca viajan a la CPU. C++ le dice a la GPU "ejecuta esto"
 
 4. Pasos de Migración
 
-Setup del Entorno: Configurar CMake y setup.py para compilar extensiones.
+✅ Setup del Entorno: Configurar CMake y setup.py para compilar extensiones. - **COMPLETADO (2024-12)**
 
-Hello World: Crear una función add(a, b) en C++ y llamarla desde Python.
+✅ Hello World: Crear una función add(a, b) en C++ y llamarla desde Python. - **COMPLETADO (2024-12)**
+   - Función `add()` implementada y probada
+   - Estructura `Coord3D` implementada
+   - Clase `SparseMap` básica implementada y funcionando
 
-Migración de Datos: Mover la estructura de datos self.matter de Python a C++.
+🔄 Migración de Datos: Mover la estructura de datos self.matter de Python a C++.
+   - `SparseMap` con soporte para valores numéricos: ✅
+   - `SparseMap` con soporte para tensores PyTorch: ✅ (implementado, pendiente pruebas completas)
 
-Migración de Lógica: Mover la función step() a C++.
+🔄 Migración de Lógica: Mover la función step() a C++.
+   - `Engine` clase implementada con `step_native()`: ✅ (estructura lista, pendiente pruebas)
 
-Integración de LibTorch: Conectar la U-Net.
+🔄 Integración de LibTorch: Conectar la U-Net.
+   - Soporte para LibTorch detectado: ✅
+   - Carga de modelos TorchScript: ✅ (implementado en Engine)
+   - Pendiente: Pruebas con modelo real
 
 Nota para Agentes: Al implementar esto, prioriza la seguridad de memoria (Smart Pointers) y el paralelismo (OpenMP/std::thread) para el bucle de física.

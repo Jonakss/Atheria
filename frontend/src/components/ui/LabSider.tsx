@@ -1,17 +1,24 @@
 // frontend/src/components/ui/LabSider.tsx
 import React, { useState } from 'react';
-import { Play, Pause, RefreshCw, Upload, ArrowRightLeft, ChevronRight, FlaskConical, Brain, BarChart3 } from 'lucide-react';
+import { Play, Pause, RefreshCw, Upload, ArrowRightLeft, ChevronLeft, ChevronRight, FlaskConical, Brain, BarChart3 } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { modelOptions, vizOptions } from '../../utils/vizOptions';
 import { ExperimentManager } from '../experiments/ExperimentManager';
-// import { CheckpointManager } from '../training/CheckpointManager'; // TODO: Migrar a Tailwind
+import { CheckpointManager } from '../training/CheckpointManager';
 import { ExperimentInfo } from '../experiments/ExperimentInfo';
-// import { TransferLearningWizard } from '../experiments/TransferLearningWizard'; // TODO: Migrar a Tailwind
+import { TransferLearningWizard } from '../experiments/TransferLearningWizard';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
 
 type LabSection = 'inference' | 'training' | 'analysis';
 
-export function LabSider() {
+interface LabSiderProps {
+    activeSection?: LabSection;
+    onSectionChange?: (section: LabSection) => void;
+    isCollapsed?: boolean;
+    onToggleCollapse?: () => void;
+}
+
+export function LabSider({ activeSection: externalActiveSection, onSectionChange, isCollapsed = false, onToggleCollapse }: LabSiderProps) {
     const { 
         sendCommand, experimentsData, trainingStatus, trainingProgress, 
         inferenceStatus, connectionStatus, connect, disconnect, selectedViz, setSelectedViz,
@@ -19,7 +26,17 @@ export function LabSider() {
     } = useWebSocket();
     
     const isConnected = connectionStatus === 'connected';
-    const [activeSection, setActiveSection] = useState<LabSection>('inference');
+    const [internalActiveSection, setInternalActiveSection] = useState<LabSection>('inference');
+    
+    // Usar la sección externa si está disponible, sino usar la interna
+    const activeSection = externalActiveSection ?? internalActiveSection;
+    const setActiveSection = (section: LabSection) => {
+        if (onSectionChange) {
+            onSectionChange(section);
+        } else {
+            setInternalActiveSection(section);
+        }
+    };
     
     // Estados para los inputs de entrenamiento
     const [selectedModel, setSelectedModel] = useState<string>('UNET');
@@ -175,44 +192,31 @@ export function LabSider() {
     ];
 
     return (
-        <div className="h-full w-full flex flex-col text-gray-300">
-            {/* Layout: Sidebar Vertical + Contenido - Sin header duplicado, integrado con dashboard */}
-            <div className="flex-1 flex overflow-hidden">
-                {/* Sidebar Vertical de Secciones - Similar a NavigationSidebar */}
-                <aside className="w-12 border-r border-white/5 bg-[#050505] flex flex-col items-center py-3 gap-2 shrink-0">
-                    {sectionButtons.map((section) => {
-                        const Icon = section.icon;
-                        const isActive = activeSection === section.id;
-                        
-                        return (
-                            <button
-                                key={section.id}
-                                onClick={() => setActiveSection(section.id)}
-                                className={`w-8 h-8 rounded flex items-center justify-center transition-all relative group ${
-                                    isActive 
-                                        ? section.id === 'inference' ? 'bg-blue-500/10 text-blue-400' :
-                                          section.id === 'training' ? 'bg-emerald-500/10 text-emerald-400' :
-                                          'bg-amber-500/10 text-amber-400'
-                                        : 'text-gray-600 hover:text-gray-300 hover:bg-white/5'
-                                }`}
-                                title={section.label}
-                            >
-                                <Icon size={16} strokeWidth={2} />
-                                {/* Indicador Activo */}
-                                {isActive && (
-                                    <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-r ${
-                                        section.id === 'inference' ? 'bg-blue-500' :
-                                        section.id === 'training' ? 'bg-emerald-500' :
-                                        'bg-amber-500'
-                                    }`} />
-                                )}
-                            </button>
-                        );
-                    })}
-                </aside>
+        <div className="h-full w-full flex flex-col text-gray-300 relative">
+            {/* Header con título y botón de colapsar */}
+            <div className={`h-10 border-b border-white/5 flex items-center bg-[#0a0a0a] shrink-0 ${
+                isCollapsed ? 'px-1 justify-center' : 'px-2 justify-between'
+            }`}>
+                {!isCollapsed && (
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Laboratorio</span>
+                )}
+                <button 
+                    onClick={onToggleCollapse}
+                    className="p-1.5 text-gray-600 hover:text-gray-400 transition-colors rounded hover:bg-white/5"
+                    title={isCollapsed ? "Expandir Panel" : "Minimizar Panel"}
+                >
+                    <ChevronLeft size={14} className={`transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} />
+                </button>
+            </div>
 
-                {/* Contenido Scrollable */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
+            {/* Contenido Scrollable - Oculto cuando está colapsado */}
+            {!isCollapsed && (
+            <div className={`flex-1 overflow-y-auto custom-scrollbar transition-all duration-300 ${
+                activeSection === 'inference' ? 'bg-blue-500/5' :
+                activeSection === 'training' ? 'bg-emerald-500/5' :
+                activeSection === 'analysis' ? 'bg-amber-500/5' :
+                ''
+            }`}>
                     {/* Progreso de Entrenamiento - Siempre visible si está corriendo */}
                     {trainingStatus === 'running' && (
                         <div className="m-4 mb-0 bg-white/5 border border-white/10 rounded-lg p-3 space-y-2">
@@ -265,34 +269,11 @@ export function LabSider() {
                                 </button>
                             </div>
 
-                            {/* Controles de Inferencia */}
+                            {/* Configuración de Visualización */}
                             <div className="space-y-3 pt-3 border-t border-white/5">
-                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">CONTROLES</div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button
-                                        onClick={togglePlayPause}
-                                        disabled={!isConnected || (!activeExperiment || !currentExperiment?.has_checkpoint) && inferenceStatus !== 'running'}
-                                        className={`flex items-center justify-center gap-2 px-3 py-2 rounded text-xs font-bold border transition-all ${
-                                            inferenceStatus === 'running'
-                                                ? 'bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500/20'
-                                                : 'bg-green-500/10 text-green-400 border-green-500/30 hover:bg-green-500/20'
-                                        } disabled:opacity-50 disabled:cursor-not-allowed`}
-                                    >
-                                        {inferenceStatus === 'running' ? <Pause size={14} /> : <Play size={14} />}
-                                        {inferenceStatus === 'running' ? 'Pausar' : 'Iniciar'}
-                                    </button>
-                                    <button
-                                        onClick={handleResetSimulation}
-                                        disabled={!isConnected || !activeExperiment || !currentExperiment?.has_checkpoint}
-                                        className="flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 text-xs font-bold rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <RefreshCw size={14} />
-                                        Reiniciar
-                                    </button>
-                                </div>
-                                
+                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">VISUALIZACIÓN</div>
                                 <div>
-                                    <label className="block text-[10px] text-gray-400 mb-1 uppercase">Visualización</label>
+                                    <label className="block text-[10px] text-gray-400 mb-1 uppercase">Tipo de Visualización</label>
                                     <select
                                         value={selectedViz || 'density'}
                                         onChange={handleVizChange}
@@ -303,15 +284,18 @@ export function LabSider() {
                                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                                         ))}
                                     </select>
+                                    <div className="text-[10px] text-gray-600 mt-1">
+                                        Usa el botón flotante <span className="text-blue-400">EJECUTAR</span> en la esquina superior izquierda para controlar la simulación
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Gestión de Experimentos (Compacta) */}
-                            <div className="space-y-3 pt-3 border-t border-white/5">
-                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">GESTIÓN</div>
-                                <ExperimentManager />
-                                {/* <CheckpointManager /> TODO: Migrar a Tailwind */}
-                            </div>
+                                    {/* Gestión de Experimentos (Compacta) */}
+                                    <div className="space-y-3 pt-3 border-t border-white/5">
+                                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">GESTIÓN</div>
+                                        <ExperimentManager />
+                                        <CheckpointManager />
+                                    </div>
                         </div>
                     )}
 
@@ -351,17 +335,20 @@ export function LabSider() {
                             <div className="space-y-3">
                                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Nuevo Experimento</div>
                                 
-                                <button
-                                    onClick={() => setTransferWizardOpened(true)}
-                                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-300 text-xs font-bold rounded transition-all"
-                                >
-                                    <ArrowRightLeft size={14} />
-                                    Transfer Learning (Wizard)
-                                </button>
-
-                                <div className="space-y-3 pt-3 border-t border-white/5">
+                                <div className="space-y-3">
                                     <div>
-                                        <label className="block text-[10px] text-gray-400 mb-1 uppercase">Transfer Learning (Opcional)</label>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="block text-[10px] text-gray-400 uppercase">Transfer Learning (Opcional)</label>
+                                            <button
+                                                onClick={() => setTransferWizardOpened(true)}
+                                                disabled={!isConnected}
+                                                className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 text-[10px] font-bold rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                title="Abrir wizard de transfer learning"
+                                            >
+                                                <ArrowRightLeft size={10} />
+                                                Wizard
+                                            </button>
+                                        </div>
                                         <select
                                             value={transferFromExperiment || ''}
                                             onChange={(e) => setTransferFromExperiment(e.target.value || null)}
@@ -606,14 +593,48 @@ export function LabSider() {
                         </div>
                     )}
                 </div>
-                </div>
             </div>
+            )}
             
-            {/* Transfer Learning Wizard - TODO: Migrar a Tailwind */}
-            {/* <TransferLearningWizard 
+            {/* Vista colapsada - Mostrar solo iconos de secciones */}
+            {isCollapsed && (
+                <div className="flex-1 flex flex-col items-center justify-start pt-2 gap-1.5 w-full">
+                    {sectionButtons.map((section) => {
+                        const Icon = section.icon;
+                        const isActive = activeSection === section.id;
+                        let activeClasses = '';
+                        if (isActive) {
+                            if (section.color === 'blue') {
+                                activeClasses = 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+                            } else if (section.color === 'emerald') {
+                                activeClasses = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+                            } else if (section.color === 'amber') {
+                                activeClasses = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+                            }
+                        }
+                        return (
+                            <button
+                                key={section.id}
+                                onClick={() => setActiveSection(section.id)}
+                                className={`w-8 h-8 flex items-center justify-center rounded transition-all border ${
+                                    isActive
+                                        ? activeClasses
+                                        : 'text-gray-600 hover:text-gray-400 hover:bg-white/5 border-transparent'
+                                }`}
+                                title={section.label}
+                            >
+                                <Icon size={16} />
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* Transfer Learning Wizard Modal */}
+            <TransferLearningWizard 
                 opened={transferWizardOpened}
                 onClose={() => setTransferWizardOpened(false)}
-            /> */}
+            />
         </div>
     );
 }
