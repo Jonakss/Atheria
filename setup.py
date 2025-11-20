@@ -204,5 +204,11 @@ setup(
         "Programming Language :: Python :: 3.10",
         "Programming Language :: C++",
     ],
+    entry_points={
+        'console_scripts': [
+            'atheria=src.cli:main',
+            'ath=src.cli:main',  # Alias corto
+        ],
+    },
 )
 

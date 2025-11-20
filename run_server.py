@@ -73,10 +73,17 @@ if __name__ == "__main__":
                        help='Host del servidor (por defecto: desde config)')
     args = parser.parse_args()
     
-    # Configurar variable de entorno si --no-frontend
+    # Configurar variable de entorno según --no-frontend
+    # CRÍTICO: Si NO se pasa --no-frontend, limpiar la variable para asegurar que el frontend se sirva
     if args.no_frontend:
         os.environ['ATHERIA_NO_FRONTEND'] = '1'
         log.info("Frontend desactivado (--no-frontend). Solo WebSocket API disponible.")
+    else:
+        # Si NO se pasa --no-frontend, asegurar que la variable NO esté establecida
+        # Esto es importante porque puede estar establecida desde una ejecución anterior
+        if 'ATHERIA_NO_FRONTEND' in os.environ:
+            del os.environ['ATHERIA_NO_FRONTEND']
+            log.info("Frontend activado (--no-frontend no especificado).")
     
     log.info("Pasando el control a 'pipeline_server.main()'.")
     
