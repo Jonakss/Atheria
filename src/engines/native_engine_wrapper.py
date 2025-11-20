@@ -9,12 +9,47 @@ import logging
 import numpy as np
 from typing import Optional
 
+# Intentar importar el módulo nativo con manejo robusto de errores CUDA
+NATIVE_AVAILABLE = False
+_native_import_error = None
+_native_cuda_issue = False  # Flag para indicar que hay problema de CUDA pero el módulo existe
+
 try:
+    # Intentar importar el módulo nativo
     import atheria_core
     NATIVE_AVAILABLE = True
-except ImportError:
-    NATIVE_AVAILABLE = False
-    logging.warning("atheria_core no disponible. El motor nativo no funcionará.")
+    logging.info("✅ Módulo nativo atheria_core importado exitosamente")
+except (ImportError, OSError, RuntimeError) as e:
+    error_str = str(e)
+    _native_import_error = error_str
+    
+    # Detectar problemas específicos de CUDA runtime
+    cuda_runtime_keywords = [
+        '__nvJitLinkCreate',
+        'libnvJitLink',
+        'libcusparse.so',
+        'undefined symbol'
+    ]
+    
+    if any(keyword in error_str for keyword in cuda_runtime_keywords):
+        # Problema de CUDA runtime - el módulo está compilado pero tiene problemas de CUDA
+        _native_cuda_issue = True
+        logging.warning(f"⚠️ Problema de CUDA runtime detectado al importar atheria_core: {error_str[:100]}")
+        logging.info("💡 El motor nativo solo funcionará en modo CPU. Usa device='cpu' al inicializar.")
+        # No marcamos como no disponible - aún puede funcionar en CPU
+        # NATIVE_AVAILABLE permanece False, pero el wrapper puede intentar inicializar en CPU
+    else:
+        # Otro tipo de error - probablemente el módulo no está compilado
+        logging.warning(f"atheria_core no disponible: {error_str[:100]}")
+        if "No module named" in error_str or "cannot open shared object file" in error_str:
+            logging.info("💡 El módulo C++ no está compilado. Ejecuta: python setup.py build_ext --inplace")
+        else:
+            logging.info("💡 Error inesperado al importar módulo nativo. Usando motor Python como fallback.")
+except Exception as e:
+    # Error inesperado
+    _native_import_error = str(e)
+    logging.warning(f"Error inesperado importando atheria_core: {e}")
+    logging.info("El motor nativo no estará disponible, usando motor Python como fallback.")
 
 from ..engines.qca_engine import QuantumState
 
@@ -38,8 +73,47 @@ class NativeEngineWrapper:
             device: Dispositivo ('cpu' o 'cuda')
             cfg: Configuración del experimento (opcional)
         """
-        if not NATIVE_AVAILABLE:
-            raise ImportError("atheria_core no está disponible. Instala el módulo C++ primero.")
+        # Verificar disponibilidad del módulo
+        module_available = NATIVE_AVAILABLE
+        
+        # Si hay problema de CUDA pero intentamos usar CPU, intentar importar forzando CPU
+        if not NATIVE_AVAILABLE and _native_cuda_issue and device == "cpu":
+            logging.info("Intentando importar módulo nativo forzando CPU mode...")
+            try:
+                import os
+                # Forzar CPU deshabilitando CUDA temporalmente
+                original_cuda = os.environ.get('CUDA_VISIBLE_DEVICES', None)
+                os.environ['CUDA_VISIBLE_DEVICES'] = ''
+                try:
+                    import atheria_core  # Reintentar importación
+                    module_available = True
+                    logging.info("✅ Módulo nativo importado exitosamente en CPU mode")
+                finally:
+                    # Restaurar valor original
+                    if original_cuda is not None:
+                        os.environ['CUDA_VISIBLE_DEVICES'] = original_cuda
+                    elif 'CUDA_VISIBLE_DEVICES' in os.environ:
+                        del os.environ['CUDA_VISIBLE_DEVICES']
+            except Exception as e2:
+                # Aún falla - no disponible
+                error_msg = f"atheria_core no está disponible. Error original: {_native_import_error[:100] if _native_import_error else str(e2)}"
+                if _native_cuda_issue:
+                    error_msg += " (Problema de CUDA runtime - solo CPU mode disponible, pero también falló)"
+                raise ImportError(error_msg + " Usa el motor Python como fallback.")
+        
+        if not module_available:
+            # No disponible para nada
+            error_msg = "atheria_core no está disponible."
+            if _native_import_error:
+                error_msg += f" Error: {_native_import_error[:100]}"
+            if _native_cuda_issue:
+                error_msg += " (Problema de CUDA runtime - intenta usar device='cpu')"
+            raise ImportError(error_msg + " Usa el motor Python como fallback.")
+        
+        # Si hay problema de CUDA runtime y se intenta usar CUDA, forzar CPU mode
+        if device == "cuda" and _native_cuda_issue:
+            logging.warning("⚠️ Problema de CUDA runtime detectado. Forzando CPU mode para motor nativo.")
+            device = "cpu"
         
         self.grid_size = int(grid_size)
         self.d_state = int(d_state)
