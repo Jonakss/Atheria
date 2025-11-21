@@ -128,31 +128,49 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
         
         // Coordenadas del mouse relativas al centro del canvas (antes del scale)
         // Necesitamos deshacer el scale primero
-        const mouseRelToCanvasCenterX = (mouseRelToCenterX / zoom) - canvasCenterOffsetX;
-        const mouseRelToCanvasCenterY = (mouseRelToCenterY / zoom) - canvasCenterOffsetY;
+        let mouseRelToCanvasCenterX = (mouseRelToCenterX / zoom) - canvasCenterOffsetX;
+        let mouseRelToCanvasCenterY = (mouseRelToCenterY / zoom) - canvasCenterOffsetY;
+        
+        // Verificar si estamos en modo toroidal
+        const toroidalMode = overlayConfig.showToroidalBorders;
+        
+        // En modo toroidal, aplicar wraparound a las coordenadas
+        if (toroidalMode && gridWidth > 0 && gridHeight > 0) {
+            // Aplicar wraparound: las coordenadas se "envuelven" alrededor del grid
+            mouseRelToCanvasCenterX = ((mouseRelToCanvasCenterX % gridWidth) + gridWidth) % gridWidth;
+            mouseRelToCanvasCenterY = ((mouseRelToCanvasCenterY % gridHeight) + gridHeight) % gridHeight;
+        }
         
         // Ahora convertir a coordenadas del grid
-        // El canvas tiene su origen (0,0) en la esquina superior izquierda
-        // El grid también tiene su origen (0,0) en la esquina superior izquierda
-        // Entonces las coordenadas del canvas son directamente las coordenadas del grid
         const gridX = Math.floor(mouseRelToCanvasCenterX);
         const gridY = Math.floor(mouseRelToCanvasCenterY);
         
-        // Verificar si estamos dentro del grid (con un pequeño margen para bordes)
+        // Verificar si estamos dentro del grid (en modo toroidal siempre está "dentro")
         const margin = 0.5; // Permitir un pequeño margen para bordes
-        if (gridX >= -margin && gridX < gridWidth + margin && gridY >= -margin && gridY < gridHeight + margin) {
-            // Clampear a los límites válidos del grid
-            const clampedX = Math.max(0, Math.min(gridWidth - 1, Math.floor(gridX)));
-            const clampedY = Math.max(0, Math.min(gridHeight - 1, Math.floor(gridY)));
+        const isInside = toroidalMode || (gridX >= -margin && gridX < gridWidth + margin && gridY >= -margin && gridY < gridHeight + margin);
+        
+        if (isInside && gridWidth > 0 && gridHeight > 0) {
+            // En modo toroidal, las coordenadas ya están wrappeadas (siempre válidas)
+            // En modo normal, clampear a los límites válidos del grid
+            let finalX, finalY;
+            if (toroidalMode) {
+                // Wraparound final en modo toroidal
+                finalX = ((gridX % gridWidth) + gridWidth) % gridWidth;
+                finalY = ((gridY % gridHeight) + gridHeight) % gridHeight;
+            } else {
+                // Clampear a límites válidos en modo normal
+                finalX = Math.max(0, Math.min(gridWidth - 1, gridX));
+                finalY = Math.max(0, Math.min(gridHeight - 1, gridY));
+            }
             
-            const value = mapData[clampedY]?.[clampedX];
+            const value = mapData[finalY]?.[finalX];
             const numValue = typeof value === 'number' && !isNaN(value) ? value : null;
             
             setTooltipData({
                 x: e.clientX,
                 y: e.clientY,
-                gridX: clampedX,
-                gridY: clampedY,
+                gridX: finalX,
+                gridY: finalY,
                 value: numValue,
                 visible: true
             });
