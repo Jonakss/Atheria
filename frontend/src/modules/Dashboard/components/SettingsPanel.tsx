@@ -1,6 +1,6 @@
 // frontend/src/modules/Dashboard/components/SettingsPanel.tsx
 import React, { useState } from 'react';
-import { X, Save, RotateCcw } from 'lucide-react';
+import { X, Save, RotateCcw, Power } from 'lucide-react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { GlassPanel } from './GlassPanel';
 
@@ -122,6 +122,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
     }
     
     localStorage.removeItem('atheria_global_config');
+  };
+  
+  const handleShutdown = () => {
+    if (!isConnected) {
+      alert('⚠️ No hay conexión con el servidor.');
+      return;
+    }
+    
+    if (!confirm('⚠️ ¿Estás seguro de que quieres apagar el servidor?\n\nEsto cerrará todas las conexiones y detendrá la simulación.')) {
+      return;
+    }
+    
+    // Enviar comando de shutdown con confirmación
+    sendCommand('server', 'shutdown', { confirm: true });
   };
   
   // Cargar configuraciones desde localStorage al montar
@@ -399,6 +413,25 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
                   </div>
                 </>
               )}
+            </div>
+          </div>
+          
+          {/* Sección: Control del Servidor */}
+          <div className="space-y-3 pt-4 border-t border-white/5">
+            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Control del Servidor</div>
+            
+            <div className="p-3 bg-red-500/5 border border-red-500/20 rounded">
+              <div className="text-xs text-gray-300 mb-2">
+                Apagar el servidor cerrará todas las conexiones y detendrá la simulación.
+              </div>
+              <button
+                onClick={handleShutdown}
+                disabled={!isConnected}
+                className="w-full px-3 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300 text-xs font-bold rounded transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Power size={14} />
+                Apagar Servidor
+              </button>
             </div>
           </div>
         </div>

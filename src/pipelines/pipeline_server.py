@@ -2144,6 +2144,54 @@ async def handle_reset(args):
         msg = f"❌ Error al reiniciar: {str(e)}"
         if ws: await send_notification(ws, msg, "error")
 
+async def handle_shutdown(args):
+    """
+    Handler para apagar el servidor desde la UI.
+    
+    Args:
+        args: Dict con parámetros (opcional: 'confirm'=True)
+    """
+    ws = args.get('ws') if isinstance(args, dict) else None
+    
+    try:
+        # Verificar confirmación
+        confirm = args.get('confirm', False) if isinstance(args, dict) else False
+        if not confirm:
+            if ws:
+                await send_notification(ws, "⚠️ Shutdown requiere confirmación. Envía con confirm=true", "warning")
+            return
+        
+        # Notificar a todos los clientes que el servidor se apagará
+        await broadcast({
+            "type": "server_shutdown",
+            "message": "Servidor apagándose en 2 segundos..."
+        })
+        
+        # Esperar un momento para que el mensaje se envíe
+        await asyncio.sleep(0.5)
+        
+        # Activar shutdown event si está disponible
+        shutdown_event = g_state.get('shutdown_event')
+        if shutdown_event:
+            shutdown_event.set()
+            logging.info("🚀 Shutdown solicitado desde UI. Evento activado.")
+            if ws:
+                await send_notification(ws, "✅ Comando de shutdown enviado", "success")
+        else:
+            # Fallback: usar os._exit si no hay evento
+            logging.warning("⚠️ Shutdown event no disponible. Usando os._exit()")
+            import os
+            if ws:
+                await send_notification(ws, "⚠️ Apagando servidor...", "warning")
+            # Esperar un momento antes de forzar salida
+            await asyncio.sleep(1.0)
+            os._exit(0)
+            
+    except Exception as e:
+        logging.error(f"Error en handle_shutdown: {e}", exc_info=True)
+        if ws:
+            await send_notification(ws, f"Error al apagar servidor: {str(e)}", "error")
+
 async def handle_refresh_experiments(args):
     """Refresca la lista de experimentos y la envía a todos los clientes conectados."""
     try:
@@ -3447,6 +3495,9 @@ HANDLERS = {
         "set_config": handle_set_inference_config,
         "inject_energy": handle_inject_energy
     },
+    "server": {
+        "shutdown": handle_shutdown  # Nuevo: apagar servidor desde UI
+    },
     "system": {
         "refresh_experiments": handle_refresh_experiments
     }
@@ -3629,6 +3680,10 @@ async def main(shutdown_event=None, serve_frontend=None):
         serve_frontend: Si True, sirve el frontend estático. Si None, auto-detecta desde variable de entorno.
                        Por defecto True si no se especifica.
     """
+    # Exponer shutdown_event en g_state para que los handlers puedan acceder
+    if shutdown_event:
+        g_state['shutdown_event'] = shutdown_event
+    
     app = web.Application()
     
     # Determinar si servir frontend

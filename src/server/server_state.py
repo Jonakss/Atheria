@@ -31,6 +31,7 @@ g_state = {
     "analysis_type": None,  # Tipo de análisis: 'universe_atlas', 'cell_chemistry', None
     "analysis_task": None,  # Tarea de análisis actual (para cancelación)
     "analysis_cancel_event": None,  # Evento para cancelar análisis
+    "shutdown_event": None,  # Evento de asyncio para señalizar shutdown del servidor
 }
 
 # --- INICIO DE LA CORRECCIÓN ---
