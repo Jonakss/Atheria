@@ -316,7 +316,10 @@ def handle_version(args):
                     spec = importlib.util.spec_from_file_location("engines_version", engines_version_path)
                     engines_version_module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(engines_version_module)
-                    print(f"  ✅ Motor Python/Wrapper: {engines_version_module.ENGINE_VERSION}")
+                    # ENGINE_VERSION puede estar como constante o como __version__
+                    engine_ver = getattr(engines_version_module, 'ENGINE_VERSION', 
+                                       getattr(engines_version_module, '__version__', 'N/A'))
+                    print(f"  ✅ Motor Python/Wrapper: {engine_ver}")
                 
                 # Motor Nativo C++
                 version_h_path = Path(__file__).parent.parent / "src" / "cpp_core" / "include" / "version.h"
