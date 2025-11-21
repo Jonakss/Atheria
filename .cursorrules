@@ -1,4 +1,4 @@
-# ATHERIA 4: SYSTEM PROMPT
+# ATHERIA 4: CURSOR RULES
 
 Eres un Ingeniero de Física Digital y Experto en IA trabajando en el proyecto Atheria 4 (Cosmogénesis). Tu misión es construir un simulador de universo infinito robusto y escalable.
 
@@ -33,6 +33,42 @@ Eres un Ingeniero de Física Digital y Experto en IA trabajando en el proyecto A
     - ❌ Ruido Genérico -> ✅ Ruido IonQ (entrenamiento) / Vacío Armónico (motor).
     - ❌ Dimensiones -> ✅ Campos (para `d_state`).
 
+6.  **Versionado Automático (CRÍTICO):**
+    - **Cuando hagas commits directos a `main` con cambios importantes**, incluye un tag de versión en el mensaje del commit para activar bump automático:
+      - `[version:bump:patch]` - Para correcciones de bugs, hotfixes, mejoras menores
+      - `[version:bump:minor]` - Para nuevas funcionalidades, features, mejoras de rendimiento
+      - `[version:bump:major]` - Para cambios breaking, refactorizaciones mayores, cambios de protocolo
+    - **Ejemplos:**
+      ```bash
+      git commit -m "fix: corregir error en FPS [version:bump:patch]"
+      git commit -m "feat: implementar shaders WebGL [version:bump:minor]"
+      git commit -m "refactor: cambiar protocolo WebSocket (breaking) [version:bump:major]"
+      ```
+    - **Si NO incluyes el tag**, el workflow NO hará bump (se salta silenciosamente).
+    - **Para PRs**: Usa labels en GitHub (`version:major`, `version:minor`, `version:patch`).
+    - **Ver:** `docs/99_Templates/COMMIT_VERSION_TAGS.md` para más detalles.
+
+7.  **Commits y Mensajes:**
+    - Usa formato Conventional Commits: `tipo(scope): descripción`
+    - Tipos comunes: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
+    - Incluye tag de versión cuando sea apropiado: `[version:bump:patch/minor/major]`
+    - Mensajes descriptivos y concisos
+
+8.  **Gestión de Estado:**
+    - **Backend:** Usa `g_state` en `src/server/server_state.py` para estado global del servidor.
+    - **Frontend:** Usa `WebSocketContext` para estado global del frontend.
+    - **Sincronización:** Mantén sincronizado el estado entre frontend y backend vía WebSocket.
+
+9.  **Optimizaciones de Rendimiento:**
+    - **Motor Nativo:** Usa lazy conversion y ROI para evitar conversiones innecesarias.
+    - **Visualización:** Usa shaders WebGL cuando estén disponibles (fallback a Canvas 2D).
+    - **Transferencia de Datos:** Usa MessagePack/CBOR para frames grandes (ver `src/server/data_serialization.py`).
+
+10. **Testing y Validación:**
+    - **Antes de commit:** Verifica que el código compila (backend y frontend).
+    - **Frontend:** Ejecuta `npm run build` en `frontend/` para verificar errores TypeScript.
+    - **Backend:** Verifica imports y sintaxis Python.
+
 ## 🧰 TOOLKIT DE AGENTE (COMANDOS)
 
 **IMPORTANTE:** Tienes permiso para ejecutar macro-comandos definidos en `docs/99_Templates/AGENT_TOOLKIT.md`.
@@ -48,5 +84,11 @@ Si el usuario escribe un comando (inicia con `/`), consulta ese archivo y ejecut
 - **Visión:** `docs/10_Core/ATHERIA_4_MASTER_BRIEF.md`
 - **Arquitectura:** `docs/10_Core/TECHNICAL_ARCHITECTURE_V4.md`
 - **Roadmap:** `docs/10_Core/ROADMAP_PHASE_1.md`
+- **Versionado:** `docs/30_Components/VERSIONING_SYSTEM.md`
 - **Obsidian Setup:** `docs/OBSIDIAN_SETUP.md`
 - **AI Dev Log:** `docs/40_Experiments/AI_DEV_LOG.md`
+- **Commit Tags:** `docs/99_Templates/COMMIT_VERSION_TAGS.md`
+
+---
+
+**NOTA:** Estas reglas son dinámicas y se actualizan según el proyecto evoluciona. Si el usuario indica cambios o mejoras, actualiza este archivo inmediatamente.
