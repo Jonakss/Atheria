@@ -1,0 +1,200 @@
+name: Version Bump Automático
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Tipo de bump de versión'
+        required: true
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
+    
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Determinar tipo de bump
+        id: version-bump
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "type=${{ github.event.inputs.version_type }}" >> $GITHUB_OUTPUT
+          else
+            # Revisar labels del PR para determinar bump
+            LABELS="${{ join(github.event.pull_request.labels.*.name, ' ') }}"
+            echo "Labels encontrados: $LABELS"
+            
+            if echo "$LABELS" | grep -qi "version:major\|major-version\|breaking"; then
+              echo "type=major" >> $GITHUB_OUTPUT
+            elif echo "$LABELS" | grep -qi "version:minor\|minor-version\|feature"; then
+              echo "type=minor" >> $GITHUB_OUTPUT
+            elif echo "$LABELS" | grep -qi "version:patch\|patch-version\|bugfix\|fix"; then
+              echo "type=patch" >> $GITHUB_OUTPUT
+            else
+              # Por defecto, patch si no hay label explícito
+              echo "type=patch" >> $GITHUB_OUTPUT
+              echo "⚠️ No se encontró label de versión, usando 'patch' por defecto"
+            fi
+          fi
+
+      - name: Leer versión actual
+        id: current-version
+        run: |
+          # Leer versión desde src/__version__.py (fuente de verdad principal)
+          CURRENT_VERSION=$(grep -E '^__version__\s*=' src/__version__.py | sed -E "s/.*['\"]([^'\"]+)['\"].*/\1/")
+          if [ -z "$CURRENT_VERSION" ]; then
+            CURRENT_VERSION="4.1.0"  # Fallback
+          fi
+          echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "📌 Versión actual: $CURRENT_VERSION"
+          
+          # Parsear versión
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          echo "major=$MAJOR" >> $GITHUB_OUTPUT
+          echo "minor=$MINOR" >> $GITHUB_OUTPUT
+          echo "patch=$PATCH" >> $GITHUB_OUTPUT
+
+      - name: Calcular nueva versión
+        id: new-version
+        run: |
+          BUMP_TYPE="${{ steps.version-bump.outputs.type }}"
+          CURRENT_MAJOR="${{ steps.current-version.outputs.major }}"
+          CURRENT_MINOR="${{ steps.current-version.outputs.minor }}"
+          CURRENT_PATCH="${{ steps.current-version.outputs.patch }}"
+          
+          case $BUMP_TYPE in
+            major)
+              NEW_MAJOR=$((CURRENT_MAJOR + 1))
+              NEW_MINOR=0
+              NEW_PATCH=0
+              ;;
+            minor)
+              NEW_MAJOR=$CURRENT_MAJOR
+              NEW_MINOR=$((CURRENT_MINOR + 1))
+              NEW_PATCH=0
+              ;;
+            patch)
+              NEW_MAJOR=$CURRENT_MAJOR
+              NEW_MINOR=$CURRENT_MINOR
+              NEW_PATCH=$((CURRENT_PATCH + 1))
+              ;;
+          esac
+          
+          NEW_VERSION="${NEW_MAJOR}.${NEW_MINOR}.${NEW_PATCH}"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "major=$NEW_MAJOR" >> $GITHUB_OUTPUT
+          echo "minor=$NEW_MINOR" >> $GITHUB_OUTPUT
+          echo "patch=$NEW_PATCH" >> $GITHUB_OUTPUT
+          echo "🚀 Nueva versión: $NEW_VERSION (bump: $BUMP_TYPE)"
+
+      - name: Configurar Git
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+      - name: Actualizar versiones en archivos
+        run: |
+          NEW_VERSION="${{ steps.new-version.outputs.version }}"
+          NEW_MAJOR="${{ steps.new-version.outputs.major }}"
+          NEW_MINOR="${{ steps.new-version.outputs.minor }}"
+          NEW_PATCH="${{ steps.new-version.outputs.patch }}"
+          
+          echo "📝 Actualizando versiones en archivos..."
+          
+          # 1. src/__version__.py
+          sed -i "s/^__version__ = \".*\"/__version__ = \"$NEW_VERSION\"/" src/__version__.py
+          sed -i "s/^__version_info__ = (.*)/__version_info__ = ($NEW_MAJOR, $NEW_MINOR, $NEW_PATCH)/" src/__version__.py
+          echo "  ✅ src/__version__.py actualizado a $NEW_VERSION"
+          
+          # 2. src/engines/__version__.py
+          if [ -f "src/engines/__version__.py" ]; then
+            sed -i "s/^ENGINE_VERSION = \".*\"/ENGINE_VERSION = \"$NEW_VERSION\"/" src/engines/__version__.py
+            echo "  ✅ src/engines/__version__.py actualizado a $NEW_VERSION"
+          fi
+          
+          # 3. src/cpp_core/include/version.h
+          if [ -f "src/cpp_core/include/version.h" ]; then
+            sed -i "s/^#define ATHERIA_NATIVE_VERSION_MAJOR .*/#define ATHERIA_NATIVE_VERSION_MAJOR $NEW_MAJOR/" src/cpp_core/include/version.h
+            sed -i "s/^#define ATHERIA_NATIVE_VERSION_MINOR .*/#define ATHERIA_NATIVE_VERSION_MINOR $NEW_MINOR/" src/cpp_core/include/version.h
+            sed -i "s/^#define ATHERIA_NATIVE_VERSION_PATCH .*/#define ATHERIA_NATIVE_VERSION_PATCH $NEW_PATCH/" src/cpp_core/include/version.h
+            sed -i "s/^#define ATHERIA_NATIVE_VERSION_STRING \".*\"/#define ATHERIA_NATIVE_VERSION_STRING \"$NEW_VERSION\"/" src/cpp_core/include/version.h
+            echo "  ✅ src/cpp_core/include/version.h actualizado a $NEW_VERSION"
+          fi
+          
+          # 4. frontend/package.json
+          if [ -f "frontend/package.json" ]; then
+            # Usar jq si está disponible, sino usar sed
+            if command -v jq &> /dev/null; then
+              jq ".version = \"$NEW_VERSION\"" frontend/package.json > frontend/package.json.tmp && mv frontend/package.json.tmp frontend/package.json
+            else
+              sed -i "s/\"version\": \".*\"/\"version\": \"$NEW_VERSION\"/" frontend/package.json
+            fi
+            echo "  ✅ frontend/package.json actualizado a $NEW_VERSION"
+          fi
+          
+          echo "✅ Todas las versiones actualizadas a $NEW_VERSION"
+
+      - name: Crear commit con versiones actualizadas
+        run: |
+          git add -A
+          git commit -m "chore: bump version to ${{ steps.new-version.outputs.version }} [skip ci]"
+          
+          # Push del commit
+          git push origin HEAD:main || git push origin HEAD:master
+
+      - name: Crear tag de versión
+        run: |
+          NEW_VERSION="${{ steps.new-version.outputs.version }}"
+          git tag -a "v${NEW_VERSION}" -m "Release version ${NEW_VERSION}"
+          git push origin "v${NEW_VERSION}"
+          echo "🏷️  Tag v${NEW_VERSION} creado y pusheado"
+
+      - name: Crear Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.new-version.outputs.version }}
+          name: "Release v${{ steps.new-version.outputs.version }}"
+          body: |
+            ## 🚀 Release v${{ steps.new-version.outputs.version }}
+            
+            **Tipo de bump:** ${{ steps.version-bump.outputs.type }}
+            
+            ### 📝 Cambios
+            ${{ github.event.pull_request.body || 'Ver commits para detalles' }}
+            
+            ### 📦 Componentes actualizados
+            - ✅ Backend Python: v${{ steps.new-version.outputs.version }}
+            - ✅ Motor Nativo C++: v${{ steps.new-version.outputs.version }}
+            - ✅ Frontend React: v${{ steps.new-version.outputs.version }}
+            
+          draft: false
+          prerelease: false
+
+      - name: Resumen
+        run: |
+          echo "## ✅ Versión actualizada exitosamente" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Versión anterior:** ${{ steps.current-version.outputs.current }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Nueva versión:** ${{ steps.new-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tipo de bump:** ${{ steps.version-bump.outputs.type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag creado:** v${{ steps.new-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+
