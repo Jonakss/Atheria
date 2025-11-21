@@ -299,8 +299,10 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
                         <Cpu size={12} className="text-teal-400" />
                         <span className="font-mono">Native (C++)</span>
                       </div>
-                      {compileStatus?.native_version && (
-                        <span className="text-[9px] text-gray-500 font-mono">v{compileStatus.native_version}</span>
+                      {(compileStatus?.native_version || compileStatus?.wrapper_version) && (
+                        <span className="text-[9px] text-gray-500 font-mono">
+                          {compileStatus?.native_version ? `v${compileStatus.native_version}` : compileStatus?.wrapper_version ? `v${compileStatus.wrapper_version}` : ''}
+                        </span>
                       )}
                     </button>
                   )}
@@ -323,7 +325,20 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
                   
                   {/* Información de versión y device */}
                   <div className="px-3 py-2 text-[9px] text-gray-500 font-mono border-t border-white/10 pt-2 space-y-0.5">
-                    {engineInfo.version && (
+                    {compileStatus?.is_native && (
+                      <>
+                        {compileStatus?.native_version && (
+                          <div>Nativo: v{compileStatus.native_version}</div>
+                        )}
+                        {compileStatus?.wrapper_version && (
+                          <div>Wrapper: v{compileStatus.wrapper_version}</div>
+                        )}
+                      </>
+                    )}
+                    {!compileStatus?.is_native && compileStatus?.python_version && (
+                      <div>Python: v{compileStatus.python_version}</div>
+                    )}
+                    {engineInfo.version && !compileStatus?.is_native && (
                       <div>Versión: {engineInfo.version}</div>
                     )}
                     {engineInfo.device && engineInfo.device !== 'N/A' && (
