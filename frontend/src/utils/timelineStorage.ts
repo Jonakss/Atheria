@@ -8,7 +8,7 @@ const STORAGE_KEY_PREFIX = 'atheria_timeline_';
 const DEFAULT_MAX_FRAMES = 100; // Por defecto, mantener últimos 100 frames
 const STORAGE_SIZE_LIMIT = 5 * 1024 * 1024; // 5MB límite total (aprox.)
 
-interface TimelineFrame {
+export interface TimelineFrame {
     step: number;
     timestamp: number;
     map_data: number[][];
@@ -208,8 +208,8 @@ export function loadTimeline(
             metadata: data.metadata || {
                 max_frames: maxFrames,
                 total_frames: frames.length,
-                min_step: frames.length > 0 ? Math.min(...frames.map(f => f.step)) : 0,
-                max_step: frames.length > 0 ? Math.max(...frames.map(f => f.step)) : 0,
+                min_step: frames.length > 0 ? Math.min(...frames.map((f: TimelineFrame) => f.step)) : 0,
+                max_step: frames.length > 0 ? Math.max(...frames.map((f: TimelineFrame) => f.step)) : 0,
                 last_updated: 0,
             },
         };

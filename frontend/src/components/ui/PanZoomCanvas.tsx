@@ -12,6 +12,8 @@ import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
 import { Stack } from '../../modules/Dashboard/components/Stack';
 import { Text } from '../../modules/Dashboard/components/Text';
 import { Box } from '../../modules/Dashboard/components/Box';
+import { ShaderCanvas } from './ShaderCanvas';
+import { isWebGLAvailable } from '../../utils/shaderVisualization';
 
 function getColor(value: number) {
     // Validar que value sea un número válido
@@ -49,7 +51,15 @@ interface PanZoomCanvasProps {
 
 export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const shaderCanvasRef = useRef<HTMLCanvasElement>(null);
     const { simData, selectedViz, inferenceStatus, sendCommand } = useWebSocket();
+    
+    // Detectar si WebGL está disponible para usar shaders (GPU rendering)
+    const webglAvailable = useMemo(() => isWebGLAvailable(), []);
+    // Usar shaders cuando WebGL está disponible y no es una visualización compleja
+    // Shaders funcionan bien para: density, phase, energy, complex
+    // No funcionan bien para: poincare, flow, phase_attractor (requieren Canvas 2D)
+    const useShaderRendering = webglAvailable && !['poincare', 'flow', 'phase_attractor'].includes(selectedViz);
     
     // Usar historyFrame si está disponible, sino usar simData actual
     const dataToRender = historyFrame ? historyFrame : simData;
@@ -58,12 +68,14 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     // PRIORIDAD: Usar el tamaño real del grid desde simulation_info si está disponible
     // (esto es el tamaño real de la simulación, no el tamaño de mapData que puede ser ROI)
     const mapData = dataToRender?.map_data;
-    const actualGridWidth = dataToRender?.simulation_info?.inference_grid_size 
-        || dataToRender?.simulation_info?.training_grid_size 
+    // Type guard: verificar si es SimData (tiene simulation_info) o historyFrame (no lo tiene)
+    const isSimData = simData !== null && simData !== undefined && 'simulation_info' in simData;
+    const actualGridWidth = (isSimData && simData?.simulation_info?.inference_grid_size) 
+        || (isSimData && simData?.simulation_info?.training_grid_size)
         || mapData?.[0]?.length 
         || 0;
-    const actualGridHeight = dataToRender?.simulation_info?.inference_grid_size 
-        || dataToRender?.simulation_info?.training_grid_size 
+    const actualGridHeight = (isSimData && simData?.simulation_info?.inference_grid_size)
+        || (isSimData && simData?.simulation_info?.training_grid_size)
         || mapData?.length 
         || 0;
     
@@ -818,29 +830,64 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 )}
             </Box>
             
-            {/* Canvas principal - En modo toroidal, se puede mover infinitamente */}
-            <canvas
-                ref={canvasRef}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                style={{ 
-                    position: 'absolute',
-                    left: '50%',
-                    top: '50%',
-                    marginLeft: `${-(gridWidth / 2) + (pan.x / zoom)}px`,
-                    marginTop: `${-(gridHeight / 2) + (pan.y / zoom)}px`,
-                    width: `${gridWidth}px`,
-                    height: `${gridHeight}px`,
-                    transform: `scale(${zoom})`,
-                    transformOrigin: 'center center',
-                    imageRendering: zoom > 2 ? 'pixelated' : 'auto',
-                    visibility: (dataToRender?.map_data || simData?.map_data) ? 'visible' : 'hidden',
-                    cursor: isPanning ? 'grabbing' : 'grab',
-                    pointerEvents: 'auto'
-                }}
-            />
+            {/* Canvas principal - Usar ShaderCanvas (WebGL) cuando WebGL está disponible y la visualización es compatible */}
+            {useShaderRendering && mapData && mapData.length > 0 && mapDataWidth > 0 && mapDataHeight > 0 ? (
+                <div
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                    style={{ 
+                        position: 'absolute',
+                        left: '50%',
+                        top: '50%',
+                        marginLeft: `${-(gridWidth / 2) + (pan.x / zoom)}px`,
+                        marginTop: `${-(gridHeight / 2) + (pan.y / zoom)}px`,
+                        width: `${gridWidth}px`,
+                        height: `${gridHeight}px`,
+                        transform: `scale(${zoom})`,
+                        transformOrigin: 'center center',
+                        cursor: isPanning ? 'grabbing' : 'grab',
+                        pointerEvents: 'auto',
+                        visibility: (dataToRender?.map_data || simData?.map_data) ? 'visible' : 'hidden',
+                    }}
+                >
+                    <ShaderCanvas
+                        mapData={mapData}
+                        width={mapDataWidth}
+                        height={mapDataHeight}
+                        selectedViz={selectedViz}
+                        className="w-full h-full"
+                        style={{
+                            imageRendering: zoom > 2 ? 'pixelated' : 'auto',
+                        }}
+                    />
+                </div>
+            ) : (
+                /* Fallback a Canvas 2D para visualizaciones complejas o cuando WebGL no está disponible */
+                <canvas
+                    ref={canvasRef}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                    style={{ 
+                        position: 'absolute',
+                        left: '50%',
+                        top: '50%',
+                        marginLeft: `${-(gridWidth / 2) + (pan.x / zoom)}px`,
+                        marginTop: `${-(gridHeight / 2) + (pan.y / zoom)}px`,
+                        width: `${gridWidth}px`,
+                        height: `${gridHeight}px`,
+                        transform: `scale(${zoom})`,
+                        transformOrigin: 'center center',
+                        imageRendering: zoom > 2 ? 'pixelated' : 'auto',
+                        visibility: (dataToRender?.map_data || simData?.map_data) ? 'visible' : 'hidden',
+                        cursor: isPanning ? 'grabbing' : 'grab',
+                        pointerEvents: 'auto'
+                    }}
+                />
+            )}
             
             {/* Overlays */}
             {(overlayConfig.showGrid || overlayConfig.showCoordinates || overlayConfig.showQuadtree || overlayConfig.showStats || overlayConfig.showToroidalBorders) && (

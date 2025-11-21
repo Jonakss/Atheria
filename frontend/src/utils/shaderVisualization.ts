@@ -274,18 +274,49 @@ export function createTextureFromData(
         }
     }
     
-    // Crear textura (usar formato R32F para un solo canal de float)
-    // Si WebGL2 no está disponible, usar RGBA8 como fallback
+    // Crear textura (usar formato LUMINANCE para un solo canal)
+    // Nota: WebGL1 no soporta FLOAT directamente en todas las implementaciones
+    // Para mejor compatibilidad, usar UNSIGNED_BYTE normalizado
+    // WebGL2 soporta R32F pero no todos los navegadores lo implementan correctamente
+    
+    // Normalizar valores a [0, 1] primero para mejor compatibilidad
+    let minVal = Infinity;
+    let maxVal = -Infinity;
+    for (let i = 0; i < flatData.length; i++) {
+        const val = flatData[i];
+        if (isFinite(val)) {
+            minVal = Math.min(minVal, val);
+            maxVal = Math.max(maxVal, val);
+        }
+    }
+    
+    // Si todos los valores son iguales, usar rango [0, 1]
+    const range = maxVal - minVal || 1;
+    
+    // Convertir a UNSIGNED_BYTE (0-255) para máxima compatibilidad
+    const normalizedData = new Uint8Array(width * height);
+    for (let i = 0; i < flatData.length; i++) {
+        const val = flatData[i];
+        if (isFinite(val)) {
+            // Normalizar a [0, 1] y luego a [0, 255]
+            const normalized = (val - minVal) / range;
+            normalizedData[i] = Math.round(Math.max(0, Math.min(255, normalized * 255)));
+        } else {
+            normalizedData[i] = 0;
+        }
+    }
+    
+    // Usar LUMINANCE para un solo canal (compatible con WebGL1 y WebGL2)
     gl.texImage2D(
         gl.TEXTURE_2D,
         0,
-        gl.LUMINANCE, // Un solo canal
+        gl.LUMINANCE,
         width,
         height,
         0,
         gl.LUMINANCE,
-        gl.FLOAT,
-        flatData
+        gl.UNSIGNED_BYTE,
+        normalizedData
     );
     
     // Configurar filtrado

@@ -55,8 +55,8 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
         canvas.width = width;
         canvas.height = height;
         
-        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-        if (!gl) {
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl') as WebGLRenderingContext | null;
+        if (!gl || !(gl instanceof WebGLRenderingContext)) {
             console.warn('WebGL no disponible, usando renderizado por defecto');
             return;
         }

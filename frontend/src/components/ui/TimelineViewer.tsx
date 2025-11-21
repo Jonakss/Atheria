@@ -2,12 +2,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { 
-    loadTimeline, 
-    getTimelineStats, 
-    clearTimeline, 
-    getFrameByStep,
-    type TimelineFrame 
-} from '../../utils/timelineStorage';
+        loadTimeline, 
+        getTimelineStats, 
+        clearTimeline, 
+        getFrameByStep,
+        TimelineFrame 
+    } from '../../utils/timelineStorage';
 import { Play, Pause, SkipBack, SkipForward, Trash2, Clock, Database, Settings } from 'lucide-react';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
 
