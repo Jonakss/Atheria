@@ -10,10 +10,11 @@ on:
     branches:
       - main
       - master
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.github/**'
+    # No ignorar ningún path para que el workflow siempre se ejecute si hay push con tag
+    # paths-ignore:
+    #   - '**.md'
+    #   - 'docs/**'
+    #   - '.github/**'
   workflow_dispatch:
     inputs:
       version_type:
@@ -56,15 +57,33 @@ jobs:
             echo "type=${{ github.event.inputs.version_type }}" >> $GITHUB_OUTPUT
           elif [ "${{ github.event_name }}" == "push" ]; then
             # Push directo: revisar mensaje de commit para [version:bump:major/minor/patch]
-            COMMIT_MSG="${{ github.event.head_commit.message }}"
-            echo "Mensaje de commit: $COMMIT_MSG"
+            # IMPORTANTE: En push, github.event.head_commit.message puede estar vacío si es un push de múltiples commits
+            # Revisar el último commit del push usando git log
+            COMMIT_MSG=$(git log -1 --format="%B" HEAD)
+            echo "Mensaje de commit (HEAD): $COMMIT_MSG"
+            
+            # También intentar con github.event.head_commit.message como fallback
+            if [ -z "$COMMIT_MSG" ] || [ "$COMMIT_MSG" == "" ]; then
+              COMMIT_MSG="${{ github.event.head_commit.message }}"
+              echo "Mensaje de commit (event): $COMMIT_MSG"
+            fi
+            
+            # Buscar en todos los commits del push si el mensaje está vacío
+            if [ -z "$COMMIT_MSG" ] || [ "$COMMIT_MSG" == "" ]; then
+              echo "⚠️ No se pudo obtener mensaje del commit, buscando en últimos 5 commits..."
+              COMMIT_MSG=$(git log -5 --format="%B" | grep -E "\[version:bump" | head -1)
+              echo "Tag encontrado en historial: $COMMIT_MSG"
+            fi
             
             if echo "$COMMIT_MSG" | grep -qi "\[version:bump:major\]\|\[version:major\]"; then
               echo "type=major" >> $GITHUB_OUTPUT
+              echo "✅ Detectado bump MAJOR"
             elif echo "$COMMIT_MSG" | grep -qi "\[version:bump:minor\]\|\[version:minor\]"; then
               echo "type=minor" >> $GITHUB_OUTPUT
+              echo "✅ Detectado bump MINOR"
             elif echo "$COMMIT_MSG" | grep -qi "\[version:bump:patch\]\|\[version:patch\]"; then
               echo "type=patch" >> $GITHUB_OUTPUT
+              echo "✅ Detectado bump PATCH"
             else
               # Si no hay tag explícito en commit, no hacer bump (salir silenciosamente)
               echo "⚠️ Commit sin tag de versión [version:bump:*], saltando bump"
