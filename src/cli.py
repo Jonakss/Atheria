@@ -89,6 +89,44 @@ def run_server(no_frontend=True, port=None, host=None):
     subprocess.run(cmd, cwd=project_root, env=env)
 
 
+def run_frontend_dev(port=None):
+    """Ejecuta el frontend en modo desarrollo (npm run dev)."""
+    print("🎨 Iniciando frontend en modo desarrollo...")
+    project_root = get_project_root()
+    frontend_dir = project_root / "frontend"
+    
+    if not frontend_dir.exists():
+        print("❌ Error: Directorio 'frontend' no encontrado")
+        sys.exit(1)
+    
+    # Verificar si node_modules existe
+    node_modules = frontend_dir / "node_modules"
+    if not node_modules.exists():
+        print("⚠️  node_modules no encontrado. Ejecutando 'npm install' primero...")
+        install_success = run_command(
+            ["npm", "install"],
+            cwd=frontend_dir,
+            check=False
+        )
+        if not install_success:
+            print("❌ Error instalando dependencias de npm")
+            sys.exit(1)
+        print()
+    
+    # Ejecutar npm run dev
+    cmd = ["npm", "run", "dev"]
+    
+    # Si se especifica puerto, agregarlo como variable de entorno
+    env = os.environ.copy()
+    if port:
+        env['PORT'] = str(port)
+        print(f"🌐 Frontend iniciándose en puerto {port}...")
+    else:
+        print(f"🌐 Frontend iniciándose en puerto por defecto (5173)...")
+    
+    subprocess.run(cmd, cwd=frontend_dir, env=env)
+
+
 def clean():
     """Limpia archivos de build y cache."""
     print("🧹 Limpiando archivos de build...")
@@ -162,12 +200,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Ejemplos:
-  atheria dev              # Build + Install + Run (sin frontend)
-  atheria dev --frontend   # Build + Install + Run (con frontend)
-  atheria build            # Solo compilar
-  atheria install          # Solo instalar
-  atheria run              # Solo ejecutar servidor
-  atheria clean            # Limpiar builds
+  atheria dev                  # Build + Install + Run (sin frontend)
+  atheria dev --frontend       # Build + Install + Run (con frontend)
+  atheria frontend-dev         # Solo frontend en modo desarrollo (npm run dev)
+  atheria frontend-dev --port 3000  # Frontend en puerto 3000
+  atheria build                # Solo compilar
+  atheria install              # Solo instalar
+  atheria run                  # Solo ejecutar servidor
+  atheria clean                # Limpiar builds
         """
     )
     
@@ -200,6 +240,12 @@ Ejemplos:
     # Comando: clean
     subparsers.add_parser('clean', help='Limpiar archivos de build')
     
+    # Comando: frontend-dev
+    frontend_parser = subparsers.add_parser('frontend-dev', 
+                                           help='Ejecutar frontend en modo desarrollo (npm run dev)')
+    frontend_parser.add_argument('--port', type=int, default=None,
+                                help='Puerto del frontend (por defecto: 5173)')
+    
     args = parser.parse_args()
     
     if not args.command:
@@ -217,6 +263,8 @@ Ejemplos:
         run_server(no_frontend=not args.frontend, port=args.port, host=args.host)
     elif args.command == 'clean':
         clean()
+    elif args.command == 'frontend-dev':
+        run_frontend_dev(port=args.port if hasattr(args, 'port') else None)
     else:
         parser.print_help()
         sys.exit(1)

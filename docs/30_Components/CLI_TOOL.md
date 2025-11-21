@@ -65,6 +65,20 @@ atheria run                  # Ejecutar servidor (sin frontend)
 atheria run --frontend       # Ejecutar servidor (con frontend)
 ```
 
+#### `atheria frontend-dev [--port PORT]`
+Ejecuta solo el frontend en modo desarrollo (npm run dev).
+
+**Opciones:**
+- `--port PORT` - Puerto del frontend (por defecto: 5173)
+
+**Ejemplos:**
+```bash
+atheria frontend-dev              # Frontend en modo desarrollo (puerto 5173)
+atheria frontend-dev --port 3000  # Frontend en puerto 3000
+```
+
+**Nota:** Este comando ejecuta `npm run dev` en el directorio `frontend/`. Si `node_modules` no existe, ejecuta `npm install` automáticamente.
+
 #### `atheria clean`
 Limpiar archivos de build, cache y archivos temporales.
 
@@ -90,6 +104,7 @@ Limpia:
 También se puede usar directamente sin instalar:
 ```bash
 python3 src/cli.py dev
+python3 src/cli.py frontend-dev
 python3 src/cli.py build
 python3 src/cli.py install
 python3 src/cli.py run
@@ -113,6 +128,7 @@ atheria dev
 El comando `ath` también está disponible como alias corto:
 ```bash
 ath dev
+ath frontend-dev
 ath build
 ath install
 ath run
