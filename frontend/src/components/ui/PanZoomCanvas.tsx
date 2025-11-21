@@ -59,10 +59,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     const gridWidth = mapData?.[0]?.length || 0;
     const gridHeight = mapData?.length || 0;
     
-    const toroidalMode = overlayConfig.showToroidalBorders; // Usar overlay de bordes toroidales como indicador
-    const { pan, zoom, handleMouseDown, handleMouseMove, handleMouseUp, handleWheel, resetView, isPanning, isZooming, zoomCenter } = usePanZoom(canvasRef, gridWidth, gridHeight, toroidalMode);
-    
-    // Estado de overlays
+    // Estado de overlays (declarar ANTES de usarlo)
     const [overlayConfig, setOverlayConfig] = useState<OverlayConfig>({
         showGrid: false,
         showCoordinates: false,
@@ -72,6 +69,9 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
         gridSize: 10,
         quadtreeThreshold: 0.01
     });
+    
+    const toroidalMode = overlayConfig.showToroidalBorders; // Usar overlay de bordes toroidales como indicador
+    const { pan, zoom, handleMouseDown, handleMouseMove, handleMouseUp, handleWheel, resetView, isPanning, isZooming, zoomCenter } = usePanZoom(canvasRef, gridWidth, gridHeight, toroidalMode);
     const [showOverlayControls, setShowOverlayControls] = useState(false);
     const [autoROIEnabled, setAutoROIEnabled] = useState(false);
     const lastROIUpdate = useRef<number>(0);
