@@ -59,7 +59,8 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     const gridWidth = mapData?.[0]?.length || 0;
     const gridHeight = mapData?.length || 0;
     
-    const { pan, zoom, handleMouseDown, handleMouseMove, handleMouseUp, handleWheel, resetView, isPanning, isZooming, zoomCenter } = usePanZoom(canvasRef, gridWidth, gridHeight);
+    const toroidalMode = overlayConfig.showToroidalBorders; // Usar overlay de bordes toroidales como indicador
+    const { pan, zoom, handleMouseDown, handleMouseMove, handleMouseUp, handleWheel, resetView, isPanning, isZooming, zoomCenter } = usePanZoom(canvasRef, gridWidth, gridHeight, toroidalMode);
     
     // Estado de overlays
     const [overlayConfig, setOverlayConfig] = useState<OverlayConfig>({
@@ -783,28 +784,71 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 )}
             </Box>
             
-            <canvas
-                ref={canvasRef}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                style={{ 
-                    position: 'absolute',
-                    left: '50%',
-                    top: '50%',
-                    marginLeft: `${-(gridWidth / 2) + (pan.x / zoom)}px`,
-                    marginTop: `${-(gridHeight / 2) + (pan.y / zoom)}px`,
-                    width: `${gridWidth}px`,
-                    height: `${gridHeight}px`,
-                    transform: `scale(${zoom})`,
-                    transformOrigin: 'center center',
-                    imageRendering: zoom > 2 ? 'pixelated' : 'auto', // Pixelated solo en zoom muy alto
-                    visibility: (dataToRender?.map_data || simData?.map_data) ? 'visible' : 'hidden',
-                    cursor: isPanning ? 'grabbing' : 'grab',
-                    pointerEvents: 'auto'
-                }}
-            />
+            {/* Modo toroidal: renderizar múltiples copias del canvas para wraparound infinito */}
+            {toroidalMode ? (
+                // En modo toroidal, renderizar 3x3 copias del canvas para crear wraparound visual
+                // Esto permite ver la "conectividad" de los bordes
+                [...Array(9)].map((_, idx) => {
+                    const row = Math.floor(idx / 3) - 1; // -1, 0, 1
+                    const col = idx % 3 - 1; // -1, 0, 1
+                    const offsetX = col * gridWidth;
+                    const offsetY = row * gridHeight;
+                    const baseMarginLeft = -(gridWidth / 2) + (pan.x / zoom);
+                    const baseMarginTop = -(gridHeight / 2) + (pan.y / zoom);
+                    
+                    return (
+                        <canvas
+                            key={idx}
+                            ref={idx === 4 ? canvasRef : null} // Solo el canvas central tiene ref
+                            onMouseDown={handleMouseDown}
+                            onMouseMove={handleMouseMove}
+                            onMouseUp={handleMouseUp}
+                            onMouseLeave={handleMouseUp}
+                            style={{ 
+                                position: 'absolute',
+                                left: '50%',
+                                top: '50%',
+                                marginLeft: `${baseMarginLeft + offsetX}px`,
+                                marginTop: `${baseMarginTop + offsetY}px`,
+                                width: `${gridWidth}px`,
+                                height: `${gridHeight}px`,
+                                transform: `scale(${zoom})`,
+                                transformOrigin: 'center center',
+                                imageRendering: zoom > 2 ? 'pixelated' : 'auto',
+                                visibility: (dataToRender?.map_data || simData?.map_data) ? 'visible' : 'hidden',
+                                cursor: isPanning ? 'grabbing' : 'grab',
+                                pointerEvents: idx === 4 ? 'auto' : 'none', // Solo el canvas central recibe eventos
+                                opacity: idx === 4 ? 1 : 0.6, // Copias ligeramente transparentes
+                                zIndex: idx === 4 ? 1 : 0 // Canvas central encima
+                            }}
+                        />
+                    );
+                })
+            ) : (
+                // Modo normal: un solo canvas
+                <canvas
+                    ref={canvasRef}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                    style={{ 
+                        position: 'absolute',
+                        left: '50%',
+                        top: '50%',
+                        marginLeft: `${-(gridWidth / 2) + (pan.x / zoom)}px`,
+                        marginTop: `${-(gridHeight / 2) + (pan.y / zoom)}px`,
+                        width: `${gridWidth}px`,
+                        height: `${gridHeight}px`,
+                        transform: `scale(${zoom})`,
+                        transformOrigin: 'center center',
+                        imageRendering: zoom > 2 ? 'pixelated' : 'auto',
+                        visibility: (dataToRender?.map_data || simData?.map_data) ? 'visible' : 'hidden',
+                        cursor: isPanning ? 'grabbing' : 'grab',
+                        pointerEvents: 'auto'
+                    }}
+                />
+            )}
             
             {/* Overlays */}
             {(overlayConfig.showGrid || overlayConfig.showCoordinates || overlayConfig.showQuadtree || overlayConfig.showStats || overlayConfig.showToroidalBorders) && (

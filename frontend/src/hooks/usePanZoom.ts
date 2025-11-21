@@ -13,7 +13,7 @@ function throttle<T extends (...args: any[]) => void>(func: T, limit: number): T
     }) as T;
 }
 
-export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWidth?: number, gridHeight?: number) => {
+export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWidth?: number, gridHeight?: number, toroidalMode: boolean = false) => {
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
     const [isPanning, setIsPanning] = useState(false);
@@ -206,25 +206,45 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
         
         let maxPanX, maxPanY, minPanX, minPanY;
         
-        if (scaledWidth > containerWidth) {
-            // Canvas más ancho que el contenedor: puede moverse horizontalmente
-            maxPanX = (scaledWidth - containerWidth) / 2;
-            minPanX = -maxPanX;
+        // Modo toroidal: pan infinito (wraparound)
+        if (toroidalMode) {
+            // En modo toroidal, permitir pan infinito pero aplicar wraparound visual
+            // Los límites son muy grandes para simular infinito
+            // El wraparound se hará visualmente en el renderizado
+            const veryLargeValue = 1e6; // Valor muy grande para simular infinito
+            maxPanX = veryLargeValue;
+            minPanX = -veryLargeValue;
+            maxPanY = veryLargeValue;
+            minPanY = -veryLargeValue;
         } else {
-            // Canvas más estrecho que el contenedor: no debe moverse horizontalmente
-            // O solo permitir un pequeño margen para mantenerlo centrado
-            maxPanX = (containerWidth - scaledWidth) / 4; // Pequeño margen
-            minPanX = -maxPanX;
-        }
-        
-        if (scaledHeight > containerHeight) {
-            // Canvas más alto que el contenedor: puede moverse verticalmente
-            maxPanY = (scaledHeight - containerHeight) / 2;
-            minPanY = -maxPanY;
-        } else {
-            // Canvas más bajo que el contenedor: no debe moverse verticalmente
-            maxPanY = (containerHeight - scaledHeight) / 4; // Pequeño margen
-            minPanY = -maxPanY;
+            // Modo normal: límites basados en tamaño del canvas
+            if (scaledWidth > containerWidth) {
+                // Canvas más ancho que el contenedor: puede moverse horizontalmente
+                // Permitir más margen para exploración (200% en lugar de 50%)
+                const extraMargin = scaledWidth * 0.5; // 50% adicional de margen
+                maxPanX = (scaledWidth - containerWidth) / 2 + extraMargin;
+                minPanX = -maxPanX;
+            } else {
+                // Canvas más estrecho que el contenedor: permitir más movimiento
+                // Permitir pan hasta que el canvas salga completamente del contenedor
+                const extraMargin = scaledWidth * 2; // 200% de margen adicional
+                maxPanX = (containerWidth - scaledWidth) / 2 + extraMargin;
+                minPanX = -maxPanX;
+            }
+            
+            if (scaledHeight > containerHeight) {
+                // Canvas más alto que el contenedor: puede moverse verticalmente
+                // Permitir más margen para exploración (200% en lugar de 50%)
+                const extraMargin = scaledHeight * 0.5; // 50% adicional de margen
+                maxPanY = (scaledHeight - containerHeight) / 2 + extraMargin;
+                minPanY = -maxPanY;
+            } else {
+                // Canvas más bajo que el contenedor: permitir más movimiento
+                // Permitir pan hasta que el canvas salga completamente del contenedor
+                const extraMargin = scaledHeight * 2; // 200% de margen adicional
+                maxPanY = (containerHeight - scaledHeight) / 2 + extraMargin;
+                minPanY = -maxPanY;
+            }
         }
         
         const constrainedPan = {
@@ -327,9 +347,22 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
             const newPanX = mouseRelToCenterX * (1 - zoomRatio) + pan.x * zoomRatio;
             const newPanY = mouseRelToCenterY * (1 - zoomRatio) + pan.y * zoomRatio;
             
-            const constrained = constrainPanZoom({ x: newPanX, y: newPanY }, constrainedZoom);
+            let finalPan = { x: newPanX, y: newPanY };
+            const constrained = constrainPanZoom(finalPan, constrainedZoom);
+            
+            // En modo toroidal, aplicar wraparound visual al pan
+            if (toroidalMode && gridWidth && gridHeight) {
+                // Aplicar wraparound: cuando pan supera un tamaño del grid, "envolver"
+                // Esto crea el efecto de espacio infinito
+                const wrappedX = constrained.pan.x % (gridWidth * constrainedZoom);
+                const wrappedY = constrained.pan.y % (gridHeight * constrainedZoom);
+                finalPan = { x: wrappedX, y: wrappedY };
+            } else {
+                finalPan = constrained.pan;
+            }
+            
             setZoom(constrained.zoom);
-            setPan(constrained.pan);
+            setPan(finalPan);
         }
     }, [zoom, pan, constrainPanZoom, canvasRef, gridWidth, gridHeight]);
 
