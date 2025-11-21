@@ -1,12 +1,26 @@
 # 📝 AI Dev Log - Atheria 4
 
-**Última actualización:** 2025-01-XX  
+**Última actualización:** 2025-01-21  
+
+**IMPORTANTE - Knowledge Base:** Este archivo es parte de la **BASE DE CONOCIMIENTOS** del proyecto. No es solo un log, es conocimiento que los agentes consultan para entender el contexto histórico y las decisiones tomadas. Ver [[00_KNOWLEDGE_BASE.md]] para más información.
+
 **Objetivo:** Documentar decisiones de desarrollo, experimentos y cambios importantes para RAG y Obsidian.
+
+**Reglas de actualización:**
+- Actualizar después de cada cambio significativo o experimento
+- Explicar **POR QUÉ** se tomó una decisión, no solo **QUÉ** se hizo
+- Incluir referencias a código relacionado y otros documentos en `docs/`
+- Usar enlaces `[[archivo]]` para conectar conceptos relacionados (formato Obsidian)
 
 ---
 
 ## 📋 Índice de Entradas
 
+- [[#2025-01-21 - Corrección Fundamental: Generación de Estado Inicial según Ley M]]
+- [[#2025-01-21 - Mejoras de Responsividad y Limpieza de Motor Nativo]]
+- [[#2025-01-XX - Refactorización Progresiva: Handlers y Visualizaciones]]
+- [[#2025-01-XX - Documentación: Análisis Atlas del Universo]]
+- [[#2025-01-XX - Corrección: Visualización en Gris (Normalización de map_data)]]
 - [[#2025-01-XX - Sistema de Versionado Automático con GitHub Actions]]
 - [[#2025-01-XX - Visualizaciones con Shaders WebGL (GPU) Implementadas]]
 - [[#2024-11-21 - Manejo Robusto de CUDA Out of Memory]]
@@ -21,6 +35,282 @@
 - [[#2024-12-XX - Fase 3 Completada: Migración de Componentes UI]]
 - [[#2024-12-XX - Fase 2 Iniciada: Setup Motor Nativo C++]]
 - [[#2024-12-XX - Optimización de Logs y Reducción de Verbosidad]]
+
+---
+
+## 2025-01-21 - Corrección Fundamental: Generación de Estado Inicial según Ley M
+
+### Contexto
+El usuario reportó que el motor nativo cargaba correctamente pero los comandos (ejecutar, cargar otro modelo, descargar) no funcionaban. Al investigar, se descubrió un problema más fundamental: **las partículas se estaban agregando manualmente como un hack, en lugar de emerger del modelo cuántico (ley M)**.
+
+### Problema Identificado
+1. **Hack de inicialización**: El motor nativo usaba `add_initial_particles()` para agregar partículas aleatorias manualmente, en lugar de generar el estado inicial según `INITIAL_STATE_MODE_INFERENCE` (como lo hace el motor Python).
+2. **Inconsistencia con ley M**: Las partículas deberían emerger del estado cuántico generado por el modelo, no agregarse manualmente.
+3. **Logging insuficiente**: Los comandos WebSocket no tenían logging suficiente para diagnosticar problemas de comunicación.
+
+### Solución Implementada
+
+#### 1. Generación Correcta de Estado Inicial ✅
+
+**Archivo:** `src/engines/native_engine_wrapper.py`
+
+**Cambios:**
+- `__init__()` ahora genera `QuantumState` con `initial_mode` desde `cfg.INITIAL_STATE_MODE_INFERENCE` (igual que el motor Python).
+- Soporta grid scaling: si `training_grid_size < inference_grid_size`, replica el estado base.
+- Llama automáticamente a `_initialize_native_state_from_dense()` después de generar el estado denso.
+
+**Nuevo método: `_initialize_native_state_from_dense()`**
+- Convierte estado denso inicial → formato disperso del motor nativo.
+- Respeta `INITIAL_STATE_MODE_INFERENCE` (`complex_noise`, `random`, etc.).
+- Genera partículas solo donde hay estado significativo (umbral dinámico: 0.01% del máximo).
+- Optimizado para grids grandes (muestreo si `grid_size > 256`).
+
+**Resultado:**
+- Las partículas ahora emergen del estado inicial generado según la ley M.
+- Consistencia completa con el motor Python.
+- Respeta `INITIAL_STATE_MODE_INFERENCE`.
+
+#### 2. Deprecación de `add_initial_particles()` ✅
+
+**Cambios:**
+- Método marcado como `DEPRECADO` con warning.
+- Solo se mantiene como fallback temporal si la generación automática falla.
+- Documentado claramente que es un hack temporal.
+
+#### 3. Logging Mejorado para Diagnóstico ✅
+
+**Archivos modificados:**
+- `src/pipelines/core/websocket_handler.py`: Logging `INFO` para comandos recibidos, handlers encontrados, y completados.
+- `src/pipelines/handlers/inference_handlers.py`: Logging al inicio de `handle_play()`.
+- `src/pipelines/pipeline_server.py`: Logging al inicio de `handle_load_experiment()` y `handle_unload_model()`.
+
+**Beneficios:**
+- Diagnóstico más fácil de problemas de comunicación WebSocket.
+- Visibilidad completa del flujo de comandos.
+- Logging de handlers disponibles si comando es desconocido.
+
+### Resultados
+- ✅ Estado inicial generado correctamente según ley M.
+- ✅ Partículas emergen del estado denso, no se agregan manualmente.
+- ✅ Logging suficiente para diagnosticar problemas de comandos WebSocket.
+- ⚠️ **Pendiente**: Verificar que los comandos WebSocket funcionen correctamente después de estos cambios.
+
+### Archivos Modificados
+- `src/engines/native_engine_wrapper.py` - Generación de estado inicial
+- `src/pipelines/core/websocket_handler.py` - Logging mejorado
+- `src/pipelines/handlers/inference_handlers.py` - Logging mejorado
+- `src/pipelines/pipeline_server.py` - Logging mejorado
+
+### Referencias
+- [[00_KNOWLEDGE_BASE.md]] - Base de conocimientos del proyecto
+- [[VISUALIZATION_FIX_ROADMAP.md]] - Roadmap de corrección de visualización
+
+---
+
+## 2025-01-XX - Refactorización Progresiva: Handlers y Visualizaciones
+
+### Contexto
+Continuación de la refactorización iniciada para convertir archivos grandes en módulos más atómicos, facilitando búsquedas, reduciendo contexto en chats y mejorando mantenibilidad.
+
+### Cambios Implementados
+
+#### 1. Refactorización de `pipeline_viz.py` ✅
+
+**Antes:**
+- Archivo monolítico de ~543 líneas con toda la lógica de visualización
+
+**Después:**
+- Paquete modular `src/pipelines/viz/`:
+  - `__init__.py` - Exports principales
+  - `utils.py` - Utilidades (conversión, downsampling, normalización)
+  - `core.py` - Cálculos básicos y función principal
+  - `advanced.py` - Visualizaciones avanzadas (Poincaré, Flow, etc.)
+- `pipeline_viz.py` mantiene compatibilidad como wrapper
+
+**Beneficios:**
+- Separación clara de responsabilidades
+- Más fácil de mantener y extender
+- Mejor organización para RAG
+
+#### 2. Extracción de `simulation_loop` ✅
+
+**Archivo:** `src/pipelines/core/simulation_loop.py`
+
+**Contenido extraído:**
+- Función `simulation_loop()` principal (~700 líneas)
+- Lógica de throttling y FPS
+- Integración con lazy conversion y ROI
+- Adaptive downsampling y ROI automático
+
+**Beneficios:**
+- Código más modular
+- Fácil de testear aisladamente
+- Mejor separación de concerns
+
+#### 3. Extracción de `websocket_handler` ✅
+
+**Archivo:** `src/pipelines/core/websocket_handler.py`
+
+**Contenido extraído:**
+- Función `websocket_handler()` (~150 líneas)
+- Manejo de mensajes WebSocket
+- Estado inicial del cliente
+- Manejo robusto de errores de conexión
+
+**Mejoras:**
+- Mejor manejo de errores (ConnectionResetError, ConnectionError, OSError)
+- Logging más informativo
+- Manejo graceful de desconexiones
+
+#### 4. Refactorización de Handlers (Parcial) ✅
+
+**Módulos creados:**
+- `src/pipelines/handlers/inference_handlers.py` - Handlers básicos (play, pause)
+- `src/pipelines/handlers/simulation_handlers.py` - Handlers de simulación (viz, speed, fps, live_feed, steps_interval)
+- `src/pipelines/handlers/system_handlers.py` - Handlers del sistema (shutdown, refresh)
+
+**Estado actual:**
+- Handlers básicos extraídos y funcionando
+- Handlers complejos (load_experiment, switch_engine, etc.) se mantienen en `pipeline_server.py` por ahora
+- Importaciones correctas en `HANDLERS` dictionary
+
+**Pendiente:**
+- Eliminar definiciones duplicadas en `pipeline_server.py`
+- Extraer handlers complejos restantes cuando sea necesario
+
+#### 5. Helpers Extraídos ✅
+
+**Archivo:** `src/pipelines/core/helpers.py`
+
+**Funciones:**
+- `calculate_adaptive_downsample()` - Cálculo de downsampling adaptativo
+- `calculate_adaptive_roi()` - Cálculo de ROI automático para grids grandes
+
+**Beneficios:**
+- Reutilización en múltiples módulos
+- Lógica centralizada y testeable
+
+#### 6. Status Helpers ✅
+
+**Archivo:** `src/pipelines/core/status_helpers.py`
+
+**Funciones:**
+- `get_compile_status()` - Obtiene compile_status de g_state o lo reconstruye
+- `build_inference_status_payload()` - Construye payload de status con compile_status siempre incluido
+
+**Beneficios:**
+- Consistencia: compile_status siempre incluido en status updates
+- Centralizado: un solo lugar para construir status payloads
+
+### Estado del Proyecto
+
+**Completado:**
+- ✅ Refactorización de `pipeline_viz.py` → paquete modular
+- ✅ Extracción de `simulation_loop` → `core/simulation_loop.py`
+- ✅ Extracción de `websocket_handler` → `core/websocket_handler.py`
+- ✅ Extracción de helpers → `core/helpers.py`
+- ✅ Creación de `status_helpers.py`
+- ✅ Refactorización parcial de handlers (básicos extraídos)
+
+**En Progreso:**
+- 🔄 Eliminación de definiciones duplicadas en `pipeline_server.py`
+- 🔄 Extracción de handlers complejos restantes
+
+**Pendiente:**
+- ⚠️ Extracción de handlers de análisis
+- ⚠️ Extracción de handlers de configuración
+- ⚠️ Tests unitarios para módulos extraídos
+
+### Beneficios Obtenidos
+
+1. **Contexto Reducido**: Archivos más pequeños y específicos
+2. **Mejor Mantenibilidad**: Cambios aislados por módulo
+3. **Testing Más Fácil**: Módulos testables independientemente
+4. **Organización Mejorada**: Estructura clara y lógica
+
+### Referencias
+- [[30_Components/REFACTORING_PLAN|Plan de Refactorización]]
+- `src/pipelines/viz/` - Paquete de visualizaciones
+- `src/pipelines/core/` - Módulos core del pipeline
+- `src/pipelines/handlers/` - Handlers extraídos
+
+---
+
+## 2025-01-XX - Documentación: Análisis Atlas del Universo
+
+### Contexto
+Documentación completa del análisis "Atlas del Universo", que visualiza la evolución temporal del estado cuántico usando t-SNE para crear grafos de nodos y conexiones.
+
+### Documentación Creada
+
+**Archivo:** `docs/30_Components/UNIVERSE_ATLAS_ANALYSIS.md`
+
+**Contenido:**
+- Metodología: Snapshots → PCA → t-SNE → Grafo
+- Interpretación de nodos y edges
+- Patrones típicos (clusters, hubs, cadenas)
+- Implementación backend y frontend
+- Parámetros configurables (compression_dim, perplexity, n_iter)
+- Métricas del grafo (spread, density, clustering, hub_count)
+
+**Conexiones:**
+- Agregado a `docs/30_Components/00_COMPONENTS_MOC.md`
+- Referencia cruzada en `docs/40_Experiments/VISUALIZATION_OPTIMIZATION_ANALYSIS.md`
+
+### Implementación Existente
+
+**Backend:** `src/analysis/analysis.py`
+- `analyze_universe_atlas()` - Función principal
+- `compress_snapshot()` - Compresión PCA de snapshots
+- `calculate_phase_map_metrics()` - Cálculo de métricas del grafo
+
+**Handlers:** `src/pipelines/pipeline_server.py`
+- `handle_analyze_universe_atlas()` - Handler para análisis desde UI
+
+### Referencias
+- [[30_Components/UNIVERSE_ATLAS_ANALYSIS|Análisis Atlas del Universo]]
+- `src/analysis/analysis.py` - Implementación del análisis
+- `docs/40_Experiments/VISUALIZATION_OPTIMIZATION_ANALYSIS.md` - Optimizaciones de visualización
+
+---
+
+## 2025-01-XX - Corrección: Visualización en Gris (Normalización de map_data)
+
+### Problema
+La visualización siempre cargaba en gris y no mostraba datos, incluso cuando había datos válidos.
+
+### Causa Raíz
+En `src/pipelines/viz/utils.py`, la función `normalize_map_data()` retornaba un array de ceros cuando todos los valores eran iguales (`max_val == min_val`), lo que causaba que la visualización apareciera completamente gris/negra.
+
+### Solución Implementada
+
+**1. Mejora de `normalize_map_data()`:**
+- Si todos los valores son iguales, retorna `0.5` (gris medio) en lugar de ceros
+- Permite ver que hay datos aunque no haya variación
+- Usa `float32` para mejor rendimiento
+
+**2. Validaciones Adicionales:**
+- Verificación de `map_data` vacío antes de normalizar
+- Fallback a densidad si está vacío
+- Validación de forma (debe ser 2D)
+- Reshape automático si la forma es incorrecta
+
+**3. Logging para Debugging:**
+- Advertencias cuando `map_data` tiene problemas
+- Logs de rango de valores para diagnóstico
+
+### Archivos Modificados
+- `src/pipelines/viz/utils.py` - Función `normalize_map_data()` mejorada
+- `src/pipelines/viz/core.py` - Validaciones adicionales antes de normalizar
+
+### Resultado
+- Visualización muestra gris medio cuando todos los valores son iguales
+- Mejor manejo de casos edge (arrays vacíos, formas incorrectas)
+- Logging útil para debugging
+
+### Referencias
+- `src/pipelines/viz/utils.py` - Normalización de map_data
+- `src/pipelines/viz/core.py` - Validaciones de map_data
 
 ---
 
@@ -1388,3 +1678,109 @@ ImportError: undefined symbol: __nvJitLinkCreate_12_8
 
 **Nota:** Este log debe actualizarse después de cada cambio significativo o experimento.  
 **Formato Obsidian:** Usar `[[]]` para enlaces internos cuando corresponda.
+## 2025-01-21 - Mejoras de Responsividad y Limpieza de Motor Nativo
+
+### Contexto
+Se identificaron dos problemas críticos durante la inferencia:
+1. **Comandos WebSocket tardaban en procesarse** - El `simulation_loop` bloqueaba el event loop
+2. **Servidor se cerraba al limpiar motor nativo** - El método `cleanup()` podía causar errores no manejados
+
+### Problemas Resueltos
+
+#### 1. Responsividad de Comandos WebSocket
+
+**Antes:**
+- El `simulation_loop` ejecutaba muchos pasos sin yield al event loop
+- Los comandos WebSocket tardaban en procesarse durante la inferencia
+- Era necesario pausar y reanudar para que los comandos se ejecutaran
+
+**Después:**
+- ✅ Yield periódico al event loop durante ejecución de pasos
+- ✅ Yield después de operaciones bloqueantes (conversión, visualización)
+- ✅ Los comandos WebSocket se procesan inmediatamente
+
+**Implementación:**
+
+1. **Yield periódico en bucle de pasos** (`src/pipelines/core/simulation_loop.py`):
+   - Cada 10 pasos para motor nativo (más frecuente por ser bloqueante)
+   - Cada 50 pasos para motor Python
+   - Permite procesar comandos WebSocket periódicamente
+
+2. **Yield después de operaciones bloqueantes:**
+   - Después de `get_dense_state()` (conversión puede tardar en grids grandes)
+   - Después de `get_visualization_data()` (cálculo puede ser bloqueante)
+   - Después de cada paso en modo live_feed
+
+**Resultado:**
+- Los comandos WebSocket ahora se procesan inmediatamente
+- No es necesario pausar/reanudar para que los comandos se ejecuten
+- La simulación sigue siendo rápida pero permite interrupciones frecuentes
+
+#### 2. Limpieza Robusta de Motor Nativo
+
+**Antes:**
+- El servidor se cerraba cuando se limpiaba el motor nativo al cambiar experimentos
+- El método `cleanup()` podía causar errores no manejados
+- No había manejo de errores robusto alrededor de `cleanup()`
+
+**Después:**
+- ✅ Try-except específico alrededor de `cleanup()`
+- ✅ Limpieza manual de respaldo si `cleanup()` falla
+- ✅ Manejo de errores granular en cada paso de limpieza
+- ✅ El servidor continúa funcionando incluso si hay errores durante la limpieza
+
+**Implementación:**
+
+1. **Manejo robusto en `pipeline_server.py`** (líneas 1014-1042):
+   - Try-except específico alrededor de `old_motor.cleanup()`
+   - Limpieza manual de respaldo si `cleanup()` falla
+   - Captura de errores en cada paso individual
+
+2. **Mejora en `NativeEngineWrapper.cleanup()`** (`src/engines/native_engine_wrapper.py`):
+   - Manejo de errores granular para cada paso de limpieza
+   - Continúa limpiando aunque un paso falle
+   - Evita que errores críticos cierren el servidor
+
+**Resultado:**
+- El servidor ya no se cierra al cambiar entre experimentos
+- La limpieza intenta múltiples estrategias antes de fallar
+- Los errores se registran sin cerrar el servidor
+
+#### 3. Corrección de Versión en setup.py
+
+**Problema:**
+- `setup.py` tenía `version="4.0.0"` cuando debería ser `4.1.1`
+- Esto causaba que se instalara la versión incorrecta
+
+**Solución:**
+- Actualizado `setup.py` para usar `version="4.1.1"` desde `src/__version__.py`
+
+### Archivos Modificados
+
+1. **`src/pipelines/core/simulation_loop.py`**:
+   - Yield periódico en bucle de pasos (líneas 117-120)
+   - Yield después de `get_dense_state()` (líneas 263, 515)
+   - Yield después de `get_visualization_data()` (líneas 340, 536)
+
+2. **`src/pipelines/pipeline_server.py`**:
+   - Manejo robusto de `cleanup()` del motor nativo (líneas 1014-1042)
+   - Limpieza manual de respaldo si `cleanup()` falla
+
+3. **`src/engines/native_engine_wrapper.py`**:
+   - Manejo de errores granular en `cleanup()` (líneas 521-575)
+   - Captura de errores individuales para cada paso de limpieza
+
+4. **`setup.py`**:
+   - Actualizado `version="4.1.1"` (línea 170)
+
+5. **`.cursorrules`**:
+   - Actualizado para que agentes revisen docs y hagan commits regularmente
+   - Mejoras en documentación sobre commits y versionado
+
+### Referencias
+- `src/pipelines/core/simulation_loop.py` - Optimizaciones de yield
+- `src/pipelines/pipeline_server.py` - Manejo robusto de cleanup
+- `src/engines/native_engine_wrapper.py` - Cleanup granular
+
+---
+

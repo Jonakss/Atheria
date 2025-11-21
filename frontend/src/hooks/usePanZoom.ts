@@ -305,11 +305,28 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
             e.preventDefault();
             
             // Calcular el punto del mouse en coordenadas del canvas antes del zoom
-            if (!canvasRef.current || !gridWidth || !gridHeight) return;
+            if (!gridWidth || !gridHeight) return;
             
-            const canvas = canvasRef.current;
-            const container = canvas.parentElement;
-            if (!container) return;
+            // Obtener el contenedor (puede ser el div que envuelve el canvas o el canvas mismo)
+            let container: HTMLElement | null = null;
+            if (canvasRef.current) {
+                container = canvasRef.current.parentElement;
+            }
+            
+            // Si no hay contenedor, usar el target del evento
+            if (!container && e.target) {
+                container = (e.target as HTMLElement).parentElement;
+            }
+            
+            // Si todavía no hay contenedor, usar el elemento del evento
+            if (!container && e.currentTarget) {
+                container = e.currentTarget as HTMLElement;
+            }
+            
+            if (!container) {
+                console.warn("⚠️ No se pudo obtener contenedor para zoom");
+                return;
+            }
             
             const containerRect = container.getBoundingClientRect();
             const containerWidth = containerRect.width;

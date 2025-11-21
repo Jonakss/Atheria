@@ -1,10 +1,12 @@
 /**
  * Utilidad para obtener la versión de la aplicación.
- * La versión se inyecta desde package.json durante el build.
+ * La versión se lee desde package.json.
  * Sigue Semantic Versioning (SemVer): MAJOR.MINOR.PATCH
  */
 
-export const APP_VERSION: string = import.meta.env.APP_VERSION || '4.0.2';
+// Leer versión directamente desde package.json (inyectada por vite.config.ts)
+// Fallback a versión hardcoded si no está disponible (se actualiza automáticamente por GitHub Actions)
+export const APP_VERSION: string = import.meta.env.APP_VERSION || '4.1.1';
 
 // Formatear versión para mostrar en UI (ej: 4.0.2 -> Ver. 4.0.2)
 export const getFormattedVersion = (): string => {

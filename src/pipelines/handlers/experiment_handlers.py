@@ -137,7 +137,9 @@ async def handle_delete_experiment(args):
             g_state['active_experiment'] = None
             g_state['simulation_step'] = 0
             g_state['is_paused'] = True
-            await broadcast({"type": "inference_status_update", "payload": {"status": "paused"}})
+            from ..core.status_helpers import build_inference_status_payload
+            status_payload = build_inference_status_payload("paused")
+            await broadcast({"type": "inference_status_update", "payload": status_payload})
         
         if ws: await send_notification(ws, f"✅ Experiment '{exp_name}' eliminado exitosamente.", "success")
         await handle_refresh_experiments(args)

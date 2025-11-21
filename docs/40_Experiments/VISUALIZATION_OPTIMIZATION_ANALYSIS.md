@@ -184,6 +184,7 @@ void main() {
 **Estrategia:**
 1. **C++ calcula visualizaciones básicas** (density, phase) en GPU
 2. **Python solo para visualizaciones complejas** (Poincaré, t-SNE)
+   - Ver: [[30_Components/UNIVERSE_ATLAS_ANALYSIS|Análisis Atlas del Universo]] para visualización de grafos con t-SNE
 3. **Envío optimizado**: Datos raw cuando es posible, procesados cuando es necesario
 4. **Frontend con shaders**: Para visualizaciones básicas (density, phase)
 

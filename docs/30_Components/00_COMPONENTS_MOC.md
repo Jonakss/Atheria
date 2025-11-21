@@ -29,6 +29,7 @@ related: [[10_core/00_CORE_MOC]], [[40_Experiments/00_EXPERIMENTS_MOC]]
 - [[NATIVE_ENGINE_COMMUNICATION]] - Comunicación del motor nativo
 - [[HISTORY_SYSTEM]] - Gestión de historia de simulación
 - [[GPU_OPTIMIZATION]] - Optimizaciones de GPU
+- [[REFACTORING_PLAN]] - Plan de refactorización (archivos atómicos) - Estado actual
 
 ---
 
@@ -44,7 +45,9 @@ related: [[10_core/00_CORE_MOC]], [[40_Experiments/00_EXPERIMENTS_MOC]]
 ## 📊 Visualización
 
 - [[VISUALIZATION_RECOMMENDATIONS]] - Guía de visualizaciones
+- [[FIELD_VISUALIZATIONS]] - Visualizaciones de campos cuánticos (Métricas Bar)
 - [[FRONTEND_IMPROVEMENTS]] - Mejoras del frontend
+- [[UNIVERSE_ATLAS_ANALYSIS]] - Análisis Atlas del Universo (visualización de grafos con t-SNE)
 
 ---
 
@@ -59,9 +62,11 @@ related: [[10_core/00_CORE_MOC]], [[40_Experiments/00_EXPERIMENTS_MOC]]
 
 ## 🔬 Análisis y Optimización
 
+- [[UNIVERSE_ATLAS_ANALYSIS]] - Análisis Atlas del Universo (visualización de grafos con t-SNE)
 - [[TECHNIQUES_ANALYSIS]] - RMSNorm, SwiGLU, RoPE
 - [[PRECISION_ANALYSIS]] - Estudios de precisión
 - [[VOXEL_ENGINE_SUGGESTIONS]] - Propuestas de motor voxel
+- [[REFACTORING_PLAN]] - Plan de refactorización (archivos atómicos) - En progreso
 
 ---
 

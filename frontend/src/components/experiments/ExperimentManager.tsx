@@ -155,19 +155,40 @@ export function ExperimentManager() {
         const groups: Record<string, string[]> = {};
         
         // Función helper para encontrar raíz usando el árbol ordenado
+        // Cache para evitar recalcular raíces y detectar ciclos solo una vez
+        const rootCache = new Map<string, string>();
+        const cycleDetected = new Set<string>();
+        
         const findRootInTree = (expName: string, visited: Set<string> = new Set()): string => {
+            // Si ya calculamos la raíz de este nodo, retornarla del cache
+            if (rootCache.has(expName)) {
+                return rootCache.get(expName)!;
+            }
+            
             // Si ya visitamos este nodo, hay un ciclo - retornar el nodo actual
             if (visited.has(expName)) {
-                console.warn(`⚠️ Ciclo detectado en transfer learning para "${expName}". Retornando nodo actual.`);
+                // Solo loguear el ciclo una vez por experimento
+                if (!cycleDetected.has(expName)) {
+                    if (process.env.NODE_ENV === 'development') {
+                        console.warn(`⚠️ Ciclo detectado en transfer learning para "${expName}". Retornando nodo actual.`);
+                    }
+                    cycleDetected.add(expName);
+                }
+                rootCache.set(expName, expName);
                 return expName;
             }
             
             const node = experimentTreeSorted[expName];
-            if (!node || !node.loadFrom) return expName;
+            if (!node || !node.loadFrom) {
+                rootCache.set(expName, expName);
+                return expName;
+            }
             
             // Agregar a visitados y continuar recursión
             visited.add(expName);
-            return findRootInTree(node.loadFrom, visited);
+            const root = findRootInTree(node.loadFrom, visited);
+            rootCache.set(expName, root);
+            return root;
         };
         
         Object.keys(experimentTreeSorted).forEach(expName => {

@@ -6,69 +6,27 @@ import os
 import uuid
 from aiohttp import web
 from pathlib import Path
+import torch
 
 # Asumimos la existencia y correcto funcionamiento de estos módulos locales
 from .. import config as global_cfg
 from ..server.server_state import g_state, broadcast, send_notification, send_to_websocket, optimize_frame_payload, get_payload_size, apply_roi_to_payload
 from ..utils import get_experiment_list, load_experiment_config, get_latest_checkpoint
 from ..server.server_handlers import create_experiment_handler
-from .pipeline_viz import get_visualization_data
+from .viz import get_visualization_data
+from .core.simulation_loop import simulation_loop
+from .core.websocket_handler import websocket_handler as ws_handler
+from .core.helpers import calculate_adaptive_downsample, calculate_adaptive_roi
+from .core.status_helpers import build_inference_status_payload
+from .handlers import EXPERIMENT_HANDLERS, SIMULATION_HANDLERS, INFERENCE_HANDLERS, SYSTEM_HANDLERS
 
-def calculate_adaptive_downsample(grid_size: int, max_visualization_size: int = 512) -> int:
-    """
-    Calcula el factor de downsampling adaptativo basado en el tamaño del grid.
-    
-    Estrategia:
-    - Si grid_size <= max_visualization_size: No downsampling (factor = 1)
-    - Si grid_size > max_visualization_size: Downsample para mantener ~max_visualization_size píxeles
-    - Factor mínimo: 1, Factor máximo: calculado para mantener rendimiento
-    
-    Args:
-        grid_size: Tamaño del grid (H x W)
-        max_visualization_size: Tamaño máximo deseado para visualización (default: 512)
-    
-    Returns:
-        Factor de downsampling (1, 2, 4, 8, etc.)
-    """
-    if grid_size <= max_visualization_size:
-        return 1
-    
-    # Calcular factor de downsampling para mantener ~max_visualization_size
-    # Factor debe ser potencia de 2 para mejor rendimiento (2, 4, 8, 16...)
-    factor = max(2, int(grid_size / max_visualization_size))
-    
-    # Redondear a la potencia de 2 más cercana hacia arriba
-    import math
-    factor = 2 ** math.ceil(math.log2(factor))
-    
-    # Límite máximo razonable (downsampling de 16x es bastante agresivo)
-    factor = min(factor, 16)
-    
-    return factor
-
-def calculate_adaptive_roi(grid_size: int, default_roi_size: int = 256) -> tuple | None:
-    """
-    Calcula ROI adaptativo para grids grandes.
-    
-    Para grids grandes (>512), sugerir ROI automático centrado para reducir overhead.
-    
-    Args:
-        grid_size: Tamaño del grid
-        default_roi_size: Tamaño del ROI deseado (default: 256)
-    
-    Returns:
-        ROI tuple (x, y, width, height) o None si no se necesita
-    """
-    # Solo aplicar ROI automático para grids muy grandes
-    if grid_size <= 512:
-        return None
-    
-    # Calcular ROI centrado
-    roi_size = min(default_roi_size, grid_size)
-    x = (grid_size - roi_size) // 2
-    y = (grid_size - roi_size) // 2
-    
-    return (x, y, roi_size, roi_size)
+# Importar handlers individuales desde módulos extraídos
+from .handlers.inference_handlers import handle_play, handle_pause
+from .handlers.simulation_handlers import (
+    handle_set_viz, handle_update_visualization, handle_set_simulation_speed,
+    handle_set_fps, handle_set_frame_skip, handle_set_live_feed, handle_set_steps_interval
+)
+from .handlers.system_handlers import handle_shutdown, handle_refresh_experiments
 from ..model_loader import load_model
 from ..engines.qca_engine import Aetheria_Motor, QuantumState
 from ..analysis.analysis import analyze_universe_atlas, analyze_cell_chemistry, calculate_phase_map_metrics
@@ -79,6 +37,14 @@ from ..physics.analysis.EpochDetector import EpochDetector
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(module)s] - %(message)s')
 
 # --- WEBSOCKET HANDLER ---
+# Ahora importado desde core.websocket_handler
+def create_websocket_handler(handlers):
+    """Factory function para crear websocket_handler con handlers."""
+    async def handler(request):
+        return await ws_handler(request, handlers)
+    return handler
+
+# Mantener función original por compatibilidad (ahora es wrapper)
 async def websocket_handler(request):
     """Maneja las conexiones WebSocket entrantes."""
     # Logging para debugging en entornos con proxy (solo debug para reducir verbosidad)
@@ -953,382 +919,27 @@ async def simulation_loop():
             "payload": f"[Error] Error en simulación: {str(e)}"
         })
         g_state['is_paused'] = True
-        await broadcast({"type": "inference_status_update", "payload": {"status": "paused"}})
+        status_payload = build_inference_status_payload("paused")
+        await broadcast({"type": "inference_status_update", "payload": status_payload})
         await asyncio.sleep(2)
 
 # --- Definición de Handlers para los Comandos ---
 
-async def handle_create_experiment(args):
-    args['CONTINUE_TRAINING'] = False
-    asyncio.create_task(create_experiment_handler(args))
-
-async def handle_continue_experiment(args):
-    """
-    Continúa el entrenamiento de un experimento existente.
-    Carga la configuración guardada y la combina con los argumentos del frontend.
-    """
-    ws = g_state['websockets'].get(args.get('ws_id'))
-    exp_name = args.get("EXPERIMENT_NAME")
-    
-    if not exp_name:
-        if ws: await send_notification(ws, "❌ El nombre del experimento es obligatorio.", "error")
-        return
-    
-    try:
-        # Cargar la configuración del experimento guardada
-        config = load_experiment_config(exp_name)
-        if not config:
-            msg = f"❌ No se encontró la configuración para '{exp_name}'. Asegúrate de que el experimento existe."
-            logging.error(msg)
-            if ws: await send_notification(ws, msg, "error")
-            return
-        
-        # Construir los argumentos completos combinando la config guardada con los del frontend
-        # Usar getattr con valores por defecto para evitar errores si faltan campos
-        continue_args = {
-            'ws_id': args.get('ws_id'),
-            'EXPERIMENT_NAME': exp_name,
-            'MODEL_ARCHITECTURE': getattr(config, 'MODEL_ARCHITECTURE', None),
-            'LR_RATE_M': getattr(config, 'LR_RATE_M', None),
-            'GRID_SIZE_TRAINING': getattr(config, 'GRID_SIZE_TRAINING', None),
-            'QCA_STEPS_TRAINING': getattr(config, 'QCA_STEPS_TRAINING', None),
-            'CONTINUE_TRAINING': True,
-        }
-        
-        # Validar que todos los campos requeridos estén presentes
-        required_fields = ['MODEL_ARCHITECTURE', 'LR_RATE_M', 'GRID_SIZE_TRAINING', 'QCA_STEPS_TRAINING']
-        missing_fields = [field for field in required_fields if continue_args[field] is None]
-        if missing_fields:
-            msg = f"❌ La configuración del experimento '{exp_name}' está incompleta. Faltan: {', '.join(missing_fields)}"
-            logging.error(msg)
-            if ws: await send_notification(ws, msg, "error")
-            return
-        
-        # Manejar EPISODES_TO_ADD: puede ser episodios adicionales o el total nuevo
-        episodes_to_add = args.get('EPISODES_TO_ADD')
-        if episodes_to_add:
-            # Si hay un checkpoint, sumar los episodios adicionales al total actual
-            checkpoint_path = get_latest_checkpoint(exp_name)
-            if checkpoint_path:
-                # Intentar extraer el episodio actual del checkpoint
-                try:
-                    import torch
-                    checkpoint = torch.load(checkpoint_path, map_location='cpu')
-                    current_episode = checkpoint.get('episode', config.TOTAL_EPISODES)
-                    continue_args['TOTAL_EPISODES'] = current_episode + episodes_to_add
-                    logging.info(f"Continuando desde episodio {current_episode}, añadiendo {episodes_to_add} más. Total: {continue_args['TOTAL_EPISODES']}")
-                except Exception as e:
-                    logging.warning(f"No se pudo leer el episodio del checkpoint, usando TOTAL_EPISODES de la config: {e}")
-                    continue_args['TOTAL_EPISODES'] = config.TOTAL_EPISODES + episodes_to_add
-            else:
-                # Sin checkpoint, usar el valor de la config + episodios adicionales
-                continue_args['TOTAL_EPISODES'] = config.TOTAL_EPISODES + episodes_to_add
-        else:
-            # Si no se proporciona EPISODES_TO_ADD, usar el TOTAL_EPISODES de la config
-            continue_args['TOTAL_EPISODES'] = config.TOTAL_EPISODES
-        
-        # Convertir MODEL_PARAMS de SimpleNamespace a dict para JSON
-        # Usar la función recursiva de utils para manejar casos anidados
-        from ..utils import sns_to_dict_recursive
-        if hasattr(config, 'MODEL_PARAMS') and config.MODEL_PARAMS is not None:
-            model_params = config.MODEL_PARAMS
-            continue_args['MODEL_PARAMS'] = sns_to_dict_recursive(model_params)
-            # Validar que MODEL_PARAMS no esté vacío
-            if not continue_args['MODEL_PARAMS'] or (isinstance(continue_args['MODEL_PARAMS'], dict) and len(continue_args['MODEL_PARAMS']) == 0):
-                msg = f"❌ MODEL_PARAMS está vacío en la configuración de '{exp_name}'. No se puede continuar el entrenamiento."
-                logging.error(msg)
-                if ws: await send_notification(ws, msg, "error")
-                return
-        else:
-            # Fallback si no hay MODEL_PARAMS en la config
-            msg = f"❌ No se encontró MODEL_PARAMS en la configuración de '{exp_name}'. No se puede continuar el entrenamiento."
-            logging.error(msg)
-            if ws: await send_notification(ws, msg, "error")
-            return
-        
-        # Validar que MODEL_PARAMS esté presente antes de continuar
-        if 'MODEL_PARAMS' not in continue_args or continue_args['MODEL_PARAMS'] is None:
-            msg = f"❌ MODEL_PARAMS es requerido para continuar el entrenamiento de '{exp_name}'."
-            logging.error(msg)
-            if ws: await send_notification(ws, msg, "error")
-            return
-        
-        # Llamar al handler de creación con los argumentos completos
-        asyncio.create_task(create_experiment_handler(continue_args))
-        
-    except Exception as e:
-        logging.error(f"Error al continuar el entrenamiento de '{exp_name}': {e}", exc_info=True)
-        if ws: await send_notification(ws, f"❌ Error al continuar el entrenamiento: {str(e)}", "error")
-
-async def handle_stop_training(args):
-    ws = g_state['websockets'].get(args['ws_id'])
-    logging.info(f"Recibida orden de detener entrenamiento de [{args['ws_id']}]")
-    if g_state.get('training_process'):
-        try:
-            g_state['training_process'].kill()
-            await g_state['training_process'].wait()
-        except ProcessLookupError:
-            logging.warning("El proceso de entrenamiento ya había terminado.")
-        finally:
-            g_state['training_process'] = None
-            await broadcast({"type": "training_status_update", "payload": {"status": "idle"}})
-            if ws: await send_notification(ws, "Entrenamiento detenido por el usuario.", "info")
-
-async def handle_update_visualization(args):
-    """Actualiza la visualización manualmente (útil cuando steps_interval = 0)."""
-    ws = g_state['websockets'].get(args.get('ws_id'))
-    motor = g_state.get('motor')
-    
-    if not motor:
-        msg = "⚠️ No hay modelo cargado. Carga un experimento primero."
-        logging.warning(msg)
-        if ws: await send_notification(ws, msg, "warning")
-        return
-    
-    if not motor.state or motor.state.psi is None:
-        msg = "⚠️ El modelo cargado no tiene un estado válido."
-        logging.warning(msg)
-        if ws: await send_notification(ws, msg, "warning")
-        return
-    
-    try:
-        # Obtener estado actual
-        motor_is_native = g_state.get('motor_is_native', False)
-        if motor_is_native and hasattr(motor, 'get_dense_state'):
-            # Motor nativo: usar lazy conversion
-            roi = None
-            roi_manager = g_state.get('roi_manager')
-            if roi_manager and roi_manager.roi_enabled:
-                roi = (
-                    roi_manager.roi_x,
-                    roi_manager.roi_y,
-                    roi_manager.roi_x + roi_manager.roi_width,
-                    roi_manager.roi_y + roi_manager.roi_height
-                )
-            psi = motor.get_dense_state(roi=roi, check_pause_callback=lambda: g_state.get('is_paused', True))
-        else:
-            # Motor Python: acceder directamente
-            psi = motor.state.psi if hasattr(motor, 'state') and motor.state else None
-        
-        if psi is None:
-            msg = "⚠️ No se pudo obtener el estado actual."
-            logging.warning(msg)
-            if ws: await send_notification(ws, msg, "warning")
-            return
-        
-        # Generar datos de visualización
-        viz_type = g_state.get('viz_type', 'density')
-        delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
-        viz_data = get_visualization_data(psi, viz_type, delta_psi=delta_psi, motor=motor)
-        
-        if not viz_data or not isinstance(viz_data, dict):
-            msg = "⚠️ Error generando datos de visualización."
-            logging.warning(msg)
-            if ws: await send_notification(ws, msg, "warning")
-            return
-        
-        current_step = g_state.get('simulation_step', 0)
-        live_feed_enabled = g_state.get('live_feed_enabled', False)
-        
-        frame_payload_raw = {
-            "step": current_step,
-            "timestamp": asyncio.get_event_loop().time(),
-            "map_data": viz_data.get("map_data", []),
-            "hist_data": viz_data.get("hist_data", {}),
-            "poincare_coords": viz_data.get("poincare_coords", []),
-            "phase_attractor": viz_data.get("phase_attractor"),
-            "flow_data": viz_data.get("flow_data"),
-            "phase_hsv_data": viz_data.get("phase_hsv_data"),
-            "complex_3d_data": viz_data.get("complex_3d_data"),
-            "simulation_info": {
-                "step": current_step,
-                "initial_step": g_state.get('initial_step', 0),
-                "checkpoint_step": g_state.get('checkpoint_step', 0),
-                "checkpoint_episode": g_state.get('checkpoint_episode', 0),
-                "is_paused": g_state.get('is_paused', True),
-                "live_feed_enabled": live_feed_enabled,
-                "fps": g_state.get('current_fps', 0.0),
-                "epoch": g_state.get('current_epoch', 0),
-                "epoch_metrics": g_state.get('epoch_metrics', {}),
-                "training_grid_size": g_state.get('training_grid_size'),
-                "inference_grid_size": g_state.get('inference_grid_size'),
-                "grid_scaled": g_state.get('grid_size_ratio', 1.0) != 1.0
-            }
-        }
-        
-        # Aplicar optimizaciones si están habilitadas
-        compression_enabled = g_state.get('data_compression_enabled', True)
-        downsample_factor = g_state.get('downsample_factor', 1)
-        
-        if compression_enabled or downsample_factor > 1:
-            frame_payload = await optimize_frame_payload(
-                frame_payload_raw,
-                enable_compression=compression_enabled,
-                downsample_factor=downsample_factor,
-                viz_type=viz_type
-            )
-        else:
-            frame_payload = frame_payload_raw
-        
-        # Enviar frame a todos los clientes conectados
-        await broadcast({"type": "simulation_frame", "payload": frame_payload})
-        g_state['last_frame_sent_step'] = current_step  # Actualizar último frame enviado
-        
-        msg = f"✅ Visualización actualizada (paso {current_step})"
-        logging.info(msg)
-        if ws: await send_notification(ws, msg, "success")
-        
-    except Exception as e:
-        logging.error(f"Error actualizando visualización: {e}", exc_info=True)
-        if ws: await send_notification(ws, f"Error al actualizar visualización: {str(e)}", "error")
-
-async def handle_set_viz(args):
-    viz_type = args.get("viz_type", "density")
-    g_state['viz_type'] = viz_type
-    if (ws := g_state['websockets'].get(args.get('ws_id'))):
-        await send_notification(ws, f"Visualización cambiada a: {viz_type}", "info")
-    # Si hay un motor activo, enviar un frame actualizado inmediatamente
-    # SOLO si live_feed está habilitado
-    live_feed_enabled = g_state.get('live_feed_enabled', True)
-    if g_state.get('motor') and live_feed_enabled:
-        try:
-            motor = g_state['motor']
-            # OPTIMIZACIÓN CRÍTICA: Usar lazy conversion para motor nativo
-            motor_is_native = hasattr(motor, 'native_engine')
-            if motor_is_native and hasattr(motor, 'get_dense_state'):
-                # Para motor nativo, usar get_dense_state() solo cuando se necesita visualizar
-                psi = motor.get_dense_state(check_pause_callback=lambda: g_state.get('is_paused', True))
-            else:
-                # Motor Python: acceder directamente (ya es denso)
-                psi = motor.state.psi if hasattr(motor, 'state') and motor.state else None
-            
-            if psi is None:
-                logging.warning("Motor activo pero sin estado psi. No se puede actualizar visualización.")
-                return
-            
-            delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
-            viz_data = get_visualization_data(psi, viz_type, delta_psi=delta_psi, motor=motor)
-            if not viz_data or not isinstance(viz_data, dict):
-                logging.warning("get_visualization_data retornó datos inválidos.")
-                return
-            
-            current_step = g_state.get('simulation_step', 0)
-            frame_payload_raw = {
-                "step": current_step,
-                "timestamp": asyncio.get_event_loop().time(),
-                "map_data": viz_data.get("map_data", []),
-                "hist_data": viz_data.get("hist_data", {}),
-                "poincare_coords": viz_data.get("poincare_coords", []),
-                "phase_attractor": viz_data.get("phase_attractor"),
-                "flow_data": viz_data.get("flow_data"),
-                "phase_hsv_data": viz_data.get("phase_hsv_data"),
-                "complex_3d_data": viz_data.get("complex_3d_data"),
-                "simulation_info": {
-                    "step": current_step,
-                    "is_paused": g_state.get('is_paused', True),
-                    "live_feed_enabled": live_feed_enabled,
-                    "fps": g_state.get('current_fps', 0.0)
-                }
-            }
-            
-            # Aplicar optimizaciones si están habilitadas
-            compression_enabled = g_state.get('data_compression_enabled', True)
-            downsample_factor = g_state.get('downsample_factor', 1)
-            
-            if compression_enabled or downsample_factor > 1:
-                frame_payload = await optimize_frame_payload(
-                    frame_payload_raw,
-                    enable_compression=compression_enabled,
-                    downsample_factor=downsample_factor,
-                    viz_type=viz_type
-                )
-            else:
-                frame_payload = frame_payload_raw
-            
-            await broadcast({"type": "simulation_frame", "payload": frame_payload})
-        except Exception as e:
-            logging.error(f"Error al actualizar visualización: {e}", exc_info=True)
-
-async def handle_set_simulation_speed(args):
-    """Controla la velocidad de la simulación (multiplicador)."""
-    speed = args.get("speed", 1.0)
-    if speed < 0.1:
-        speed = 0.1
-    elif speed > 100.0:
-        speed = 100.0
-    g_state['simulation_speed'] = float(speed)
-    logging.info(f"Velocidad de simulación ajustada a: {speed}x")
-    
-    # Enviar actualización a clientes
-    await broadcast({
-        "type": "simulation_speed_update",
-        "payload": {"speed": g_state['simulation_speed']}
-    })
-
-async def handle_set_fps(args):
-    """Controla los FPS objetivo de la simulación."""
-    fps = args.get("fps", 10.0)
-    if fps < 0.1:
-        fps = 0.1
-    elif fps > 120.0:
-        fps = 120.0
-    g_state['target_fps'] = float(fps)
-    logging.info(f"FPS objetivo ajustado a: {fps}")
-    
-    # Enviar actualización a clientes
-    await broadcast({
-        "type": "simulation_fps_update",
-        "payload": {"fps": g_state['target_fps']}
-    })
-
-async def handle_set_frame_skip(args):
-    """Controla cuántos frames saltar para acelerar (0 = todos, 1 = cada otro, etc.)."""
-    skip = args.get("skip", 0)
-    if skip < 0:
-        skip = 0
-    elif skip > 10:
-        skip = 10
-    g_state['frame_skip'] = int(skip)
-    logging.info(f"Frame skip ajustado a: {skip} (cada {skip + 1} frames se renderiza)")
-    
-    # Enviar actualización a clientes
-    await broadcast({
-        "type": "simulation_frame_skip_update",
-        "payload": {"skip": g_state['frame_skip']}
-    })
-
-async def handle_play(args):
-    ws = g_state['websockets'].get(args['ws_id'])
-    
-    # Validar que haya un motor cargado antes de iniciar
-    motor = g_state.get('motor')
-    if not motor:
-        msg = "⚠️ No hay un modelo cargado. Primero debes cargar un experimento entrenado."
-        logging.warning(msg)
-        if ws: await send_notification(ws, msg, "warning")
-        return
-    
-    # Validar que el motor tenga estado válido
-    if not motor.state or motor.state.psi is None:
-        msg = "⚠️ El modelo cargado no tiene un estado válido. Intenta reiniciar la simulación."
-        logging.warning(msg)
-        if ws: await send_notification(ws, msg, "warning")
-        return
-    
-    g_state['is_paused'] = False
-    logging.info(f"Simulación iniciada. Motor: {type(motor).__name__}, Step: {g_state.get('simulation_step', 0)}, Live feed: {g_state.get('live_feed_enabled', True)}")
-    await broadcast({"type": "inference_status_update", "payload": {"status": "running"}})
-    if ws: await send_notification(ws, "Simulación iniciada.", "info")
-
-async def handle_pause(args):
-    ws = g_state['websockets'].get(args.get('ws_id'))
-    logging.info("Comando de pausa recibido. Pausando simulación...")
-    g_state['is_paused'] = True
-    await broadcast({"type": "inference_status_update", "payload": {"status": "paused"}})
-    if ws:
-        await send_notification(ws, "Simulación pausada.", "info")
+# Handlers extraídos a módulos separados
+# Los imports están al inicio del archivo
+# Handlers eliminados (ya están en handlers/):
+# - handle_create_experiment → handlers/experiment_handlers.py
+# - handle_continue_experiment → handlers/experiment_handlers.py
+# - handle_stop_training → handlers/experiment_handlers.py
+# - handle_delete_experiment → handlers/experiment_handlers.py
+# - handle_set_viz, handle_update_visualization, handle_set_simulation_speed,
+#   handle_set_fps, handle_set_frame_skip, handle_set_live_feed, handle_set_steps_interval
+#   → handlers/simulation_handlers.py
+# - handle_play, handle_pause → handlers/inference_handlers.py
+# - handle_shutdown, handle_refresh_experiments → handlers/system_handlers.py
 
 async def handle_load_experiment(args):
+    logging.info("📦 handle_load_experiment() llamado - Cargando experimento...")
     ws = g_state['websockets'].get(args['ws_id'])
     exp_name = args.get("experiment_name")
     if not exp_name:
@@ -1355,7 +966,8 @@ async def handle_load_experiment(args):
         # CRÍTICO: Pausar simulación primero para evitar que el motor esté en uso durante el cleanup
         logging.info("Pausando simulación antes de limpiar motor anterior...")
         g_state['is_paused'] = True
-        await broadcast({"type": "inference_status_update", "payload": {"status": "paused"}})
+        status_payload = build_inference_status_payload("paused")
+        await broadcast({"type": "inference_status_update", "payload": status_payload})
         
         # Pequeña espera para asegurar que el simulation_loop haya detectado la pausa
         await asyncio.sleep(0.2)
@@ -1384,23 +996,83 @@ async def handle_load_experiment(args):
                     # Es un motor nativo - llamar cleanup explícitamente
                     try:
                         logging.info("Limpiando motor nativo...")
+                        
+                        # PASO 1: Asegurar que la simulación esté pausada y el loop no esté usando el motor
+                        # Esperar un poco más para asegurar que el simulation_loop haya detectado la pausa
+                        await asyncio.sleep(0.3)
+                        
+                        # PASO 2: Verificar que no haya operaciones pendientes en el motor
+                        # El motor nativo puede tener operaciones asíncronas en CUDA
+                        if hasattr(old_motor, 'native_engine') and old_motor.native_engine is not None:
+                            try:
+                                # Sincronizar CUDA si está disponible
+                                import torch
+                                if torch.cuda.is_available():
+                                    torch.cuda.synchronize()
+                            except Exception as sync_error:
+                                logging.debug(f"Error sincronizando CUDA: {sync_error}")
+                        
+                        # PASO 3: Llamar cleanup del wrapper con manejo de errores robusto
+                        cleanup_success = False
                         if hasattr(old_motor, 'cleanup'):
-                            old_motor.cleanup()
-                            logging.info("✅ Motor nativo limpiado explícitamente")
+                            try:
+                                old_motor.cleanup()
+                                logging.info("✅ Motor nativo limpiado explícitamente")
+                                cleanup_success = True
+                            except Exception as cleanup_error:
+                                logging.error(f"❌ Error durante cleanup del motor nativo: {cleanup_error}", exc_info=True)
+                                # Continuar con limpieza manual aunque cleanup() haya fallado
+                                cleanup_success = False
                         else:
                             # Fallback: limpiar manualmente si no hay método cleanup
                             logging.warning("⚠️ Motor nativo sin método cleanup(), limpiando manualmente...")
-                            if hasattr(old_motor, 'native_engine') and old_motor.native_engine is not None:
-                                old_motor.native_engine = None
-                            if hasattr(old_motor, 'state') and old_motor.state is not None:
-                                if hasattr(old_motor.state, 'psi') and old_motor.state.psi is not None:
-                                    old_motor.state.psi = None
-                                old_motor.state = None
                         
-                        # Espera adicional después del cleanup para asegurar que C++ termine de limpiar
-                        await asyncio.sleep(0.1)
+                        # Si cleanup() falló o no existe, hacer limpieza manual
+                        if not cleanup_success:
+                            try:
+                                if hasattr(old_motor, 'native_engine') and old_motor.native_engine is not None:
+                                    old_motor.native_engine = None
+                                if hasattr(old_motor, 'state') and old_motor.state is not None:
+                                    if hasattr(old_motor.state, 'psi') and old_motor.state.psi is not None:
+                                        old_motor.state.psi = None
+                                    old_motor.state = None
+                                if hasattr(old_motor, 'dense_state_cache'):
+                                    old_motor.dense_state_cache = None
+                                logging.info("✅ Limpieza manual del motor nativo completada")
+                            except Exception as manual_cleanup_error:
+                                logging.error(f"❌ Error durante limpieza manual del motor nativo: {manual_cleanup_error}", exc_info=True)
+                        
+                        # PASO 4: Espera adicional después del cleanup para asegurar que C++ termine de limpiar
+                        await asyncio.sleep(0.2)
+                        
+                        # PASO 5: Limpiar referencias de Python explícitamente
+                        if hasattr(old_motor, 'native_engine'):
+                            old_motor.native_engine = None
+                        if hasattr(old_motor, 'state'):
+                            old_motor.state = None
+                        if hasattr(old_motor, 'dense_state_cache'):
+                            old_motor.dense_state_cache = None
+                        
+                        # PASO 6: Forzar garbage collection para liberar memoria inmediatamente
+                        import gc
+                        gc.collect()
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                        
+                        logging.info("✅ Limpieza completa del motor nativo finalizada")
+                        
                     except Exception as cleanup_error:
                         logging.error(f"❌ Error durante cleanup de motor nativo: {cleanup_error}", exc_info=True)
+                        # Intentar limpieza mínima en caso de error
+                        try:
+                            if hasattr(old_motor, 'native_engine'):
+                                old_motor.native_engine = None
+                            if hasattr(old_motor, 'state'):
+                                old_motor.state = None
+                            import gc
+                            gc.collect()
+                        except Exception as minimal_cleanup_error:
+                            logging.error(f"❌ Error en limpieza mínima: {minimal_cleanup_error}")
                         # No fallar completamente, continuar con la carga
                 
                 # Remover referencia del estado global antes de destruir
@@ -1794,6 +1466,41 @@ async def handle_load_experiment(args):
         g_state['is_paused'] = True
         g_state['live_feed_enabled'] = True  # Live feed habilitado por defecto al cargar modelo
         
+        # CRÍTICO: Inicializar estado del motor nativo si está vacío
+        # El motor nativo necesita partículas iniciales para tener estado visible
+        if is_native and hasattr(motor, 'native_engine') and hasattr(motor, 'add_initial_particles'):
+            try:
+                # Verificar si el motor tiene estado válido
+                motor._dense_state_stale = True  # Forzar reconversión
+                motor.state.psi = None  # Limpiar estado denso para forzar reconversión
+                psi_test = motor.get_dense_state(check_pause_callback=lambda: True)  # Forzar conversión con pausa
+                
+                if psi_test is not None and psi_test.numel() > 0:
+                    psi_abs_max = psi_test.abs().max().item()
+                    if psi_abs_max < 1e-10:
+                        # Motor está vacío, inicializar con partículas
+                        logging.info(f"🛠️ Motor nativo vacío detectado. Inicializando con partículas aleatorias...")
+                        grid_size = g_state.get('inference_grid_size', 256)
+                        num_particles = min(500, (grid_size * grid_size) // 100)  # ~1% del grid, máximo 500
+                        motor.add_initial_particles(num_particles)
+                        logging.info(f"✅ {num_particles} partículas aleatorias agregadas al motor nativo")
+                        # Forzar reconversión después de inicializar
+                        motor._dense_state_stale = True
+                        motor.state.psi = None
+                    else:
+                        logging.info(f"✅ Motor nativo tiene estado válido (max abs={psi_abs_max:.6e})")
+                else:
+                    # Si no se pudo obtener estado, inicializar de todas formas
+                    logging.warning(f"⚠️ No se pudo verificar estado del motor nativo. Inicializando con partículas por seguridad...")
+                    grid_size = g_state.get('inference_grid_size', 256)
+                    num_particles = min(500, (grid_size * grid_size) // 100)
+                    motor.add_initial_particles(num_particles)
+                    logging.info(f"✅ {num_particles} partículas aleatorias agregadas al motor nativo")
+                    motor._dense_state_stale = True
+                    motor.state.psi = None
+            except Exception as init_error:
+                logging.error(f"❌ Error verificando/inicializando estado del motor nativo: {init_error}", exc_info=True)
+        
         # Información del grid para mostrar en UI
         g_state['training_grid_size'] = training_grid_size
         g_state['inference_grid_size'] = inference_grid_size
@@ -1817,71 +1524,179 @@ async def handle_load_experiment(args):
                         psi = motor.state.psi if hasattr(motor, 'state') and motor.state else None
                     
                     if psi is not None:
-                        delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
-                        viz_data = get_visualization_data(
-                            psi, 
-                            g_state.get('viz_type', 'density'),
-                            delta_psi=delta_psi,
-                            motor=motor
-                        )
+                        # CRÍTICO: Verificar que psi tenga datos válidos antes de visualizar
+                        psi_valid = False
+                        if isinstance(psi, torch.Tensor):
+                            psi_abs_max = psi.abs().max().item() if psi.numel() > 0 else 0.0
+                            if psi_abs_max > 1e-10:
+                                psi_valid = True
+                            else:
+                                logging.warning(f"⚠️ Frame inicial: psi tiene valores muy pequeños (max abs={psi_abs_max:.6e}). El motor puede estar vacío.")
+                                # Intentar inicializar motor nativo si está vacío
+                                if motor_is_native and hasattr(motor, 'add_initial_particles'):
+                                    logging.info("🛠️ Frame inicial: Intentando inicializar motor nativo con partículas aleatorias...")
+                                    try:
+                                        # CRÍTICO: Agregar más partículas para asegurar que sean visibles
+                                        # Usar ~1-5% del grid para tener suficiente densidad
+                                        grid_size = g_state.get('inference_grid_size', 256)
+                                        num_particles = min(500, max(100, (grid_size * grid_size) // 50))  # ~2% del grid mínimo
+                                        motor.add_initial_particles(num_particles)
+                                        logging.info(f"✅ Frame inicial: {num_particles} partículas aleatorias agregadas")
+                                        # CRÍTICO: Forzar reconversión después de agregar partículas
+                                        motor._dense_state_stale = True
+                                        if motor.state:
+                                            motor.state.psi = None
+                                        # Reobtener psi - esto forzará la reconversión
+                                        psi = motor.get_dense_state(check_pause_callback=lambda: g_state.get('is_paused', True))
+                                        psi_abs_max_new = psi.abs().max().item() if psi is not None else 0.0
+                                        logging.info(f"📊 Frame inicial: Después de inicialización, psi max abs={psi_abs_max_new:.6e}")
+                                        
+                                        # Si aún está vacío después de agregar partículas, intentar ejecutar algunos pasos
+                                        if psi_abs_max_new < 1e-10:
+                                            logging.warning(f"⚠️ Frame inicial: psi sigue vacío después de agregar partículas. Ejecutando pasos de propagación...")
+                                            for i in range(3):  # Ejecutar 3 pasos para propagar
+                                                motor.evolve_internal_state()
+                                            # Forzar reconversión después de propagar
+                                            motor._dense_state_stale = True
+                                            if motor.state:
+                                                motor.state.psi = None
+                                            psi = motor.get_dense_state(check_pause_callback=lambda: g_state.get('is_paused', True))
+                                            if psi is not None and isinstance(psi, torch.Tensor):
+                                                psi_abs_max_new = psi.abs().max().item()
+                                                logging.info(f"📊 Frame inicial: Después de propagación (3 pasos), psi max abs={psi_abs_max_new:.6e}")
+                                        
+                                        if psi_abs_max_new > 1e-10:
+                                            psi_valid = True
+                                    except Exception as init_error:
+                                        logging.error(f"❌ Frame inicial: Error inicializando motor: {init_error}", exc_info=True)
+                        
+                        if psi_valid:
+                            delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
+                            viz_data = get_visualization_data(
+                                psi, 
+                                g_state.get('viz_type', 'density'),
+                                delta_psi=delta_psi,
+                                motor=motor
+                            )
+                        else:
+                            logging.error("❌ Frame inicial: psi no válido. No se enviará frame inicial.")
+                            viz_data = None
                     else:
+                        logging.error("❌ Frame inicial: psi es None. No se enviará frame inicial.")
                         viz_data = None
                     if viz_data and isinstance(viz_data, dict):
                         # Validar que los datos sean válidos antes de enviar
                         map_data = viz_data.get("map_data", [])
                         if map_data and len(map_data) > 0:
-                            # Usar el step inicial (del checkpoint si existe, sino 0)
-                            initial_step = g_state.get('initial_step', 0)
-                            frame_payload_raw = {
-                                "step": initial_step,
-                                "timestamp": asyncio.get_event_loop().time(),
-                                "map_data": map_data,
-                                "hist_data": viz_data.get("hist_data", {}),
-                                "poincare_coords": viz_data.get("poincare_coords", []),
-                                "phase_attractor": viz_data.get("phase_attractor"),
-                                "flow_data": viz_data.get("flow_data"),
-                                "phase_hsv_data": viz_data.get("phase_hsv_data"),
-                                "complex_3d_data": viz_data.get("complex_3d_data"),
-                                "simulation_info": {
+                            # CRÍTICO: Verificar que map_data tenga variación (no todos los valores iguales)
+                            # Esto evita enviar frames en gris (todos 0.5)
+                            import numpy as np
+                            map_data_np = np.array(map_data) if not isinstance(map_data, np.ndarray) else map_data
+                            if map_data_np.size > 0:
+                                min_val = np.min(map_data_np)
+                                max_val = np.max(map_data_np)
+                                range_val = max_val - min_val
+                                
+                                # Si el rango es muy pequeño, puede estar en estado de fallback (gris medio)
+                                if range_val < 1e-6:
+                                    logging.warning(f"⚠️ Frame inicial: map_data tiene rango muy pequeño ({min_val:.6f} - {max_val:.6f}). Todos los valores son iguales. Esto causará visualización en gris.")
+                                    # Intentar inicializar motor nativo si está vacío
+                                    if motor_is_native and hasattr(motor, 'add_initial_particles'):
+                                        logging.info("🛠️ Frame inicial: map_data uniforme, intentando inicializar motor nativo...")
+                                        try:
+                                            # Obtener dimensiones del grid
+                                            grid_size = g_state.get('inference_grid_size', 256)
+                                            # CRÍTICO: Agregar más partículas para asegurar propagación
+                                            num_particles = max(500, (grid_size * grid_size) // 20)  # Aumentar número de partículas
+                                            motor.add_initial_particles(num_particles)
+                                            logging.info(f"✅ Frame inicial: {num_particles} partículas agregadas (incluye paso de propagación), regenerando visualización...")
+                                            # add_initial_particles ahora ejecuta un paso automáticamente, pero forzamos reconversión de todas formas
+                                            motor._dense_state_stale = True
+                                            motor.state.psi = None
+                                            psi = motor.get_dense_state(check_pause_callback=lambda: g_state.get('is_paused', True))
+                                            if psi is not None and psi.numel() > 0:
+                                                psi_abs_max = psi.abs().max().item()
+                                                if psi_abs_max > 1e-10:
+                                                    delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
+                                                    viz_data_regenerated = get_visualization_data(
+                                                        psi, 
+                                                        g_state.get('viz_type', 'density'),
+                                                        delta_psi=delta_psi,
+                                                        motor=motor
+                                                    )
+                                                    # CRÍTICO: Actualizar viz_data y map_data con los regenerados
+                                                    if viz_data_regenerated and isinstance(viz_data_regenerated, dict):
+                                                        viz_data = viz_data_regenerated
+                                                        map_data = viz_data.get("map_data", [])
+                                                        if map_data:
+                                                            map_data_np = np.array(map_data) if not isinstance(map_data, np.ndarray) else map_data
+                                                            min_val_new = np.min(map_data_np)
+                                                            max_val_new = np.max(map_data_np)
+                                                            range_val_new = max_val_new - min_val_new
+                                                            logging.info(f"📊 Frame inicial: Después de inicialización, map_data range={range_val_new:.6f} ({min_val_new:.6f} - {max_val_new:.6f})")
+                                                else:
+                                                    logging.error("❌ Frame inicial: psi sigue vacío después de inicialización")
+                                            else:
+                                                logging.error("❌ Frame inicial: No se pudo obtener psi después de inicialización")
+                                        except Exception as init_error:
+                                            logging.error(f"❌ Frame inicial: Error inicializando motor: {init_error}", exc_info=True)
+                            
+                            # CRÍTICO: Re-obtener map_data de viz_data antes de enviar (por si fue regenerado)
+                            if viz_data and isinstance(viz_data, dict):
+                                map_data = viz_data.get("map_data", [])
+                            
+                            if map_data and len(map_data) > 0:
+                                # Usar el step inicial (del checkpoint si existe, sino 0)
+                                initial_step = g_state.get('initial_step', 0)
+                                frame_payload_raw = {
                                     "step": initial_step,
-                                    "initial_step": initial_step,
-                                    "checkpoint_step": checkpoint_step,
-                                    "checkpoint_episode": checkpoint_episode,
-                                    "is_paused": True,
-                                    "live_feed_enabled": live_feed_enabled,
-                                    "fps": g_state.get('current_fps', 0.0),
-                                    "training_grid_size": training_grid_size,
-                                    "inference_grid_size": inference_grid_size,
-                                    "grid_scaled": training_grid_size != inference_grid_size
+                                    "timestamp": asyncio.get_event_loop().time(),
+                                    "map_data": map_data,
+                                    "hist_data": viz_data.get("hist_data", {}),
+                                    "poincare_coords": viz_data.get("poincare_coords", []),
+                                    "phase_attractor": viz_data.get("phase_attractor"),
+                                    "flow_data": viz_data.get("flow_data"),
+                                    "phase_hsv_data": viz_data.get("phase_hsv_data"),
+                                    "complex_3d_data": viz_data.get("complex_3d_data"),
+                                    "simulation_info": {
+                                        "step": initial_step,
+                                        "initial_step": initial_step,
+                                        "checkpoint_step": checkpoint_step,
+                                        "checkpoint_episode": checkpoint_episode,
+                                        "is_paused": True,
+                                        "live_feed_enabled": live_feed_enabled,
+                                        "fps": g_state.get('current_fps', 0.0),
+                                        "training_grid_size": training_grid_size,
+                                        "inference_grid_size": inference_grid_size,
+                                        "grid_scaled": training_grid_size != inference_grid_size
+                                    }
                                 }
-                            }
-                            
-                            # Aplicar optimizaciones si están habilitadas
-                            compression_enabled = g_state.get('data_compression_enabled', True)
-                            downsample_factor = g_state.get('downsample_factor', 1)
-                            viz_type = g_state.get('viz_type', 'density')
-                            
-                            if compression_enabled or downsample_factor > 1:
-                                frame_payload = await optimize_frame_payload(
-                                    frame_payload_raw,
-                                    enable_compression=compression_enabled,
-                                    downsample_factor=downsample_factor,
-                                    viz_type=viz_type
-                                )
+                                
+                                # Aplicar optimizaciones si están habilitadas
+                                compression_enabled = g_state.get('data_compression_enabled', True)
+                                downsample_factor = g_state.get('downsample_factor', 1)
+                                viz_type = g_state.get('viz_type', 'density')
+                                
+                                if compression_enabled or downsample_factor > 1:
+                                    frame_payload = await optimize_frame_payload(
+                                        frame_payload_raw,
+                                        enable_compression=compression_enabled,
+                                        downsample_factor=downsample_factor,
+                                        viz_type=viz_type
+                                    )
+                                else:
+                                    frame_payload = frame_payload_raw
+                                
+                                # Verificar que el payload tenga step antes de enviar
+                                if 'step' not in frame_payload:
+                                    logging.warning(f"⚠️ Frame inicial sin step, añadiendo step={initial_step}")
+                                    frame_payload['step'] = initial_step
+                                
+                                await broadcast({"type": "simulation_frame", "payload": frame_payload})
+                                logging.info(f"Frame inicial enviado exitosamente para '{exp_name}' (step={initial_step}, keys={list(frame_payload.keys())})")
                             else:
-                                frame_payload = frame_payload_raw
-                            
-                            # Verificar que el payload tenga step antes de enviar
-                            initial_step = g_state.get('initial_step', 0)
-                            if 'step' not in frame_payload:
-                                logging.warning(f"⚠️ Frame inicial sin step, añadiendo step={initial_step}")
-                                frame_payload['step'] = initial_step
-                            
-                            await broadcast({"type": "simulation_frame", "payload": frame_payload})
-                            logging.info(f"Frame inicial enviado exitosamente para '{exp_name}' (step={initial_step}, keys={list(frame_payload.keys())})")
-                        else:
-                            logging.warning("get_visualization_data retornó map_data vacío.")
-                            if ws: await send_notification(ws, "⚠️ Modelo cargado pero sin datos de visualización iniciales.", "warning")
+                                logging.warning("get_visualization_data retornó map_data vacío.")
+                                if ws: await send_notification(ws, "⚠️ Modelo cargado pero sin datos de visualización iniciales.", "warning")
                     else:
                         logging.warning("get_visualization_data retornó datos inválidos para frame inicial.")
                         if ws: await send_notification(ws, "⚠️ Error generando datos de visualización iniciales.", "warning")
@@ -1943,25 +1758,28 @@ async def handle_load_experiment(args):
         # Logging detallado para debugging
         logging.info(f"📊 compile_status completo: {compile_status}")
         
+        # Guardar compile_status en g_state para uso futuro (para build_inference_status_payload)
+        g_state['compile_status'] = compile_status
+        
         if ws: await send_notification(ws, f"✅ Modelo '{exp_name}' cargado exitosamente. Presiona 'Iniciar' para comenzar la simulación.", "success")
         
         # Enviar compile_status en el broadcast con información del checkpoint y grid
         initial_step = checkpoint_step if checkpoint_path else 0
-        status_payload = {
-            "status": "paused",
-            "model_loaded": True,
-            "experiment_name": exp_name,
-            "compile_status": compile_status,
-            "checkpoint_info": {
-                "checkpoint_path": checkpoint_path if checkpoint_path else None,
-                "checkpoint_step": checkpoint_step,
-                "checkpoint_episode": checkpoint_episode,
-                "initial_step": initial_step,
-                "training_grid_size": training_grid_size,
-                "inference_grid_size": inference_grid_size,
-                "grid_scaled": training_grid_size != inference_grid_size,
-                "grid_size_ratio": inference_grid_size / training_grid_size if training_grid_size > 0 else 1.0
-            }
+        status_payload = build_inference_status_payload(
+            "paused",
+            model_loaded=True,
+            experiment_name=exp_name
+        )
+        # Agregar información adicional del checkpoint
+        status_payload["checkpoint_info"] = {
+            "checkpoint_path": checkpoint_path if checkpoint_path else None,
+            "checkpoint_step": checkpoint_step,
+            "checkpoint_episode": checkpoint_episode,
+            "initial_step": initial_step,
+            "training_grid_size": training_grid_size,
+            "inference_grid_size": inference_grid_size,
+            "grid_scaled": training_grid_size != inference_grid_size,
+            "grid_size_ratio": inference_grid_size / training_grid_size if training_grid_size > 0 else 1.0
         }
         logging.info(f"📤 Enviando inference_status_update con compile_status: {status_payload}")
         await broadcast({
@@ -2060,17 +1878,85 @@ async def handle_switch_engine(args):
     was_running = not g_state.get('is_paused', True)
     if was_running:
         g_state['is_paused'] = True
-        await broadcast({"type": "inference_status_update", "payload": {"status": "paused"}})
+        status_payload = build_inference_status_payload("paused")
+        await broadcast({"type": "inference_status_update", "payload": status_payload})
+        # Esperar para asegurar que el simulation_loop detecte la pausa
+        await asyncio.sleep(0.3)
     
-    # CRÍTICO: Limpiar motor anterior antes de cambiar para prevenir segfaults
+    # CRÍTICO: Guardar estado ANTES de limpiar motor (solo si ambos motores son compatibles)
+    current_step = g_state.get('simulation_step', 0)
+    current_psi = None
+    state_compatible = False
+    
+    # Determinar si los motores son compatibles para transferir estado
+    # Los motores nativo y Python pueden tener formatos diferentes, incluso si ambos usan PyTorch
+    # Por ahora, asumimos que NO son directamente compatibles y siempre recargamos desde checkpoint
+    # Esto es más seguro y evita problemas de formato
+    engines_compatible = False
+    
+    # FUTURO: Si ambos motores usan el mismo formato de estado denso, podríamos transferir
+    # Por ahora, para seguridad, siempre recargamos desde checkpoint al cambiar entre motores
+    
+    if current_is_native and target_engine == 'native':
+        # Mismo motor: compatible
+        engines_compatible = True
+    elif not current_is_native and target_engine == 'python':
+        # Mismo motor: compatible
+        engines_compatible = True
+    else:
+        # Cambiando entre motores diferentes: NO son directamente compatibles
+        engines_compatible = False
+        logging.info(f"⚠️ Cambiando entre motores diferentes (compatibilidad no garantizada). Se recargará desde checkpoint.")
+    
+    # Intentar guardar estado solo si son compatibles
+    if engines_compatible:
+        try:
+            if motor and hasattr(motor, 'get_dense_state'):
+                # Motor nativo: usar get_dense_state() para obtener estado denso
+                try:
+                    current_psi = motor.get_dense_state(check_pause_callback=lambda: False)
+                    if current_psi is not None and isinstance(current_psi, torch.Tensor):
+                        current_psi = current_psi.clone().detach()
+                        state_compatible = True
+                        logging.info(f"Estado guardado desde motor nativo (shape={current_psi.shape})")
+                except Exception as e:
+                    logging.debug(f"No se pudo guardar estado desde motor nativo: {e}")
+                    state_compatible = False
+            elif motor and hasattr(motor, 'state') and motor.state and hasattr(motor.state, 'psi'):
+                # Motor Python: estado ya está en formato denso
+                try:
+                    if motor.state.psi is not None:
+                        current_psi = motor.state.psi.clone().detach()
+                        state_compatible = True
+                        logging.info(f"Estado guardado desde motor Python (shape={current_psi.shape})")
+                except Exception as e:
+                    logging.debug(f"No se pudo guardar estado desde motor Python: {e}")
+                    state_compatible = False
+        except Exception as e:
+            logging.warning(f"Error guardando estado al cambiar engine: {e}")
+            state_compatible = False
+    else:
+        # Motores no compatibles: no intentar transferir estado
+        logging.info("Motores no compatibles para transferir estado. Se recargará desde checkpoint.")
+        if ws:
+            try:
+                await send_notification(ws, "ℹ️ Los motores nativo y Python no son directamente compatibles. Recargando desde checkpoint.", "info")
+            except:
+                pass
+    
+    # CRÍTICO: Limpiar motor anterior ANTES de cargar el nuevo para prevenir segfaults
     old_motor = motor
+    cleanup_success = False
     try:
         # Limpiar motor nativo explícitamente antes de eliminarlo
         if old_motor and hasattr(old_motor, 'native_engine'):
+            logging.info("Limpiando motor nativo antes de cambiar a motor Python...")
             try:
                 if hasattr(old_motor, 'cleanup'):
                     old_motor.cleanup()
-                    logging.debug("Motor nativo limpiado explícitamente antes de cambiar de engine")
+                    await asyncio.sleep(0.2)  # Espera adicional después del cleanup
+                    cleanup_success = True
+                    logging.info("✅ Motor nativo limpiado explícitamente antes de cambiar de engine")
                 else:
                     # Fallback: limpiar manualmente
                     if hasattr(old_motor, 'native_engine') and old_motor.native_engine is not None:
@@ -2079,55 +1965,150 @@ async def handle_switch_engine(args):
                         if hasattr(old_motor.state, 'psi') and old_motor.state.psi is not None:
                             old_motor.state.psi = None
                         old_motor.state = None
+                    cleanup_success = True
             except Exception as cleanup_error:
-                logging.warning(f"Error durante cleanup de motor nativo al cambiar engine: {cleanup_error}")
+                logging.error(f"❌ Error durante cleanup de motor nativo al cambiar engine: {cleanup_error}", exc_info=True)
+                # Continuar con limpieza manual aunque cleanup() haya fallado
+                try:
+                    if hasattr(old_motor, 'native_engine'):
+                        old_motor.native_engine = None
+                    if hasattr(old_motor, 'state'):
+                        old_motor.state = None
+                    if hasattr(old_motor, 'dense_state_cache'):
+                        old_motor.dense_state_cache = None
+                    cleanup_success = True
+                except Exception as manual_cleanup_error:
+                    logging.error(f"❌ Error en limpieza manual: {manual_cleanup_error}")
+        else:
+            cleanup_success = True  # No es motor nativo, no necesita cleanup especial
+        
+        # Limpiar referencias en g_state
+        g_state['motor'] = None
+        import gc
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
+        # Espera adicional después de cleanup para asegurar que C++ termine
+        await asyncio.sleep(0.2)
+        
     except Exception as e:
-        logging.warning(f"Error limpiando motor anterior al cambiar engine: {e}", exc_info=True)
+        logging.error(f"❌ Error crítico limpiando motor anterior al cambiar engine: {e}", exc_info=True)
+        # Intentar continuar aunque haya error, pero marcar como fallido
+        cleanup_success = False
     
-    # Guardar estado actual si es posible
-    current_step = g_state.get('simulation_step', 0)
-    current_psi = None
-    try:
-        if motor and hasattr(motor, 'state') and motor.state and motor.state.psi is not None:
-            current_psi = motor.state.psi.clone().detach()
-    except Exception as e:
-        logging.warning(f"Error guardando estado al cambiar engine: {e}")
-        current_psi = None
+    # Advertir si el cleanup no fue exitoso, pero continuar de todas formas
+    if not cleanup_success:
+        logging.warning("⚠️ Cleanup del motor anterior tuvo problemas, pero continuando...")
+        if ws: 
+            await send_notification(ws, "⚠️ Hubo problemas limpiando el motor anterior, pero continuando...", "warning")
     
+    # CRÍTICO: Envolver carga del nuevo motor en try-except robusto para evitar que el servidor se cierre
     try:
         # Recargar el experimento con el motor objetivo
         # Usar handle_load_experiment pero forzar el motor específico
-        await handle_load_experiment({
-            'ws_id': args.get('ws_id'),
-            'experiment_name': exp_name,
-            'force_engine': target_engine
-        })
+        logging.info(f"Recargando experimento '{exp_name}' con motor {target_engine}...")
         
-        # Restaurar el paso y estado si es posible
-        if current_psi is not None:
+        try:
+            await handle_load_experiment({
+                'ws_id': args.get('ws_id'),
+                'experiment_name': exp_name,
+                'force_engine': target_engine
+            })
+            logging.info(f"✅ Experimento '{exp_name}' recargado exitosamente con motor {target_engine}")
+        except Exception as load_error:
+            logging.error(f"❌ Error crítico cargando experimento con motor {target_engine}: {load_error}", exc_info=True)
+            # Intentar notificar al cliente
+            if ws: 
+                try:
+                    await send_notification(ws, f"❌ Error cargando experimento con motor {target_engine}: {str(load_error)[:80]}...", "error")
+                except Exception as notify_error:
+                    logging.debug(f"Error enviando notificación: {notify_error}")
+            
+            # Asegurar que g_state esté en un estado válido aunque haya error
+            try:
+                g_state['motor'] = None
+                g_state['is_paused'] = True
+                g_state['active_experiment'] = None
+            except:
+                pass
+            
+            # NO re-raise: evitar que el servidor se cierre, solo notificar el error
+            # El usuario puede intentar cargar nuevamente o usar otro motor
+            return
+        
+        # Intentar restaurar el paso y estado solo si son compatibles
+        # NOTA: El estado puede no ser compatible entre motores (formato diferente)
+        if state_compatible and current_psi is not None:
             new_motor = g_state.get('motor')
             if new_motor and hasattr(new_motor, 'state'):
                 try:
-                    # Intentar restaurar el estado (puede fallar si cambió el formato)
-                    new_motor.state.psi = current_psi.to(new_motor.state.psi.device)
-                    g_state['simulation_step'] = current_step
-                    logging.info(f"✅ Estado restaurado al cambiar de motor (step={current_step})")
-                except Exception as e:
-                    logging.warning(f"⚠️ No se pudo restaurar el estado: {e}. Usando estado inicial.")
+                    # Verificar que las formas coincidan
+                    new_psi_shape = new_motor.state.psi.shape if hasattr(new_motor.state, 'psi') and new_motor.state.psi is not None else None
+                    if new_psi_shape and current_psi.shape == new_psi_shape:
+                        # Intentar restaurar el estado (puede fallar si cambió el formato)
+                        new_motor.state.psi = current_psi.to(new_motor.state.psi.device)
+                        g_state['simulation_step'] = current_step
+                        logging.info(f"✅ Estado restaurado al cambiar de motor (step={current_step})")
+                    else:
+                        logging.warning(f"⚠️ Formas incompatibles: actual={current_psi.shape}, nuevo={new_psi_shape}. No se restaurará el estado.")
+                        if ws: 
+                            try:
+                                await send_notification(ws, "⚠️ Estados incompatibles entre motores. Usando estado del checkpoint.", "warning")
+                            except:
+                                pass
+                except Exception as restore_error:
+                    logging.warning(f"⚠️ No se pudo restaurar el estado: {restore_error}. Usando estado inicial del checkpoint.")
+                    if ws: 
+                        try:
+                            await send_notification(ws, "⚠️ No se pudo transferir el estado entre motores. Usando estado del checkpoint.", "warning")
+                        except:
+                            pass
+        else:
+            # Si no se pudo guardar el estado o no es compatible, usar estado del checkpoint
+            logging.info("Estado no transferido entre motores. Usando estado del checkpoint.")
+            if ws and not state_compatible:
+                try:
+                    await send_notification(ws, "ℹ️ Estados no transferidos entre motores. Usando estado del checkpoint.", "info")
+                except:
+                    pass
         
         if ws: 
-            engine_label = "Nativo (C++)" if target_engine == 'native' else "Python"
-            await send_notification(ws, f"✅ Cambiado a motor {engine_label}", "success")
+            try:
+                engine_label = "Nativo (C++)" if target_engine == 'native' else "Python"
+                await send_notification(ws, f"✅ Cambiado a motor {engine_label}", "success")
+            except:
+                pass
         
         # Reanudar simulación si estaba corriendo
         if was_running:
-            await handle_play({'ws_id': args.get('ws_id')})
+            try:
+                await asyncio.sleep(0.1)  # Pequeña espera antes de reanudar
+                await handle_play({'ws_id': args.get('ws_id')})
+            except Exception as play_error:
+                logging.warning(f"Error reanudando simulación: {play_error}")
             
     except Exception as e:
-        logging.error(f"Error cambiando de motor: {e}", exc_info=True)
-        if ws: await send_notification(ws, f"❌ Error cambiando de motor: {str(e)[:50]}...", "error")
+        # Captura cualquier error inesperado y evita que el servidor se cierre
+        logging.error(f"❌ Error inesperado cambiando de motor: {e}", exc_info=True)
+        if ws: 
+            try:
+                await send_notification(ws, f"❌ Error inesperado cambiando de motor: {str(e)[:80]}...", "error")
+            except Exception as notify_error:
+                logging.debug(f"Error enviando notificación: {notify_error}")
+        
+        # Asegurar que g_state esté en un estado válido aunque haya error
+        try:
+            g_state['motor'] = None
+            g_state['is_paused'] = True
+        except:
+            pass
+        
+        # NO re-raise: evitar que el servidor se cierre completamente
+        # Solo loguear el error y continuar
 
 async def handle_unload_model(args):
+    logging.info("🗑️ handle_unload_model() llamado - Descargando modelo...")
     """Descarga el modelo cargado y limpia el estado."""
     ws = g_state['websockets'].get(args.get('ws_id'))
     motor = g_state.get('motor')
@@ -2136,11 +2117,16 @@ async def handle_unload_model(args):
         if ws: 
             try:
                 await send_notification(ws, "⚠️ No hay modelo cargado para descargar.", "warning")
-            except (ConnectionResetError, ConnectionError, OSError):
+            except (ConnectionResetError, ConnectionError, OSError, RuntimeError):
                 pass  # Cliente ya desconectado, ignorar
+            except Exception as e:
+                logging.debug(f"Error enviando notificación de sin modelo: {e}")
         return
     
     try:
+        # Pausar la simulación primero para evitar race conditions
+        g_state['is_paused'] = True
+        await asyncio.sleep(0.1)  # Pequeña espera para que el loop detecte la pausa
         # Limpiar motor y estado
         experiment_name = g_state.get('active_experiment', 'Unknown')
         
@@ -2150,26 +2136,41 @@ async def handle_unload_model(args):
             try:
                 if hasattr(motor, 'cleanup'):
                     motor.cleanup()
+                    await asyncio.sleep(0.1)  # Pequeña espera después del cleanup
                     logging.debug("Motor nativo limpiado usando método cleanup()")
                 elif hasattr(motor, 'native_engine') and hasattr(motor.native_engine, 'clear'):
                     motor.native_engine.clear()
+                    await asyncio.sleep(0.1)  # Pequeña espera después del clear
                     logging.debug("Motor nativo limpiado usando clear()")
-            except Exception as cleanup_error:
+            except (RuntimeError, AttributeError, OSError) as cleanup_error:
                 logging.warning(f"Error durante cleanup de motor nativo (no crítico): {cleanup_error}")
+            except Exception as cleanup_error:
+                logging.warning(f"Error inesperado durante cleanup de motor nativo: {cleanup_error}", exc_info=True)
         
         # Limpiar estado del motor
         if hasattr(motor, 'state') and motor.state is not None:
             try:
                 if hasattr(motor.state, 'psi') and motor.state.psi is not None:
-                    del motor.state.psi
+                    try:
+                        del motor.state.psi
+                    except (AttributeError, RuntimeError):
+                        pass
                     motor.state.psi = None
-                del motor.state
+                try:
+                    del motor.state
+                except (AttributeError, RuntimeError):
+                    pass
                 motor.state = None
-            except Exception as state_cleanup_error:
+            except (AttributeError, RuntimeError) as state_cleanup_error:
                 logging.debug(f"Error limpiando estado del motor (no crítico): {state_cleanup_error}")
+            except Exception as state_cleanup_error:
+                logging.warning(f"Error inesperado limpiando estado del motor: {state_cleanup_error}")
         
         # Limpiar referencia del motor (no usar del directamente)
-        motor = None
+        try:
+            motor = None
+        except:
+            pass
         
         # Limpiar g_state ANTES de eliminar el motor
         g_state['motor'] = None
@@ -2207,34 +2208,65 @@ async def handle_unload_model(args):
         
         logging.info(f"✅ Modelo '{experiment_name}' descargado y memoria limpiada")
         
+        # Limpiar compile_status de g_state
+        if 'compile_status' in g_state:
+            g_state['compile_status'] = None
+        
         # Enviar notificación solo si el WebSocket sigue conectado
         if ws and not ws.closed:
             try:
                 await send_notification(ws, f"✅ Modelo descargado. Memoria limpiada.", "success")
-            except (ConnectionResetError, ConnectionError, OSError):
+            except (ConnectionResetError, ConnectionError, OSError, RuntimeError):
                 logging.debug("WebSocket cerrado durante notificación de descarga (normal)")
+            except Exception as notify_error:
+                logging.debug(f"Error enviando notificación de descarga: {notify_error}")
         
         # Enviar actualización de estado a todos los clientes conectados
         try:
-            await broadcast({
-                "type": "inference_status_update",
-                "payload": {
-                    "status": "paused",
-                    "model_loaded": False,
-                    "experiment_name": None,
-                    "compile_status": None
-                }
-            })
+            status_payload = build_inference_status_payload("paused", model_loaded=False, experiment_name=None)
+            status_payload["compile_status"] = None  # Sin modelo, no hay compile_status
+            await broadcast({"type": "inference_status_update", "payload": status_payload})
+        except (ConnectionResetError, ConnectionError, OSError, RuntimeError) as broadcast_error:
+            logging.debug(f"Error enviando broadcast de estado después de descarga (cliente desconectado): {broadcast_error}")
         except Exception as broadcast_error:
             logging.warning(f"Error enviando broadcast de estado después de descarga: {broadcast_error}")
         
-    except Exception as e:
-        logging.error(f"Error descargando modelo: {e}", exc_info=True)
+    except (RuntimeError, AttributeError, OSError) as e:
+        logging.error(f"Error crítico descargando modelo: {e}", exc_info=True)
+        # Limpiar estado mínimo para evitar estado inconsistente
+        try:
+            g_state['motor'] = None
+            g_state['is_paused'] = True
+            g_state['motor_is_native'] = False
+            g_state['active_experiment'] = None
+            if 'compile_status' in g_state:
+                g_state['compile_status'] = None
+        except:
+            pass
         # Enviar notificación solo si el WebSocket sigue conectado
         if ws and not ws.closed:
             try:
                 await send_notification(ws, f"⚠️ Error al descargar modelo: {str(e)[:50]}...", "error")
-            except (ConnectionResetError, ConnectionError, OSError):
+            except (ConnectionResetError, ConnectionError, OSError, RuntimeError):
+                pass  # Cliente ya desconectado, ignorar
+    except Exception as e:
+        # Capturar cualquier otro error inesperado
+        logging.error(f"Error inesperado descargando modelo: {e}", exc_info=True)
+        # Limpiar estado mínimo para evitar estado inconsistente
+        try:
+            g_state['motor'] = None
+            g_state['is_paused'] = True
+            g_state['motor_is_native'] = False
+            g_state['active_experiment'] = None
+            if 'compile_status' in g_state:
+                g_state['compile_status'] = None
+        except:
+            pass
+        # Enviar notificación solo si el WebSocket sigue conectado
+        if ws and not ws.closed:
+            try:
+                await send_notification(ws, f"⚠️ Error inesperado al descargar modelo.", "error")
+            except (ConnectionResetError, ConnectionError, OSError, RuntimeError):
                 pass  # Cliente ya desconectado, ignorar
 
 async def handle_reset(args):
@@ -2336,67 +2368,8 @@ async def handle_reset(args):
         msg = f"❌ Error al reiniciar: {str(e)}"
         if ws: await send_notification(ws, msg, "error")
 
-async def handle_shutdown(args):
-    """
-    Handler para apagar el servidor desde la UI.
-    
-    Args:
-        args: Dict con parámetros (opcional: 'confirm'=True)
-    """
-    ws = args.get('ws') if isinstance(args, dict) else None
-    
-    try:
-        # Verificar confirmación
-        confirm = args.get('confirm', False) if isinstance(args, dict) else False
-        if not confirm:
-            if ws:
-                await send_notification(ws, "⚠️ Shutdown requiere confirmación. Envía con confirm=true", "warning")
-            return
-        
-        # Notificar a todos los clientes que el servidor se apagará
-        await broadcast({
-            "type": "server_shutdown",
-            "message": "Servidor apagándose en 2 segundos..."
-        })
-        
-        # Esperar un momento para que el mensaje se envíe
-        await asyncio.sleep(0.5)
-        
-        # Activar shutdown event si está disponible
-        shutdown_event = g_state.get('shutdown_event')
-        if shutdown_event:
-            shutdown_event.set()
-            logging.info("🚀 Shutdown solicitado desde UI. Evento activado.")
-            if ws:
-                await send_notification(ws, "✅ Comando de shutdown enviado", "success")
-        else:
-            # Fallback: usar os._exit si no hay evento
-            logging.warning("⚠️ Shutdown event no disponible. Usando os._exit()")
-            import os
-            if ws:
-                await send_notification(ws, "⚠️ Apagando servidor...", "warning")
-            # Esperar un momento antes de forzar salida
-            await asyncio.sleep(1.0)
-            os._exit(0)
-            
-    except Exception as e:
-        logging.error(f"Error en handle_shutdown: {e}", exc_info=True)
-        if ws:
-            await send_notification(ws, f"Error al apagar servidor: {str(e)}", "error")
-
-async def handle_refresh_experiments(args):
-    """Refresca la lista de experimentos y la envía a todos los clientes conectados."""
-    try:
-        experiments = get_experiment_list()
-        await broadcast({
-            "type": "experiments_updated",
-            "payload": {
-                "experiments": experiments
-            }
-        })
-        logging.info(f"Lista de experimentos actualizada y enviada a clientes ({len(experiments)} experimentos)")
-    except Exception as e:
-        logging.error(f"Error al refrescar lista de experimentos: {e}", exc_info=True)
+# handle_shutdown y handle_refresh_experiments ahora están en handlers/system_handlers.py
+# Importados al inicio del archivo y usados en el diccionario HANDLERS
 
 async def handle_list_checkpoints(args):
     """Lista todos los checkpoints de un experimento."""
@@ -2541,49 +2514,7 @@ async def handle_delete_checkpoint(args):
         logging.error(f"Error al eliminar checkpoint: {e}", exc_info=True)
         if ws: await send_notification(ws, f"Error al eliminar checkpoint: {str(e)}", "error")
 
-async def handle_delete_experiment(args):
-    """Elimina un experimento completo (configuración y checkpoints)."""
-    ws = g_state['websockets'].get(args.get('ws_id'))
-    exp_name = args.get("EXPERIMENT_NAME")
-    
-    if not exp_name:
-        if ws: await send_notification(ws, "Nombre de experimento no proporcionado.", "error")
-        return
-    
-    try:
-        import os
-        import shutil
-        
-        # Eliminar directorio del experimento (config.json)
-        exp_dir = os.path.join(global_cfg.EXPERIMENTS_DIR, exp_name)
-        if os.path.exists(exp_dir):
-            shutil.rmtree(exp_dir)
-            logging.info(f"Directorio de experimento eliminado: {exp_dir}")
-        
-        # Eliminar directorio de checkpoints
-        checkpoint_dir = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, exp_name)
-        if os.path.exists(checkpoint_dir):
-            shutil.rmtree(checkpoint_dir)
-            logging.info(f"Directorio de checkpoints eliminado: {checkpoint_dir}")
-        
-        # Si el experimento activo era el eliminado, limpiar el estado
-        active_exp = g_state.get('active_experiment')
-        if g_state.get('motor') and active_exp:
-            if active_exp == exp_name:
-                g_state['motor'] = None
-                g_state['active_experiment'] = None
-                g_state['simulation_step'] = 0
-                g_state['is_paused'] = True
-                await broadcast({"type": "inference_status_update", "payload": {"status": "paused"}})
-        
-        if ws: await send_notification(ws, f"✅ Experiment '{exp_name}' eliminado exitosamente.", "success")
-        
-        # Enviar lista actualizada de experimentos
-        await handle_refresh_experiments(args)
-        
-    except Exception as e:
-        logging.error(f"Error al eliminar experimento '{exp_name}': {e}", exc_info=True)
-        if ws: await send_notification(ws, f"Error al eliminar experimento: {str(e)}", "error")
+# handle_delete_experiment ya está en handlers/experiment_handlers.py - eliminado duplicado
 
 async def handle_analyze_universe_atlas(args):
     """
@@ -3033,82 +2964,8 @@ async def handle_enable_snapshots(args):
         if ws:
             await send_notification(ws, f"Error al configurar snapshots: {str(e)}", "error")
 
-async def handle_set_live_feed(args):
-    """Habilita o deshabilita el envío de datos en tiempo real (live feed)."""
-    ws = g_state['websockets'].get(args.get('ws_id'))
-    enabled = args.get('enabled', True)
-    g_state['live_feed_enabled'] = bool(enabled)
-    
-    # Resetear contador de pasos cuando se activa/desactiva live feed
-    if 'steps_interval_counter' not in g_state:
-        g_state['steps_interval_counter'] = 0
-    if 'last_frame_sent_step' not in g_state:
-        g_state['last_frame_sent_step'] = -1  # Forzar envío de frame inicial
-    
-    status_msg = "activado" if enabled else "desactivado"
-    logging.info(f"Live feed {status_msg}. La simulación continuará ejecutándose {'sin calcular visualizaciones' if not enabled else 'y enviando datos en tiempo real'}.")
-    
-    if ws:
-        await send_notification(ws, f"Live feed {status_msg}. {'La simulación corre sin calcular visualizaciones para mejor rendimiento.' if not enabled else 'Enviando datos en tiempo real.'}", "info")
-    
-    # Si se desactiva live feed, enviar un frame inicial inmediatamente para que el usuario vea algo
-    if not enabled and g_state.get('motor') and not g_state.get('is_paused', True):
-        try:
-            current_step = g_state.get('simulation_step', 0)
-            delta_psi = g_state['motor'].last_delta_psi if hasattr(g_state['motor'], 'last_delta_psi') else None
-            viz_data = get_visualization_data(
-                g_state['motor'].state.psi, 
-                g_state.get('viz_type', 'density'),
-                delta_psi=delta_psi,
-                motor=g_state['motor']
-            )
-            
-            if viz_data and isinstance(viz_data, dict):
-                map_data = viz_data.get("map_data", [])
-                if map_data and len(map_data) > 0:
-                    frame_payload_raw = {
-                        "step": current_step,
-                        "timestamp": asyncio.get_event_loop().time(),
-                        "map_data": map_data,
-                        "hist_data": viz_data.get("hist_data", {}),
-                        "poincare_coords": viz_data.get("poincare_coords", []),
-                        "phase_attractor": viz_data.get("phase_attractor"),
-                        "flow_data": viz_data.get("flow_data"),
-                        "phase_hsv_data": viz_data.get("phase_hsv_data"),
-                        "complex_3d_data": viz_data.get("complex_3d_data"),
-                        "simulation_info": {
-                            "step": current_step,
-                            "is_paused": False,
-                            "live_feed_enabled": False,
-                            "fps": g_state.get('current_fps', 0.0)
-                        }
-                    }
-                    
-                    # Aplicar optimizaciones si están habilitadas
-                    compression_enabled = g_state.get('data_compression_enabled', True)
-                    downsample_factor = g_state.get('downsample_factor', 1)
-                    
-                    if compression_enabled or downsample_factor > 1:
-                        frame_payload = await optimize_frame_payload(
-                            frame_payload_raw,
-                            enable_compression=compression_enabled,
-                            downsample_factor=downsample_factor,
-                            viz_type=g_state.get('viz_type', 'density')
-                        )
-                    else:
-                        frame_payload = frame_payload_raw
-                    
-                    await broadcast({"type": "simulation_frame", "payload": frame_payload})
-                    g_state['last_frame_sent_step'] = current_step
-                    logging.info(f"Frame inicial enviado al desactivar live feed (paso {current_step})")
-        except Exception as e:
-            logging.warning(f"Error enviando frame inicial al desactivar live feed: {e}")
-    
-    # Enviar actualización a todos los clientes
-    await broadcast({
-        "type": "live_feed_status_update",
-        "payload": {"enabled": g_state['live_feed_enabled']}
-    })
+# handle_set_live_feed ahora está en handlers/simulation_handlers.py
+# Importado al inicio del archivo y usado en el diccionario HANDLERS
 
 async def handle_set_compression(args):
     """Habilita o deshabilita la compresión de datos WebSocket."""
@@ -3690,24 +3547,12 @@ async def handle_capture_snapshot(args):
 
 # Diccionario central para mapear comandos a funciones handler
 # Se define aquí después de todas las funciones handler
+# Combinar handlers de módulos extraídos con handlers locales (aún no extraídos)
 HANDLERS = {
-    "experiment": {
-        "create": handle_create_experiment, 
-        "continue": handle_continue_experiment, 
-        "stop": handle_stop_training,
-        "delete": handle_delete_experiment,
-        "list_checkpoints": handle_list_checkpoints,
-        "delete_checkpoint": handle_delete_checkpoint,
-        "cleanup_checkpoints": handle_cleanup_checkpoints
-    },
+    "experiment": EXPERIMENT_HANDLERS,  # Handlers extraídos
     "simulation": {
-        "set_viz": handle_set_viz,
-        "update_visualization": handle_update_visualization,  # Nuevo: actualización manual
-        "set_speed": handle_set_simulation_speed,
-        "set_fps": handle_set_fps,
-        "set_frame_skip": handle_set_frame_skip,
-        "set_live_feed": handle_set_live_feed,
-        "set_steps_interval": handle_set_steps_interval,
+        **SIMULATION_HANDLERS,  # Handlers extraídos
+        # Handlers complejos aún en pipeline_server.py (se extraerán progresivamente)
         "set_compression": handle_set_compression,
         "set_downsample": handle_set_downsample,
         "set_roi": handle_set_roi,
@@ -3727,21 +3572,19 @@ HANDLERS = {
         "clear_snapshots": handle_clear_snapshots
     },
     "inference": {
-        "play": handle_play, 
-        "pause": handle_pause, 
+        **INFERENCE_HANDLERS,  # Handlers extraídos (play, pause)
+        # Handlers complejos aún en pipeline_server.py
         "load": handle_load_experiment,  # También acepta "load" además de "load_experiment"
         "load_experiment": handle_load_experiment, 
-        "unload": handle_unload_model,  # Nuevo: descargar modelo
-        "switch_engine": handle_switch_engine,  # Nuevo: cambiar entre motor nativo y Python
+        "unload": handle_unload_model,
+        "switch_engine": handle_switch_engine,
         "reset": handle_reset,
         "set_config": handle_set_inference_config,
         "inject_energy": handle_inject_energy
     },
-    "server": {
-        "shutdown": handle_shutdown  # Nuevo: apagar servidor desde UI
-    },
+    "server": SYSTEM_HANDLERS,  # Handlers extraídos
     "system": {
-        "refresh_experiments": handle_refresh_experiments
+        **SYSTEM_HANDLERS,  # Handlers extraídos (ya incluye refresh_experiments)
     }
 }
 
@@ -3761,7 +3604,9 @@ def setup_routes(app, serve_frontend=True):
     
     # Siempre agregar la ruta WebSocket (debe tener prioridad absoluta)
     # Esto permite que el servidor funcione aunque no tenga el frontend construido
-    app.router.add_get("/ws", websocket_handler)
+    # Crear handler con HANDLERS (ya está definido antes de llamar a setup_routes)
+    ws_handler_func = create_websocket_handler(HANDLERS)
+    app.router.add_get("/ws", ws_handler_func)
     
     # Si se desactiva el frontend o no existe, servir solo mensaje informativo
     if not serve_frontend:

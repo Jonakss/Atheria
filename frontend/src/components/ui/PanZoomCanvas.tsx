@@ -64,6 +64,45 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     // Usar historyFrame si está disponible, sino usar simData actual
     const dataToRender = historyFrame ? historyFrame : simData;
     
+        // DEBUG: Log cuando se reciben datos (con throttling para evitar spam)
+        const lastLogTimeRef = useRef<number>(0);
+        useEffect(() => {
+            if (process.env.NODE_ENV === 'development' && dataToRender) {
+                const now = Date.now();
+                const timeSinceLastLog = now - lastLogTimeRef.current;
+                
+                // Solo loguear cada 5 segundos para evitar spam en la consola
+                if (timeSinceLastLog < 5000) {
+                    return;
+                }
+                
+                const mapDataShape = dataToRender.map_data 
+                    ? [dataToRender.map_data.length, dataToRender.map_data[0]?.length || 0]
+                    : [0, 0];
+                
+                // Solo loguear si map_data está vacío Y live_feed está activado
+                // Si live_feed está desactivado, es normal que no haya map_data (se envía simulation_state_update)
+                // historyFrame no tiene simulation_info, así que verificar primero si existe
+                const liveFeedEnabled = (dataToRender && 'simulation_info' in dataToRender) 
+                    ? (dataToRender.simulation_info?.live_feed_enabled ?? true)
+                    : true; // Por defecto asumir true si no hay simulation_info
+                
+                if ((mapDataShape[0] === 0 || mapDataShape[1] === 0) && liveFeedEnabled) {
+                    // Solo mostrar advertencia si live_feed está activado pero no hay map_data
+                    // Esto indica un problema real, no un comportamiento normal
+                    console.warn(`⚠️ PanZoomCanvas: dataToRender actualizado pero map_data está vacío - step: ${dataToRender.step}, live_feed: ${liveFeedEnabled}`);
+                    console.warn(`⚠️ dataToRender keys:`, Object.keys(dataToRender || {}));
+                    console.warn(`💡 SUGERENCIA: Verifica que el motor tenga estado válido o usa 'Actualizar Visualización' manualmente`);
+                } else if (mapDataShape[0] > 0 && mapDataShape[1] > 0) {
+                    // Solo loguear cuando hay datos válidos
+                    console.log(`📊 PanZoomCanvas: dataToRender actualizado - step: ${dataToRender.step}, map_data shape: [${mapDataShape[0]}, ${mapDataShape[1]}], useShaderRendering: ${useShaderRendering}, live_feed: ${liveFeedEnabled}`);
+                }
+                // Si no hay map_data pero live_feed está desactivado, no mostrar advertencia (comportamiento normal)
+                
+                lastLogTimeRef.current = now;
+            }
+        }, [dataToRender, useShaderRendering]);
+    
     // Obtener dimensiones de la grilla
     // PRIORIDAD: Usar el tamaño real del grid desde simulation_info si está disponible
     // (esto es el tamaño real de la simulación, no el tamaño de mapData que puede ser ROI)
@@ -311,23 +350,81 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
         };
     }, [pan, zoom, gridWidth, gridHeight, mapData, autoROIEnabled, sendCommand]);
 
-    // Manejar wheel event con listener no pasivo para prevenir el comportamiento por defecto
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        
-        const wheelHandler = (e: WheelEvent) => {
+    // Ref para el contenedor div que maneja el pan y zoom
+    // Necesitamos dos refs: uno para ShaderCanvas y otro para Canvas 2D
+    const containerRefShader = useRef<HTMLDivElement>(null);
+    const containerRefCanvas = useRef<HTMLDivElement>(null);
+    
+    // Función helper para crear el wheel handler
+    const createWheelHandler = useCallback(() => {
+        return (e: WheelEvent) => {
             e.preventDefault();
-            handleWheel(e as any);
-        };
-        
-        // Agregar listener con opciones para que no sea pasivo
-        canvas.addEventListener('wheel', wheelHandler, { passive: false });
-        
-        return () => {
-            canvas.removeEventListener('wheel', wheelHandler);
+            e.stopPropagation();
+            
+            // Crear un evento sintético compatible con React.WheelEvent
+            // El handler espera un React.WheelEvent con clientX, clientY, deltaY
+            const syntheticEvent = {
+                ...e,
+                clientX: e.clientX,
+                clientY: e.clientY,
+                deltaY: e.deltaY,
+                deltaX: e.deltaX,
+                deltaZ: e.deltaZ,
+                preventDefault: () => e.preventDefault(),
+                stopPropagation: () => e.stopPropagation(),
+                isDefaultPrevented: () => e.defaultPrevented,
+                isPropagationStopped: () => false,
+                persist: () => {},
+                nativeEvent: e,
+                currentTarget: e.currentTarget,
+                target: e.target,
+                bubbles: e.bubbles,
+                cancelable: e.cancelable,
+                defaultPrevented: e.defaultPrevented,
+                eventPhase: e.eventPhase,
+                timeStamp: e.timeStamp,
+                type: e.type
+            } as unknown as React.WheelEvent<HTMLDivElement>;
+            
+            handleWheel(syntheticEvent);
         };
     }, [handleWheel]);
+    
+    // Manejar wheel event para ShaderCanvas (WebGL)
+    useEffect(() => {
+        const container = containerRefShader.current;
+        if (!container) return;
+        
+        const wheelHandler = createWheelHandler();
+        
+        // Agregar listener con opciones para que no sea pasivo (permite preventDefault)
+        container.addEventListener('wheel', wheelHandler, { passive: false });
+        
+        // Cleanup al desmontar o cuando cambie handleWheel
+        return () => {
+            if (container) {
+                container.removeEventListener('wheel', wheelHandler);
+            }
+        };
+    }, [createWheelHandler]);
+    
+    // Manejar wheel event para Canvas 2D (fallback)
+    useEffect(() => {
+        const container = containerRefCanvas.current;
+        if (!container) return;
+        
+        const wheelHandler = createWheelHandler();
+        
+        // Agregar listener con opciones para que no sea pasivo (permite preventDefault)
+        container.addEventListener('wheel', wheelHandler, { passive: false });
+        
+        // Cleanup al desmontar o cuando cambie handleWheel
+        return () => {
+            if (container) {
+                container.removeEventListener('wheel', wheelHandler);
+            }
+        };
+    }, [createWheelHandler]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -833,6 +930,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
             {/* Canvas principal - Usar ShaderCanvas (WebGL) cuando WebGL está disponible y la visualización es compatible */}
             {useShaderRendering && mapData && mapData.length > 0 && mapDataWidth > 0 && mapDataHeight > 0 ? (
                 <div
+                    ref={containerRefShader}
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
@@ -857,20 +955,40 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                         width={mapDataWidth}
                         height={mapDataHeight}
                         selectedViz={selectedViz}
+                        minValue={0}  // CRÍTICO: Backend ya normaliza a [0, 1], pasar explícitamente
+                        maxValue={1}  // CRÍTICO: Backend ya normaliza a [0, 1], pasar explícitamente
                         className="w-full h-full"
                         style={{
                             imageRendering: zoom > 2 ? 'pixelated' : 'auto',
+                            pointerEvents: 'none', // El canvas no debe interceptar eventos, el contenedor los maneja
                         }}
                     />
                 </div>
             ) : (
                 /* Fallback a Canvas 2D para visualizaciones complejas o cuando WebGL no está disponible */
-                <canvas
-                    ref={canvasRef}
+                <div
+                    ref={containerRefCanvas}
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
+                    style={{
+                        position: 'absolute',
+                        left: '50%',
+                        top: '50%',
+                        marginLeft: `${-(gridWidth / 2) + (pan.x / zoom)}px`,
+                        marginTop: `${-(gridHeight / 2) + (pan.y / zoom)}px`,
+                        width: `${gridWidth}px`,
+                        height: `${gridHeight}px`,
+                        transform: `scale(${zoom})`,
+                        transformOrigin: 'center center',
+                        cursor: isPanning ? 'grabbing' : 'grab',
+                        pointerEvents: 'auto',
+                        visibility: (dataToRender?.map_data || simData?.map_data) ? 'visible' : 'hidden',
+                    }}
+                >
+                <canvas
+                    ref={canvasRef}
                     style={{ 
                         position: 'absolute',
                         left: '50%',
@@ -887,6 +1005,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                         pointerEvents: 'auto'
                     }}
                 />
+                </div>
             )}
             
             {/* Overlays */}

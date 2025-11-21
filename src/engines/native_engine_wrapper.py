@@ -224,9 +224,39 @@ class NativeEngineWrapper:
             else:
                 raise
         
+        # CRÍTICO: Generar estado inicial según INITIAL_STATE_MODE_INFERENCE (como motor Python)
+        # El motor nativo usa formato disperso, pero generamos estado denso primero
+        # y luego lo convertimos al formato disperso del motor nativo
+        initial_mode = 'complex_noise'  # Default
+        if cfg is not None:
+            initial_mode = getattr(cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')
+        
+        # Soporte para grid scaling: si training_grid_size < inference_grid_size, replicar estado
+        base_state = None
+        base_grid_size = None
+        if cfg is not None:
+            training_grid_size = getattr(cfg, 'GRID_SIZE_TRAINING', None)
+            if training_grid_size and training_grid_size < grid_size:
+                # Crear estado base del tamaño de entrenamiento y replicarlo
+                base_state_temp = QuantumState(training_grid_size, d_state, device, initial_mode=initial_mode)
+                base_state = base_state_temp.psi
+                base_grid_size = training_grid_size
+                logging.info(f"🔄 Grid escalado: Creando estado base {training_grid_size}x{training_grid_size} para replicar en {grid_size}x{grid_size}")
+        
         # Estado cuántico para compatibilidad (denso)
         # El motor nativo usa formato disperso, pero necesitamos denso para visualización
-        self.state = QuantumState(grid_size, d_state, device)
+        self.state = QuantumState(
+            grid_size, 
+            d_state, 
+            device,
+            initial_mode=initial_mode,
+            base_state=base_state,
+            base_grid_size=base_grid_size
+        )
+        
+        # CRÍTICO: Convertir estado denso inicial al formato disperso del motor nativo
+        # Esto genera las partículas iniciales desde el estado denso (ley M respetada)
+        self._initialize_native_state_from_dense(self.state.psi)
         
         # Configuración
         self.grid_size = grid_size
@@ -252,7 +282,62 @@ class NativeEngineWrapper:
         self._dense_state_stale = True  # Estado denso está desactualizado después de evolve
         self._last_conversion_roi = None  # Última ROI usada para conversión
         
-        logging.info(f"NativeEngineWrapper inicializado (grid_size={grid_size}, d_state={d_state}, device={device})")
+        logging.info(f"NativeEngineWrapper inicializado (grid_size={grid_size}, d_state={d_state}, device={device}, initial_mode={initial_mode})")
+    
+    def _initialize_native_state_from_dense(self, dense_psi: torch.Tensor):
+        """
+        Convierte estado denso inicial al formato disperso del motor nativo.
+        
+        Esto respeta INITIAL_STATE_MODE_INFERENCE y genera partículas desde el estado denso,
+        en lugar de agregar partículas manualmente. Las partículas emergen del estado inicial
+        generado según la ley M (modelo cuántico).
+        
+        Args:
+            dense_psi: Tensor complejo [1, H, W, d_state] con estado inicial denso
+        """
+        if dense_psi is None or dense_psi.numel() == 0:
+            logging.warning("⚠️ Estado denso inicial vacío. No se inicializará motor nativo.")
+            return
+        
+        # Obtener valores absolutos para determinar qué células tienen estado significativo
+        psi_abs = dense_psi.abs()
+        psi_abs_sq = psi_abs.pow(2)
+        
+        # Umbral para considerar una célula como "activa" (tiene partícula)
+        # Usar un umbral dinámico basado en la distribución de valores
+        threshold = psi_abs_sq.max().item() * 1e-4  # 0.01% del máximo
+        
+        # Si el umbral es muy pequeño, usar un umbral mínimo
+        if threshold < 1e-10:
+            threshold = 1e-6
+        
+        # Agregar partículas solo donde hay estado significativo
+        particle_count = 0
+        grid_size = dense_psi.shape[1]  # H == W
+        
+        # OPTIMIZACIÓN: Muestrear grid si es muy grande (>256x256)
+        # Para grids grandes, no agregar partículas en cada célula (sería muy lento)
+        sample_step = 1 if grid_size <= 256 else max(1, grid_size // 256)
+        
+        for y in range(0, grid_size, sample_step):
+            for x in range(0, grid_size, sample_step):
+                # Obtener estado en esta posición
+                cell_state = dense_psi[0, y, x, :]  # [d_state]
+                cell_density = psi_abs_sq[0, y, x, :].sum().item()
+                
+                # Solo agregar partícula si tiene densidad significativa
+                if cell_density > threshold:
+                    try:
+                        coord = atheria_core.Coord3D(x, y, 0)
+                        self.native_engine.add_particle(coord, cell_state)
+                        particle_count += 1
+                    except Exception as e:
+                        logging.debug(f"Error agregando partícula en ({x}, {y}): {e}")
+        
+        logging.info(f"✅ Estado inicial generado según INITIAL_STATE_MODE_INFERENCE: {particle_count} partículas activas agregadas al motor nativo (umbral={threshold:.6e})")
+        
+        # Marcar estado denso como stale para que se reconvierta cuando se necesite
+        self._dense_state_stale = True
     
     def load_model(self, model_path: str) -> bool:
         """
@@ -400,6 +485,10 @@ class NativeEngineWrapper:
                 logging.debug(f"Usando lista completa: {len(coords_to_process)} coordenadas")
             
             # Procesar en batches con verificación de pausa
+            non_zero_count = 0
+            total_processed = 0
+            max_abs_value = 0.0
+            
             for i in range(0, len(coords_to_process), BATCH_SIZE):
                 # CRÍTICO: Verificar pausa cada batch para permitir pausa inmediata
                 if check_pause_callback and check_pause_callback():
@@ -413,6 +502,12 @@ class NativeEngineWrapper:
                         
                         # Verificar shape antes de copiar
                         if state_tensor.shape == (self.d_state,):
+                            # Verificar si el estado tiene datos válidos (no todo ceros)
+                            abs_value = state_tensor.abs().max().item()
+                            if abs_value > 1e-10:
+                                non_zero_count += 1
+                                max_abs_value = max(max_abs_value, abs_value)
+                            
                             # Mover a dispositivo correcto si es necesario
                             if state_tensor.device != self.device:
                                 state_tensor = state_tensor.to(self.device)
@@ -420,17 +515,58 @@ class NativeEngineWrapper:
                             # Copiar al estado denso (batch, H, W, d_state)
                             if 0 <= coord.y < self.grid_size and 0 <= coord.x < self.grid_size:
                                 self.state.psi[0, coord.y, coord.x] = state_tensor
+                            
+                            total_processed += 1
                     except Exception as e:
                         logging.debug(f"Error obteniendo estado en ({coord.x}, {coord.y}): {e}")
+            
+            # DEBUG: Logging de estadísticas de conversión
+            if total_processed > 0:
+                non_zero_percent = (non_zero_count / total_processed) * 100.0
+                logging.info(f"📊 Conversión dense state: {total_processed} coordenadas procesadas, {non_zero_count} no-cero ({non_zero_percent:.1f}%), max_abs={max_abs_value:.6f}")
+                
+                if non_zero_count == 0:
+                    logging.error(f"❌ CRÍTICO: Ninguna coordenada tiene estado no-cero. El motor nativo está vacío.")
+                    logging.error(f"💡 El motor nativo necesita estado inicial. Inicializando con estado aleatorio...")
+                    
+                    # CRÍTICO: Si el motor está vacío, inicializar con estado aleatorio
+                    # Esto puede pasar si el motor nativo no se inicializó correctamente al cargar
+                    try:
+                        # Agregar algunas partículas aleatorias para inicializar el estado
+                        import numpy as np
+                        num_particles = min(100, self.grid_size * self.grid_size // 100)  # ~1% del grid
+                        for _ in range(num_particles):
+                            x = np.random.randint(0, self.grid_size)
+                            y = np.random.randint(0, self.grid_size)
+                            z = 0
+                            
+                            # Estado inicial pequeño aleatorio
+                            initial_state = torch.randn(self.d_state, dtype=torch.complex64, device=self.device) * 0.1
+                            
+                            # Agregar al motor nativo
+                            coord = atheria_core.Coord3D(x, y, z)
+                            self.native_engine.add_particle(coord, initial_state)
+                        
+                        logging.info(f"✅ {num_particles} partículas aleatorias agregadas al motor nativo para inicialización.")
+                        
+                        # Reconvertir el estado denso ahora que tiene partículas
+                        # Limpiar el estado denso anterior para forzar reconversión
+                        self.state.psi = None
+                        self._update_dense_state_from_sparse(roi=roi, check_pause_callback=check_pause_callback)
+                    except Exception as init_error:
+                        logging.error(f"❌ Error inicializando estado del motor nativo: {init_error}", exc_info=True)
+            else:
+                logging.error(f"❌ CRÍTICO: No se procesaron coordenadas. El motor nativo puede estar vacío.")
                         
         except Exception as e:
-            logging.warning(f"Error convirtiendo estado disperso a denso: {e}")
+            logging.error(f"❌ Error convirtiendo estado disperso a denso: {e}", exc_info=True)
             # En caso de error, mantener grid actual o inicializar vacío
             if self.state.psi is None:
                 self.state.psi = torch.zeros(
                     1, self.grid_size, self.grid_size, self.d_state,
                     dtype=torch.complex64, device=self.device
                 )
+                logging.warning(f"⚠️ Estado denso inicializado a ceros debido a error en conversión.")
     
     def get_model_for_params(self):
         """Retorna el modelo para acceso a parámetros (compatibilidad)."""
@@ -443,29 +579,56 @@ class NativeEngineWrapper:
     
     def add_initial_particles(self, num_particles: int = 10):
         """
-        Agrega partículas iniciales aleatorias al motor nativo.
+        DEPRECADO: Este método es un hack temporal.
+        
+        Las partículas deberían generarse automáticamente desde el estado inicial denso
+        según INITIAL_STATE_MODE_INFERENCE (ver _initialize_native_state_from_dense).
+        
+        Este método solo se mantiene como fallback si el estado inicial denso no se genera correctamente.
         
         Args:
             num_particles: Número de partículas a agregar
         """
+        import numpy as np
+        
+        logging.warning(f"⚠️ add_initial_particles() es un hack temporal. El estado debería generarse automáticamente según INITIAL_STATE_MODE_INFERENCE.")
+        logging.info(f"🛠️ Fallback: Agregando {num_particles} partículas aleatorias al motor nativo...")
+        
         # Generar partículas aleatorias en el grid
         for _ in range(num_particles):
             x = np.random.randint(0, self.grid_size)
             y = np.random.randint(0, self.grid_size)
             z = 0  # Para 2D, z=0
             
-            # Estado inicial pequeño (energía baja)
-            initial_state = torch.randn(self.d_state, dtype=torch.complex64) * 0.1
+            # Estado inicial con valores significativos (no tan pequeños)
+            # Usar valores más grandes para que sean visibles después de la conversión
+            initial_state = torch.randn(self.d_state, dtype=torch.complex64, device=self.device) * 0.5
             
             # Agregar al motor nativo
             coord = atheria_core.Coord3D(x, y, z)
             self.native_engine.add_particle(coord, initial_state)
         
-        logging.info(f"✅ {num_particles} partículas iniciales agregadas al motor nativo")
+        logging.info(f"✅ {num_particles} partículas aleatorias agregadas al motor nativo (fallback)")
         
-        # Actualizar estado denso (solo si se necesita)
-        # Usar get_dense_state() para lazy conversion
-        self.get_dense_state()
+        # CRÍTICO: Marcar estado denso como stale y limpiar cache
+        # Esto fuerza la reconversión cuando se llame get_dense_state()
+        self._dense_state_stale = True
+        if self.state and self.state.psi is not None:
+            self.state.psi = None
+            logging.debug(f"🔧 Estado denso limpiado después de agregar partículas. Se reconvertirá en próxima llamada a get_dense_state()")
+        
+        # Opcionalmente, ejecutar un paso para que las partículas se propaguen
+        # Esto puede ayudar a que el estado sea más visible
+        try:
+            if self.model_loaded:
+                self.native_engine.step_native()
+                self.step_count += 1
+                logging.debug(f"🔧 Paso de propagación ejecutado después de agregar partículas")
+        except Exception as e:
+            logging.debug(f"⚠️ No se pudo ejecutar paso de propagación después de agregar partículas: {e}")
+        
+        # NO llamar get_dense_state() aquí - dejar que lazy conversion lo haga cuando se necesite
+        # Esto evita conversión innecesaria si no se va a visualizar inmediatamente
     
     def cleanup(self):
         """
@@ -474,27 +637,52 @@ class NativeEngineWrapper:
         """
         try:
             # Limpiar estado denso primero
-            if hasattr(self, 'state') and self.state is not None:
-                if hasattr(self.state, 'psi') and self.state.psi is not None:
-                    self.state.psi = None
-                self.state = None
+            try:
+                if hasattr(self, 'state') and self.state is not None:
+                    if hasattr(self.state, 'psi') and self.state.psi is not None:
+                        try:
+                            self.state.psi = None
+                        except Exception as psi_error:
+                            logging.debug(f"Error limpiando state.psi: {psi_error}")
+                    try:
+                        self.state = None
+                    except Exception as state_error:
+                        logging.debug(f"Error limpiando state: {state_error}")
+            except Exception as state_cleanup_error:
+                logging.debug(f"Error durante limpieza de state: {state_cleanup_error}")
             
             # Limpiar referencias al motor nativo
             # El destructor de C++ se llamará automáticamente cuando no haya más referencias
-            if hasattr(self, 'native_engine') and self.native_engine is not None:
-                # Liberar referencias explícitamente
-                self.native_engine = None
+            try:
+                if hasattr(self, 'native_engine') and self.native_engine is not None:
+                    # Liberar referencias explícitamente
+                    # CRÍTICO: Capturar cualquier error durante la liberación del motor C++
+                    try:
+                        self.native_engine = None
+                    except Exception as native_cleanup_error:
+                        logging.warning(f"Error liberando native_engine: {native_cleanup_error}")
+            except Exception as native_error:
+                logging.warning(f"Error durante limpieza de native_engine: {native_error}")
             
-            # Limpiar otras referencias
-            self.model_loaded = False
-            self.step_count = 0
-            self.last_delta_psi = None
-            self.last_psi_input = None
-            self.last_delta_psi_decay = None
+            # Limpiar otras referencias de forma segura
+            try:
+                if hasattr(self, 'dense_state_cache'):
+                    self.dense_state_cache = None
+            except Exception:
+                pass  # Ignorar errores en limpieza de cache
+            
+            try:
+                self.model_loaded = False
+                self.step_count = 0
+                self.last_delta_psi = None
+                self.last_psi_input = None
+                self.last_delta_psi_decay = None
+            except Exception:
+                pass  # Ignorar errores en limpieza de atributos simples
             
             logging.debug("NativeEngineWrapper limpiado correctamente")
         except Exception as e:
-            logging.warning(f"Error durante cleanup de NativeEngineWrapper: {e}")
+            logging.warning(f"Error durante cleanup de NativeEngineWrapper: {e}", exc_info=True)
     
     def __del__(self):
         """Destructor - llama a cleanup para asegurar limpieza correcta."""

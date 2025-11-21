@@ -418,13 +418,32 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         break;
                     case 'inference_status_update':
                         setInferenceStatus(payload.status);
+                        
+                        // CRÍTICO: Actualizar simulation_info si está disponible (FPS, step, etc.)
+                        if (payload.simulation_info) {
+                            setSimData(prev => ({
+                                ...(prev || {}),
+                                step: payload.step ?? payload.simulation_info?.step ?? prev?.step ?? null,
+                                timestamp: payload.timestamp ?? Date.now(),
+                                simulation_info: {
+                                    ...(prev?.simulation_info || {}),
+                                    ...payload.simulation_info,
+                                    is_paused: payload.status === 'paused'
+                                }
+                            }));
+                        }
+                        
                         // Almacenar compile_status si está disponible
                         if (payload.compile_status) {
                             const newCompileStatus = payload.compile_status as CompileStatus;
-                            console.log('📥 WebSocketContext - Recibido compile_status:', JSON.stringify(newCompileStatus, null, 2));
+                            if (process.env.NODE_ENV === 'development') {
+                                console.log('📥 WebSocketContext - Recibido compile_status:', JSON.stringify(newCompileStatus, null, 2));
+                            }
                             setCompileStatus(newCompileStatus);
                         } else {
-                            console.warn('⚠️ WebSocketContext - inference_status_update sin compile_status. Payload completo:', payload);
+                            if (process.env.NODE_ENV === 'development') {
+                                console.warn('⚠️ WebSocketContext - inference_status_update sin compile_status. Payload completo:', payload);
+                            }
                         }
                         break;
                     case 'simulation_frame':
@@ -439,6 +458,18 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                                 timestamp: payload.timestamp ?? Date.now(),
                                 simulation_info: payload.simulation_info
                             };
+                            
+                            // DEBUG: Log información del frame recibido
+                            if (process.env.NODE_ENV === 'development') {
+                                const mapDataShape = finalPayload.map_data 
+                                    ? [finalPayload.map_data.length, finalPayload.map_data[0]?.length || 0]
+                                    : [0, 0];
+                                const mapDataSample = finalPayload.map_data && finalPayload.map_data.length > 0 && finalPayload.map_data[0]?.length > 0
+                                    ? finalPayload.map_data[0][0]
+                                    : null;
+                                
+                                console.log(`📥 WebSocketContext: simulation_frame recibido - step: ${finalPayload.step}, map_data shape: [${mapDataShape[0]}, ${mapDataShape[1]}], sample value: ${mapDataSample}`);
+                            }
                             
                             // Guardar frame en timeline del navegador (localStorage)
                             // Solo guardar si hay map_data y step válido
@@ -475,6 +506,12 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                                     finalPayload.timestamp < prev.timestamp) {
                                     return prev;
                                 }
+                                
+                                // DEBUG: Log cuando se actualiza simData
+                                if (process.env.NODE_ENV === 'development') {
+                                    console.log(`🔄 WebSocketContext: Actualizando simData - step: ${finalPayload.step}, map_data presente: ${!!finalPayload.map_data}`);
+                                }
+                                
                                 return finalPayload;
                             });
                         } catch (error) {
@@ -483,7 +520,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         break;
                     case 'simulation_state_update':
                         // Actualización de estado sin datos de visualización (cuando live feed está desactivado)
-                        // Actualizar solo step y simulation_info, preservando otros datos existentes
+                        // Actualizar solo step y simulation_info, preservando otros datos existentes (incluyendo map_data)
                         // Usar función de actualización para evitar condiciones de carrera
                         try {
                             setSimData(prev => {
@@ -503,15 +540,18 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                                     setLiveFeedEnabledState(newLiveFeedEnabled);
                                 }
                                 
+                                // CRÍTICO: Preservar TODOS los datos existentes (map_data, hist_data, etc.)
+                                // Solo actualizar step, timestamp y simulation_info
                                 return {
-                                    ...prev,
+                                    ...(prev || {}), // Asegurar que prev existe, si no usar objeto vacío
                                     step: newStep,
                                     timestamp: newTimestamp,
                                     simulation_info: {
-                                        ...(payload.simulation_info ?? prev?.simulation_info ?? {}),
+                                        ...(prev?.simulation_info || {}), // Preservar simulation_info anterior
+                                        ...(payload.simulation_info || {}), // Actualizar con nuevo
                                         live_feed_enabled: newLiveFeedEnabled
                                     }
-                                    // No actualizar map_data, hist_data, etc. - estos solo vienen con simulation_frame
+                                    // map_data, hist_data, etc. se preservan desde prev
                                 };
                             });
                         } catch (error) {

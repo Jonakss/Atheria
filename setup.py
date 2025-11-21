@@ -167,7 +167,7 @@ class CMakeBuildExt(build_ext):
 # Configuración del setup
 setup(
     name="atheria",
-    version="4.0.0",
+    version="4.1.1",
     description="Atheria 4: Simulador de universo infinito con núcleo C++ de alto rendimiento",
     long_description=open("README.md").read() if Path("README.md").exists() else "",
     long_description_content_type="text/markdown",

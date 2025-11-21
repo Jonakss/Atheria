@@ -114,11 +114,11 @@ export const FRAGMENT_SHADER_DENSITY = `
     
     void main() {
         // Obtener valor de densidad desde textura
+        // La textura almacena datos normalizados a [0, 255] (UNSIGNED_BYTE)
+        // WebGL lee esto automáticamente como [0, 1] cuando usamos LUMINANCE + UNSIGNED_BYTE
+        // Por lo tanto, texel.r ya está en [0, 1] y NO necesitamos normalizar de nuevo
         vec4 texel = texture2D(u_texture, v_texCoord);
-        float density = texel.r; // Asumir que densidad está en canal R
-        
-        // Normalizar a rango [0, 1]
-        float normalized = (density - u_minValue) / (u_maxValue - u_minValue);
+        float normalized = texel.r; // Ya está normalizado a [0, 1] desde la textura
         normalized = clamp(normalized, 0.0, 1.0);
         
         // Aplicar corrección gamma
@@ -243,10 +243,10 @@ export const FRAGMENT_SHADER_ENERGY = `
     
     void main() {
         vec4 texel = texture2D(u_texture, v_texCoord);
-        float energy = texel.r; // Energía almacenada en canal R
-        
-        // Normalizar a rango [0, 1]
-        float normalized = (energy - u_minValue) / (u_maxValue - u_minValue);
+        // La textura almacena datos normalizados a [0, 255] (UNSIGNED_BYTE)
+        // WebGL lee esto automáticamente como [0, 1] cuando usamos LUMINANCE + UNSIGNED_BYTE
+        // Por lo tanto, texel.r ya está en [0, 1] y NO necesitamos normalizar de nuevo
+        float normalized = texel.r;
         normalized = clamp(normalized, 0.0, 1.0);
         
         // Aplicar corrección gamma
@@ -301,10 +301,9 @@ export const FRAGMENT_SHADER_REAL = `
     
     void main() {
         vec4 texel = texture2D(u_texture, v_texCoord);
-        float real = texel.r; // Parte real almacenada en canal R
-        
-        // Normalizar a rango [0, 1] (puede ser negativo)
-        float normalized = (real - u_minValue) / (u_maxValue - u_minValue);
+        // La textura ya está normalizada a [0, 1] desde [dataMin, dataMax]
+        // Usamos directamente texel.r que ya está en [0, 1]
+        float normalized = texel.r;
         normalized = clamp(normalized, 0.0, 1.0);
         
         // Aplicar corrección gamma
@@ -351,10 +350,9 @@ export const FRAGMENT_SHADER_IMAG = `
     
     void main() {
         vec4 texel = texture2D(u_texture, v_texCoord);
-        float imag = texel.r; // Parte imaginaria almacenada en canal R
-        
-        // Normalizar a rango [0, 1] (puede ser negativo)
-        float normalized = (imag - u_minValue) / (u_maxValue - u_minValue);
+        // La textura ya está normalizada a [0, 1] desde [dataMin, dataMax]
+        // Usamos directamente texel.r que ya está en [0, 1]
+        float normalized = texel.r;
         normalized = clamp(normalized, 0.0, 1.0);
         
         // Aplicar corrección gamma
@@ -427,12 +425,18 @@ function compileShader(
 
 /**
  * Crea una textura WebGL desde datos de array 2D
+ * 
+ * NOTA: Esta función NO normaliza los datos. Los datos se pasan directamente
+ * a la textura, y la normalización se hace en el shader usando u_minValue y u_maxValue.
+ * Esto evita doble normalización que puede causar visualización incorrecta.
  */
 export function createTextureFromData(
     gl: WebGLRenderingContext,
     data: number[][],
     width: number,
-    height: number
+    height: number,
+    minValue?: number,
+    maxValue?: number
 ): WebGLTexture | null {
     const texture = gl.createTexture();
     if (!texture) {
@@ -449,35 +453,58 @@ export function createTextureFromData(
         }
     }
     
-    // Crear textura (usar formato LUMINANCE para un solo canal)
-    // Nota: WebGL1 no soporta FLOAT directamente en todas las implementaciones
-    // Para mejor compatibilidad, usar UNSIGNED_BYTE normalizado
-    // WebGL2 soporta R32F pero no todos los navegadores lo implementan correctamente
+    // CRÍTICO: Los datos del backend ya vienen normalizados a [0, 1]
+    // Si minValue y maxValue están definidos y son 0 y 1, significa que los datos ya están normalizados
+    // En ese caso, NO debemos normalizar de nuevo, solo convertir a formato de textura [0, 255]
     
-    // Normalizar valores a [0, 1] primero para mejor compatibilidad
-    let minVal = Infinity;
-    let maxVal = -Infinity;
-    for (let i = 0; i < flatData.length; i++) {
-        const val = flatData[i];
-        if (isFinite(val)) {
-            minVal = Math.min(minVal, val);
-            maxVal = Math.max(maxVal, val);
+    // Calcular rango de datos si no se proporciona
+    let dataMin = minValue;
+    let dataMax = maxValue;
+    const isPreNormalized = (minValue === 0 && maxValue === 1) || (minValue === undefined && maxValue === undefined);
+    
+    if (dataMin === undefined || dataMax === undefined) {
+        let minVal = Infinity;
+        let maxVal = -Infinity;
+        for (let i = 0; i < flatData.length; i++) {
+            const val = flatData[i];
+            if (isFinite(val)) {
+                minVal = Math.min(minVal, val);
+                maxVal = Math.max(maxVal, val);
+            }
+        }
+        dataMin = minVal === Infinity ? 0 : minVal;
+        dataMax = maxVal === -Infinity ? 1 : maxVal;
+        
+        // Si los datos calculados están en [0, 1], asumir que ya están normalizados
+        if (dataMin >= 0 && dataMax <= 1 && (dataMax - dataMin) < 1.1) {
+            dataMin = 0;
+            dataMax = 1;
         }
     }
     
-    // Si todos los valores son iguales, usar rango [0, 1]
-    const range = maxVal - minVal || 1;
+    // Si todos los valores son iguales, usar rango [0, 1] para evitar división por cero
+    const dataRange = dataMax - dataMin || 1;
+    const isNormalized = (dataMin === 0 && dataMax === 1) || (Math.abs(dataMin) < 0.01 && Math.abs(dataMax - 1) < 0.01);
     
-    // Convertir a UNSIGNED_BYTE (0-255) para máxima compatibilidad
-    const normalizedData = new Uint8Array(width * height);
+    // Convertir a UNSIGNED_BYTE (0-255) como formato de almacenamiento
+    // IMPORTANTE: Si los datos ya están normalizados [0, 1], simplemente escalar a [0, 255]
+    // Si NO están normalizados, normalizar usando dataMin/dataMax antes de escalar
+    const textureData = new Uint8Array(width * height);
     for (let i = 0; i < flatData.length; i++) {
         const val = flatData[i];
         if (isFinite(val)) {
-            // Normalizar a [0, 1] y luego a [0, 255]
-            const normalized = (val - minVal) / range;
-            normalizedData[i] = Math.round(Math.max(0, Math.min(255, normalized * 255)));
+            let normalized: number;
+            if (isNormalized || isPreNormalized) {
+                // Datos ya normalizados [0, 1]: solo escalar a [0, 255]
+                normalized = Math.max(0, Math.min(1, val));
+            } else {
+                // Datos raw: normalizar usando dataMin/dataMax, luego escalar a [0, 255]
+                normalized = (val - dataMin) / dataRange;
+                normalized = Math.max(0, Math.min(1, normalized));
+            }
+            textureData[i] = Math.round(normalized * 255);
         } else {
-            normalizedData[i] = 0;
+            textureData[i] = 0;
         }
     }
     
@@ -491,7 +518,7 @@ export function createTextureFromData(
         0,
         gl.LUMINANCE,
         gl.UNSIGNED_BYTE,
-        normalizedData
+        textureData
     );
     
     // Configurar filtrado
@@ -539,11 +566,14 @@ export function renderWithShader(
     if (textureLocation) {
         gl.uniform1i(textureLocation, 0);
     }
+    // CRÍTICO: Los datos ya están normalizados [0, 1] en la textura
+    // El shader NO necesita usar u_minValue/u_maxValue porque lee directamente texel.r [0, 1]
+    // Pasamos 0 y 1 para compatibilidad, pero el shader no los usa
     if (minValueLocation) {
-        gl.uniform1f(minValueLocation, config.minValue || 0);
+        gl.uniform1f(minValueLocation, 0);  // Shader no usa este valor, pero lo pasamos por compatibilidad
     }
     if (maxValueLocation) {
-        gl.uniform1f(maxValueLocation, config.maxValue || 1);
+        gl.uniform1f(maxValueLocation, 1);  // Shader no usa este valor, pero lo pasamos por compatibilidad
     }
     if (gammaLocation) {
         gl.uniform1f(gammaLocation, config.gamma || 1.0);
