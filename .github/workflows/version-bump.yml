@@ -86,10 +86,11 @@ jobs:
               echo "type=patch" >> $GITHUB_OUTPUT
               echo "✅ Detectado bump PATCH"
             else
-              # Si no hay tag explícito en commit, no hacer bump (salir silenciosamente)
+              # Si no hay tag explícito en commit, no hacer bump
               echo "⚠️ Commit sin tag de versión [version:bump:*], saltando bump"
               echo "skip=true" >> $GITHUB_OUTPUT
-              exit 0
+              # IMPORTANTE: NO hacer exit 0 aquí porque necesitamos continuar para crear el output
+              # En su lugar, estableceremos un flag que se verifique después
             fi
           else
             # Pull Request: revisar labels del PR
@@ -111,6 +112,7 @@ jobs:
 
       - name: Leer versión actual
         id: current-version
+        if: steps.version-bump.outputs.skip != 'true'
         run: |
           # Leer versión desde src/__version__.py (fuente de verdad principal)
           CURRENT_VERSION=$(grep -E '^__version__\s*=' src/__version__.py | sed -E "s/.*['\"]([^'\"]+)['\"].*/\1/")
@@ -128,6 +130,7 @@ jobs:
 
       - name: Calcular nueva versión
         id: new-version
+        if: steps.version-bump.outputs.skip != 'true'
         run: |
           BUMP_TYPE="${{ steps.version-bump.outputs.type }}"
           CURRENT_MAJOR="${{ steps.current-version.outputs.major }}"
@@ -218,6 +221,7 @@ jobs:
           git diff || true
 
       - name: Crear commit con versiones actualizadas
+        if: steps.version-bump.outputs.skip != 'true'
         run: |
           git add -A
           git commit -m "chore: bump version to ${{ steps.new-version.outputs.version }} [skip ci]"
@@ -226,6 +230,7 @@ jobs:
           git push origin HEAD:main || git push origin HEAD:master
 
       - name: Crear tag de versión
+        if: steps.version-bump.outputs.skip != 'true'
         run: |
           NEW_VERSION="${{ steps.new-version.outputs.version }}"
           git tag -a "v${NEW_VERSION}" -m "Release version ${NEW_VERSION}"
@@ -233,6 +238,7 @@ jobs:
           echo "🏷️  Tag v${NEW_VERSION} creado y pusheado"
 
       - name: Crear Release
+        if: steps.version-bump.outputs.skip != 'true'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.new-version.outputs.version }}
@@ -254,6 +260,7 @@ jobs:
           prerelease: false
 
       - name: Resumen
+        if: steps.version-bump.outputs.skip != 'true'
         run: |
           echo "## ✅ Versión actualizada exitosamente" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
