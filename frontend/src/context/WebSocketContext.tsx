@@ -79,6 +79,12 @@ interface SimData {
             clustering?: number;
             symmetry?: number;
         };
+        initial_step?: number;
+        checkpoint_step?: number;
+        checkpoint_episode?: number;
+        training_grid_size?: number;
+        inference_grid_size?: number;
+        grid_scaled?: boolean;
     };
     phase_attractor?: any;
     flow_data?: {

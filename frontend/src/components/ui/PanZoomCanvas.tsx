@@ -55,9 +55,25 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     const dataToRender = historyFrame ? historyFrame : simData;
     
     // Obtener dimensiones de la grilla
+    // PRIORIDAD: Usar el tamaño real del grid desde simulation_info si está disponible
+    // (esto es el tamaño real de la simulación, no el tamaño de mapData que puede ser ROI)
     const mapData = dataToRender?.map_data;
-    const gridWidth = mapData?.[0]?.length || 0;
-    const gridHeight = mapData?.length || 0;
+    const actualGridWidth = dataToRender?.simulation_info?.inference_grid_size 
+        || dataToRender?.simulation_info?.training_grid_size 
+        || mapData?.[0]?.length 
+        || 0;
+    const actualGridHeight = dataToRender?.simulation_info?.inference_grid_size 
+        || dataToRender?.simulation_info?.training_grid_size 
+        || mapData?.length 
+        || 0;
+    
+    // gridWidth/gridHeight para cálculos de zoom/pan (usar tamaño real del grid)
+    const gridWidth = actualGridWidth;
+    const gridHeight = actualGridHeight;
+    
+    // mapDataWidth/mapDataHeight para renderizado (puede ser ROI)
+    const mapDataWidth = mapData?.[0]?.length || 0;
+    const mapDataHeight = mapData?.length || 0;
     
     // Estado de overlays (declarar ANTES de usarlo)
     const [overlayConfig, setOverlayConfig] = useState<OverlayConfig>({
