@@ -1,6 +1,6 @@
 # 📋 Tareas Pendientes - Atheria 4
 
-**Última actualización:** 2024-12-20  
+**Última actualización:** 2024-11-21  
 **Estado General:** 🟢 **Críticos resueltos, solo funcionalidades opcionales pendientes**
 
 ---
@@ -92,7 +92,7 @@
 
 ### 5. Apagar Servidor desde UI
 **Prioridad:** 🟡 **ALTA**  
-**Estado:** ✅ **IMPLEMENTADO** (2024-12-20)
+**Estado:** ✅ **IMPLEMENTADO** (2024-11-20)
 
 **Requisito:**
 - Botón en UI para apagar el servidor
@@ -261,8 +261,9 @@
 ### 🟡 ALTO (Implementar Pronto)
 ~~3. Mostrar "Paso Actual" como "Total - Actual"~~ ✅ **RESUELTO**
 4. Visualizaciones en Shaders (GPU) - ⏳ **EN ROADMAP** (Phase 2 - Opcional)
-5. Apagar Servidor desde UI - ❌ **PENDIENTE**
+~~5. Apagar Servidor desde UI~~ ✅ **IMPLEMENTADO** (2024-11-20)
 ~~6. Migración Automática de Estado~~ ✅ **IMPLEMENTADO**
+~~9. Sistema de Historial/Buffer Completo~~ ✅ **IMPLEMENTADO** (2024-11-21)
 
 ### 🟢 MEDIO/BAJO (Implementar Después)
 7-16. Resto de tareas
