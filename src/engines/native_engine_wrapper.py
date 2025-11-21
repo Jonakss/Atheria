@@ -269,7 +269,13 @@ class NativeEngineWrapper:
         if success:
             logging.info(f"✅ Modelo TorchScript cargado en motor nativo: {model_path}")
         else:
-            logging.error(f"❌ Error al cargar modelo TorchScript: {model_path}")
+            # Obtener mensaje de error específico desde C++
+            error_msg = self.native_engine.get_last_error()
+            if error_msg:
+                logging.error(f"❌ Error al cargar modelo TorchScript: {model_path}")
+                logging.error(f"   Detalle del error: {error_msg}")
+            else:
+                logging.error(f"❌ Error al cargar modelo TorchScript: {model_path} (error desconocido)")
         return success
     
     def evolve_internal_state(self):

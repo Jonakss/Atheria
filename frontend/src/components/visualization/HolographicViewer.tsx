@@ -65,8 +65,35 @@ const HolographicViewer: React.FC<HolographicViewerProps> = ({
         };
         animate();
 
+        // Handler de resize que solo ajusta el renderer sin cambiar la vista
+        const handleResize = () => {
+            if (!mountRef.current || !renderer || !camera) return;
+            
+            const width = mountRef.current.clientWidth;
+            const height = mountRef.current.clientHeight;
+            
+            if (width === 0 || height === 0) return;
+            
+            // Solo ajustar tamaño del renderer y aspect ratio de la cámara
+            // NO cambiar posición de la cámara ni controles (mantiene vista del usuario)
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        };
+
+        // Listener de resize
+        window.addEventListener('resize', handleResize);
+        
+        // También ajustar si el contenedor cambia de tamaño
+        const resizeObserver = new ResizeObserver(handleResize);
+        if (mountRef.current) {
+            resizeObserver.observe(mountRef.current);
+        }
+
         // Limpieza
         return () => {
+            window.removeEventListener('resize', handleResize);
+            resizeObserver.disconnect();
             if (mountRef.current && renderer.domElement) {
                 mountRef.current.removeChild(renderer.domElement);
             }

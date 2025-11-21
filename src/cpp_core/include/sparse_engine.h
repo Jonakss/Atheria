@@ -97,6 +97,11 @@ public:
      */
     std::vector<Coord3D> get_active_coords() const;
     
+    /**
+     * Obtiene el último mensaje de error (si hubo un error al cargar el modelo)
+     */
+    std::string get_last_error() const;
+    
 private:
     // Configuración
     int64_t d_state_;
@@ -112,6 +117,9 @@ private:
     // Estado de simulación
     std::unordered_set<Coord3D, Coord3DHash> active_region_;
     int64_t step_count_;
+    
+    // Manejo de errores
+    std::string last_error_;
     
     // Helpers internos
     std::vector<Coord3D> get_neighbors(const Coord3D& center, int radius = 1) const;

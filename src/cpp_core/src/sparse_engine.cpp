@@ -20,7 +20,8 @@ Engine::Engine(int64_t d_state, const std::string& device_str, int64_t grid_size
     , device_(determine_device(device_str))
     , model_loaded_(false)
     , vacuum_(d_state_, device_)
-    , step_count_(0) {
+    , step_count_(0)
+    , last_error_("") {
     // Device ya está determinado y vacuum inicializado correctamente
     // grid_size se usa para construir inputs del modelo con el tamaño correcto
 }
@@ -41,7 +42,13 @@ bool Engine::load_model(const std::string& model_path) {
         model_loaded_ = true;
         return true;
     } catch (const std::exception& e) {
-        // Error al cargar el modelo
+        // Error al cargar el modelo - guardar mensaje de error
+        last_error_ = std::string(e.what());
+        model_loaded_ = false;
+        return false;
+    } catch (...) {
+        // Error desconocido
+        last_error_ = "Error desconocido al cargar modelo";
         model_loaded_ = false;
         return false;
     }
@@ -369,6 +376,10 @@ void Engine::clear() {
 
 std::vector<Coord3D> Engine::get_active_coords() const {
     return std::vector<Coord3D>(active_region_.begin(), active_region_.end());
+}
+
+std::string Engine::get_last_error() const {
+    return last_error_;
 }
 
 } // namespace atheria
