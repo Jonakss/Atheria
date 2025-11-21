@@ -25,6 +25,7 @@ related: [[10_core/00_CORE_MOC]], [[40_Experiments/00_EXPERIMENTS_MOC]]
 
 ## ⚙️ Motores y Sistemas
 
+- [[Native_Engine_Core]] - Motor Nativo C++ (arquitectura y optimizaciones)
 - [[NATIVE_ENGINE_COMMUNICATION]] - Comunicación del motor nativo
 - [[HISTORY_SYSTEM]] - Gestión de historia de simulación
 - [[GPU_OPTIMIZATION]] - Optimizaciones de GPU
@@ -33,6 +34,7 @@ related: [[10_core/00_CORE_MOC]], [[40_Experiments/00_EXPERIMENTS_MOC]]
 
 ## 📡 Transferencia de Datos
 
+- [[WEB_SOCKET_PROTOCOL]] - Protocolo WebSocket optimizado (MessagePack binario)
 - [[WORLD_DATA_TRANSFER_OPTIMIZATION]] - Optimizaciones de transferencia
 - [[ZOOM_AND_DATA_TRANSFER]] - Sistema de zoom
 - [[QUICK_START_OPTIMIZATION]] - Guía rápida de optimización
@@ -65,6 +67,7 @@ related: [[10_core/00_CORE_MOC]], [[40_Experiments/00_EXPERIMENTS_MOC]]
 
 ## 🛠️ Herramientas
 
+- [[CLI_TOOL]] - CLI tool (atheria/ath) para desarrollo
 - [[EXPERIMENT_LOGGER_BRIEF]] - Sistema de logging
 - [[Logging_Optimization]] - Optimización de logs en Pipeline Server
 
