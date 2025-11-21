@@ -161,9 +161,9 @@ export const DashboardLayout: React.FC = () => {
           onLabSectionChange={(section) => setActiveLabSection(section)}
         />
 
-        {/* Panel de Laboratorio (Experimentos/Entrenamiento) - Colapsable como drawer */}
+        {/* Panel de Laboratorio (Experimentos/Entrenamiento) - Colapsable como drawer, Glass */}
         {labPanelOpen && (
-          <aside className={`flex-col border-r border-white/10 bg-[#080808] z-40 shrink-0 transition-all duration-300 ${
+          <aside className={`flex-col border-r border-white/5 bg-black/40 backdrop-blur-md z-40 shrink-0 transition-all duration-300 ${
             labPanelCollapsed ? 'w-12' : 'w-[380px]'
           } flex overflow-hidden relative`}>
             <LabSider 

@@ -59,7 +59,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     const gridWidth = mapData?.[0]?.length || 0;
     const gridHeight = mapData?.length || 0;
     
-    const { pan, zoom, handleMouseDown, handleMouseMove, handleMouseUp, handleWheel, resetView, isPanning } = usePanZoom(canvasRef, gridWidth, gridHeight);
+    const { pan, zoom, handleMouseDown, handleMouseMove, handleMouseUp, handleWheel, resetView, isPanning, isZooming, zoomCenter } = usePanZoom(canvasRef, gridWidth, gridHeight);
     
     // Estado de overlays
     const [overlayConfig, setOverlayConfig] = useState<OverlayConfig>({
@@ -667,6 +667,49 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
             onMouseMove={handleCanvasMouseMove}
             onMouseLeave={handleCanvasMouseLeave}
         >
+            {/* Overlay de zoom centrado en el mouse */}
+            {isZooming && zoomCenter && (
+                <div
+                    className="absolute pointer-events-none z-50"
+                    style={{
+                        left: `${zoomCenter.x}px`,
+                        top: `${zoomCenter.y}px`,
+                        transform: 'translate(-50%, -50%)',
+                    }}
+                >
+                    <div className="relative">
+                        {/* Círculo exterior pulsante */}
+                        <div 
+                            className="absolute inset-0 rounded-full border-2 border-teal-400/50 animate-ping"
+                            style={{
+                                width: '60px',
+                                height: '60px',
+                                margin: '-30px 0 0 -30px',
+                            }}
+                        />
+                        {/* Círculo interior fijo */}
+                        <div 
+                            className="absolute inset-0 rounded-full border-2 border-teal-400 shadow-glow-teal"
+                            style={{
+                                width: '40px',
+                                height: '40px',
+                                margin: '-20px 0 0 -20px',
+                            }}
+                        />
+                        {/* Indicador de zoom */}
+                        <div 
+                            className="absolute inset-0 flex items-center justify-center text-teal-400 text-xs font-mono font-bold"
+                            style={{
+                                width: '40px',
+                                height: '40px',
+                                margin: '-20px 0 0 -20px',
+                            }}
+                        >
+                            {zoom.toFixed(1)}x
+                        </div>
+                    </div>
+                </div>
+            )}
             {(!dataToRender?.map_data && !simData?.map_data) && (
                 <Box className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center text-gray-500 z-10 pointer-events-none">
                     <Text size="lg" className="block mb-2">Esperando datos de simulación...</Text>

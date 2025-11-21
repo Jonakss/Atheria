@@ -42,7 +42,7 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
   const recentLogs = allLogs?.slice(-2) || [];
 
   return (
-    <aside className={`${collapsed ? 'w-10' : 'w-72'} border-l border-white/10 bg-[#080808] flex flex-col z-40 shrink-0 flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden`} style={{ minWidth: collapsed ? '2.5rem' : '18rem', maxWidth: collapsed ? '2.5rem' : '18rem' }}>
+    <aside className={`${collapsed ? 'w-10' : 'w-72'} border-l border-white/5 bg-black/40 backdrop-blur-md flex flex-col z-40 shrink-0 flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden`} style={{ minWidth: collapsed ? '2.5rem' : '18rem', maxWidth: collapsed ? '2.5rem' : '18rem' }}>
       {/* Título Panel - Con botón de colapsar */}
       <div className="h-10 border-b border-white/5 flex items-center justify-between px-4 bg-[#0a0a0a] shrink-0">
         {!collapsed && (

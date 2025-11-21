@@ -17,11 +17,14 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
     const [isPanning, setIsPanning] = useState(false);
+    const [isZooming, setIsZooming] = useState(false);
+    const [zoomCenter, setZoomCenter] = useState<{ x: number; y: number } | null>(null);
     const isPanningRef = useRef(false);
     const lastMousePos = useRef({ x: 0, y: 0 });
     const panUpdateRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
     const initializedRef = useRef(false);
     const lastGridSizeRef = useRef<{ width: number; height: number } | null>(null);
+    const zoomTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Función para calcular zoom y pan inicial centrado en el centro del grid
     const calculateInitialView = useCallback(() => {
@@ -242,38 +245,39 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
             const mouseX = e.clientX - containerRect.left;
             const mouseY = e.clientY - containerRect.top;
             
-            // El canvas está centrado con CSS (left: 50%, top: 50%, marginLeft: -gridWidth/2, marginTop: -gridHeight/2)
-            // Esto coloca el punto (0,0) del canvas en el centro del contenedor
-            // Con transformOrigin: '0 0', el origen de la transformación está en el centro del contenedor
-            // Con transform: scale(zoom) translate(pan.x, pan.y):
-            //   - Primero se escala (el origen permanece en el centro)
-            //   - Luego se traslada (pan.x, pan.y en píxeles del canvas escalado)
+            // Mostrar overlay de zoom centrado en el mouse
+            setIsZooming(true);
+            setZoomCenter({ x: mouseX, y: mouseY });
+            
+            // Limpiar timeout anterior
+            if (zoomTimeoutRef.current) {
+                clearTimeout(zoomTimeoutRef.current);
+            }
+            
+            // Ocultar overlay después de 300ms sin zoom
+            zoomTimeoutRef.current = setTimeout(() => {
+                setIsZooming(false);
+                setZoomCenter(null);
+            }, 300);
             
             // Coordenadas del mouse relativas al centro del contenedor
             const mouseRelToCenterX = mouseX - containerWidth / 2;
             const mouseRelToCenterY = mouseY - containerHeight / 2;
             
             // Convertir a coordenadas del canvas (antes del zoom y pan)
-            // Un punto del canvas (canvasX, canvasY) se transforma a:
-            //   screenX = (canvasX * zoom) + pan.x  (relativo al centro)
-            // Inversamente:
-            //   canvasX = (screenX - pan.x) / zoom
             const canvasX = (mouseRelToCenterX - pan.x) / zoom;
             const canvasY = (mouseRelToCenterY - pan.y) / zoom;
             
-            // Aplicar zoom con factor más suave
-            const zoomFactor = 1.15; // Un poco más rápido para mejor UX
-            const newZoom = e.deltaY < 0 ? zoom * zoomFactor : zoom / zoomFactor;
-            const constrainedZoom = Math.max(0.05, Math.min(newZoom, 100)); // Ampliar límites
+            // Aplicar zoom con factor más suave y progresivo
+            const zoomFactor = 1.1; // Más suave para mejor control
+            const delta = Math.abs(e.deltaY);
+            const smoothFactor = Math.min(1 + (delta / 100) * 0.05, 1.2); // Factor suave basado en velocidad
+            const newZoom = e.deltaY < 0 
+                ? zoom * zoomFactor * smoothFactor 
+                : zoom / (zoomFactor * smoothFactor);
+            const constrainedZoom = Math.max(0.05, Math.min(newZoom, 100));
             
             // Calcular nuevo pan para mantener el punto del canvas fijo bajo el mouse
-            // Después del nuevo zoom, queremos que (canvasX, canvasY) siga bajo el mouse:
-            //   mouseRelToCenterX = (canvasX * constrainedZoom) + newPanX
-            //   newPanX = mouseRelToCenterX - (canvasX * constrainedZoom)
-            // Sustituyendo canvasX:
-            //   newPanX = mouseRelToCenterX - ((mouseRelToCenterX - pan.x) / zoom) * constrainedZoom
-            //   newPanX = mouseRelToCenterX - (mouseRelToCenterX - pan.x) * (constrainedZoom / zoom)
-            //   newPanX = mouseRelToCenterX * (1 - constrainedZoom/zoom) + pan.x * (constrainedZoom/zoom)
             const zoomRatio = constrainedZoom / zoom;
             const newPanX = mouseRelToCenterX * (1 - zoomRatio) + pan.x * zoomRatio;
             const newPanY = mouseRelToCenterY * (1 - zoomRatio) + pan.y * zoomRatio;
@@ -284,6 +288,15 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
         }
     }, [zoom, pan, constrainPanZoom, canvasRef, gridWidth, gridHeight]);
 
+    // Cleanup timeout al desmontar
+    useEffect(() => {
+        return () => {
+            if (zoomTimeoutRef.current) {
+                clearTimeout(zoomTimeoutRef.current);
+            }
+        };
+    }, []);
+
     return {
         pan,
         zoom,
@@ -293,5 +306,7 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
         handleWheel,
         resetView,
         isPanning,
+        isZooming,
+        zoomCenter,
     };
 };
