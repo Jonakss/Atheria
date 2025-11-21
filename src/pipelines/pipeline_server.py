@@ -1352,9 +1352,19 @@ async def handle_load_experiment(args):
             g_state['epoch_detector'] = EpochDetector()
         
         # OPTIMIZACIÓN DE MEMORIA: Liberar motor anterior antes de cargar uno nuevo
+        # CRÍTICO: Pausar simulación primero para evitar que el motor esté en uso durante el cleanup
+        logging.info("Pausando simulación antes de limpiar motor anterior...")
+        g_state['is_paused'] = True
+        await broadcast({"type": "inference_status_update", "payload": {"status": "paused"}})
+        
+        # Pequeña espera para asegurar que el simulation_loop haya detectado la pausa
+        await asyncio.sleep(0.2)
+        
         old_motor = g_state.get('motor')
         if old_motor is not None:
             try:
+                logging.info(f"Limpiando motor anterior (tipo: {'native' if hasattr(old_motor, 'native_engine') else 'python'})...")
+                
                 # Limpiar snapshots y historial del motor anterior
                 if 'snapshots' in g_state:
                     for snap in g_state['snapshots']:
@@ -1366,25 +1376,32 @@ async def handle_load_experiment(args):
                 # Limpiar historial si está habilitado
                 if 'simulation_history' in g_state:
                     g_state['simulation_history'].clear()
+                    logging.info("Historial limpiado")
                 
                 # CRÍTICO: Limpiar motor nativo explícitamente antes de eliminarlo
                 # Esto previene segfaults al destruir el motor nativo C++
                 if hasattr(old_motor, 'native_engine'):
                     # Es un motor nativo - llamar cleanup explícitamente
                     try:
+                        logging.info("Limpiando motor nativo...")
                         if hasattr(old_motor, 'cleanup'):
                             old_motor.cleanup()
-                            logging.debug("Motor nativo limpiado explícitamente antes de eliminarlo")
+                            logging.info("✅ Motor nativo limpiado explícitamente")
                         else:
                             # Fallback: limpiar manualmente si no hay método cleanup
+                            logging.warning("⚠️ Motor nativo sin método cleanup(), limpiando manualmente...")
                             if hasattr(old_motor, 'native_engine') and old_motor.native_engine is not None:
                                 old_motor.native_engine = None
                             if hasattr(old_motor, 'state') and old_motor.state is not None:
                                 if hasattr(old_motor.state, 'psi') and old_motor.state.psi is not None:
                                     old_motor.state.psi = None
                                 old_motor.state = None
+                        
+                        # Espera adicional después del cleanup para asegurar que C++ termine de limpiar
+                        await asyncio.sleep(0.1)
                     except Exception as cleanup_error:
-                        logging.warning(f"Error durante cleanup de motor nativo: {cleanup_error}")
+                        logging.error(f"❌ Error durante cleanup de motor nativo: {cleanup_error}", exc_info=True)
+                        # No fallar completamente, continuar con la carga
                 
                 # Remover referencia del estado global antes de destruir
                 g_state['motor'] = None
@@ -1393,9 +1410,15 @@ async def handle_load_experiment(args):
                 del old_motor
                 import gc
                 gc.collect()  # Forzar garbage collection
-                logging.debug("Motor anterior liberado para liberar memoria")
+                logging.info("✅ Motor anterior liberado para liberar memoria")
+                
+                # Espera final para asegurar que la memoria se libere completamente
+                await asyncio.sleep(0.1)
             except Exception as e:
-                logging.warning(f"Error liberando motor anterior: {e}", exc_info=True)
+                logging.error(f"❌ Error liberando motor anterior: {e}", exc_info=True)
+                # No fallar completamente, continuar con la carga pero limpiar g_state
+                g_state['motor'] = None
+                g_state['is_paused'] = True
         
         config = load_experiment_config(exp_name)
         if not config:
