@@ -107,6 +107,10 @@ Si no hay label explícito, se usa `patch` automáticamente (más seguro).
 
 ## 📝 Proceso Automático
 
+El workflow se ejecuta en tres escenarios:
+
+### 1. Pull Request Mergeado (Recomendado para PRs)
+
 Cuando se mergea un PR con label apropiado:
 
 1. **Detectar tipo de bump** desde labels del PR
@@ -121,6 +125,34 @@ Cuando se mergea un PR con label apropiado:
 6. **Push commit** a la rama principal
 7. **Crear tag Git:** `vX.Y.Z`
 8. **Crear release GitHub** con descripción del PR
+
+### 2. Push Directo a Main/Master (Para commits del agente)
+
+Cuando haces un commit directo a `main` o `master` con tag de versión:
+
+**Formato del mensaje de commit:**
+```
+feat: nueva funcionalidad [version:bump:minor]
+
+O alternativas:
+- [version:bump:major] para bump mayor
+- [version:bump:minor] para bump menor  
+- [version:bump:patch] para bump patch
+```
+
+**Proceso:**
+1. El workflow detecta el tag `[version:bump:*]` en el mensaje del commit
+2. Ejecuta el mismo proceso que en PRs
+3. Si NO hay tag de versión, el workflow se salta silenciosamente (no hace bump)
+
+**Ejemplo de uso:**
+```bash
+git commit -m "feat: implementar shaders WebGL [version:bump:minor]"
+```
+
+### 3. Workflow Manual (Desde GitHub Actions UI)
+
+Para bump manual desde la interfaz de GitHub Actions.
 
 ---
 

@@ -129,6 +129,22 @@ También disponible como workflow manual para bump manual:
 3. Hacer merge a `main`
 4. Workflow se ejecuta automáticamente
 
+#### Para Commits Directos (Agente/Desarrollo)
+Cuando haces commits directos a `main`, incluye un tag de versión en el mensaje:
+
+```bash
+git commit -m "feat: nueva funcionalidad [version:bump:minor]"
+git commit -m "fix: corrección de bug [version:bump:patch]"
+git commit -m "refactor: cambio breaking [version:bump:major]"
+```
+
+**Tags disponibles:**
+- `[version:bump:major]` - Bump mayor (X.0.0)
+- `[version:bump:minor]` - Bump menor (0.X.0)
+- `[version:bump:patch]` - Bump patch (0.0.X)
+
+**Si NO incluyes el tag**, el workflow se salta silenciosamente (no hace bump).
+
 #### Para Bump Manual
 1. Ir a GitHub Actions → "Version Bump Automático"
 2. Click en "Run workflow"
