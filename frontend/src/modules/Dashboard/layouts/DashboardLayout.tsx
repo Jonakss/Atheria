@@ -8,6 +8,7 @@ import { AnalysisView } from '../components/AnalysisView';
 import { HistoryView } from '../components/HistoryView';
 import { LogsView } from '../components/LogsView';
 import { PanZoomCanvas } from '../../../components/ui/PanZoomCanvas';
+import { TimelineViewer } from '../../../components/ui/TimelineViewer';
 import HolographicViewer from '../../../components/visualization/HolographicViewer';
 import { LabSider } from '../../../components/ui/LabSider';
 import { useWebSocket } from '../../../hooks/useWebSocket';
@@ -22,6 +23,12 @@ export const DashboardLayout: React.FC = () => {
   const [labPanelCollapsed, setLabPanelCollapsed] = useState(false); // Panel de laboratorio colapsado
   const [activeLabSection, setActiveLabSection] = useState<LabSection>('inference'); // Sub-sección activa de Lab
   const [physicsInspectorCollapsed, setPhysicsInspectorCollapsed] = useState(false); // Inspector físico colapsado
+  const [timelineOpen, setTimelineOpen] = useState(false); // Timeline viewer abierto/cerrado
+  const [selectedTimelineFrame, setSelectedTimelineFrame] = useState<{
+    step: number;
+    timestamp: string;
+    map_data: number[][];
+  } | null>(null);
   const { simData, selectedViz, connectionStatus, sendCommand, setSelectedViz } = useWebSocket();
   
   // Obtener época detectada del backend
@@ -111,7 +118,27 @@ export const DashboardLayout: React.FC = () => {
           return (
             <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#050505] to-black overflow-hidden">
               {connectionStatus === 'connected' ? (
-                <PanZoomCanvas />
+                <>
+                  <PanZoomCanvas historyFrame={selectedTimelineFrame} />
+                  {/* Timeline Viewer - Panel flotante */}
+                  {timelineOpen && (
+                    <div className="absolute bottom-20 left-4 z-50 w-80 max-h-96 overflow-y-auto">
+                      <TimelineViewer
+                        onFrameSelect={(frame) => {
+                          if (frame) {
+                            setSelectedTimelineFrame({
+                              step: frame.step,
+                              timestamp: new Date(frame.timestamp).toISOString(),
+                              map_data: frame.map_data,
+                            });
+                          } else {
+                            setSelectedTimelineFrame(null);
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-300 text-sm">
                   Conectando al servidor...
@@ -180,7 +207,7 @@ export const DashboardLayout: React.FC = () => {
         <main className="flex-1 relative bg-black flex flex-col overflow-hidden">
           
           {/* Barra de Herramientas Superior (Flotante) */}
-          <Toolbar />
+          <Toolbar onToggleTimeline={() => setTimelineOpen(prev => !prev)} timelineOpen={timelineOpen} />
 
           {/* Viewport (Fondo) - Design System: bg-[#050505] a black según mockup */}
           {renderContentView()}

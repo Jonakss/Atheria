@@ -1,9 +1,14 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Play, Pause, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp } from 'lucide-react';
+import { Play, Pause, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp, Clock } from 'lucide-react';
 import { GlassPanel } from './GlassPanel';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 
-export const Toolbar: React.FC = () => {
+interface ToolbarProps {
+  onToggleTimeline?: () => void;
+  timelineOpen?: boolean;
+}
+
+export const Toolbar: React.FC<ToolbarProps> = ({ onToggleTimeline, timelineOpen = false }) => {
   const { 
     inferenceStatus, 
     sendCommand, 
@@ -79,6 +84,23 @@ export const Toolbar: React.FC = () => {
 
   return (
     <div className="absolute top-4 left-4 z-30 flex gap-2 pointer-events-none">
+      {/* Botón Timeline */}
+      {onToggleTimeline && (
+        <GlassPanel className="pointer-events-auto">
+          <button
+            onClick={onToggleTimeline}
+            className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 transition-all border ${
+              timelineOpen
+                ? 'bg-teal-500/10 text-teal-400 border-teal-500/30 hover:bg-teal-500/20'
+                : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10'
+            }`}
+            title="Abrir/Cerrar Timeline Local"
+          >
+            <Clock size={12} />
+            <span>TIMELINE</span>
+          </button>
+        </GlassPanel>
+      )}
       {/* Panel Principal: Play/Pause + Reset + Paso Actual - según mockup */}
       <GlassPanel className="pointer-events-auto flex items-center p-1 gap-1">
         <button 
