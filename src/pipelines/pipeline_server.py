@@ -3387,14 +3387,49 @@ async def handle_set_inference_config(args):
     
     if gamma_decay is not None:
         old_gamma = getattr(global_cfg, 'GAMMA_DECAY', 0.01)
-        global_cfg.GAMMA_DECAY = float(gamma_decay)
-        changes.append(f"Gamma Decay: {old_gamma} → {gamma_decay}")
-        logging.info(f"Gamma Decay configurado a: {gamma_decay} (requiere recargar experimento)")
+        new_gamma = float(gamma_decay)
+        
+        # Validar rango razonable (0 a 10, aunque valores > 1 pueden ser inestables)
+        if new_gamma < 0:
+            new_gamma = 0.0
+            logging.warning(f"Gamma Decay negativo, ajustado a 0")
+        elif new_gamma > 10.0:
+            new_gamma = 10.0
+            logging.warning(f"Gamma Decay muy alto (>10), ajustado a 10")
+        
+        global_cfg.GAMMA_DECAY = new_gamma
+        
+        # APLICAR EN TIEMPO REAL: Actualizar gamma_decay en el motor si existe
+        motor = g_state.get('motor')
+        if motor and hasattr(motor, 'cfg'):
+            if motor.cfg is not None:
+                motor.cfg.GAMMA_DECAY = new_gamma
+                logging.info(f"✅ Gamma Decay actualizado en tiempo real en motor: {new_gamma}")
+            else:
+                # Si cfg es None, crear uno nuevo
+                from types import SimpleNamespace
+                motor.cfg = SimpleNamespace(GAMMA_DECAY=new_gamma)
+                logging.info(f"✅ Gamma Decay configurado en motor (nuevo cfg): {new_gamma}")
+        
+        changes.append(f"Gamma Decay: {old_gamma:.3f} → {new_gamma:.3f}")
+        logging.info(f"Gamma Decay configurado a: {new_gamma} (aplicado en tiempo real)")
     
     if changes:
-        msg = f"⚠️ Configuración actualizada: {', '.join(changes)}. Recarga el experimento para aplicar los cambios."
-        if ws:
-            await send_notification(ws, msg, "warning")
+        # Determinar si hay cambios que requieren recargar vs. cambios en tiempo real
+        requires_reload = any(
+            'grid_size' in change.lower() or 
+            'inicialización' in change.lower() 
+            for change in changes
+        )
+        
+        if requires_reload:
+            msg = f"⚠️ Configuración actualizada: {', '.join(changes)}. Recarga el experimento para aplicar los cambios."
+            if ws:
+                await send_notification(ws, msg, "warning")
+        else:
+            msg = f"✅ Configuración actualizada en tiempo real: {', '.join(changes)}"
+            if ws:
+                await send_notification(ws, msg, "success")
         
         await broadcast({
             "type": "inference_config_update",

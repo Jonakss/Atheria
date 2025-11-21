@@ -76,13 +76,13 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
             <input
               type="range"
               min="0"
-              max="0.1"
+              max="1.0"
               step="0.001"
               value={gammaDecay}
               onChange={(e) => handleGammaChange(parseFloat(e.target.value))}
               className="w-full h-1 bg-gray-800 rounded-full appearance-none cursor-pointer slider-thumb"
               style={{
-                background: `linear-gradient(to right, rgb(107, 114, 128) 0%, rgb(107, 114, 128) ${(gammaDecay / 0.1) * 100}%, rgb(31, 41, 55) ${(gammaDecay / 0.1) * 100}%, rgb(31, 41, 55) 100%)`
+                background: `linear-gradient(to right, rgb(107, 114, 128) 0%, rgb(107, 114, 128) ${(gammaDecay / 1.0) * 100}%, rgb(31, 41, 55) ${(gammaDecay / 1.0) * 100}%, rgb(31, 41, 55) 100%)`
               }}
             />
           </div>
