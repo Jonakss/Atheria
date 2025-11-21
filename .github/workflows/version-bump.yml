@@ -30,12 +30,13 @@ jobs:
   bump-version:
     runs-on: ubuntu-latest
     # Ejecutar si:
-    # 1. PR fue mergeado Y tiene label de versión, O
-    # 2. Push directo a main/master con mensaje que contiene [version:bump], O
+    # 1. PR fue mergeado (verificaremos labels después), O
+    # 2. Push directo a main/master (verificaremos tags en commits después), O
     # 3. Workflow manual
+    # NOTA: Verificamos tags/labels dentro del job, no en la condición if
     if: |
       (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
-      (github.event_name == 'push' && contains(github.event.head_commit.message, '[version:bump]')) ||
+      github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch'
     
     permissions:
