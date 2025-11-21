@@ -16,18 +16,35 @@ class QuantumState:
     """
     Estado cuántico con soporte para memoria temporal (ConvLSTM).
     """
-    def __init__(self, grid_size, d_state, device, d_memory=None, initial_mode='complex_noise'):
+    def __init__(self, grid_size, d_state, device, d_memory=None, initial_mode='complex_noise', base_state=None, base_grid_size=None):
         self.grid_size = grid_size
         self.d_state = d_state
         self.device = device
         self.d_memory = d_memory  # Dimensión de memoria para ConvLSTM
-        self.psi = self._initialize_state(mode=initial_mode)
+        self.psi = self._initialize_state(mode=initial_mode, base_state=base_state, base_grid_size=base_grid_size)
         # Estados de memoria para ConvLSTM (h_state y c_state)
         # Se inicializarán cuando se use un modelo ConvLSTM
         self.h_state = None
         self.c_state = None
         
-    def _initialize_state(self, mode='complex_noise', complex_noise_strength=0.1):
+    def _initialize_state(self, mode='complex_noise', complex_noise_strength=0.1, base_state=None, base_grid_size=None):
+        """
+        Inicializa el estado cuántico.
+        
+        Args:
+            mode: Modo de inicialización ('random', 'complex_noise', 'zeros')
+            complex_noise_strength: Intensidad del ruido complejo
+            base_state: Estado base opcional a replicar (tensor complejo de tamaño menor)
+            base_grid_size: Tamaño del grid del estado base (si se proporciona base_state)
+        
+        Si se proporciona base_state y base_grid_size < self.grid_size,
+        el estado base se replicará (tile) en el grid más grande.
+        """
+        # Si hay un estado base y el grid actual es más grande, replicar (tile) el estado
+        if base_state is not None and base_grid_size is not None and base_grid_size < self.grid_size:
+            return self._replicate_state(base_state, base_grid_size, self.grid_size)
+        
+        # Inicialización normal
         if mode == 'random':
             real = torch.randn(1, self.grid_size, self.grid_size, self.d_state, device=self.device)
             imag = torch.randn(1, self.grid_size, self.grid_size, self.d_state, device=self.device)
@@ -40,6 +57,36 @@ class QuantumState:
             return torch.complex(real, imag)
         else:
             return torch.zeros(1, self.grid_size, self.grid_size, self.d_state, device=self.device, dtype=torch.complex64)
+    
+    def _replicate_state(self, base_state, base_grid_size, target_grid_size):
+        """
+        Replica (tile) un estado de un grid más pequeño en un grid más grande.
+        
+        El estado base se repite múltiples veces para llenar el grid más grande.
+        Esto mantiene la misma información pero en un espacio más grande.
+        
+        Args:
+            base_state: Estado base [1, H_base, W_base, d_state]
+            base_grid_size: Tamaño del grid base
+            target_grid_size: Tamaño del grid destino
+        
+        Returns:
+            Estado replicado [1, H_target, W_target, d_state]
+        """
+        # Calcular cuántas veces se debe repetir en cada dimensión
+        reps_h = (target_grid_size + base_grid_size - 1) // base_grid_size  # Redondear hacia arriba
+        reps_w = (target_grid_size + base_grid_size - 1) // base_grid_size
+        
+        # Repetir el estado base
+        replicated = base_state.repeat(1, reps_h, reps_w, 1)
+        
+        # Cortar al tamaño exacto si es necesario
+        if replicated.shape[1] > target_grid_size or replicated.shape[2] > target_grid_size:
+            replicated = replicated[:, :target_grid_size, :target_grid_size, :]
+        
+        logging.info(f"🔄 Estado replicado: {base_grid_size}x{base_grid_size} → {target_grid_size}x{target_grid_size} (tiles: {reps_h}x{reps_w})")
+        
+        return replicated
     
     def _reset_state_random(self): 
         self.psi = self._initialize_state(mode='random')
@@ -117,8 +164,23 @@ class Aetheria_Motor:
         if cfg is not None:
             initial_mode = getattr(cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')
         
+        # Si hay un training_grid_size diferente (menor) que inference_grid_size,
+        # crear un estado base del tamaño de entrenamiento y replicarlo (tile) en el grid más grande
+        base_state = None
+        base_grid_size = None
+        if cfg is not None:
+            training_grid_size = getattr(cfg, 'GRID_SIZE_TRAINING', None)
+            if training_grid_size and training_grid_size < self.grid_size:
+                # Crear estado base del tamaño de entrenamiento
+                base_state_temp = QuantumState(training_grid_size, self.d_state, device, initial_mode=initial_mode)
+                base_state = base_state_temp.psi
+                base_grid_size = training_grid_size
+                logging.info(f"🔄 Grid escalado: Creando estado base {training_grid_size}x{training_grid_size} para replicar (tile) en {self.grid_size}x{self.grid_size}")
+        
         # Inicializar estado cuántico con soporte para memoria si es necesario
-        self.state = QuantumState(self.grid_size, self.d_state, device, d_memory=d_memory, initial_mode=initial_mode)
+        # Si hay base_state, se replicará automáticamente en _initialize_state
+        self.state = QuantumState(self.grid_size, self.d_state, device, d_memory=d_memory, 
+                                   initial_mode=initial_mode, base_state=base_state, base_grid_size=base_grid_size)
         
         self.is_compiled = False
         self.cfg = cfg
