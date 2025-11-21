@@ -162,25 +162,70 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
         const constrainedZoom = Math.max(minZoom, Math.min(newZoom, maxZoom));
         
         // Calcular límites de pan
-        // El canvas está centrado en el contenedor con CSS
-        // Con transformOrigin: '0 0', el origen está en el centro del contenedor
-        // Después del scale y translate, el centro del grid debe estar dentro del contenedor
-        // El centro del grid en coordenadas del canvas: (gridWidth/2, gridHeight/2)
-        // Después del scale: (gridWidth/2 * zoom, gridHeight/2 * zoom)
-        // Después del translate: (gridWidth/2 * zoom + pan.x, gridHeight/2 * zoom + pan.y)
-        // Para mantener el grid visible:
-        // - El borde izquierdo del grid (x=0) debe estar a la izquierda del borde derecho del contenedor
-        // - gridWidth * zoom + pan.x >= -containerWidth/2 (muy aproximado)
-        // - El borde derecho del grid (x=gridWidth) debe estar a la derecha del borde izquierdo del contenedor
-        // - pan.x <= containerWidth/2 (muy aproximado)
+        // El canvas está centrado con CSS:
+        // - left: 50%, top: 50%
+        // - marginLeft: -(gridWidth/2) + (pan.x/zoom)
+        // - marginTop: -(gridHeight/2) + (pan.y/zoom)
+        // - transform: scale(zoom)
+        // - transformOrigin: center center
         
-        // Límites más permisivos: permitir pan hasta que todo el grid esté fuera de vista
-        // Esto permite explorar fuera del grid si es necesario
-        const margin = 0.5; // Permitir 50% de margen para mejor exploración
-        const maxPanX = (gridWidth * constrainedZoom * (1 + margin)) / 2;
-        const maxPanY = (gridHeight * constrainedZoom * (1 + margin)) / 2;
-        const minPanX = -maxPanX;
-        const minPanY = -maxPanY;
+        // El tamaño del canvas escalado
+        const scaledWidth = gridWidth * constrainedZoom;
+        const scaledHeight = gridHeight * constrainedZoom;
+        
+        // El canvas está centrado en el contenedor
+        // El centro del canvas está en el centro del contenedor (0,0 relativo al centro)
+        // Después del pan, el canvas se mueve: pan.x/zoom en X, pan.y/zoom en Y
+        
+        // Límites de pan basados en el tamaño escalado del canvas y el contenedor
+        // Queremos que el canvas escalado no se salga completamente del contenedor
+        // Permitir que se mueva hasta que una esquina del canvas esté en el borde del contenedor
+        
+        // Límite máximo de pan en píxeles del canvas (antes del scale)
+        // Cuando el canvas escalado es más grande que el contenedor:
+        // - Puede moverse hasta que una esquina toque el borde del contenedor
+        // - El canvas tiene tamaño gridWidth x gridHeight
+        // - El canvas escalado tiene tamaño scaledWidth x scaledHeight
+        // - El contenedor tiene tamaño containerWidth x containerHeight
+        
+        // Si scaledWidth > containerWidth, el canvas puede moverse horizontalmente
+        // El desplazamiento máximo en píxeles del canvas (antes del scale) es:
+        // maxPanInCanvasPixels = (scaledWidth - containerWidth) / (2 * zoom)
+        // Pero pan.x está en píxeles del contenedor, no del canvas
+        
+        // Conversión correcta:
+        // pan.x está en píxeles del contenedor (relativo al centro)
+        // El canvas se mueve pan.x/zoom píxeles antes del scale
+        // Después del scale, esto se convierte en pan.x píxeles del contenedor
+        
+        // Si scaledWidth > containerWidth, el canvas puede moverse:
+        // - Hacia la izquierda: hasta que el borde derecho del canvas toque el borde derecho del contenedor
+        // - Hacia la derecha: hasta que el borde izquierdo del canvas toque el borde izquierdo del contenedor
+        // El desplazamiento máximo en píxeles del contenedor es:
+        // maxPanX = (scaledWidth - containerWidth) / 2
+        
+        let maxPanX, maxPanY, minPanX, minPanY;
+        
+        if (scaledWidth > containerWidth) {
+            // Canvas más ancho que el contenedor: puede moverse horizontalmente
+            maxPanX = (scaledWidth - containerWidth) / 2;
+            minPanX = -maxPanX;
+        } else {
+            // Canvas más estrecho que el contenedor: no debe moverse horizontalmente
+            // O solo permitir un pequeño margen para mantenerlo centrado
+            maxPanX = (containerWidth - scaledWidth) / 4; // Pequeño margen
+            minPanX = -maxPanX;
+        }
+        
+        if (scaledHeight > containerHeight) {
+            // Canvas más alto que el contenedor: puede moverse verticalmente
+            maxPanY = (scaledHeight - containerHeight) / 2;
+            minPanY = -maxPanY;
+        } else {
+            // Canvas más bajo que el contenedor: no debe moverse verticalmente
+            maxPanY = (containerHeight - scaledHeight) / 4; // Pequeño margen
+            minPanY = -maxPanY;
+        }
         
         const constrainedPan = {
             x: Math.max(minPanX, Math.min(newPan.x, maxPanX)),
