@@ -37,6 +37,8 @@
 - **[Benchmark Python vs Native](../40_Experiments/BENCHMARK_PYTHON_VS_NATIVE.md)** - Comparación de rendimiento Python vs C++ Nativo
 - **[EXP_006: Optimización de Transferencia](../40_Experiments/EXP_006_DATA_TRANSFER_OPTIMIZATION.md)** - Optimización de transferencia de datos
 - **[EXP_007: Verificación de Spatial Indexing](../40_Experiments/EXP_007_SPATIAL_INDEXING_VERIFICATION.md)** - Verificación de códigos Morton
+- **[Análisis de Optimización de Visualización](../40_Experiments/VISUALIZATION_OPTIMIZATION_ANALYSIS.md)** - Análisis de flujo de visualización y opciones de optimización
+- **[Evaluación Arquitectónica: Go vs Python](../40_Experiments/ARCHITECTURE_EVALUATION_GO_VS_PYTHON.md)** - Análisis de usar Go para comunicaciones
 
 ---
 
