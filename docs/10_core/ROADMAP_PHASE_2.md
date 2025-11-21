@@ -71,4 +71,39 @@ Ventaja: Los tensores nunca viajan a la CPU. C++ le dice a la GPU "ejecuta esto"
    - Carga de modelos TorchScript: ✅ (implementado en Engine)
    - Pendiente: Pruebas con modelo real
 
+⏳ Optimizaciones de Rendimiento (Alta Prioridad):
+   
+   **A. Paralelismo (OpenMP/std::thread)**
+   - Paralelizar iteración sobre partículas activas en `step_native()`
+   - Usar OpenMP para loops paralelos (`#pragma omp parallel for`)
+   - Thread pool para operaciones independientes
+   - Paralelizar conversión disperso→denso cuando sea necesario
+   - **Impacto**: 2-4x mejora en simulación multi-core
+   
+   **B. Optimizaciones SIMD (Vectorización)**
+   - Usar instrucciones SIMD (SSE/AVX) para operaciones vectoriales
+   - Optimizar cálculos de física con vectorización automática
+   - Mejorar rendimiento de operaciones matemáticas (suma, producto, etc.)
+   - Vectorizar operaciones sobre tensores LibTorch
+   - **Impacto**: 2-3x mejora en operaciones matemáticas
+   
+   **C. Visualización en C++ (Motor Nativo)**
+   - Implementar `compute_visualization()` en Engine C++
+   - Cálculos básicos (density, phase, energy) directamente en GPU
+   - Reducir overhead Python en pipeline de visualización
+   - Envío directo desde GPU cuando sea posible (zero-copy)
+   - **Impacto**: Reducción de ~2-5ms → ~0.5-1ms por frame
+   
+   **D. Envío de Datos Optimizado**
+   - Evaluar envío directo desde GPU (evitar CPU)
+   - Considerar shaders en frontend para procesamiento
+   - Optimizar serialización para datos raw
+   - **Impacto**: Reducción adicional de ~1-2ms por frame
+   
+   **Impacto Total Esperado**: 10-50x mejora en rendimiento de simulación
+   
+   **Referencias**: 
+   - [[40_Experiments/ARCHITECTURE_EVALUATION_GO_VS_PYTHON|Evaluación Go vs Python]] - Análisis de optimizaciones
+   - [[40_Experiments/VISUALIZATION_OPTIMIZATION_ANALYSIS|Análisis de Optimización de Visualización]] - Opciones de optimización
+
 Nota para Agentes: Al implementar esto, prioriza la seguridad de memoria (Smart Pointers) y el paralelismo (OpenMP/std::thread) para el bucle de física.
