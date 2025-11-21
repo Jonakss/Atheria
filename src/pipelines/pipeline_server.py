@@ -124,8 +124,17 @@ async def websocket_handler(request):
             # Obtener versión del motor nativo si está disponible
             from ..engines.native_engine_wrapper import NativeEngineWrapper
             wrapper_version = getattr(NativeEngineWrapper, 'VERSION', None) or "unknown"
-            # Intentar obtener versión del motor C++ (requiere motor instanciado)
-            native_version = "available"  # Solo indicar que está disponible
+            # Intentar obtener versión del motor C++ directamente del módulo
+            try:
+                if hasattr(atheria_core, 'get_version'):
+                    native_version = atheria_core.get_version()
+                elif hasattr(atheria_core, '__version__'):
+                    native_version = getattr(atheria_core, '__version__')
+                else:
+                    native_version = "available"  # Solo indicar que está disponible
+            except Exception as e:
+                logging.debug(f"No se pudo obtener versión del motor nativo en estado inicial: {e}")
+                native_version = "available"  # Solo indicar que está disponible
         except (ImportError, OSError, RuntimeError):
             pass
         
