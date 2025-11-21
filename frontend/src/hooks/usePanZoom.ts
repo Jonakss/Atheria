@@ -151,15 +151,24 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
         }
         
         // Calcular límites de zoom
-        // Zoom mínimo: mostrar TODO el grid con margen de seguridad
+        // Zoom mínimo: permitir zoom out suficiente para ver TODO el grid completo
+        // Si el procesamiento lo permite, permitir zoom out incluso más allá
         const minZoomX = containerWidth / gridWidth;
         const minZoomY = containerHeight / gridHeight;
-        const minZoom = Math.min(minZoomX, minZoomY) * 0.85; // 85% para dejar más margen
+        // Permitir zoom out hasta un 50% más pequeño que lo necesario para ver todo el grid
+        // Esto permite ver el grid completo con espacio alrededor, o incluso más lejos
+        const minZoomRequired = Math.min(minZoomX, minZoomY);
+        const minZoom = minZoomRequired * 0.5; // 50% del zoom necesario = permite ver 2x más área
+        
+        // Permitir zoom out incluso más si el grid es muy grande (límite absoluto muy bajo)
+        // Esto permite ver grids grandes desde muy lejos si el rendimiento lo permite
+        const absoluteMinZoom = 0.01; // Límite absoluto mínimo (permite ver hasta 100x el área del contenedor)
+        const finalMinZoom = Math.max(absoluteMinZoom, minZoom);
         
         // Zoom máximo: permitir zoom hasta 100x o hasta que 1 unidad = 1 píxel
         const maxZoom = Math.max(100, Math.min(containerWidth, containerHeight));
         
-        const constrainedZoom = Math.max(minZoom, Math.min(newZoom, maxZoom));
+        const constrainedZoom = Math.max(finalMinZoom, Math.min(newZoom, maxZoom));
         
         // Calcular límites de pan
         // El canvas está centrado con CSS:
@@ -340,7 +349,10 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
             const newZoom = e.deltaY < 0 
                 ? zoom * zoomFactor * smoothFactor 
                 : zoom / (zoomFactor * smoothFactor);
-            const constrainedZoom = Math.max(0.05, Math.min(newZoom, 100));
+            
+            // Usar constrainPanZoom para aplicar límites (incluye minZoom ajustado)
+            const constrained = constrainPanZoom(pan, newZoom);
+            const constrainedZoom = constrained.zoom;
             
             // Calcular nuevo pan para mantener el punto del canvas fijo bajo el mouse
             const zoomRatio = constrainedZoom / zoom;
