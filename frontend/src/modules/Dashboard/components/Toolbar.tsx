@@ -39,12 +39,20 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onToggleTimeline, timelineOpen
     }
   }, [stepsInterval, isConnected, liveFeedEnabled, sendCommand]);
   
-  // Verificar si hay experimento activo con checkpoint
+  // Verificar si hay experimento activo con checkpoint o si hay un modelo cargado
   const currentExperiment = activeExperiment 
     ? experimentsData?.find(exp => exp.name === activeExperiment) 
     : null;
   const hasActiveExperiment = currentExperiment?.has_checkpoint || false;
-  const canControlInference = isConnected && (hasActiveExperiment || inferenceStatus === 'running');
+  // Permitir control si:
+  // 1. Hay un experimento activo con checkpoint, O
+  // 2. La simulación está corriendo (ya está iniciada), O
+  // 3. La simulación está pausada PERO hay un experimento activo (puede reanudar)
+  const canControlInference = isConnected && (
+    hasActiveExperiment || 
+    inferenceStatus === 'running' || 
+    (inferenceStatus === 'paused' && activeExperiment !== null)
+  );
   
   const currentStep = isConnected ? (simData?.step ?? simData?.simulation_info?.step ?? 0) : 0;
   
