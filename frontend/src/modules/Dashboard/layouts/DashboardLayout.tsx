@@ -29,7 +29,14 @@ export const DashboardLayout: React.FC = () => {
     timestamp: string;
     map_data: number[][];
   } | null>(null);
-  const { simData, selectedViz, connectionStatus, sendCommand, setSelectedViz } = useWebSocket();
+  const { simData, selectedViz, connectionStatus, sendCommand, setSelectedViz, inferenceStatus } = useWebSocket();
+  
+  // Si la simulación está corriendo, deseleccionar frame del timeline para mostrar datos en vivo
+  useEffect(() => {
+    if (inferenceStatus === 'running' && selectedTimelineFrame !== null) {
+      setSelectedTimelineFrame(null);
+    }
+  }, [inferenceStatus, selectedTimelineFrame]);
   
   // Obtener época detectada del backend
   const detectedEpoch = useMemo(() => simData?.simulation_info?.epoch ?? 2, [simData?.simulation_info?.epoch]);
