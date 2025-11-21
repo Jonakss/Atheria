@@ -246,6 +246,22 @@ Ejemplos:
     frontend_parser.add_argument('--port', type=int, default=None,
                                 help='Puerto del frontend (por defecto: 5173)')
     
+    # Comando: version
+    version_parser = subparsers.add_parser('version', help='Gestionar versiones')
+    version_subparsers = version_parser.add_subparsers(dest='version_command', help='Comando de versión')
+    
+    # Subcomando: show
+    version_subparsers.add_parser('show', help='Mostrar versión actual')
+    
+    # Subcomando: bump
+    bump_parser = version_subparsers.add_parser('bump', help='Bump de versión')
+    bump_parser.add_argument('--type', choices=['major', 'minor', 'patch'], 
+                            help='Tipo de bump: major, minor, o patch')
+    bump_parser.add_argument('--version', type=str,
+                            help='Versión específica (ej: 4.2.0). Ignora --type si se especifica.')
+    bump_parser.add_argument('--dry-run', action='store_true',
+                            help='Solo mostrar cambios sin aplicar')
+    
     args = parser.parse_args()
     
     if not args.command:
@@ -265,8 +281,89 @@ Ejemplos:
         clean()
     elif args.command == 'frontend-dev':
         run_frontend_dev(port=args.port if hasattr(args, 'port') else None)
+    elif args.command == 'version':
+        handle_version(args)
     else:
         parser.print_help()
+        sys.exit(1)
+
+def handle_version(args):
+    """Maneja comandos de versión."""
+    from pathlib import Path
+    
+    script_path = Path(__file__).parent.parent / "scripts" / "bump_version.py"
+    
+    if args.version_command == 'show':
+        # Leer versión actual desde src/__version__.py
+        try:
+            import importlib.util
+            version_module_path = Path(__file__).parent / "__version__.py"
+            if version_module_path.exists():
+                spec = importlib.util.spec_from_file_location("version", version_module_path)
+                version_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(version_module)
+                print(f"📌 Versión actual: {version_module.__version__}")
+                
+                # Mostrar versiones de todos los componentes
+                print("\n📦 Versiones de componentes:")
+                
+                # Backend Python
+                print(f"  ✅ Backend Python: {version_module.__version__}")
+                
+                # Motor Python/Wrapper
+                engines_version_path = Path(__file__).parent / "engines" / "__version__.py"
+                if engines_version_path.exists():
+                    spec = importlib.util.spec_from_file_location("engines_version", engines_version_path)
+                    engines_version_module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(engines_version_module)
+                    print(f"  ✅ Motor Python/Wrapper: {engines_version_module.ENGINE_VERSION}")
+                
+                # Motor Nativo C++
+                version_h_path = Path(__file__).parent.parent / "src" / "cpp_core" / "include" / "version.h"
+                if version_h_path.exists():
+                    content = version_h_path.read_text()
+                    import re
+                    match = re.search(r'#define ATHERIA_NATIVE_VERSION_STRING "([^"]+)"', content)
+                    if match:
+                        print(f"  ✅ Motor Nativo C++: {match.group(1)}")
+                
+                # Frontend
+                package_json_path = Path(__file__).parent.parent / "frontend" / "package.json"
+                if package_json_path.exists():
+                    import json
+                    package_data = json.loads(package_json_path.read_text())
+                    print(f"  ✅ Frontend React: {package_data.get('version', 'N/A')}")
+                
+            else:
+                print("❌ Error: src/__version__.py no existe")
+                sys.exit(1)
+        except Exception as e:
+            print(f"❌ Error leyendo versión: {e}")
+            sys.exit(1)
+    
+    elif args.version_command == 'bump':
+        # Ejecutar script de bump
+        if not script_path.exists():
+            print(f"❌ Error: {script_path} no existe")
+            sys.exit(1)
+        
+        cmd = [sys.executable, str(script_path)]
+        if args.type:
+            cmd.extend(['--type', args.type])
+        if args.version:
+            cmd.extend(['--version', args.version])
+        if args.dry_run:
+            cmd.append('--dry-run')
+        
+        print(f"🔄 Ejecutando bump de versión...")
+        success = run_command(cmd, check=False)
+        
+        if not success:
+            print("❌ Error en bump de versión")
+            sys.exit(1)
+    
+    else:
+        print("❌ Error: Comando de versión no reconocido. Usa 'show' o 'bump'")
         sys.exit(1)
 
 
