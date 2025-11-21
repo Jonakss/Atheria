@@ -292,5 +292,6 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
         handleMouseUp,
         handleWheel,
         resetView,
+        isPanning,
     };
 };

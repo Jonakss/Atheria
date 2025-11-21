@@ -59,7 +59,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     const gridWidth = mapData?.[0]?.length || 0;
     const gridHeight = mapData?.length || 0;
     
-    const { pan, zoom, handleMouseDown, handleMouseMove, handleMouseUp, handleWheel, resetView } = usePanZoom(canvasRef, gridWidth, gridHeight);
+    const { pan, zoom, handleMouseDown, handleMouseMove, handleMouseUp, handleWheel, resetView, isPanning } = usePanZoom(canvasRef, gridWidth, gridHeight);
     
     // Estado de overlays
     const [overlayConfig, setOverlayConfig] = useState<OverlayConfig>({
@@ -732,7 +732,8 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                     transformOrigin: 'center center',
                     imageRendering: zoom > 2 ? 'pixelated' : 'auto', // Pixelated solo en zoom muy alto
                     visibility: (dataToRender?.map_data || simData?.map_data) ? 'visible' : 'hidden',
-                    cursor: isPanning ? 'grabbing' : 'grab'
+                    cursor: isPanning ? 'grabbing' : 'grab',
+                    pointerEvents: 'auto'
                 }}
             />
             
