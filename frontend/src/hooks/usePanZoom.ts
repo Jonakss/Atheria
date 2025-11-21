@@ -347,22 +347,9 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
             const newPanX = mouseRelToCenterX * (1 - zoomRatio) + pan.x * zoomRatio;
             const newPanY = mouseRelToCenterY * (1 - zoomRatio) + pan.y * zoomRatio;
             
-            let finalPan = { x: newPanX, y: newPanY };
-            const constrained = constrainPanZoom(finalPan, constrainedZoom);
-            
-            // En modo toroidal, aplicar wraparound visual al pan
-            if (toroidalMode && gridWidth && gridHeight) {
-                // Aplicar wraparound: cuando pan supera un tamaño del grid, "envolver"
-                // Esto crea el efecto de espacio infinito
-                const wrappedX = constrained.pan.x % (gridWidth * constrainedZoom);
-                const wrappedY = constrained.pan.y % (gridHeight * constrainedZoom);
-                finalPan = { x: wrappedX, y: wrappedY };
-            } else {
-                finalPan = constrained.pan;
-            }
-            
+            const constrained = constrainPanZoom({ x: newPanX, y: newPanY }, constrainedZoom);
             setZoom(constrained.zoom);
-            setPan(finalPan);
+            setPan(constrained.pan);
         }
     }, [zoom, pan, constrainPanZoom, canvasRef, gridWidth, gridHeight]);
 
