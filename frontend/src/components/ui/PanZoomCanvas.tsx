@@ -716,15 +716,23 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
             
             <canvas
                 ref={canvasRef}
-                className="absolute inset-0 w-full h-full"
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
                 style={{ 
-                    transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
-                    transformOrigin: '0 0',
-                    visibility: (dataToRender?.map_data || simData?.map_data) ? 'visible' : 'hidden'
+                    position: 'absolute',
+                    left: '50%',
+                    top: '50%',
+                    marginLeft: `${-(gridWidth / 2) + (pan.x / zoom)}px`,
+                    marginTop: `${-(gridHeight / 2) + (pan.y / zoom)}px`,
+                    width: `${gridWidth}px`,
+                    height: `${gridHeight}px`,
+                    transform: `scale(${zoom})`,
+                    transformOrigin: 'center center',
+                    imageRendering: zoom > 2 ? 'pixelated' : 'auto', // Pixelated solo en zoom muy alto
+                    visibility: (dataToRender?.map_data || simData?.map_data) ? 'visible' : 'hidden',
+                    cursor: isPanning ? 'grabbing' : 'grab'
                 }}
             />
             

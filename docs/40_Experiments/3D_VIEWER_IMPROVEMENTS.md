@@ -84,10 +84,11 @@ related: [[30_Components/HolographicViewer|Visor Holográfico]], [[VISUALIZATION
 
 ## ✅ Soluciones Implementadas
 
-### 1. Mejora de Resize (En Progreso)
-- [ ] Listener de resize que NO recalcule zoom/pan
-- [ ] Solo ajustar tamaño del renderer
-- [ ] Mantener vista del usuario al redimensionar
+### 1. Mejora de Resize (✅ Implementado)
+- [x] Listener de resize que NO recalcule zoom/pan
+- [x] Solo ajustar tamaño del renderer y aspect ratio de la cámara
+- [x] Mantener vista del usuario (posición de cámara y controles) al redimensionar
+- [x] Usar ResizeObserver para detectar cambios de tamaño del contenedor
 
 ### 2. Controles de Tamaño (Pendiente)
 - [ ] Slider o botones para tamaño del visor
