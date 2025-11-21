@@ -204,10 +204,29 @@ class QC_Trainer_v4:
         import gc
         gc.collect()  # Forzar garbage collection para liberar memoria inmediatamente
         
-        # Retropropagación
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.motor.operator.parameters(), 1.0) # Evitar explosión de gradientes
-        self.optimizer.step()
+        # Retropropagación con manejo de memoria CUDA
+        try:
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.motor.operator.parameters(), 1.0) # Evitar explosión de gradientes
+            self.optimizer.step()
+        except torch.cuda.OutOfMemoryError as e:
+            # Si hay error de memoria CUDA, limpiar caché y reintentar una vez
+            logging.warning(f"⚠️ CUDA Out of Memory durante entrenamiento episodio {episode_num}. Limpiando caché...")
+            torch.cuda.empty_cache()
+            gc.collect()
+            # Reintentar una vez después de limpiar
+            try:
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.motor.operator.parameters(), 1.0)
+                self.optimizer.step()
+                logging.info("✅ Recuperado después de limpiar caché CUDA")
+            except torch.cuda.OutOfMemoryError:
+                logging.error(f"❌ CUDA Out of Memory persistente en episodio {episode_num}. Deteniendo entrenamiento.")
+                raise
+        
+        # Limpiar caché CUDA periódicamente (cada 10 episodios)
+        if episode_num % 10 == 0 and torch.cuda.is_available():
+            torch.cuda.empty_cache()
         
         # Logging
         if episode_num % 10 == 0:

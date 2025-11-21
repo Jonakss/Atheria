@@ -267,7 +267,42 @@ def _run_v4_training_loop(trainer: QC_Trainer_v4, exp_cfg: SimpleNamespace):
                         current_loss=loss,
                         is_best=is_best
                     )
+                
+                # Limpiar caché CUDA periódicamente para evitar OutOfMemoryError
+                # Limpiar cada 20 episodios o después de guardar checkpoint
+                if (episode + 1) % 20 == 0 or (episode + 1) % save_every == 0:
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                        import gc
+                        gc.collect()
+                        logging.debug(f"Memoria CUDA limpiada después del episodio {episode + 1}")
                     
+            except torch.cuda.OutOfMemoryError as e:
+                logging.error(f"❌ CUDA Out of Memory en episodio {episode}: {e}")
+                # Limpiar caché CUDA y reintentar una vez
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    import gc
+                    gc.collect()
+                    logging.warning(f"⚠️ Memoria CUDA limpiada. Intentando continuar...")
+                    try:
+                        # Reintentar el episodio
+                        loss, metrics = trainer.train_episode(episode)
+                        last_loss = loss
+                        last_metrics = metrics
+                        logging.info(f"✅ Episodio {episode} completado después de limpiar memoria")
+                    except torch.cuda.OutOfMemoryError:
+                        logging.error(f"❌ CUDA Out of Memory persistente en episodio {episode}. Deteniendo entrenamiento.")
+                        # Guardar checkpoint con último estado disponible
+                        trainer.save_checkpoint(
+                            episode - 1 if episode > 0 else 0,
+                            current_metrics=last_metrics,
+                            current_loss=last_loss,
+                            is_best=False
+                        )
+                        raise
+                else:
+                    raise
             except KeyboardInterrupt:
                 logging.info("Entrenamiento interrumpido por el usuario.")
                 # Guardar checkpoint con las últimas métricas disponibles
