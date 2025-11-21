@@ -224,22 +224,22 @@ export const Toolbar: React.FC = () => {
                     <label className="text-[10px] text-gray-500">Cada</label>
                     <input
                       type="number"
-                      min={1}
-                      max={1000}
+                      min={0}
+                      max={1000000}
                       step={1}
                       value={stepsInterval}
                       onChange={(e) => {
                         const val = parseInt(e.target.value, 10);
-                        if (!isNaN(val) && val >= 1 && val <= 1000) {
+                        if (!isNaN(val) && val >= 0 && val <= 1000000) {
                           setStepsInterval(val);
                         }
                       }}
-                      className="w-16 px-2 py-1 bg-white/5 border border-white/10 rounded text-xs font-mono text-gray-300 focus:outline-none focus:border-blue-500/50"
+                      className="w-20 px-2 py-1 bg-white/5 border border-white/10 rounded text-xs font-mono text-gray-300 focus:outline-none focus:border-blue-500/50"
                     />
                     <span className="text-[10px] text-gray-500">pasos</span>
                   </div>
-                  <div className="flex gap-1">
-                    {[1, 5, 10, 25, 50, 100].map(val => (
+                  <div className="flex gap-1 flex-wrap">
+                    {[1, 5, 10, 25, 50, 100, 500, 1000, 5000, 10000].map(val => (
                       <button
                         key={val}
                         onClick={() => setStepsInterval(val)}
@@ -254,7 +254,9 @@ export const Toolbar: React.FC = () => {
                     ))}
                   </div>
                   <div className="text-[9px] text-gray-600 pt-1 border-t border-white/10">
-                    Mostrar frame cada {stepsInterval} pasos cuando live feed está desactivado
+                    {stepsInterval === 0 
+                      ? 'Modo manual: frames solo con botón de actualización'
+                      : `Mostrar frame cada ${stepsInterval.toLocaleString()} pasos cuando live feed está desactivado`}
                   </div>
                 </div>
               </GlassPanel>
