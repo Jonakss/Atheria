@@ -2815,6 +2815,7 @@ async def handle_set_steps_interval(args):
     
     Args:
         steps_interval: Intervalo en pasos. Valores:
+            - -1: Fullspeed (no enviar frames automáticamente, máxima velocidad)
             - 0: Modo manual (solo actualizar con botón)
             - 1-1000000: Enviar frame cada N pasos automáticamente (permite intervalos muy grandes)
     """
@@ -2822,21 +2823,35 @@ async def handle_set_steps_interval(args):
     
     try:
         steps_interval = args.get('steps_interval', 10)
-        if steps_interval < 0:
-            steps_interval = 0  # Permitir 0 para modo manual
+        if steps_interval == -1:
+            # Modo fullspeed: no enviar frames automáticamente
+            g_state['steps_interval'] = -1
+            g_state['steps_interval_counter'] = 0  # Resetear contador
+            msg = "✅ Modo fullspeed activado: simulación a máxima velocidad sin enviar frames"
+        elif steps_interval < 0:
+            steps_interval = -1  # Permitir -1 para modo fullspeed
+            g_state['steps_interval'] = -1
+            g_state['steps_interval_counter'] = 0
+            msg = "✅ Modo fullspeed activado: simulación a máxima velocidad sin enviar frames"
+        elif steps_interval == 0:
+            # Modo manual: solo actualizar con botón
+            g_state['steps_interval'] = 0
+            g_state['steps_interval_counter'] = 0
+            msg = "✅ Modo manual activado: solo actualizar con botón 'Actualizar Visualización'"
         elif steps_interval > 1000000:  # Límite aumentado a 1 millón
             steps_interval = 1000000
             logging.warning(f"steps_interval limitado a 1,000,000 (valor solicitado: {args.get('steps_interval')})")
-        
-        g_state['steps_interval'] = int(steps_interval)
-        g_state['steps_interval_counter'] = 0  # Resetear contador
-        
-        if steps_interval == 0:
-            msg = "✅ Modo manual activado: solo actualizar con botón 'Actualizar Visualización'"
+            g_state['steps_interval'] = int(steps_interval)
+            g_state['steps_interval_counter'] = 0
+            steps_str = f"{steps_interval:,}".replace(",", ".")
+            msg = f"✅ Intervalo de pasos configurado: cada {steps_str} pasos"
         else:
+            g_state['steps_interval'] = int(steps_interval)
+            g_state['steps_interval_counter'] = 0
             # Formatear número con separadores de miles para mejor legibilidad
             steps_str = f"{steps_interval:,}".replace(",", ".")
             msg = f"✅ Intervalo de pasos configurado: cada {steps_str} pasos"
+        
         logging.info(msg)
         if ws:
             await send_notification(ws, msg, "success")

@@ -18,6 +18,7 @@ export const Toolbar: React.FC = () => {
   const isConnected = connectionStatus === 'connected';
   
   // Estado para el intervalo de pasos cuando live feed está desactivado
+  // -1 = fullspeed (no enviar frames), 0 = manual (solo con botón), >0 = cada N pasos
   const [stepsInterval, setStepsInterval] = useState<number>(() => {
     const saved = localStorage.getItem('atheria_steps_interval');
     return saved ? parseInt(saved, 10) : 10; // Por defecto cada 10 pasos
@@ -224,13 +225,13 @@ export const Toolbar: React.FC = () => {
                     <label className="text-[10px] text-gray-500">Cada</label>
                     <input
                       type="number"
-                      min={0}
+                      min={-1}
                       max={1000000}
                       step={1}
                       value={stepsInterval}
                       onChange={(e) => {
                         const val = parseInt(e.target.value, 10);
-                        if (!isNaN(val) && val >= 0 && val <= 1000000) {
+                        if (!isNaN(val) && val >= -1 && val <= 1000000) {
                           setStepsInterval(val);
                         }
                       }}
@@ -239,7 +240,7 @@ export const Toolbar: React.FC = () => {
                     <span className="text-[10px] text-gray-500">pasos</span>
                   </div>
                   <div className="flex gap-1 flex-wrap">
-                    {[1, 5, 10, 25, 50, 100, 500, 1000, 5000, 10000].map(val => (
+                    {[-1, 0, 1, 5, 10, 25, 50, 100, 500, 1000, 5000, 10000].map(val => (
                       <button
                         key={val}
                         onClick={() => setStepsInterval(val)}
