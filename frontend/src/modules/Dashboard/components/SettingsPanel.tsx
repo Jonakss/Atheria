@@ -412,6 +412,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
                        compileStatus.is_compiled ? 'COMPILADO (PyTorch)' : 'PYTHON'}
                     </span>
                   </div>
+                  {/* Información de versiones */}
+                  <div className="text-[9px] text-gray-500 font-mono space-y-0.5 border-t border-white/5 pt-2 mt-2">
+                    <div className="text-gray-400 text-[10px] font-bold uppercase mb-1">Versiones</div>
+                    <div className="text-gray-500">Frontend: {getFormattedVersion()}</div>
+                    {compileStatus.native_version && (
+                      <div className="text-gray-500">Nativo: v{compileStatus.native_version}</div>
+                    )}
+                    {compileStatus.wrapper_version && (
+                      <div className="text-gray-500">Wrapper: v{compileStatus.wrapper_version}</div>
+                    )}
+                    {compileStatus.python_version && (
+                      <div className="text-gray-500">Python: v{compileStatus.python_version}</div>
+                    )}
+                  </div>
                 </>
               )}
             </div>
