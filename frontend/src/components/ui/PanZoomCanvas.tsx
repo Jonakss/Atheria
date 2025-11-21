@@ -100,39 +100,65 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
         if (!container) return;
         
         const containerRect = container.getBoundingClientRect();
-        const canvasRect = canvas.getBoundingClientRect();
         
-        // Coordenadas del mouse relativas al canvas
-        const mouseX = e.clientX - canvasRect.left;
-        const mouseY = e.clientY - canvasRect.top;
+        // Coordenadas del mouse relativas al contenedor
+        const mouseX = e.clientX - containerRect.left;
+        const mouseY = e.clientY - containerRect.top;
         
-        // Convertir a coordenadas del grid
+        // El canvas está centrado con:
+        // - left: 50%, top: 50%
+        // - marginLeft: -(gridWidth/2) + (pan.x/zoom)
+        // - marginTop: -(gridHeight/2) + (pan.y/zoom)
+        // - transform: scale(zoom)
+        // - transformOrigin: center center
+        
+        // Coordenadas relativas al centro del contenedor
         const containerWidth = containerRect.width;
         const containerHeight = containerRect.height;
-        const mouseRelToCanvasCenterX = mouseX - containerWidth / 2;
-        const mouseRelToCanvasCenterY = mouseY - containerHeight / 2;
+        const mouseRelToCenterX = mouseX - containerWidth / 2;
+        const mouseRelToCenterY = mouseY - containerHeight / 2;
         
-        // Coordenadas del grid
-        const gridX = Math.floor((mouseRelToCanvasCenterX - pan.x) / zoom + gridWidth / 2);
-        const gridY = Math.floor((mouseRelToCanvasCenterY - pan.y) / zoom + gridHeight / 2);
+        // El canvas está desplazado por el margen antes del scale
+        // El margen efectivo es: -(gridWidth/2) + (pan.x/zoom) en X
+        // Después del scale, este desplazamiento se multiplica por zoom
+        // Entonces, la posición del centro del canvas (antes del scale) es:
+        const canvasCenterOffsetX = -(gridWidth / 2) + (pan.x / zoom);
+        const canvasCenterOffsetY = -(gridHeight / 2) + (pan.y / zoom);
         
-        // Verificar si estamos dentro del grid
-        if (gridX >= 0 && gridX < gridWidth && gridY >= 0 && gridY < gridHeight) {
-            const value = mapData[gridY]?.[gridX];
+        // Coordenadas del mouse relativas al centro del canvas (antes del scale)
+        // Necesitamos deshacer el scale primero
+        const mouseRelToCanvasCenterX = (mouseRelToCenterX / zoom) - canvasCenterOffsetX;
+        const mouseRelToCanvasCenterY = (mouseRelToCenterY / zoom) - canvasCenterOffsetY;
+        
+        // Ahora convertir a coordenadas del grid
+        // El canvas tiene su origen (0,0) en la esquina superior izquierda
+        // El grid también tiene su origen (0,0) en la esquina superior izquierda
+        // Entonces las coordenadas del canvas son directamente las coordenadas del grid
+        const gridX = Math.floor(mouseRelToCanvasCenterX);
+        const gridY = Math.floor(mouseRelToCanvasCenterY);
+        
+        // Verificar si estamos dentro del grid (con un pequeño margen para bordes)
+        const margin = 0.5; // Permitir un pequeño margen para bordes
+        if (gridX >= -margin && gridX < gridWidth + margin && gridY >= -margin && gridY < gridHeight + margin) {
+            // Clampear a los límites válidos del grid
+            const clampedX = Math.max(0, Math.min(gridWidth - 1, Math.floor(gridX)));
+            const clampedY = Math.max(0, Math.min(gridHeight - 1, Math.floor(gridY)));
+            
+            const value = mapData[clampedY]?.[clampedX];
             const numValue = typeof value === 'number' && !isNaN(value) ? value : null;
             
             setTooltipData({
                 x: e.clientX,
                 y: e.clientY,
-                gridX,
-                gridY,
+                gridX: clampedX,
+                gridY: clampedY,
                 value: numValue,
                 visible: true
             });
         } else {
             setTooltipData(null);
         }
-    }, [mapData, gridWidth, gridHeight, pan, zoom]);
+    }, [mapData, gridWidth, gridHeight, pan, zoom, tooltipData]);
     
     const handleCanvasMouseLeave = useCallback(() => {
         setTooltipData(null);
