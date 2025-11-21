@@ -33,9 +33,10 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
 
   const handleThermalNoiseChange = (value: number) => {
     setThermalNoise(value);
-    // Thermal noise podría ser parte de la configuración de ruido cuántico
+    // TODO: Thermal noise aún no está implementado en el backend
     // Por ahora solo guardamos el estado local
-    // TODO: Integrar con sistema de ruido cuántico si existe
+    // Cuando esté implementado, enviar con:
+    // sendCommand('inference', 'set_config', { thermal_noise: value })
   };
 
   // Filtrar logs recientes (últimos 2)
@@ -76,13 +77,13 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
             <input
               type="range"
               min="0"
-              max="1.0"
+              max="10.0"
               step="0.001"
               value={gammaDecay}
               onChange={(e) => handleGammaChange(parseFloat(e.target.value))}
               className="w-full h-1 bg-gray-800 rounded-full appearance-none cursor-pointer slider-thumb"
               style={{
-                background: `linear-gradient(to right, rgb(107, 114, 128) 0%, rgb(107, 114, 128) ${(gammaDecay / 1.0) * 100}%, rgb(31, 41, 55) ${(gammaDecay / 1.0) * 100}%, rgb(31, 41, 55) 100%)`
+                background: `linear-gradient(to right, rgb(107, 114, 128) 0%, rgb(107, 114, 128) ${(gammaDecay / 10.0) * 100}%, rgb(31, 41, 55) ${(gammaDecay / 10.0) * 100}%, rgb(31, 41, 55) 100%)`
               }}
             />
           </div>
