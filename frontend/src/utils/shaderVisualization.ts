@@ -6,7 +6,7 @@
  */
 
 export interface ShaderConfig {
-    type: 'density' | 'phase' | 'energy' | 'complex';
+    type: 'density' | 'phase' | 'energy' | 'complex' | 'real' | 'imag';
     colormap?: 'viridis' | 'plasma' | 'inferno' | 'magma' | 'turbo';
     minValue?: number;
     maxValue?: number;
@@ -188,6 +188,181 @@ export const FRAGMENT_SHADER_PHASE = `
         float phase = texel.r; // Fase almacenada en canal R
         
         vec3 color = phaseToHSL(phase);
+        gl_FragColor = vec4(color, 1.0);
+    }
+`;
+
+/**
+ * Shader de fragment para visualización de energía (energy = |∇ψ|²)
+ */
+export const FRAGMENT_SHADER_ENERGY = `
+    precision mediump float;
+    
+    uniform sampler2D u_texture;
+    uniform vec2 u_textureSize;
+    uniform float u_minValue;
+    uniform float u_maxValue;
+    uniform float u_gamma;
+    uniform int u_colormap;
+    
+    varying vec2 v_texCoord;
+    
+    // Colormap Viridis (reutilizado de density shader)
+    vec3 viridis(float t) {
+        t = clamp(t, 0.0, 1.0);
+        vec3 c0 = vec3(0.267004, 0.004874, 0.329415);
+        vec3 c1 = vec3(0.127568, 0.566949, 0.550556);
+        vec3 c2 = vec3(0.369214, 0.788888, 0.382914);
+        vec3 c3 = vec3(0.993248, 0.906157, 0.143936);
+        
+        if (t < 0.33) {
+            return mix(c0, c1, t * 3.0);
+        } else if (t < 0.66) {
+            return mix(c1, c2, (t - 0.33) * 3.0);
+        } else {
+            return mix(c2, c3, (t - 0.66) * 3.0);
+        }
+    }
+    
+    // Colormap Plasma (reutilizado)
+    vec3 plasma(float t) {
+        t = clamp(t, 0.0, 1.0);
+        vec3 c0 = vec3(0.050383, 0.029803, 0.527975);
+        vec3 c1 = vec3(0.546989, 0.127025, 0.513125);
+        vec3 c2 = vec3(0.998156, 0.401833, 0.255082);
+        vec3 c3 = vec3(0.988362, 0.998364, 0.644924);
+        
+        if (t < 0.33) {
+            return mix(c0, c1, t * 3.0);
+        } else if (t < 0.66) {
+            return mix(c1, c2, (t - 0.33) * 3.0);
+        } else {
+            return mix(c2, c3, (t - 0.66) * 3.0);
+        }
+    }
+    
+    void main() {
+        vec4 texel = texture2D(u_texture, v_texCoord);
+        float energy = texel.r; // Energía almacenada en canal R
+        
+        // Normalizar a rango [0, 1]
+        float normalized = (energy - u_minValue) / (u_maxValue - u_minValue);
+        normalized = clamp(normalized, 0.0, 1.0);
+        
+        // Aplicar corrección gamma
+        normalized = pow(normalized, u_gamma);
+        
+        // Aplicar colormap
+        vec3 color;
+        if (u_colormap == 0) {
+            color = viridis(normalized);
+        } else if (u_colormap == 1) {
+            color = plasma(normalized);
+        } else {
+            // Default: grayscale
+            color = vec3(normalized);
+        }
+        
+        gl_FragColor = vec4(color, 1.0);
+    }
+`;
+
+/**
+ * Shader de fragment para visualización de parte real (real = Re(ψ))
+ */
+export const FRAGMENT_SHADER_REAL = `
+    precision mediump float;
+    
+    uniform sampler2D u_texture;
+    uniform vec2 u_textureSize;
+    uniform float u_minValue;
+    uniform float u_maxValue;
+    uniform float u_gamma;
+    uniform int u_colormap;
+    
+    varying vec2 v_texCoord;
+    
+    // Colormap Viridis
+    vec3 viridis(float t) {
+        t = clamp(t, 0.0, 1.0);
+        vec3 c0 = vec3(0.267004, 0.004874, 0.329415);
+        vec3 c1 = vec3(0.127568, 0.566949, 0.550556);
+        vec3 c2 = vec3(0.369214, 0.788888, 0.382914);
+        vec3 c3 = vec3(0.993248, 0.906157, 0.143936);
+        
+        if (t < 0.33) {
+            return mix(c0, c1, t * 3.0);
+        } else if (t < 0.66) {
+            return mix(c1, c2, (t - 0.33) * 3.0);
+        } else {
+            return mix(c2, c3, (t - 0.66) * 3.0);
+        }
+    }
+    
+    void main() {
+        vec4 texel = texture2D(u_texture, v_texCoord);
+        float real = texel.r; // Parte real almacenada en canal R
+        
+        // Normalizar a rango [0, 1] (puede ser negativo)
+        float normalized = (real - u_minValue) / (u_maxValue - u_minValue);
+        normalized = clamp(normalized, 0.0, 1.0);
+        
+        // Aplicar corrección gamma
+        normalized = pow(normalized, u_gamma);
+        
+        // Aplicar colormap
+        vec3 color = viridis(normalized);
+        
+        gl_FragColor = vec4(color, 1.0);
+    }
+`;
+
+/**
+ * Shader de fragment para visualización de parte imaginaria (imag = Im(ψ))
+ */
+export const FRAGMENT_SHADER_IMAG = `
+    precision mediump float;
+    
+    uniform sampler2D u_texture;
+    uniform vec2 u_textureSize;
+    uniform float u_minValue;
+    uniform float u_maxValue;
+    uniform float u_gamma;
+    uniform int u_colormap;
+    
+    varying vec2 v_texCoord;
+    
+    // Colormap Viridis
+    vec3 viridis(float t) {
+        t = clamp(t, 0.0, 1.0);
+        vec3 c0 = vec3(0.267004, 0.004874, 0.329415);
+        vec3 c1 = vec3(0.127568, 0.566949, 0.550556);
+        vec3 c2 = vec3(0.369214, 0.788888, 0.382914);
+        vec3 c3 = vec3(0.993248, 0.906157, 0.143936);
+        
+        if (t < 0.33) {
+            return mix(c0, c1, t * 3.0);
+        } else if (t < 0.66) {
+            return mix(c1, c2, (t - 0.33) * 3.0);
+        } else {
+            return mix(c2, c3, (t - 0.66) * 3.0);
+        }
+    }
+    
+    void main() {
+        vec4 texel = texture2D(u_texture, v_texCoord);
+        float imag = texel.r; // Parte imaginaria almacenada en canal R
+        
+        // Normalizar a rango [0, 1] (puede ser negativo)
+        float normalized = (imag - u_minValue) / (u_maxValue - u_minValue);
+        normalized = clamp(normalized, 0.0, 1.0);
+        
+        // Aplicar corrección gamma
+        normalized = pow(normalized, u_gamma);
+        
+        // Aplicar colormap
+        vec3 color = viridis(normalized);
+        
         gl_FragColor = vec4(color, 1.0);
     }
 `;

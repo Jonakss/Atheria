@@ -15,6 +15,9 @@ import {
     VERTEX_SHADER_2D,
     FRAGMENT_SHADER_DENSITY,
     FRAGMENT_SHADER_PHASE,
+    FRAGMENT_SHADER_ENERGY,
+    FRAGMENT_SHADER_REAL,
+    FRAGMENT_SHADER_IMAG,
     type ShaderConfig
 } from '../../utils/shaderVisualization';
 
@@ -67,7 +70,14 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
         let fragmentShader: string;
         if (selectedViz === 'phase') {
             fragmentShader = FRAGMENT_SHADER_PHASE;
+        } else if (selectedViz === 'energy') {
+            fragmentShader = FRAGMENT_SHADER_ENERGY;
+        } else if (selectedViz === 'real') {
+            fragmentShader = FRAGMENT_SHADER_REAL;
+        } else if (selectedViz === 'imag') {
+            fragmentShader = FRAGMENT_SHADER_IMAG;
         } else {
+            // Default: density
             fragmentShader = FRAGMENT_SHADER_DENSITY;
         }
         

@@ -57,9 +57,9 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     // Detectar si WebGL está disponible para usar shaders (GPU rendering)
     const webglAvailable = useMemo(() => isWebGLAvailable(), []);
     // Usar shaders cuando WebGL está disponible y no es una visualización compleja
-    // Shaders funcionan bien para: density, phase, energy, complex
-    // No funcionan bien para: poincare, flow, phase_attractor (requieren Canvas 2D)
-    const useShaderRendering = webglAvailable && !['poincare', 'flow', 'phase_attractor'].includes(selectedViz);
+    // Shaders funcionan bien para: density, phase, energy, real, imag
+    // No funcionan bien para: poincare, flow, phase_attractor, phase_hsv (requieren Canvas 2D)
+    const useShaderRendering = webglAvailable && !['poincare', 'flow', 'phase_attractor', 'phase_hsv'].includes(selectedViz);
     
     // Usar historyFrame si está disponible, sino usar simData actual
     const dataToRender = historyFrame ? historyFrame : simData;
