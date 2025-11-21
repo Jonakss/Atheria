@@ -1360,13 +1360,14 @@ async def handle_load_experiment(args):
                 logging.warning(f"⚠️ No se pudo leer información del checkpoint: {e}")
             
             # Cargar modelo desde checkpoint (modelo entrenado)
+            logging.info(f"📋 Paso 4/10: Cargando modelo desde checkpoint...")
             model, state_dict = load_model(config, checkpoint_path)
             if model is None:
                 msg = f"❌ Error al cargar el modelo desde el checkpoint. Verifica que el checkpoint no esté corrupto."
                 logging.error(msg)
                 if ws: await send_notification(ws, msg, "error")
                 return
-            logging.info(f"✅ Modelo cargado desde checkpoint: {checkpoint_path}")
+            logging.info(f"✅ Paso 4/10: Modelo cargado desde checkpoint: {checkpoint_path}")
         else:
             # No hay checkpoint: crear modelo nuevo sin pesos entrenados
             logging.info(f"⚠️ El experimento '{exp_name}' no tiene checkpoints. Creando modelo nuevo sin pesos entrenados.")
@@ -1407,6 +1408,7 @@ async def handle_load_experiment(args):
         # NOTA: Solo usar motor nativo si hay checkpoint (modelo entrenado)
         # Si no hay checkpoint, usar motor Python con modelo sin entrenar
         # Permitir forzar el motor desde args (para cambio dinámico)
+        logging.info(f"📋 Paso 5/10: Decidiendo motor a usar...")
         force_engine = args.get('force_engine', None)  # 'native', 'python', o None para auto
         if force_engine == 'python':
             use_native_engine = False
@@ -1440,7 +1442,7 @@ async def handle_load_experiment(args):
                     
                     # Si no existe modelo JIT, exportarlo automáticamente desde el checkpoint
                     if not jit_path:
-                        logging.info(f"Modelo JIT no encontrado para '{exp_name}'. Exportando automáticamente...")
+                        logging.info(f"📋 Paso 6/10: Modelo JIT no encontrado para '{exp_name}'. Exportando automáticamente...")
                         if ws: await send_notification(ws, f"📦 Exportando modelo a TorchScript...", "info")
                         
                         # device_str ya está definido al inicio de la función
@@ -1495,7 +1497,7 @@ async def handle_load_experiment(args):
                             
                             if exported_path and os.path.exists(exported_path):
                                 jit_path = exported_path
-                                logging.info(f"✅ Modelo exportado exitosamente a: {jit_path}")
+                                logging.info(f"✅ Paso 6/10: Modelo exportado exitosamente a: {jit_path}")
                                 if ws: await send_notification(ws, "✅ Modelo exportado a TorchScript", "success")
                             else:
                                 logging.warning(f"⚠️ Error al exportar modelo JIT. Usando motor Python como fallback.")
@@ -1508,6 +1510,7 @@ async def handle_load_experiment(args):
                     
                     # Si tenemos modelo JIT, usar motor nativo
                     if jit_path and os.path.exists(jit_path):
+                        logging.info(f"📋 Paso 7/10: Inicializando motor nativo...")
                         temp_motor = None
                         try:
                             # Usar auto-detección del device (configurado en config.py)
@@ -1521,10 +1524,12 @@ async def handle_load_experiment(args):
                             logging.info(f"✅ Motor nativo inicializado con device: {temp_motor.device_str}")
                             
                             # Cargar modelo JIT en el motor nativo
+                            logging.info(f"📋 Paso 8/10: Cargando modelo JIT en motor nativo...")
                             if temp_motor.load_model(jit_path):
                                 motor = temp_motor
                                 temp_motor = None  # Evitar cleanup - motor se usará
                                 is_native = True
+                                logging.info(f"✅ Paso 8/10: Modelo JIT cargado en motor nativo")
                                 # Obtener versión del motor nativo después de cargar el modelo
                                 try:
                                     if hasattr(motor, 'native_version'):
@@ -1574,13 +1579,16 @@ async def handle_load_experiment(args):
         # 2. Motor nativo no está disponible
         # 3. Error al cargar modelo JIT
         if motor is None:
+            logging.info(f"📋 Paso 7/10: Usando motor Python (fallback)...")
             if not has_checkpoint:
                 logging.info(f"Usando motor Python tradicional (Aetheria_Motor) - Modelo sin entrenar, iniciando con ruido aleatorio")
             else:
                 logging.info(f"Usando motor Python tradicional (Aetheria_Motor)")
             # device_str ya está definido al inicio de la función
             # El estado inicial se creará automáticamente con ruido aleatorio según INITIAL_STATE_MODE_INFERENCE
+            logging.info(f"📋 Paso 7.1/10: Creando instancia de Aetheria_Motor...")
             motor = Aetheria_Motor(model, inference_grid_size, d_state, global_cfg.DEVICE, cfg=config)
+            logging.info(f"✅ Paso 7.1/10: Aetheria_Motor creado")
             
             # Compilar modelo para optimización de inferencia (solo para motor Python)
             try:
@@ -1659,6 +1667,7 @@ async def handle_load_experiment(args):
         
         # Enviar frame inicial inmediatamente para mostrar el estado inicial
         # SOLO si live_feed está habilitado
+        logging.info(f"📋 Paso 9/10: Preparando frame inicial...")
         live_feed_enabled = g_state.get('live_feed_enabled', True)
         if live_feed_enabled:
             try:
@@ -1750,6 +1759,7 @@ async def handle_load_experiment(args):
                 if ws: await send_notification(ws, f"⚠️ Error al generar visualización inicial: {str(e)}", "warning")
         
         # Enviar información sobre el estado del motor
+        logging.info(f"📋 Paso 10/10: Enviando estado final...")
         if is_native:
             # Obtener device del motor nativo
             device_str = motor.device_str if hasattr(motor, 'device_str') else 'cpu'
