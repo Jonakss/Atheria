@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { X, Save, RotateCcw, Power } from 'lucide-react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { GlassPanel } from './GlassPanel';
+import { getFormattedVersion } from '../../../utils/version';
 
 interface SettingsPanelProps {
   isOpen: boolean;
