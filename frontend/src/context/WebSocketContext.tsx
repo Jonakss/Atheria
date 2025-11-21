@@ -1,6 +1,7 @@
 // frontend/src/context/WebSocketContext.tsx
 import { createContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { decompressIfNeeded, decodeBinaryFrame, processDecodedPayload } from '../utils/dataDecompression';
+import { saveFrameToTimeline, getTimelineStats } from '../utils/timelineStorage';
 
 /**
  * Descomprime arrays comprimidos dentro de un payload (formato antiguo o nuevo).
@@ -438,6 +439,34 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                                 timestamp: payload.timestamp ?? Date.now(),
                                 simulation_info: payload.simulation_info
                             };
+                            
+                            // Guardar frame en timeline del navegador (localStorage)
+                            // Solo guardar si hay map_data y step válido
+                            if (finalPayload.map_data && finalPayload.step !== null && finalPayload.step !== undefined) {
+                                try {
+                                    // Obtener límite de frames desde localStorage o usar valor por defecto
+                                    const maxFrames = parseInt(
+                                        localStorage.getItem('atheria_timeline_max_frames') || '100',
+                                        10
+                                    );
+                                    
+                                    saveFrameToTimeline(
+                                        {
+                                            step: finalPayload.step,
+                                            timestamp: finalPayload.timestamp || Date.now(),
+                                            map_data: finalPayload.map_data,
+                                            simulation_info: finalPayload.simulation_info,
+                                        },
+                                        activeExperimentRef.current,
+                                        maxFrames
+                                    );
+                                } catch (timelineError) {
+                                    // Silenciar errores de timeline (puede ser por cuota excedida)
+                                    if (process.env.NODE_ENV === 'development') {
+                                        console.warn('Error guardando frame en timeline:', timelineError);
+                                    }
+                                }
+                            }
                             
                             // Usar función de actualización para evitar sobrescribir actualizaciones más recientes
                             setSimData(prev => {
