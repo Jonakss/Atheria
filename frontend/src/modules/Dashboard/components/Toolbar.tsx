@@ -189,7 +189,15 @@ export const Toolbar: React.FC = () => {
                   ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/20'
                   : 'bg-gray-800 text-gray-500 border-gray-700 hover:bg-gray-700'
             }`}
-            title={liveFeedEnabled ? 'Live Feed ON - Desactivar para acelerar simulación' : `Live Feed OFF - Mostrando cada ${stepsInterval} pasos`}
+            title={
+              liveFeedEnabled 
+                ? 'Live Feed ON - Desactivar para acelerar simulación' 
+                : stepsInterval === -1
+                  ? 'Live Feed OFF - Modo FULLSPEED: máxima velocidad sin frames'
+                  : stepsInterval === 0
+                    ? 'Live Feed OFF - Modo MANUAL: actualizar con botón'
+                    : `Live Feed OFF - Mostrando cada ${stepsInterval.toLocaleString()} pasos`
+            }
           >
             {liveFeedEnabled ? <Eye size={12} /> : <EyeOff size={12} />}
             <span>{liveFeedEnabled ? 'LIVE' : 'OFF'}</span>
@@ -198,9 +206,21 @@ export const Toolbar: React.FC = () => {
           {!liveFeedEnabled && (
             <>
               <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-[9px] font-mono text-gray-400">
-                <span>cada</span>
-                <span className="text-blue-400 font-bold">{stepsInterval}</span>
-                <span>pasos</span>
+                {stepsInterval === -1 ? (
+                  <>
+                    <span className="text-red-400 font-bold">FULLSPEED</span>
+                  </>
+                ) : stepsInterval === 0 ? (
+                  <>
+                    <span className="text-amber-400 font-bold">MANUAL</span>
+                  </>
+                ) : (
+                  <>
+                    <span>cada</span>
+                    <span className="text-blue-400 font-bold">{stepsInterval.toLocaleString()}</span>
+                    <span>pasos</span>
+                  </>
+                )}
               </div>
               <button
                 onClick={() => setShowIntervalControl(!showIntervalControl)}
@@ -255,9 +275,11 @@ export const Toolbar: React.FC = () => {
                     ))}
                   </div>
                   <div className="text-[9px] text-gray-600 pt-1 border-t border-white/10">
-                    {stepsInterval === 0 
-                      ? 'Modo manual: frames solo con botón de actualización'
-                      : `Mostrar frame cada ${stepsInterval.toLocaleString()} pasos cuando live feed está desactivado`}
+                    {stepsInterval === -1 
+                      ? 'Modo fullspeed: simulación a máxima velocidad sin enviar frames'
+                      : stepsInterval === 0 
+                        ? 'Modo manual: frames solo con botón de actualización'
+                        : `Mostrar frame cada ${stepsInterval.toLocaleString()} pasos cuando live feed está desactivado`}
                   </div>
                 </div>
               </GlassPanel>

@@ -224,12 +224,17 @@ async def simulation_loop():
                         if 'last_frame_sent_step' not in g_state:
                             g_state['last_frame_sent_step'] = -1  # Para forzar primer frame
                         
-                        # Si steps_interval es 0 (modo manual), ejecutar pasos pero NO enviar frames
-                        # El usuario debe presionar el botón para actualizar visualización
+                        # Si steps_interval es 0 (modo manual) o -1 (modo fullspeed), ejecutar pasos pero NO enviar frames
+                        # El usuario debe presionar el botón para actualizar visualización (modo manual)
+                        # O nunca enviar frames (modo fullspeed)
                         if steps_interval == 0:
                             # Modo manual: ejecutar pasos rápidamente sin enviar frames
                             # Usar un valor razonable para ejecutar múltiples pasos (ej: 100)
                             steps_to_execute = 100  # Ejecutar múltiples pasos para velocidad
+                        elif steps_interval == -1:
+                            # Modo fullspeed: ejecutar pasos a máxima velocidad sin enviar frames
+                            # Usar un valor grande para ejecutar muchos pasos en cada iteración
+                            steps_to_execute = 1000  # Ejecutar muchos pasos para máxima velocidad
                         else:
                             # Ejecutar múltiples pasos en cada iteración (hasta steps_interval)
                             steps_to_execute = steps_interval
