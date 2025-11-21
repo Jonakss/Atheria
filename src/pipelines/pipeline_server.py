@@ -13,6 +13,62 @@ from ..server.server_state import g_state, broadcast, send_notification, send_to
 from ..utils import get_experiment_list, load_experiment_config, get_latest_checkpoint
 from ..server.server_handlers import create_experiment_handler
 from .pipeline_viz import get_visualization_data
+
+def calculate_adaptive_downsample(grid_size: int, max_visualization_size: int = 512) -> int:
+    """
+    Calcula el factor de downsampling adaptativo basado en el tamaño del grid.
+    
+    Estrategia:
+    - Si grid_size <= max_visualization_size: No downsampling (factor = 1)
+    - Si grid_size > max_visualization_size: Downsample para mantener ~max_visualization_size píxeles
+    - Factor mínimo: 1, Factor máximo: calculado para mantener rendimiento
+    
+    Args:
+        grid_size: Tamaño del grid (H x W)
+        max_visualization_size: Tamaño máximo deseado para visualización (default: 512)
+    
+    Returns:
+        Factor de downsampling (1, 2, 4, 8, etc.)
+    """
+    if grid_size <= max_visualization_size:
+        return 1
+    
+    # Calcular factor de downsampling para mantener ~max_visualization_size
+    # Factor debe ser potencia de 2 para mejor rendimiento (2, 4, 8, 16...)
+    factor = max(2, int(grid_size / max_visualization_size))
+    
+    # Redondear a la potencia de 2 más cercana hacia arriba
+    import math
+    factor = 2 ** math.ceil(math.log2(factor))
+    
+    # Límite máximo razonable (downsampling de 16x es bastante agresivo)
+    factor = min(factor, 16)
+    
+    return factor
+
+def calculate_adaptive_roi(grid_size: int, default_roi_size: int = 256) -> tuple | None:
+    """
+    Calcula ROI adaptativo para grids grandes.
+    
+    Para grids grandes (>512), sugerir ROI automático centrado para reducir overhead.
+    
+    Args:
+        grid_size: Tamaño del grid
+        default_roi_size: Tamaño del ROI deseado (default: 256)
+    
+    Returns:
+        ROI tuple (x, y, width, height) o None si no se necesita
+    """
+    # Solo aplicar ROI automático para grids muy grandes
+    if grid_size <= 512:
+        return None
+    
+    # Calcular ROI centrado
+    roi_size = min(default_roi_size, grid_size)
+    x = (grid_size - roi_size) // 2
+    y = (grid_size - roi_size) // 2
+    
+    return (x, y, roi_size, roi_size)
 from ..model_loader import load_model
 from ..engines.qca_engine import Aetheria_Motor, QuantumState
 from ..analysis.analysis import analyze_universe_atlas, analyze_cell_chemistry, calculate_phase_map_metrics
@@ -419,12 +475,30 @@ async def simulation_loop():
                                 logging.warning("Estado psi es None. Saltando frame.")
                                 continue
                             
+                            # OPTIMIZACIÓN PARA GRIDS GRANDES: Downsampling adaptativo y ROI automático
+                            inference_grid_size = g_state.get('inference_grid_size', 256)
+                            adaptive_downsample = calculate_adaptive_downsample(inference_grid_size)
+                            
+                            # Aplicar ROI automático para grids muy grandes (>512)
+                            if inference_grid_size > 512 and motor_is_native and hasattr(motor, 'get_dense_state'):
+                                adaptive_roi = calculate_adaptive_roi(inference_grid_size)
+                                roi_manager = g_state.get('roi_manager')
+                                if adaptive_roi and roi_manager and not roi_manager.roi_enabled:
+                                    # Activar ROI automático solo si no está ya habilitado manualmente
+                                    roi_manager.set_roi(*adaptive_roi)
+                                    roi_manager.roi_enabled = True
+                                    logging.info(f"🔍 ROI automático activado para grid grande ({inference_grid_size}x{inference_grid_size}): {adaptive_roi}")
+                            
+                            if adaptive_downsample > 1:
+                                logging.debug(f"🔄 Downsampling adaptativo activado: factor={adaptive_downsample} para grid {inference_grid_size}x{inference_grid_size}")
+                            
                             delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
                             viz_data = get_visualization_data(
                                 psi, 
                                 viz_type,
                                 delta_psi=delta_psi,
-                                motor=motor
+                                motor=motor,
+                                downsample_factor=adaptive_downsample
                             )
                             
                             # OPTIMIZACIÓN: Reutilizar coordenadas de Poincaré del frame anterior si no se recalcula
@@ -1657,6 +1731,29 @@ async def handle_load_experiment(args):
             roi_manager.clear_roi()  # Resetear ROI al cambiar de tamaño
         else:
             g_state['roi_manager'] = ROIManager(grid_size=inference_grid_size)
+            roi_manager = g_state['roi_manager']
+        
+        # OPTIMIZACIÓN PARA GRIDS GRANDES: Configurar optimizaciones automáticas
+        adaptive_downsample = calculate_adaptive_downsample(inference_grid_size)
+        if adaptive_downsample > 1:
+            # Actualizar downsample_factor para grids grandes
+            g_state['downsample_factor'] = adaptive_downsample
+            logging.info(f"📐 Grid grande detectado ({inference_grid_size}x{inference_grid_size}). Downsampling adaptativo: {adaptive_downsample}x")
+            if ws: await send_notification(ws, f"📐 Grid grande ({inference_grid_size}x{inference_grid_size}). Downsampling automático: {adaptive_downsample}x para mejor rendimiento.", "info")
+        
+        # Advertencia para grids muy grandes
+        if inference_grid_size > 1024:
+            logging.warning(f"⚠️ Grid extremadamente grande ({inference_grid_size}x{inference_grid_size}). Puede requerir mucha memoria.")
+            if ws: await send_notification(ws, f"⚠️ Grid muy grande ({inference_grid_size}x{inference_grid_size}). Se recomienda usar ROI para mejor rendimiento.", "warning")
+        
+        # Aplicar ROI automático para grids muy grandes (>512) si es motor nativo
+        if inference_grid_size > 512 and is_native:
+            adaptive_roi = calculate_adaptive_roi(inference_grid_size)
+            if adaptive_roi:
+                roi_manager.set_roi(*adaptive_roi)
+                roi_manager.roi_enabled = True
+                logging.info(f"🔍 ROI automático activado para grid grande ({inference_grid_size}x{inference_grid_size}): {adaptive_roi}")
+                if ws: await send_notification(ws, f"🔍 ROI automático activado ({adaptive_roi[2]}x{adaptive_roi[3]}) para optimizar visualización.", "info")
         
         # --- NOTA IMPORTANTE: La simulación queda en pausa después de cargar el modelo ---
         # Esto es INTENCIONAL: el modelo se carga en memoria y queda listo para ejecutar,
