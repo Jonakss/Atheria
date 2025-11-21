@@ -1999,26 +1999,45 @@ async def handle_unload_model(args):
     motor = g_state.get('motor')
     
     if not motor:
-        if ws: await send_notification(ws, "⚠️ No hay modelo cargado para descargar.", "warning")
+        if ws: 
+            try:
+                await send_notification(ws, "⚠️ No hay modelo cargado para descargar.", "warning")
+            except (ConnectionResetError, ConnectionError, OSError):
+                pass  # Cliente ya desconectado, ignorar
         return
     
     try:
         # Limpiar motor y estado
         experiment_name = g_state.get('active_experiment', 'Unknown')
         
-        # Limpiar memoria del motor
-        if hasattr(motor, 'state') and motor.state:
-            if hasattr(motor.state, 'psi') and motor.state.psi is not None:
-                del motor.state.psi
-        if hasattr(motor, 'native_engine'):
-            # Motor nativo: limpiar
+        # CRÍTICO: Limpiar motor nativo correctamente antes de eliminarlo
+        if hasattr(motor, 'native_engine') and motor.native_engine is not None:
+            # Motor nativo: usar método cleanup() si existe
             try:
-                motor.native_engine.clear()
-            except:
-                pass
-        del motor
+                if hasattr(motor, 'cleanup'):
+                    motor.cleanup()
+                    logging.debug("Motor nativo limpiado usando método cleanup()")
+                elif hasattr(motor, 'native_engine') and hasattr(motor.native_engine, 'clear'):
+                    motor.native_engine.clear()
+                    logging.debug("Motor nativo limpiado usando clear()")
+            except Exception as cleanup_error:
+                logging.warning(f"Error durante cleanup de motor nativo (no crítico): {cleanup_error}")
         
-        # Limpiar g_state
+        # Limpiar estado del motor
+        if hasattr(motor, 'state') and motor.state is not None:
+            try:
+                if hasattr(motor.state, 'psi') and motor.state.psi is not None:
+                    del motor.state.psi
+                    motor.state.psi = None
+                del motor.state
+                motor.state = None
+            except Exception as state_cleanup_error:
+                logging.debug(f"Error limpiando estado del motor (no crítico): {state_cleanup_error}")
+        
+        # Limpiar referencia del motor (no usar del directamente)
+        motor = None
+        
+        # Limpiar g_state ANTES de eliminar el motor
         g_state['motor'] = None
         g_state['simulation_step'] = 0
         g_state['motor_type'] = None
@@ -2028,32 +2047,61 @@ async def handle_unload_model(args):
         
         # Limpiar snapshots y otros datos
         if 'snapshots' in g_state:
-            g_state['snapshots'].clear()
+            try:
+                g_state['snapshots'].clear()
+            except Exception:
+                pass
+        
         if 'simulation_history' in g_state:
-            g_state['simulation_history'].clear()
+            try:
+                g_state['simulation_history'].clear()
+            except Exception:
+                pass
         
         # Limpiar cache de CUDA si está disponible
-        import torch
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                logging.debug("Cache de CUDA limpiado")
+        except Exception as cuda_cleanup_error:
+            logging.debug(f"Error limpiando cache de CUDA (no crítico): {cuda_cleanup_error}")
+        
+        # Forzar garbage collection
+        import gc
+        gc.collect()
         
         logging.info(f"✅ Modelo '{experiment_name}' descargado y memoria limpiada")
-        if ws: await send_notification(ws, f"✅ Modelo descargado. Memoria limpiada.", "success")
         
-        # Enviar actualización de estado
-        await broadcast({
-            "type": "inference_status_update",
-            "payload": {
-                "status": "paused",
-                "model_loaded": False,
-                "experiment_name": None,
-                "compile_status": None
-            }
-        })
+        # Enviar notificación solo si el WebSocket sigue conectado
+        if ws and not ws.closed:
+            try:
+                await send_notification(ws, f"✅ Modelo descargado. Memoria limpiada.", "success")
+            except (ConnectionResetError, ConnectionError, OSError):
+                logging.debug("WebSocket cerrado durante notificación de descarga (normal)")
+        
+        # Enviar actualización de estado a todos los clientes conectados
+        try:
+            await broadcast({
+                "type": "inference_status_update",
+                "payload": {
+                    "status": "paused",
+                    "model_loaded": False,
+                    "experiment_name": None,
+                    "compile_status": None
+                }
+            })
+        except Exception as broadcast_error:
+            logging.warning(f"Error enviando broadcast de estado después de descarga: {broadcast_error}")
         
     except Exception as e:
         logging.error(f"Error descargando modelo: {e}", exc_info=True)
-        if ws: await send_notification(ws, f"⚠️ Error al descargar modelo: {str(e)[:50]}...", "error")
+        # Enviar notificación solo si el WebSocket sigue conectado
+        if ws and not ws.closed:
+            try:
+                await send_notification(ws, f"⚠️ Error al descargar modelo: {str(e)[:50]}...", "error")
+            except (ConnectionResetError, ConnectionError, OSError):
+                pass  # Cliente ya desconectado, ignorar
 
 async def handle_reset(args):
     """Reinicia el estado de la simulación al estado inicial."""
