@@ -4,7 +4,7 @@ type: index
 status: active
 tags: [core, documentation, index]
 created: 2024-11-19
-updated: 2024-11-19
+updated: 2025-11-20
 aliases: [Documentation Index, Main Documentation]
 ---
 
@@ -26,10 +26,13 @@ aliases: [Documentation Index, Main Documentation]
 - [[10_core/MASSIVE_INFERENCE_ARCHITECTURE|Arquitectura de Inferencia Masiva]] - Escalabilidad horizontal
 
 ### 🧩 [[30_Components/00_COMPONENTS_MOC|Componentes Técnicos]]
+- [[30_Components/CLI_TOOL|CLI Tool]] - Herramienta de línea de comandos (atheria/ath)
+- [[30_Components/Native_Engine_Core|Motor Nativo C++]] - Motor de alto rendimiento (LibTorch)
+- [[30_Components/WEB_SOCKET_PROTOCOL|Protocolo WebSocket]] - Protocolo binario (MessagePack) vs JSON
 - [[30_Components/Models|Modelos]] - Arquitecturas de modelos
 - [[30_Components/UNET|UNet]] - Documentación específica de UNet
 - [[30_Components/ARCHITECTURE_V3|Arquitectura V3]] - Sistema V3
-- [[30_Components/NATIVE_ENGINE_COMMUNICATION|Motor Nativo C++]] - Comunicación motor nativo
+- [[30_Components/NATIVE_ENGINE_COMMUNICATION|Motor Nativo C++ - Comunicación]] - Comunicación motor nativo
 - [[30_Components/HISTORY_SYSTEM|Sistema de Historia]] - Gestión de historia
 - [[30_Components/GPU_OPTIMIZATION|Optimización GPU]] - Optimizaciones GPU
 - [[30_Components/WORLD_DATA_TRANSFER_OPTIMIZATION|Optimización de Transferencia]] - Transferencia optimizada
@@ -38,10 +41,11 @@ aliases: [Documentation Index, Main Documentation]
 - Y más componentes técnicos...
 
 ### 🧪 [[40_Experiments/00_EXPERIMENTS_MOC|Experimentos y Resultados]]
-- [[40_Experiments/AI_DEV_LOG|Log de Desarrollo AI]] - Bitácora de desarrollo
+- [[40_Experiments/HOW_TO_RUN|Cómo Ejecutar]] - Instrucciones completas con CLI (⭐ Empezar aquí)
+- [[40_Experiments/AI_DEV_LOG|Log de Desarrollo AI]] - Bitácora de desarrollo y cambios recientes
 - [[40_Experiments/EXPERIMENTATION_GUIDE|Guía de Experimentación]] - Cómo experimentar
 - [[40_Experiments/VISUALIZATION_TESTING|Guía de Pruebas de Visualización]] - Tests de visualizaciones
-- [[40_Experiments/HOW_TO_RUN|Cómo Ejecutar]] - Instrucciones de ejecución
+- [[40_Experiments/NATIVE_ENGINE_PERFORMANCE_ISSUES|Problemas de Rendimiento Motor Nativo]] - Troubleshooting
 - [[40_Experiments/BENCHMARK_TENSOR_STORAGE|Benchmarks de Rendimiento]] - Resultados de benchmarks
 - Y más experimentos...
 
@@ -63,9 +67,11 @@ aliases: [Documentation Index, Main Documentation]
 3. Prueba [[40_Experiments/VISUALIZATION_TESTING|Guía de Pruebas de Visualización]]
 
 ### Para Desarrolladores
-1. Estudia [[10_core/TECHNICAL_ARCHITECTURE_V4|Arquitectura Técnica V4]]
-2. Revisa [[30_Components/NATIVE_ENGINE_COMMUNICATION|Motor Nativo C++]]
-3. Consulta [[99_Templates/AGENT_GUIDELINES|Guía de Agente]]
+1. Lee [[40_Experiments/HOW_TO_RUN|Cómo Ejecutar]] - Instrucciones de instalación y CLI
+2. Estudia [[10_core/TECHNICAL_ARCHITECTURE_V4|Arquitectura Técnica V4]]
+3. Revisa [[30_Components/Native_Engine_Core|Motor Nativo C++]]
+4. Consulta [[30_Components/CLI_TOOL|CLI Tool]] para desarrollo
+5. Consulta [[99_Templates/AGENT_GUIDELINES|Guía de Agente]]
 
 ### Para Experimentadores
 1. Consulta [[40_Experiments/EXPERIMENTATION_GUIDE|Guía de Experimentación]]
@@ -173,4 +179,4 @@ Usa estos tags para organizar:
 
 ---
 
-*Última actualización: 2024-11-19*
+*Última actualización: 2025-11-20*

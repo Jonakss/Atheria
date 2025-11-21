@@ -69,7 +69,7 @@ Este proyecto es una aplicación web interactiva con un backend de `aiohttp` y u
 
 ## 📖 Documentación
 
-La documentación completa está disponible en el directorio [`docs/`](docs/README.md):
+La documentación completa está disponible en el directorio [`docs/`](docs/README.md). Este es un **vault de Obsidian** para navegación avanzada y RAG (Retrieval Augmented Generation).
 
 ### Guías Principales
 - **[Guía de Aprendizaje Progresivo](docs/PROGRESSIVE_LEARNING.md)**: Aprende desde lo básico hasta experimentos avanzados
