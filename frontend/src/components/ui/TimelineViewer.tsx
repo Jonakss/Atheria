@@ -17,7 +17,7 @@ interface TimelineViewerProps {
 }
 
 export function TimelineViewer({ onFrameSelect, className = '' }: TimelineViewerProps) {
-    const { activeExperiment } = useWebSocket();
+    const { activeExperiment, inferenceStatus } = useWebSocket();
     const [frames, setFrames] = useState<TimelineFrame[]>([]);
     const [currentFrameIndex, setCurrentFrameIndex] = useState<number>(-1);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -95,8 +95,24 @@ export function TimelineViewer({ onFrameSelect, className = '' }: TimelineViewer
         }
     }, [isPlaying, frames.length, currentFrameIndex, playSpeed]);
 
-    // Notificar frame seleccionado
+    // Si la simulación está corriendo, deseleccionar frame y pausar timeline
     useEffect(() => {
+        if (inferenceStatus === 'running') {
+            setIsPlaying(false);
+            if (currentFrameIndex >= 0 && onFrameSelect) {
+                // Deseleccionar frame para mostrar datos en vivo
+                onFrameSelect(null);
+            }
+        }
+    }, [inferenceStatus, currentFrameIndex, onFrameSelect]);
+
+    // Notificar frame seleccionado (solo si la simulación está pausada)
+    useEffect(() => {
+        if (inferenceStatus === 'running') {
+            // No seleccionar frames del timeline cuando la simulación está corriendo
+            return;
+        }
+        
         if (currentFrameIndex >= 0 && currentFrameIndex < frames.length) {
             const frame = frames[currentFrameIndex];
             if (onFrameSelect) {
@@ -105,7 +121,7 @@ export function TimelineViewer({ onFrameSelect, className = '' }: TimelineViewer
         } else if (currentFrameIndex === -1 && onFrameSelect) {
             onFrameSelect(null);
         }
-    }, [currentFrameIndex, frames, onFrameSelect]);
+    }, [currentFrameIndex, frames, onFrameSelect, inferenceStatus]);
 
     // Frame actual
     const currentFrame = useMemo(() => {
