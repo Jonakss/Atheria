@@ -127,11 +127,11 @@ export const Toolbar: React.FC = () => {
           <span className="text-xs font-mono text-gray-200">
             {(() => {
               const initialStep = simData?.simulation_info?.initial_step ?? 0;
-              const totalSteps = currentStep;
-              const relativeSteps = totalSteps - initialStep;
+              const totalSteps = currentStep || 0;
               
-              // Mostrar "total - relativo" si hay un step inicial
-              if (initialStep > 0) {
+              // Solo calcular pasos relativos si hay datos válidos
+              if (initialStep > 0 && totalSteps >= initialStep) {
+                const relativeSteps = totalSteps - initialStep;
                 return (
                   <>
                     <span>{totalSteps.toLocaleString()}</span>
@@ -139,8 +139,23 @@ export const Toolbar: React.FC = () => {
                     <span className="text-teal-400">{relativeSteps.toLocaleString()}</span>
                   </>
                 );
+              } else if (initialStep > 0 && totalSteps < initialStep) {
+                // Si el step total es menor que el inicial, puede ser que aún no hay datos
+                // Mostrar solo el total o indicar que está cargando
+                if (totalSteps === 0) {
+                  return <span className="text-gray-500">N/A</span>;
+                }
+                // Si hay un step pero es menor que el inicial, puede ser un estado intermedio
+                return (
+                  <>
+                    <span>{totalSteps.toLocaleString()}</span>
+                    <span className="text-gray-500 mx-1">-</span>
+                    <span className="text-gray-500">cargando...</span>
+                  </>
+                );
               }
-              return totalSteps.toLocaleString();
+              // Sin step inicial, mostrar solo el total
+              return totalSteps > 0 ? totalSteps.toLocaleString() : <span className="text-gray-500">N/A</span>;
             })()}
           </span>
         </div>
