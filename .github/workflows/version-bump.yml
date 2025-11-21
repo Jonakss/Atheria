@@ -111,6 +111,13 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
+      - name: Instalar herramientas necesarias
+        run: |
+          # Instalar jq para manejar JSON si no está disponible
+          if ! command -v jq &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+
       - name: Actualizar versiones en archivos
         run: |
           NEW_VERSION="${{ steps.new-version.outputs.version }}"
@@ -142,16 +149,20 @@ jobs:
           
           # 4. frontend/package.json
           if [ -f "frontend/package.json" ]; then
-            # Usar jq si está disponible, sino usar sed
-            if command -v jq &> /dev/null; then
-              jq ".version = \"$NEW_VERSION\"" frontend/package.json > frontend/package.json.tmp && mv frontend/package.json.tmp frontend/package.json
-            else
-              sed -i "s/\"version\": \".*\"/\"version\": \"$NEW_VERSION\"/" frontend/package.json
-            fi
+            # Usar jq para manejar JSON correctamente
+            jq ".version = \"$NEW_VERSION\"" frontend/package.json > frontend/package.json.tmp && mv frontend/package.json.tmp frontend/package.json
             echo "  ✅ frontend/package.json actualizado a $NEW_VERSION"
           fi
           
           echo "✅ Todas las versiones actualizadas a $NEW_VERSION"
+
+      - name: Verificar cambios
+        run: |
+          echo "📋 Verificando cambios en archivos de versión:"
+          git diff --name-only
+          echo ""
+          echo "📝 Cambios detallados:"
+          git diff || true
 
       - name: Crear commit con versiones actualizadas
         run: |
