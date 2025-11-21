@@ -351,17 +351,16 @@ export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWi
                 : zoom / (zoomFactor * smoothFactor);
             
             // Usar constrainPanZoom para aplicar límites (incluye minZoom ajustado)
-            const constrained = constrainPanZoom(pan, newZoom);
-            const constrainedZoom = constrained.zoom;
+            const constrainedZoom = constrainPanZoom(pan, newZoom).zoom;
             
             // Calcular nuevo pan para mantener el punto del canvas fijo bajo el mouse
             const zoomRatio = constrainedZoom / zoom;
             const newPanX = mouseRelToCenterX * (1 - zoomRatio) + pan.x * zoomRatio;
             const newPanY = mouseRelToCenterY * (1 - zoomRatio) + pan.y * zoomRatio;
             
-            const constrained = constrainPanZoom({ x: newPanX, y: newPanY }, constrainedZoom);
-            setZoom(constrained.zoom);
-            setPan(constrained.pan);
+            const constrainedPanZoomResult = constrainPanZoom({ x: newPanX, y: newPanY }, constrainedZoom);
+            setZoom(constrainedPanZoomResult.zoom);
+            setPan(constrainedPanZoomResult.pan);
         }
     }, [zoom, pan, constrainPanZoom, canvasRef, gridWidth, gridHeight]);
 
