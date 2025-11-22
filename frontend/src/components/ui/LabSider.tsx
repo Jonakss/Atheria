@@ -164,7 +164,11 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
         if (activeExperiment) {
             const exp = experimentsData?.find(e => e.name === activeExperiment);
             if (exp && !exp.has_checkpoint) return;
-            sendCommand('inference', 'load_experiment', { experiment_name: activeExperiment }); 
+            // Incluir grid_size actual de la configuración (usar estado local)
+            sendCommand('inference', 'load_experiment', { 
+                experiment_name: activeExperiment,
+                grid_size: gridSizeInference  // Pasar grid_size configurado desde el estado local
+            }); 
         }
     };
 

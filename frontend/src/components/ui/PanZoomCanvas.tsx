@@ -948,6 +948,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                         cursor: isPanning ? 'grabbing' : 'grab',
                         pointerEvents: 'auto',
                         visibility: (dataToRender?.map_data || simData?.map_data) ? 'visible' : 'hidden',
+                        zIndex: 10,
                     }}
                 >
                     <ShaderCanvas

@@ -205,7 +205,14 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
         try {
             renderWithShader(gl, program, texture, config, width, height);
             if (process.env.NODE_ENV === 'development') {
-                console.log(`✅ ShaderCanvas: Renderizado completado para viz_type=${selectedViz}`);
+                console.log(`✅ ShaderCanvas: Renderizado completado para viz_type=${selectedViz}, canvas size: ${width}x${height}`);
+                
+                // Verificar si el canvas es visible
+                if (canvasRef.current) {
+                    const rect = canvasRef.current.getBoundingClientRect();
+                    const style = window.getComputedStyle(canvasRef.current);
+                    console.log(`🔍 ShaderCanvas: Canvas visibility - rect: ${rect.width}x${rect.height}, visible: ${rect.width > 0 && rect.height > 0}, display: ${style.display}, visibility: ${style.visibility}, opacity: ${style.opacity}`);
+                }
             }
         } catch (error) {
             console.error('❌ ShaderCanvas: Error durante renderizado:', error);
