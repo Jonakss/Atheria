@@ -3,9 +3,21 @@ import asyncio
 import logging
 import torch
 import numpy as np
+import time
+import importlib
+import sys
+import gc
+from pathlib import Path
+from types import SimpleNamespace
 
-from ...server.server_state import g_state, broadcast, send_notification
+from ...server.server_state import g_state, broadcast, send_notification, send_to_websocket, optimize_frame_payload
 from ..core.status_helpers import build_inference_status_payload
+from ...model_loader import load_model
+from ... import config as global_cfg
+from ...engines.qca_engine import Aetheria_Motor, QuantumState
+from ..viz import get_visualization_data
+from ...physics.analysis.EpochDetector import EpochDetector
+from ...utils import get_latest_checkpoint, get_latest_jit_model, load_experiment_config
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +25,7 @@ logger = logging.getLogger(__name__)
 async def handle_play(args):
     """Inicia la simulación."""
     logging.info("🎮 handle_play() llamado - Iniciando simulación...")
-    ws = g_state['websockets'].get(args['ws_id'])
+    ws = g_state['websockets'].get(args.get('ws_id'))
     
     # Validar que haya un motor cargado antes de iniciar
     motor = g_state.get('motor')
@@ -28,8 +40,6 @@ async def handle_play(args):
     
     if motor_is_native and hasattr(motor, 'native_engine'):
         # Motor nativo: verificar que tenga partículas o estado inicializado
-        # El motor nativo usa lazy conversion, así que no verificamos motor.state.psi aquí
-        # En su lugar, verificamos que el motor tenga partículas
         try:
             # Verificar que el motor nativo esté inicializado
             if not hasattr(motor, 'model_loaded') or not motor.model_loaded:
@@ -39,73 +49,64 @@ async def handle_play(args):
                 return
             
             # Intentar obtener el estado denso para verificar que haya datos
-            # Esto forzará la conversión si es necesario
             import torch
-            psi = motor.get_dense_state(check_pause_callback=lambda: False)
+            logging.info("🔍 Verificando estado del motor nativo (get_dense_state con timeout 10s)...")
+            try:
+                loop = asyncio.get_event_loop()
+                psi = await asyncio.wait_for(
+                    loop.run_in_executor(
+                        None,
+                        lambda: motor.get_dense_state(check_pause_callback=lambda: False)
+                    ),
+                    timeout=10.0
+                )
+                logging.info(f"✅ Estado denso obtenido exitosamente (shape={psi.shape if psi is not None else None})")
+            except asyncio.TimeoutError:
+                logging.error("❌ Timeout obteniendo estado denso del motor nativo (10s). El motor puede estar bloqueado.")
+                msg = "⚠️ Timeout obteniendo estado del motor. Intenta reiniciar."
+                if ws: await send_notification(ws, msg, "error")
+                return
+            except Exception as conv_error:
+                logging.error(f"❌ Error obteniendo estado denso: {conv_error}", exc_info=True)
+                msg = "⚠️ Error obteniendo estado del motor. Intenta reiniciar."
+                if ws: await send_notification(ws, msg, "error")
+                return
+            
             if psi is None or (isinstance(psi, torch.Tensor) and psi.numel() == 0):
                 logging.warning("⚠️ Motor nativo no tiene estado válido. Intentando inicializar...")
-                # Intentar inicializar con partículas aleatorias
                 grid_size = g_state.get('inference_grid_size', 256)
-                # CRÍTICO: Agregar más partículas para asegurar propagación
-                num_particles = max(500, (grid_size * grid_size) // 20)  # Aumentar número de partículas
+                num_particles = max(100, (grid_size * grid_size) // 100)
                 if hasattr(motor, 'add_initial_particles'):
-                    motor.add_initial_particles(num_particles)
-                    logging.info(f"✅ {num_particles} partículas agregadas al motor nativo (incluye paso de propagación)")
-                    # add_initial_particles ahora ejecuta un paso automáticamente, pero forzamos reconversión de todas formas
+                    logging.info(f"🛠️ Agregando {num_particles} partículas al motor nativo...")
+                    try:
+                        loop = asyncio.get_event_loop()
+                        await asyncio.wait_for(
+                            loop.run_in_executor(
+                                None,
+                                lambda: motor.add_initial_particles(num_particles)
+                            ),
+                            timeout=5.0
+                        )
+                        logging.info(f"✅ {num_particles} partículas agregadas al motor nativo")
+                    except asyncio.TimeoutError:
+                        logging.error("❌ Timeout agregando partículas (5s).")
+                        msg = "⚠️ Timeout agregando partículas. Intenta reiniciar."
+                        if ws: await send_notification(ws, msg, "error")
+                        return
+                    except Exception as e:
+                        logging.error(f"❌ Error agregando partículas: {e}", exc_info=True)
+                        msg = "⚠️ Error agregando partículas. Intenta reiniciar."
+                        if ws: await send_notification(ws, msg, "error")
+                        return
+                    
                     motor._dense_state_stale = True
                     motor.state.psi = None
-                    psi = motor.get_dense_state(check_pause_callback=lambda: False)
-                    psi_abs_max = psi.abs().max().item() if psi is not None and isinstance(psi, torch.Tensor) else 0.0
-                    if psi is None or (isinstance(psi, torch.Tensor) and psi.numel() == 0) or psi_abs_max < 1e-10:
-                        # Intentar ejecutar otro paso manualmente
-                        try:
-                            motor.native_engine.step_native()
-                            motor._dense_state_stale = True
-                            motor.state.psi = None
-                            psi = motor.get_dense_state(check_pause_callback=lambda: False)
-                            psi_abs_max = psi.abs().max().item() if psi is not None and isinstance(psi, torch.Tensor) else 0.0
-                            logging.info(f"📊 Después de paso adicional, psi max abs={psi_abs_max:.6e}")
-                        except Exception as step_error:
-                            logging.error(f"❌ Error ejecutando paso adicional: {step_error}", exc_info=True)
-                        
-                        if psi is None or (isinstance(psi, torch.Tensor) and psi.numel() == 0) or psi_abs_max < 1e-10:
-                            msg = "⚠️ No se pudo inicializar el estado del motor nativo. Intenta reiniciar."
-                            logging.error(msg)
-                            if ws: await send_notification(ws, msg, "error")
-                            return
                 else:
                     msg = "⚠️ El motor nativo no tiene un estado válido y no se puede inicializar automáticamente."
                     logging.error(msg)
                     if ws: await send_notification(ws, msg, "error")
                     return
             
-            # Verificar que el estado tenga valores significativos
-            if isinstance(psi, torch.Tensor):
-                psi_abs_max = psi.abs().max().item()
-                if psi_abs_max < 1e-10:
-                    logging.warning("⚠️ Estado del motor nativo tiene valores muy pequeños. Intentando inicializar...")
-                    grid_size = g_state.get('inference_grid_size', 256)
-                    # CRÍTICO: Agregar más partículas para asegurar propagación
-                    num_particles = max(500, (grid_size * grid_size) // 20)  # Aumentar número de partículas
-                    if hasattr(motor, 'add_initial_particles'):
-                        motor.add_initial_particles(num_particles)
-                        motor._dense_state_stale = True
-                        motor.state.psi = None
-                        logging.info(f"✅ {num_particles} partículas agregadas al motor nativo (incluye paso de propagación)")
-                        # Verificar que se inicializó correctamente
-                        psi_new = motor.get_dense_state(check_pause_callback=lambda: False)
-                        psi_abs_max_new = psi_new.abs().max().item() if psi_new is not None and isinstance(psi_new, torch.Tensor) else 0.0
-                        if psi_abs_max_new < 1e-10:
-                            logging.warning("⚠️ psi sigue vacío después de inicialización. Ejecutando paso adicional...")
-                            try:
-                                motor.native_engine.step_native()
-                                motor._dense_state_stale = True
-                                motor.state.psi = None
-                                psi_new = motor.get_dense_state(check_pause_callback=lambda: False)
-                                psi_abs_max_new = psi_new.abs().max().item() if psi_new is not None and isinstance(psi_new, torch.Tensor) else 0.0
-                                logging.info(f"📊 Después de paso adicional, psi max abs={psi_abs_max_new:.6e}")
-                            except Exception as step_error:
-                                logging.error(f"❌ Error ejecutando paso adicional: {step_error}", exc_info=True)
         except Exception as e:
             logging.error(f"❌ Error validando motor nativo: {e}", exc_info=True)
             msg = "⚠️ Error validando el estado del motor nativo. Intenta reiniciar."
@@ -121,20 +122,20 @@ async def handle_play(args):
     
     g_state['is_paused'] = False
     
-    # CRÍTICO: Enviar frame inicial si no se ha enviado todavía
-    # Esto asegura que la visualización no aparezca gris
+    # Enviar frame inicial si es necesario
     if motor_is_native and hasattr(motor, 'get_dense_state'):
         try:
-            from ..viz import get_visualization_data
-            import numpy as np
-            
-            # Obtener estado denso
-            psi = motor.get_dense_state(check_pause_callback=lambda: False)
+            loop = asyncio.get_event_loop()
+            psi = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: motor.get_dense_state(check_pause_callback=lambda: False)
+                ),
+                timeout=10.0
+            )
             if psi is not None and isinstance(psi, torch.Tensor) and psi.numel() > 0:
-                # Verificar que tenga valores significativos
                 psi_abs_max = psi.abs().max().item()
                 if psi_abs_max > 1e-10:
-                    # Generar visualización
                     viz_type = g_state.get('viz_type', 'density')
                     delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
                     viz_data = get_visualization_data(psi, viz_type, delta_psi=delta_psi, motor=motor)
@@ -147,10 +148,9 @@ async def handle_play(args):
                             max_val = np.max(map_data_np)
                             range_val = max_val - min_val
                             
-                            # Solo enviar si tiene rango significativo (no está todo gris)
                             if range_val > 1e-6:
                                 current_step = g_state.get('simulation_step', 0)
-                                frame_payload = {
+                                frame_payload_raw = {
                                     "step": current_step,
                                     "timestamp": asyncio.get_event_loop().time(),
                                     "map_data": map_data,
@@ -167,14 +167,20 @@ async def handle_play(args):
                                         "fps": g_state.get('current_fps', 0.0)
                                     }
                                 }
+                                # CRÍTICO: Optimizar payload antes de enviar (maneja numpy arrays)
+                                frame_payload = await optimize_frame_payload(
+                                    frame_payload_raw,
+                                    enable_compression=g_state.get('data_compression_enabled', True),
+                                    downsample_factor=g_state.get('downsample_factor', 1),
+                                    viz_type=viz_type
+                                )
                                 await broadcast({"type": "simulation_frame", "payload": frame_payload})
-                                logging.info(f"✅ Frame inicial enviado al iniciar simulación (step={current_step}, range={range_val:.6f})")
+                                logging.info(f"📤 Frame inicial enviado al frontend (step={current_step})")
         except Exception as e:
-            logging.debug(f"Error enviando frame inicial al iniciar: {e}")
+            logging.error(f"Error enviando frame inicial al iniciar: {e}", exc_info=True)
     
-    logging.info(f"Simulación iniciada. Motor: {type(motor).__name__}, Step: {g_state.get('simulation_step', 0)}, Live feed: {g_state.get('live_feed_enabled', True)}")
+    logging.info(f"Simulación iniciada. Motor: {type(motor).__name__}, Step: {g_state.get('simulation_step', 0)}")
     
-    # CRÍTICO: Incluir FPS e información de estado al iniciar
     status_payload = build_inference_status_payload("running")
     status_payload.update({
         "step": g_state.get('simulation_step', 0),
@@ -198,18 +204,14 @@ async def handle_pause(args):
     logging.info("Comando de pausa recibido. Pausando simulación...")
     g_state['is_paused'] = True
     
-    # CRÍTICO: Incluir FPS actual en el estado pausado (puede ser 0 o último valor)
-    # Esto permite que el frontend muestre el FPS incluso cuando está pausado
     status_payload = build_inference_status_payload("paused")
-    
-    # Agregar información de estado adicional
     status_payload.update({
         "step": g_state.get('simulation_step', 0),
         "simulation_info": {
             "step": g_state.get('simulation_step', 0),
             "is_paused": True,
             "live_feed_enabled": g_state.get('live_feed_enabled', True),
-            "fps": g_state.get('current_fps', 0.0),  # Incluir FPS incluso cuando está pausado
+            "fps": g_state.get('current_fps', 0.0),
             "epoch": g_state.get('current_epoch', 0),
             "epoch_metrics": g_state.get('epoch_metrics', {})
         }
@@ -220,12 +222,512 @@ async def handle_pause(args):
         await send_notification(ws, "Simulación pausada.", "info")
 
 
-# handle_load_experiment, handle_switch_engine, handle_unload_model, handle_reset, handle_inject_energy
-# se mantienen en pipeline_server.py por ahora ya que son muy largos y complejos
-# Se pueden extraer más adelante si es necesario
+async def handle_unload_model(args):
+    """Descarga el modelo cargado y limpia el estado."""
+    logging.info("🗑️ handle_unload_model() llamado - Descargando modelo...")
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    motor = g_state.get('motor')
+    
+    if not motor:
+        if ws: 
+            try:
+                await send_notification(ws, "⚠️ No hay modelo cargado para descargar.", "warning")
+            except Exception:
+                pass
+        return
+    
+    try:
+        g_state['is_paused'] = True
+        await asyncio.sleep(0.1)
+        experiment_name = g_state.get('active_experiment', 'Unknown')
+        
+        # Limpiar motor nativo
+        if hasattr(motor, 'native_engine') and motor.native_engine is not None:
+            try:
+                if hasattr(motor, 'cleanup'):
+                    motor.cleanup()
+                    await asyncio.sleep(0.1)
+                elif hasattr(motor.native_engine, 'clear'):
+                    motor.native_engine.clear()
+                    await asyncio.sleep(0.1)
+            except Exception as cleanup_error:
+                logging.warning(f"Error durante cleanup de motor nativo: {cleanup_error}")
+        
+        # Limpiar estado del motor
+        if hasattr(motor, 'state') and motor.state is not None:
+            try:
+                motor.state.psi = None
+                motor.state = None
+            except Exception:
+                pass
+        
+        motor = None
+        g_state['motor'] = None
+        g_state['simulation_step'] = 0
+        g_state['motor_type'] = None
+        g_state['motor_is_native'] = False
+        g_state['active_experiment'] = None
+        g_state['is_paused'] = True
+        
+        if 'snapshots' in g_state: g_state['snapshots'].clear()
+        if 'simulation_history' in g_state: g_state['simulation_history'].clear()
+        
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
+        gc.collect()
+        
+        logging.info(f"✅ Modelo '{experiment_name}' descargado y memoria limpiada")
+        
+        if 'compile_status' in g_state:
+            g_state['compile_status'] = None
+        
+        if ws and not ws.closed:
+            try:
+                await send_notification(ws, f"✅ Modelo descargado. Memoria limpiada.", "success")
+            except Exception:
+                pass
+        
+        status_payload = build_inference_status_payload("idle")
+        await broadcast({"type": "inference_status_update", "payload": status_payload})
+        
+    except Exception as e:
+        logging.error(f"Error descargando modelo: {e}", exc_info=True)
+        if ws: await send_notification(ws, f"Error descargando modelo: {str(e)}", "error")
+
+
+async def handle_load_experiment(args):
+    """Carga un experimento."""
+    logging.info("📦 handle_load_experiment() llamado - Cargando experimento...")
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    exp_name = args.get("experiment_name")
+    if not exp_name:
+        if ws: await send_notification(ws, "Nombre de experimento no proporcionado.", "error")
+        return
+
+    device = global_cfg.DEVICE
+    device_str = str(device).split(':')[0]
+
+    try:
+        logging.info(f"Intentando cargar el experimento '{exp_name}'...")
+        if ws: await send_notification(ws, f"Cargando modelo '{exp_name}'...", "info")
+        
+        if 'epoch_detector' not in g_state:
+            g_state['epoch_detector'] = EpochDetector()
+        
+        # Pausar y limpiar motor anterior
+        g_state['is_paused'] = True
+        status_payload = build_inference_status_payload("paused")
+        await broadcast({"type": "inference_status_update", "payload": status_payload})
+        await asyncio.sleep(0.2)
+        
+        old_motor = g_state.get('motor')
+        if old_motor is not None:
+            # Reutilizar lógica de limpieza de handle_unload_model (simplificada aquí)
+            if hasattr(old_motor, 'native_engine') and old_motor.native_engine is not None:
+                if torch.cuda.is_available(): torch.cuda.synchronize()
+                if hasattr(old_motor, 'cleanup'):
+                    old_motor.cleanup()
+            
+            old_motor = None
+            g_state['motor'] = None
+            gc.collect()
+            if torch.cuda.is_available(): torch.cuda.empty_cache()
+        
+        # Determinar motor a usar
+        force_engine = args.get('force_engine')
+        use_native = False
+        
+        if force_engine == 'native':
+            use_native = True
+        elif force_engine == 'python':
+            use_native = False
+        else:
+            # Auto-detectar
+            try:
+                import atheria_core
+                use_native = True
+            except ImportError:
+                use_native = False
+        
+        # Cargar modelo
+        try:
+            logging.info(f"Cargando modelo con motor: {'NATIVO (C++)' if use_native else 'PYTHON'}")
+            
+            if use_native:
+                # Lógica de carga para motor nativo
+                checkpoint_path = get_latest_checkpoint(exp_name)
+                if not checkpoint_path:
+                    raise FileNotFoundError(f"No se encontró checkpoint para {exp_name}")
+                
+                jit_path = get_latest_jit_model(exp_name, silent=True)
+                if not jit_path:
+                    # Exportar JIT si no existe
+                    logging.info("Modelo JIT no encontrado, exportando...")
+                    if ws: await send_notification(ws, "Exportando modelo a JIT para motor nativo...", "info")
+                    # Cargar temporalmente en Python para exportar
+                    from ...utils import load_experiment_config
+                    exp_cfg = load_experiment_config(exp_name)
+                    if not exp_cfg:
+                        raise ValueError(f"No se pudo cargar configuración de {exp_name}")
+                    
+                    temp_model, _ = load_model(exp_cfg, checkpoint_path)
+                    if temp_model is None:
+                        raise ValueError(f"No se pudo cargar modelo de {exp_name}")
+                    
+                    from ...engines.native_engine_wrapper import export_model_to_jit
+                    d_state = exp_cfg.MODEL_PARAMS.d_state
+                    grid_size = g_state.get('inference_grid_size', global_cfg.GRID_SIZE_INFERENCE)
+                    jit_path = export_model_to_jit(temp_model, exp_name, (1, d_state, grid_size, grid_size))
+                    del temp_model
+                    gc.collect()
+                    if torch.cuda.is_available(): torch.cuda.empty_cache()
+                
+                from ...engines.native_engine_wrapper import NativeEngineWrapper
+                from ...utils import load_experiment_config
+                exp_cfg = load_experiment_config(exp_name)
+                if not exp_cfg:
+                    raise ValueError(f"No se pudo cargar configuración de {exp_name}")
+                
+                if ws: await send_notification(ws, "Inicializando motor nativo (puede tomar unos segundos)...", "info")
+                
+                # CRÍTICO: Ejecutar inicialización en thread pool para no bloquear event loop
+                def create_native_motor():
+                    motor = NativeEngineWrapper(
+                        grid_size=g_state.get('inference_grid_size', global_cfg.GRID_SIZE_INFERENCE),
+                        d_state=exp_cfg.MODEL_PARAMS.d_state,
+                        device=device_str,
+                        cfg=exp_cfg
+                    )
+                    success = motor.load_model(str(jit_path))
+                    if not success:
+                        raise ValueError(f"No se pudo cargar modelo JIT de {exp_name}")
+                    return motor
+                
+                # Ejecutar en thread pool
+                loop = asyncio.get_event_loop()
+                motor = await loop.run_in_executor(None, create_native_motor)
+                
+                g_state['motor_is_native'] = True
+                g_state['motor_type'] = 'native'
+            else:
+                # Motor Python
+                from ...utils import load_experiment_config
+                exp_cfg = load_experiment_config(exp_name)
+                if not exp_cfg:
+                    raise ValueError(f"No se pudo cargar configuración de {exp_name}")
+                
+                if ws: await send_notification(ws, "Inicializando motor Python...", "info")
+                
+                checkpoint_path = get_latest_checkpoint(exp_name)
+                
+                # CRÍTICO: Ejecutar inicialización en thread pool para no bloquear event loop
+                def create_python_motor():
+                    model, _ = load_model(exp_cfg, checkpoint_path)
+                    if model is None:
+                        raise ValueError(f"No se pudo cargar modelo de {exp_name}")
+                    
+                    from ...engines.qca_engine import Aetheria_Motor
+                    motor = Aetheria_Motor(
+                        model_operator=model,
+                        grid_size=g_state.get('inference_grid_size', global_cfg.GRID_SIZE_INFERENCE),
+                        d_state=exp_cfg.MODEL_PARAMS.d_state,
+                        device=device,
+                        cfg=exp_cfg
+                    )
+                    motor.eval()
+                    return motor
+                
+                # Ejecutar en thread pool
+                loop = asyncio.get_event_loop()
+                motor = await loop.run_in_executor(None, create_python_motor)
+                
+                g_state['motor_is_native'] = False
+                g_state['motor_type'] = 'python'
+                
+                # Configurar estado inicial
+                initial_mode = getattr(global_cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')
+                motor.state = QuantumState(
+                    motor.grid_size,
+                    motor.d_state,
+                    motor.device,
+                    initial_mode=initial_mode
+                )
+            
+            g_state['motor'] = motor
+            g_state['active_experiment'] = exp_name
+            g_state['simulation_step'] = 0
+            g_state['current_epoch'] = 0
+            g_state['epoch_metrics'] = {}
+            
+            # Notificar éxito
+            msg = f"✅ Experimento '{exp_name}' cargado exitosamente ({'Nativo' if use_native else 'Python'})."
+            logging.info(msg)
+            if ws: await send_notification(ws, msg, "success")
+            
+            status_payload = build_inference_status_payload("ready")
+            await broadcast({"type": "inference_status_update", "payload": status_payload})
+            
+        except Exception as e:
+            logging.error(f"Error cargando modelo: {e}", exc_info=True)
+            if ws: await send_notification(ws, f"Error cargando modelo: {str(e)}", "error")
+            # Intentar fallback a Python si falló nativo
+            if use_native:
+                logging.info("Intentando fallback a motor Python...")
+                if ws: await send_notification(ws, "Intentando fallback a motor Python...", "warning")
+                args['force_engine'] = 'python'
+                await handle_load_experiment(args)
+            
+    except Exception as e:
+        logging.error(f"Error fatal en handle_load_experiment: {e}", exc_info=True)
+        if ws: await send_notification(ws, f"Error fatal cargando experimento: {str(e)}", "error")
+
+
+async def handle_switch_engine(args):
+    """Cambia entre motor nativo (C++) y motor Python."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    target_engine = args.get('engine', 'auto')
+    
+    motor = g_state.get('motor')
+    current_is_native = hasattr(motor, 'native_engine') if motor else False
+    current_engine_type = 'native' if current_is_native else 'python'
+    
+    if target_engine == 'auto':
+        target_engine = 'python' if current_is_native else 'native'
+    elif target_engine == current_engine_type:
+        if ws: await send_notification(ws, f"⚠️ Ya estás usando el motor {current_engine_type}.", "info")
+        return
+    
+    exp_name = g_state.get('active_experiment')
+    if not exp_name:
+        if ws: await send_notification(ws, f"✅ Motor {target_engine} seleccionado para próxima carga.", "info")
+        return
+    
+    # Recargar experimento con el nuevo motor
+    await handle_load_experiment({
+        'ws_id': args.get('ws_id'),
+        'experiment_name': exp_name,
+        'force_engine': target_engine
+    })
+
+
+async def handle_reset(args):
+    """Reinicia el estado de la simulación al estado inicial."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    motor = g_state.get('motor')
+    
+    if not motor:
+        msg = "⚠️ No hay modelo cargado. Carga un experimento primero."
+        logging.warning(msg)
+        if ws: await send_notification(ws, msg, "warning")
+        return
+    
+    try:
+        initial_mode = getattr(global_cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')
+        
+        if hasattr(motor, 'native_engine'):
+            # Reiniciar motor nativo
+            # TODO: Implementar reset específico para nativo si es necesario
+            # Por ahora recargamos partículas o limpiamos estado
+            if hasattr(motor, 'reset'):
+                motor.reset()
+            else:
+                # Fallback: recargar experimento
+                exp_name = g_state.get('active_experiment')
+                await handle_load_experiment({
+                    'ws_id': args.get('ws_id'),
+                    'experiment_name': exp_name,
+                    'force_engine': 'native'
+                })
+                return
+        else:
+            # Reiniciar motor Python
+            motor.state = QuantumState(
+                motor.grid_size, 
+                motor.d_state, 
+                motor.device,
+                initial_mode=initial_mode
+            )
+        
+        g_state['simulation_step'] = 0
+        
+        # Enviar frame actualizado
+        live_feed_enabled = g_state.get('live_feed_enabled', True)
+        if live_feed_enabled and hasattr(motor, 'state') and motor.state and motor.state.psi is not None:
+            try:
+                delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
+                viz_type = g_state.get('viz_type', 'density')
+                viz_data = get_visualization_data(motor.state.psi, viz_type, delta_psi=delta_psi, motor=motor)
+                
+                if viz_data and isinstance(viz_data, dict):
+                    map_data = viz_data.get("map_data", [])
+                    if map_data:
+                        frame_payload = {
+                            "step": 0,
+                            "timestamp": asyncio.get_event_loop().time(),
+                            "map_data": map_data,
+                            "simulation_info": {
+                                "step": 0,
+                                "is_paused": True,
+                                "live_feed_enabled": live_feed_enabled,
+                                "fps": g_state.get('current_fps', 0.0)
+                            }
+                        }
+                        await broadcast({"type": "simulation_frame", "payload": frame_payload})
+            except Exception as e:
+                logging.error(f"Error generando frame de reinicio: {e}")
+        
+        msg = f"✅ Estado de simulación reiniciado (modo: {initial_mode})."
+        if ws: await send_notification(ws, msg, "success")
+        
+    except Exception as e:
+        logging.error(f"Error al reiniciar simulación: {e}", exc_info=True)
+        if ws: await send_notification(ws, f"❌ Error al reiniciar: {str(e)}", "error")
+
+
+async def handle_inject_energy(args):
+    """Inyecta energía en el estado cuántico actual."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    motor = g_state.get('motor')
+    
+    if not motor:
+        if ws: await send_notification(ws, "⚠️ No hay modelo cargado.", "warning")
+        return
+    
+    if hasattr(motor, 'native_engine'):
+        if ws: await send_notification(ws, "⚠️ Inyección de energía no soportada aún en motor nativo.", "warning")
+        return
+        
+    if not motor.state or motor.state.psi is None:
+        if ws: await send_notification(ws, "⚠️ Estado no válido.", "warning")
+        return
+    
+    energy_type = args.get('type', 'primordial_soup')
+    
+    try:
+        psi = motor.state.psi
+        if psi.dim() == 4: psi = psi[0]
+        
+        device = psi.device
+        channels, height, width = psi.shape
+        center_x, center_y = width // 2, height // 2
+        psi_new = psi.clone()
+        
+        msg = ""
+        if energy_type == 'primordial_soup':
+            radius = min(20, width // 4)
+            density = 0.3
+            for x in range(max(0, center_x - radius), min(width, center_x + radius)):
+                for y in range(max(0, center_y - radius), min(height, center_y + radius)):
+                    dist = ((x - center_x)**2 + (y - center_y)**2)**0.5
+                    prob = density * torch.exp(torch.tensor(-dist / (radius/2), device=device))
+                    if torch.rand(1, device=device).item() < prob.item():
+                        noise = (torch.randn(channels, device=device) + 1j * torch.randn(channels, device=device)) * 0.1
+                        psi_new[:, y, x] = psi_new[:, y, x] + noise
+            msg = "🧪 Sopa Primordial inyectada"
+            
+        elif energy_type == 'dense_monolith':
+            size = min(10, width // 8)
+            intensity = 2.0
+            for x in range(max(0, center_x - size), min(width, center_x + size)):
+                for y in range(max(0, center_y - size), min(height, center_y + size)):
+                    psi_new[:, y, x] = (torch.randn(channels, device=device) + 1j * torch.randn(channels, device=device)) * intensity * 0.1
+            msg = "⬛ Monolito Denso inyectado"
+            
+        elif energy_type == 'symmetric_seed':
+            size = min(8, width // 10)
+            intensity = 1.5
+            for x in range(center_x - size, center_x):
+                for y in range(center_y - size, center_y):
+                    base_state = (torch.randn(channels, device=device) + 1j * torch.randn(channels, device=device)) * intensity * 0.1
+                    dx, dy = center_x - x, center_y - y
+                    if 0 <= center_x + dx < width and 0 <= center_y + dy < height:
+                        psi_new[:, center_y + dy, center_x + dx] = base_state
+                    if 0 <= center_x - dx < width and 0 <= center_y + dy < height:
+                        psi_new[:, center_y + dy, center_x - dx] = base_state
+                    if 0 <= center_x + dx < width and 0 <= center_y - dy < height:
+                        psi_new[:, center_y - dy, center_x + dx] = base_state
+                    if 0 <= center_x - dx < width and 0 <= center_y - dy < height:
+                        psi_new[:, center_y - dy, center_x - dx] = base_state
+            msg = "🔬 Semilla Simétrica inyectada"
+        
+        if motor.state.psi.dim() == 4:
+            motor.state.psi[0] = psi_new
+        else:
+            motor.state.psi = psi_new
+            
+        logging.info(msg)
+        if ws: await send_notification(ws, msg, "success")
+        
+    except Exception as e:
+        logging.error(f"Error inyectando energía: {e}", exc_info=True)
+        if ws: await send_notification(ws, f"Error: {str(e)}", "error")
+
+
+async def handle_set_inference_config(args):
+    """Configura parámetros de inferencia."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    
+    grid_size = args.get("grid_size")
+    initial_state_mode = args.get("initial_state_mode")
+    gamma_decay = args.get("gamma_decay")
+    
+    changes = []
+    
+    if grid_size is not None:
+        new_size = int(grid_size)
+        global_cfg.GRID_SIZE_INFERENCE = new_size
+        g_state['inference_grid_size'] = new_size
+        changes.append(f"Grid size: {new_size}")
+        
+        roi_manager = g_state.get('roi_manager')
+        if roi_manager:
+            roi_manager.grid_size = new_size
+            roi_manager.clear_roi()
+        else:
+            from ...managers.roi_manager import ROIManager
+            g_state['roi_manager'] = ROIManager(grid_size=new_size)
+    
+    if initial_state_mode is not None:
+        global_cfg.INITIAL_STATE_MODE_INFERENCE = str(initial_state_mode)
+        changes.append(f"Inicialización: {initial_state_mode}")
+    
+    if gamma_decay is not None:
+        new_gamma = float(gamma_decay)
+        if new_gamma < 0: new_gamma = 0.0
+        elif new_gamma > 10.0: new_gamma = 10.0
+        global_cfg.GAMMA_DECAY = new_gamma
+        
+        motor = g_state.get('motor')
+        if motor:
+            if hasattr(motor, 'cfg') and motor.cfg:
+                motor.cfg.GAMMA_DECAY = new_gamma
+            elif not hasattr(motor, 'cfg') or motor.cfg is None:
+                motor.cfg = SimpleNamespace(GAMMA_DECAY=new_gamma)
+        
+        changes.append(f"Gamma Decay: {new_gamma}")
+    
+    if changes:
+        msg = f"✅ Configuración actualizada: {', '.join(changes)}"
+        if ws: await send_notification(ws, msg, "success")
+        
+        await broadcast({
+            "type": "inference_config_update",
+            "payload": {
+                "grid_size": global_cfg.GRID_SIZE_INFERENCE,
+                "initial_state_mode": global_cfg.INITIAL_STATE_MODE_INFERENCE,
+                "gamma_decay": global_cfg.GAMMA_DECAY
+            }
+        })
+
 
 HANDLERS = {
     "play": handle_play,
     "pause": handle_pause,
+    "load_experiment": handle_load_experiment,
+    "unload_model": handle_unload_model,
+    "switch_engine": handle_switch_engine,
+    "reset": handle_reset,
+    "inject_energy": handle_inject_energy,
+    "set_inference_config": handle_set_inference_config
 }
-

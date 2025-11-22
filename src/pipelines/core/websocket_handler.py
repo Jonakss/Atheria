@@ -133,19 +133,31 @@ async def websocket_handler(request, handlers):
                         handler = handlers[scope][command]
                         logging.info(f"✅ Handler encontrado para {scope}.{command}, ejecutando...")
                         try:
-                            await handler(args)
-                            logging.info(f"✅ Handler {scope}.{command} completado exitosamente")
-                        except (ConnectionResetError, ConnectionError, OSError, RuntimeError) as handler_error:
-                            # Cliente se desconectó durante el handler - normal
-                            logging.debug(f"Cliente desconectado durante handler {scope}.{command}: {type(handler_error).__name__}")
-                            break
-                        except Exception as handler_error:
-                            # Error inesperado en el handler - loguear pero no crashear
-                            logging.error(f"Error ejecutando handler {scope}.{command}: {handler_error}", exc_info=True)
+                            # CRÍTICO: Agregar timeout global a handlers para prevenir bloqueos infinitos
+                            # Algunos handlers pueden bloquearse (especialmente conversiones denso → disperso)
                             try:
-                                await send_notification(ws, f"Error ejecutando {scope}.{command}: {str(handler_error)[:100]}", "error")
-                            except (ConnectionResetError, ConnectionError, OSError, RuntimeError):
-                                break  # Cliente desconectado, salir del loop
+                                await asyncio.wait_for(handler(args), timeout=30.0)  # 30 segundos máximo por comando
+                                logging.info(f"✅ Handler {scope}.{command} completado exitosamente")
+                            except asyncio.TimeoutError:
+                                logging.error(f"❌ Handler {scope}.{command} excedió timeout de 30s. Posible bloqueo.")
+                                try:
+                                    await send_notification(ws, f"Error: {scope}.{command} excedió tiempo límite. Intenta de nuevo.", "error")
+                                except (ConnectionResetError, ConnectionError, OSError, RuntimeError):
+                                    break
+                            except (ConnectionResetError, ConnectionError, OSError, RuntimeError) as handler_error:
+                                # Cliente se desconectó durante el handler - normal
+                                logging.debug(f"Cliente desconectado durante handler {scope}.{command}: {type(handler_error).__name__}")
+                                break
+                            except Exception as handler_error:
+                                # Error inesperado en el handler - loguear pero no crashear
+                                logging.error(f"Error ejecutando handler {scope}.{command}: {handler_error}", exc_info=True)
+                                try:
+                                    await send_notification(ws, f"Error ejecutando {scope}.{command}: {str(handler_error)[:100]}", "error")
+                                except (ConnectionResetError, ConnectionError, OSError, RuntimeError):
+                                    break  # Cliente desconectado, salir del loop
+                        except Exception as outer_error:
+                            # Error incluso antes de ejecutar handler (timeout, etc.)
+                            logging.error(f"Error preparando handler {scope}.{command}: {outer_error}", exc_info=True)
                     else:
                         logging.warning(f"⚠️ Comando desconocido: {scope}.{command}")
                         logging.warning(f"⚠️ Handlers disponibles en scope '{scope}': {list(handlers.get(scope, {}).keys())}")

@@ -2,7 +2,7 @@
 import asyncio
 import logging
 
-from ...server.server_state import g_state, broadcast, send_notification, optimize_frame_payload
+from ...server.server_state import g_state, broadcast, send_notification, send_to_websocket, optimize_frame_payload
 from ..viz import get_visualization_data
 
 logger = logging.getLogger(__name__)
@@ -266,8 +266,217 @@ async def handle_set_steps_interval(args):
             await send_notification(ws, f"Error al configurar intervalo: {str(e)}. Usando valor por defecto: 10", "error")
 
 
-# Más handlers de simulación se agregarán aquí según se extraigan de pipeline_server.py
-# Por ahora, los handlers complejos (snapshots, history, etc.) se mantienen en pipeline_server.py
+async def handle_set_compression(args):
+    """Habilita o deshabilita la compresión de datos (gzip/zlib)."""
+    enabled = args.get("enabled", True)
+    g_state['data_compression_enabled'] = enabled
+    
+    logging.info(f"Compresión de datos {'activada' if enabled else 'desactivada'}")
+    
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    if ws:
+        await send_notification(ws, f"Compresión {'activada' if enabled else 'desactivada'}", "info")
+    
+    await broadcast({
+        "type": "compression_status_update",
+        "payload": {"enabled": enabled}
+    })
+
+
+async def handle_set_downsample(args):
+    """Configura el factor de downsampling para la visualización."""
+    factor = args.get("factor", 1)
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    
+    try:
+        factor = int(factor)
+    except (ValueError, TypeError):
+        factor = 1
+    
+    # Validar factor (potencias de 2 son mejores: 1, 2, 4, 8)
+    if factor < 1:
+        factor = 1
+    elif factor > 8:
+        factor = 8
+    g_state['downsample_factor'] = int(factor)
+    
+    logging.info(f"Downsampling ajustado a: {factor}x ({'sin downsampling' if factor == 1 else f'{factor}x reducción'})")
+    
+    if ws:
+        if factor == 1:
+            await send_notification(ws, "Downsampling desactivado. Enviando datos a resolución completa.", "info")
+        else:
+            grid_size = g_state.get('roi_manager', None)
+            grid_size = grid_size.grid_size if grid_size else 256
+            await send_notification(ws, f"Downsampling activado: {factor}x reducción (resolución {grid_size//factor}x{grid_size//factor})", "info")
+    
+    await broadcast({
+        "type": "downsample_status_update",
+        "payload": {"factor": g_state['downsample_factor']}
+    })
+
+
+async def handle_set_roi(args):
+    """Configura la región de interés (ROI) para visualización."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    roi_manager = g_state.get('roi_manager')
+    
+    if not roi_manager:
+        # Crear ROI manager si no existe
+        from ...managers.roi_manager import ROIManager
+        grid_size = g_state.get('grid_size', 256)
+        roi_manager = ROIManager(grid_size=grid_size)
+        g_state['roi_manager'] = roi_manager
+    
+    # Soporte para formato nuevo (enabled) y formato antiguo (action)
+    enabled = args.get("enabled", None)
+    if enabled is not None:
+        if not enabled:
+            roi_manager.clear_roi()
+            logging.info("ROI desactivada")
+            if ws:
+                await send_notification(ws, "ROI desactivada. Mostrando grid completo.", "info")
+            await broadcast({
+                "type": "roi_status_update",
+                "payload": {"enabled": False}
+            })
+            return
+        # Si enabled=True, continuar con set_roi
+    
+    action = args.get("action", "set")  # 'set', 'clear', 'get'
+    
+    if action == "clear" or (enabled is not None and not enabled):
+        roi_manager.clear_roi()
+        logging.info("ROI desactivada")
+        if ws:
+            await send_notification(ws, "ROI desactivada. Mostrando grid completo.", "info")
+    elif action == "get":
+        # Retornar información de ROI actual
+        roi_info = roi_manager.get_roi_info()
+        if ws:
+            await send_to_websocket(ws, "roi_info", roi_info)
+        return
+    else:  # action == "set" o enabled == True
+        x = args.get("x", 0)
+        y = args.get("y", 0)
+        width = args.get("width", 128)
+        height = args.get("height", 128)
+        
+        success = roi_manager.set_roi(x, y, width, height)
+        
+        if success:
+            roi_info = roi_manager.get_roi_info()
+            reduction_msg = f" ({roi_info['reduction_ratio']:.1f}x reducción de datos)"
+            logging.info(f"ROI configurada: ({x}, {y}) tamaño {width}x{height}{reduction_msg}")
+            if ws:
+                await send_notification(ws, f"ROI configurada: región {width}x{height} en ({x}, {y}){reduction_msg}", "info")
+        else:
+            error_msg = f"ROI inválida: ({x}, {y}) tamaño {width}x{height} excede el grid {roi_manager.grid_size}x{roi_manager.grid_size}"
+            logging.warning(error_msg)
+            if ws:
+                await send_notification(ws, error_msg, "error")
+            return
+    
+    # Enviar actualización a todos los clientes
+    roi_info = roi_manager.get_roi_info()
+    await broadcast({
+        "type": "roi_status_update",
+        "payload": roi_info
+    })
+
+
+async def handle_set_snapshot_interval(args):
+    """Configura el intervalo de captura de snapshots."""
+    interval = args.get("interval", 500)
+    try:
+        interval = int(interval)
+        if interval < 10: interval = 10  # Mínimo 10 pasos
+        
+        g_state['snapshot_interval'] = interval
+        logging.info(f"Intervalo de snapshots ajustado a: {interval}")
+        
+        ws = g_state['websockets'].get(args.get('ws_id'))
+        if ws:
+            await send_notification(ws, f"Intervalo de snapshots: {interval} pasos", "info")
+            
+    except (ValueError, TypeError):
+        pass
+
+
+async def handle_enable_snapshots(args):
+    """Habilita o deshabilita la captura automática de snapshots."""
+    enabled = args.get("enabled", True)
+    g_state['snapshot_enabled'] = enabled
+    
+    logging.info(f"Captura de snapshots {'habilitada' if enabled else 'deshabilitada'}")
+    
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    if ws:
+        await send_notification(ws, f"Snapshots {'habilitados' if enabled else 'deshabilitados'}", "info")
+
+
+async def handle_capture_snapshot(args):
+    """Captura un snapshot manual del estado actual de la simulación."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    try:
+        motor = g_state.get('motor')
+        if not motor:
+            msg = "⚠️ No hay un modelo cargado. Primero debes cargar un experimento."
+            logging.warning(msg)
+            if ws:
+                await send_notification(ws, msg, "warning")
+            return
+        
+        if motor.state.psi is None:
+            msg = "⚠️ El motor no tiene un estado válido para capturar."
+            logging.warning(msg)
+            if ws:
+                await send_notification(ws, msg, "warning")
+            return
+        
+        # Inicializar lista de snapshots si no existe
+        if 'snapshots' not in g_state:
+            g_state['snapshots'] = []
+        
+        current_step = g_state.get('simulation_step', 0)
+        
+        # Capturar snapshot
+        try:
+            psi_tensor = motor.state.psi
+            snapshot = psi_tensor.detach().cpu().clone() if hasattr(psi_tensor, 'detach') else psi_tensor.cpu().clone()
+            
+            g_state['snapshots'].append({
+                'psi': snapshot,
+                'step': current_step,
+                'timestamp': asyncio.get_event_loop().time()
+            })
+            
+            # Limitar número de snapshots almacenados
+            max_snapshots = g_state.get('max_snapshots', 500)
+            if len(g_state['snapshots']) > max_snapshots:
+                g_state['snapshots'] = g_state['snapshots'][-max_snapshots:]
+            
+            n_snapshots = len(g_state['snapshots'])
+            msg = f"📸 Snapshot capturado manualmente (paso {current_step}). Total: {n_snapshots} snapshots."
+            logging.info(msg)
+            if ws:
+                await send_notification(ws, msg, "success")
+                # Enviar actualización del número de snapshots
+                await send_to_websocket(ws, "snapshot_count", {
+                    "count": n_snapshots,
+                    "step": current_step
+                })
+        except Exception as e:
+            error_msg = f"Error al capturar snapshot: {str(e)}"
+            logging.error(error_msg, exc_info=True)
+            if ws:
+                await send_notification(ws, error_msg, "error")
+        
+    except Exception as e:
+        logging.error(f"Error en handle_capture_snapshot: {e}", exc_info=True)
+        if ws:
+            await send_notification(ws, f"Error al capturar snapshot: {str(e)}", "error")
+
 
 HANDLERS = {
     "set_viz": handle_set_viz,
@@ -277,5 +486,10 @@ HANDLERS = {
     "set_frame_skip": handle_set_frame_skip,
     "set_live_feed": handle_set_live_feed,
     "set_steps_interval": handle_set_steps_interval,
+    "set_compression": handle_set_compression,
+    "set_downsample": handle_set_downsample,
+    "set_roi": handle_set_roi,
+    "set_snapshot_interval": handle_set_snapshot_interval,
+    "enable_snapshots": handle_enable_snapshots,
+    "capture_snapshot": handle_capture_snapshot
 }
-
