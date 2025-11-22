@@ -137,8 +137,10 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
         logging.error(f"❌ map_data está vacío después de normalización para viz_type={viz_type}!")
     
     # Inicializar resultado
+    # CRÍTICO: NO convertir a .tolist() aquí - es muy lento para arrays grandes (256x256)
+    # optimize_frame_payload() se encargará de la conversión eficiente
     result = {
-        "map_data": map_data.tolist(),
+        "map_data": map_data,  # Dejar como numpy array
         "hist_data": {},
         "poincare_coords": [[0.0, 0.0]]
     }

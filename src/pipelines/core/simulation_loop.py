@@ -469,7 +469,9 @@ async def simulation_loop():
                     g_state['simulation_step'] = current_step + 1
                     
                     # Validar que el motor tenga un estado válido
-                    if g_state['motor'].state.psi is None:
+                    # CRÍTICO: Para motor nativo, el estado está en C++, no en motor.state.psi
+                    motor_is_native = g_state.get('motor_is_native', False)
+                    if not motor_is_native and g_state['motor'].state.psi is None:
                         logging.warning("Motor activo pero sin estado psi. Saltando frame.")
                         await asyncio.sleep(0.1)
                         continue
@@ -550,9 +552,27 @@ async def simulation_loop():
                         continue
                     
                     # Validar que map_data no esté vacío
+                    # CRÍTICO: map_data ahora puede ser numpy array o lista
                     map_data = viz_data.get("map_data", [])
-                    if not map_data or (isinstance(map_data, list) and len(map_data) == 0):
-                        logging.warning(f"⚠️ map_data está vacío en step {g_state.get('simulation_step', 0)}. Saltando frame.")
+                    if map_data is None:
+                        logging.warning(f"⚠️ map_data es None en step {g_state.get('simulation_step', 0)}. Saltando frame.")
+                        await asyncio.sleep(0.1)
+                        continue
+                    
+                    # Validar tamaño según tipo
+                    import numpy as np
+                    if isinstance(map_data, np.ndarray):
+                        if map_data.size == 0:
+                            logging.warning(f"⚠️ map_data (numpy array) está vacío en step {g_state.get('simulation_step', 0)}. Saltando frame.")
+                            await asyncio.sleep(0.1)
+                            continue
+                    elif isinstance(map_data, list):
+                        if len(map_data) == 0:
+                            logging.warning(f"⚠️ map_data (lista) está vacío en step {g_state.get('simulation_step', 0)}. Saltando frame.")
+                            await asyncio.sleep(0.1)
+                            continue
+                    else:
+                        logging.warning(f"⚠️ map_data tiene tipo inesperado: {type(map_data)} en step {g_state.get('simulation_step', 0)}. Saltando frame.")
                         await asyncio.sleep(0.1)
                         continue
                     
