@@ -35,6 +35,114 @@
 - [[#2024-12-XX - Fase 3 Completada: Migración de Componentes UI]]
 - [[#2024-12-XX - Fase 2 Iniciada: Setup Motor Nativo C++]]
 - [[#2024-12-XX - Optimización de Logs y Reducción de Verbosidad]]
+## 2025-11-21 - Fix: Carga de Modelos en Servidor de Inferencia
+
+### Problema
+El servidor fallaba al cargar modelos desde el frontend con dos errores:
+1. `AttributeError: module 'src.config' has no attribute 'D_STATE'`
+2. `TypeError: load_model() got an unexpected keyword argument 'device'`
+
+### Causa Raíz
+- **Error 1**: El código usaba `global_cfg.D_STATE` que no existe. El atributo correcto es `MODEL_PARAMS['d_state']` desde la configuración del experimento.
+- **Error 2**: La firma de `load_model()` cambió de `load_model(exp_name, device=device)` a `load_model(exp_cfg, checkpoint_path)`.
+
+### Solución
+**Archivo Modificado:** `src/pipelines/handlers/inference_handlers.py`
+
+1. **Motor Nativo (C++)**:
+   - Cargar configuración del experimento con `load_experiment_config(exp_name)`
+   - Usar `exp_cfg.MODEL_PARAMS.d_state` en lugar de `global_cfg.D_STATE`
+   - Llamar `load_model(exp_cfg, checkpoint_path)` con la firma correcta
+
+2. **Motor Python**:
+   - Cargar configuración del experimento
+   - Crear modelo con `load_model(exp_cfg, checkpoint_path)`
+   - Envolver en `Aetheria_Motor` con parámetros correctos
+
+### Resultado
+- ✅ Carga de modelos funciona correctamente
+- ✅ Compatibilidad con motor nativo y Python
+- ✅ Configuración del experimento se carga dinámicamente
+
+---
+
+## 2025-11-21 - Fix: Configuración de Proxy WebSocket en Frontend
+
+### Problema
+El frontend en desarrollo (`ath frontend-dev`) no podía conectarse al backend.
+
+### Solución
+Agregado proxy en `frontend/vite.config.ts`:
+```typescript
+server: {
+  port: 3000,
+  proxy: {
+    '/ws': {
+      target: 'ws://localhost:8000',
+      ws: true,
+      changeOrigin: true,
+    },
+  },
+}
+```
+
+---
+
+## 2025-11-21 - Fase 2: Paralelización con OpenMP en Motor Nativo
+
+### Contexto
+Implementación de paralelización multi-hilo en el motor nativo C++ para mejorar el rendimiento.
+
+### Cambios Implementados
+
+**Archivos Modificados:**
+1. **`CMakeLists.txt`**: Habilitado soporte OpenMP (`find_package(OpenMP REQUIRED)`) y linkeo de `OpenMP::OpenMP_CXX`.
+2. **`src/cpp_core/src/sparse_engine.cpp`**: 
+   - Incluido `<omp.h>`.
+   - Refactorizado `step_native()` para usar `#pragma omp parallel` con thread-local storage.
+   - Cada thread procesa batches independientes y almacena resultados en mapas locales.
+   - Sección crítica (`#pragma omp critical`) para merge de resultados al final.
+
+### Estrategia de Paralelización
+- **Thread-Local Buffers**: Cada thread tiene su propio `local_batch_coords`, `local_batch_states`, `local_next_matter_map`, `local_next_active_region`.
+- **Sin Race Conditions**: No hay acceso concurrente a estructuras compartidas durante el procesamiento.
+- **Merge Seguro**: Solo al final del loop paralelo se fusionan los resultados en sección crítica.
+
+### Verificación
+**Test:** `scripts/test_native_engine_openmp.py`
+- ✅ Conservación de partículas: 100% (648/648 mantenidas durante 10 pasos).
+- ✅ Determinismo (thread safety): Ambos motores producen el mismo resultado final.
+- ✅ Performance: **2318 steps/sec** sin modelo (CPU).
+
+### Resultado
+- Paralelización implementada correctamente.
+- Sin problemas de sincronización o race conditions.
+- Base sólida para futuras optimizaciones (SIMD, visualización en C++).
+
+---
+
+## 2025-11-21 - Corrección Crítica: Filtrado de Propagación Z en Motor Nativo
+
+### Contexto
+El usuario reportó problemas de rendimiento ("se tranca", "sin fps") y advertencias sobre "número sospechoso de coordenadas activas" (13k vs 4k esperadas).
+
+### Problema Identificado
+El motor nativo (C++) es tridimensional y propaga partículas a vecinos en Z (`z=-1` y `z=1`) incluso si la simulación se visualiza en 2D (`z=0`).
+- `get_active_coords` retornaba ~3x coordenadas (z=-1, 0, 1).
+- `NativeEngineWrapper` procesaba todas, sobrescribiendo el estado denso 2D múltiples veces.
+- Esto causaba overhead innecesario y advertencias de duplicados.
+
+### Solución Implementada
+**Archivo:** `src/engines/native_engine_wrapper.py`
+
+**Cambios:**
+1.  **Filtrado Z=0:** En `_update_dense_state_from_sparse`, se ignoran explícitamente las coordenadas con `coord.z != 0`.
+2.  **Robustez de Inicialización:** Se redujo el umbral de detección de partículas (`1e-9`) y se agregó lógica de reintento para evitar fallbacks a ruido aleatorio.
+
+### Resultado
+- ✅ Coordenadas procesadas reducidas de ~13k a ~4k (solo slice Z=0).
+- ✅ Eliminación de advertencias de "coordenadas sospechosas".
+- ✅ Mejora de rendimiento en conversión de estado.
 
 ---
 

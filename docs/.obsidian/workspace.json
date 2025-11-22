@@ -164,6 +164,7 @@
   },
   "active": "7a1f269a0d340ce6",
   "lastOpenFiles": [
+    "20_Concepts/SPARSE_ENGINE_ACTIVE_NEIGHBORS.md",
     "40_Experiments/SNN_UNET-d12-h128-g64-lr1e-4.md",
     "30_Components/UNIVERSE_ATLAS_ANALYSIS.md",
     "40_Experiments/VISUALIZATION_FIX_ROADMAP.md",
@@ -188,7 +189,6 @@
     "40_Experiments/00_EXPERIMENTS_MOC.md",
     "30_Components/00_COMPONENTS_MOC.md",
     "10_core/00_CORE_MOC.md",
-    "20_Concepts/HARMONIC_VACUUM_CONCEPT.md",
-    "40_Experiments/EXP_002_CPP_ENGINE.md"
+    "20_Concepts/HARMONIC_VACUUM_CONCEPT.md"
   ]
 }

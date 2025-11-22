@@ -135,13 +135,25 @@ dmypy.json
 cython_debug/
 
 # VS Code
-.vscode/
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
 
 # Atheria Project Specific
 /output/
 /notebooks/
 *.ipynb
-.gemini/
+# Atheria Project Specific
+/output/
+/notebooks/
+*.ipynb
+.gemini/*
+!.gemini/GEMINI.md
+frontend/dist/
 frontend/dist/
 frontend/node_modules/
 
