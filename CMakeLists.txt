@@ -18,6 +18,15 @@ else()
     add_compile_options(-g -Wall -Wextra)
 endif()
 
+# Buscar OpenMP para paralelismo
+find_package(OpenMP REQUIRED)
+if(OpenMP_CXX_FOUND)
+    message(STATUS "Found OpenMP: ${OpenMP_CXX_VERSION}")
+    # Los flags se agregan automáticamente al linkear con OpenMP::OpenMP_CXX
+else()
+    message(WARNING "OpenMP not found. Parallelism will be disabled.")
+endif()
+
 # Definir TORCH_FOUND si LibTorch está disponible (se definirá más adelante)
 
 # Buscar Python3 (necesario para PyBind11)
@@ -142,6 +151,11 @@ pybind11_add_module(
 
 # Configuración específica de PyBind11 y LibTorch
 target_link_libraries(atheria_core PRIVATE pybind11::module)
+
+# Enlazar OpenMP si está disponible
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(atheria_core PRIVATE OpenMP::OpenMP_CXX)
+endif()
 
 # Enlazar LibTorch si está disponible
 if(TORCH_FOUND)
