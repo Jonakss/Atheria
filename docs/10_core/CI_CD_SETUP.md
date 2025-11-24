@@ -34,7 +34,7 @@ Una vez configurado, puedes usar los siguientes comandos en comentarios de Issue
 - **`@gemini-cli /triage`**: Analiza un issue y le asigna etiquetas (labels) automáticamente.
 - **`@gemini-cli /review`**: (En un PR) Realiza una revisión de código detallada.
 - **`@gemini-cli /invoke [prompt]`**: Ejecuta una instrucción personalizada.
-  - Ejemplo: `@gemini-cli /invoke Explícame qué hace el archivo qca_engine.py`
+  - Ejemplo: `@gemini-cli /invoke Explícame qué hace el archivo run_server.py`
 
 ## 🛠 Solución de Problemas
 
