@@ -23,7 +23,7 @@ Ve a la pestaña **Variables** en la misma sección de configuración.
 
 | Nombre | Valor Recomendado | Descripción | Requerido |
 |--------|-------------------|-------------|-----------|
-| `GEMINI_MODEL` | `gemini-1.5-flash` | El modelo a usar. `gemini-1.5-flash` es rápido y gratuito (con límites). `gemini-1.5-pro` es más potente. | ✅ SÍ |
+| `GEMINI_MODEL` | `gemini-2.0-flash` | El modelo a usar. Se recomienda **gemini-2.0-flash** (GA) por velocidad y costo. También puedes usar `gemini-2.0-pro-exp`, `gemini-2.5-flash` o `gemini-3.0-pro-preview` si tienes acceso. | ✅ SÍ |
 | `GOOGLE_GENAI_USE_VERTEXAI` | `false` | Ponlo en `false` si usas **AI Studio** (API Key). Ponlo en `true` si usas **Vertex AI**. | ✅ SÍ |
 | `GOOGLE_GENAI_USE_GCA` | `false` | Uso de Gemini Code Assist (opcional). | No |
 
@@ -38,10 +38,11 @@ Una vez configurado, puedes usar los siguientes comandos en comentarios de Issue
 
 ## 🛠 Solución de Problemas
 
-- **Error: "Resource has been exhausted"**: Si usas la capa gratuita de AI Studio, es posible que alcances el límite de cuota. Espera unos minutos o cambia a un modelo más ligero (`gemini-1.5-flash`).
+- **Error: "Resource has been exhausted"**: Si usas la capa gratuita de AI Studio, es posible que alcances el límite de cuota. Espera unos minutos o cambia a un modelo más ligero.
 - **El bot no responde**: Asegúrate de que los workflows tienen permisos de lectura/escritura en **Settings** -> **Actions** -> **General** -> **Workflow permissions**.
 
 ## Referencias
 
 - [Google AI Studio](https://aistudio.google.com/)
 - [Gemini CLI Action](https://github.com/google-github-actions/run-gemini-cli)
+- [Modelos Gemini Disponibles](https://ai.google.dev/gemini-api/docs/models)
