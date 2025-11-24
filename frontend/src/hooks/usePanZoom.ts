@@ -101,16 +101,13 @@ export const usePanZoom = (
       // Calcular límites de zoom
       // Zoom mínimo: permitir zoom out suficiente para ver TODO el grid completo
       // Si el procesamiento lo permite, permitir zoom out incluso más allá
-      const minZoomX = containerWidth / gridWidth;
-      const minZoomY = containerHeight / gridHeight;
-      // Permitir zoom out hasta un 50% más pequeño que lo necesario para ver todo el grid
-      // Esto permite ver el grid completo con espacio alrededor, o incluso más lejos
-      const minZoomRequired = Math.min(minZoomX, minZoomY);
-      const minZoom = minZoomRequired * 0.8; // 80% del zoom necesario = permite ver un poco más de área
-
       // Límite absoluto mínimo más conservador para evitar zoom excesivo
       const absoluteMinZoom = 0.1; // Límite absoluto (permite zoom out hasta ver 10x el viewport)
-      const finalMinZoom = Math.max(absoluteMinZoom, minZoom);
+
+      // FIX: Usar absoluteMinZoom como límite inferior real para permitir zoom out libre
+      // El cálculo anterior (minZoomRequired * 0.8) forzaba al grid a llenar la pantalla,
+      // impidiendo hacer zoom out si el grid era pequeño y el contenedor grande.
+      const finalMinZoom = absoluteMinZoom;
 
       // Zoom máximo más conservador: máximo 10x o 1 píxel = 10 unidades del grid
       const maxZoom = 10;
