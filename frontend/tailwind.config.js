@@ -36,22 +36,22 @@ export default {
           900: '#831843',
           950: '#500724',
         },
-        // Colores neutros oscuros (fondo)
+        // Colores "Deep Space" - más pulidos, con un ligero tinte azulado/pizarra en lugar de negro puro
         dark: {
-          50: '#fafafa',
-          100: '#f5f5f5',
-          200: '#e5e5e5',
-          300: '#d4d4d4',
-          400: '#a3a3a3',
-          500: '#737373',
-          600: '#525252',
-          700: '#404040',
-          800: '#262626',
-          900: '#171717',
-          950: '#0a0a0a',
-          980: '#080808', // Más oscuro
-          990: '#050505', // Casi negro
-          bg: '#020202', // Fondo principal
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a',  // Dark slate
+          950: '#0b0f19',  // Mucho más rico que #0a0a0a
+          980: '#05070a',  // Casi negro, pero con tinte
+          990: '#030406',  // Muy oscuro
+          bg: '#040507',   // Fondo principal - Ligeramente más claro y azulado que #020202
         },
       },
       // Efectos de brillo/glow
@@ -64,6 +64,7 @@ export default {
       backgroundImage: {
         'gradient-teal-pink': 'linear-gradient(135deg, rgba(20, 184, 166, 0.2) 0%, rgba(236, 72, 153, 0.2) 100%)',
         'gradient-teal-pink-strong': 'linear-gradient(135deg, rgba(20, 184, 166, 0.4) 0%, rgba(236, 72, 153, 0.4) 100%)',
+        'gradient-deep-space': 'linear-gradient(to bottom, #0b0f19 0%, #040507 100%)', // Nuevo gradiente de fondo
       },
     },
   },

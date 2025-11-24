@@ -206,17 +206,17 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
     ];
 
     return (
-        <div className="h-full w-full flex flex-col text-gray-300 relative">
+        <div className="h-full w-full flex flex-col text-dark-200 relative bg-dark-950/80 backdrop-blur-md">
             {/* Header con título y botón de colapsar */}
-            <div className={`h-10 border-b border-white/5 flex items-center bg-[#0a0a0a] shrink-0 ${
+            <div className={`h-10 border-b border-white/5 flex items-center bg-dark-980/90 shrink-0 ${
                 isCollapsed ? 'px-1 justify-center' : 'px-2 justify-between'
             }`}>
                 {!isCollapsed && (
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Laboratorio</span>
+                    <span className="text-[10px] font-bold text-dark-400 uppercase tracking-widest">Laboratorio</span>
                 )}
                 <button 
                     onClick={onToggleCollapse}
-                    className="p-1.5 text-gray-600 hover:text-gray-400 transition-colors rounded hover:bg-white/5"
+                    className="p-1.5 text-dark-500 hover:text-dark-300 transition-colors rounded hover:bg-white/5"
                     title={isCollapsed ? "Expandir Panel" : "Minimizar Panel"}
                 >
                     <ChevronLeft size={14} className={`transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} />
@@ -226,14 +226,14 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
             {/* Contenido Scrollable - Oculto cuando está colapsado */}
             {!isCollapsed && (
             <div className={`flex-1 overflow-y-auto custom-scrollbar transition-all duration-300 ${
-                activeSection === 'inference' ? 'bg-blue-500/5' :
-                activeSection === 'training' ? 'bg-teal-500/5' :
-                activeSection === 'analysis' ? 'bg-pink-500/5' :
+                activeSection === 'inference' ? 'bg-blue-900/10' :
+                activeSection === 'training' ? 'bg-teal-900/10' :
+                activeSection === 'analysis' ? 'bg-pink-900/10' :
                 ''
             }`}>
                     {/* Progreso de Entrenamiento - Siempre visible si está corriendo */}
                     {trainingStatus === 'running' && (
-                        <div className="m-4 mb-0 bg-white/5 border border-white/10 rounded-lg p-3 space-y-2">
+                        <div className="m-4 mb-0 bg-dark-900/50 border border-white/10 rounded-lg p-3 space-y-2">
                             <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                                 <span>PROGRESO</span>
                                 <span className="text-teal-400">ACTIVO</span>
