@@ -76,7 +76,7 @@
 
 ### 4. Visualizaciones en Shaders (GPU)
 **Prioridad:** 🟡 **ALTA**  
-**Estado:** Pendiente
+**Estado:** ⏳ **EN VERIFICACIÓN** (2025-11-22)
 
 **Requisito:**
 - Cuando GPU está disponible, usar shaders para visualizaciones
