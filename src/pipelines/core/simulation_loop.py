@@ -190,9 +190,13 @@ async def simulation_loop():
                                 # Promediar con últimos valores para suavizar
                                 fps_value = min(steps_per_second, 10000.0)
                                 g_state['fps_samples'].append(fps_value)
-                                if len(g_state['fps_samples']) > 10:  # Mantener solo últimos 10
-                                    g_state['fps_samples'].pop(0)
+                               # Calcular promedio (limitar a máximo razonable para pasos/segundo Sin live feed puede ser 1000+)
+                            if 'fps_samples' in g_state and len(g_state['fps_samples']) > 0:
                                 g_state['current_fps'] = sum(g_state['fps_samples']) / len(g_state['fps_samples'])
+                                
+                                # DEBUG: Log FPS calculation every 100 steps
+                                if updated_step % 100 == 0:
+                                    logging.info(f"📊 FPS calculado: {g_state['current_fps']:.1f} (live_feed={live_feed_enabled}, steps_interval={steps_interval})")
                         # Si live_feed está ON, el FPS se actualizará en el bloque de visualización
                         
                         # Actualizar contador para frames (solo si no es modo manual)

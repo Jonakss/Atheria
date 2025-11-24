@@ -891,6 +891,19 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 </div>
             )}
             
+            {/* DEBUG: Log simulation_info when it changes */}
+            {React.useEffect(() => {
+                if (simData?.simulation_info) {
+                    console.log('[FPS DEBUG] simulation_info:', {
+                        fps: simData.simulation_info.fps,
+                        step: simData.simulation_info.step,
+                        live_feed_enabled: simData.simulation_info.live_feed_enabled,
+                        full_info: simData.simulation_info
+                    });
+                }
+            }, [simData?.simulation_info])}
+            
+            
             {/* Controles de overlay */}
             <Box className="absolute top-2.5 right-2.5 z-20 flex flex-col gap-2">
                 <Group gap={1}>
