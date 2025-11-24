@@ -17,7 +17,7 @@ El Objetivo: Observar la emergencia de complejidad en 5 etapas: Vacío -> Partí
 
 Inferencia Masiva (Sparse Engine): El universo es infinito. No usamos un grid denso. Usamos un Hash Map de materia activa y generamos el vacío proceduralmente mediante Interferencia de Ondas (Harmonic Vacuum).
 
-Campos Cuánticos (QFT): Cada celda del espacio no tiene un color, tiene un vector d_state de 16 dimensiones. Estos no son coordenadas, son Campos (Fermiones, Bosones, Fuerzas) que la IA aprende a usar.
+Campos Cuánticos (QFT): Cada celda del espacio no tiene un color, tiene un vector d_state de 16 dimensiones. Estos no son coordenadas, son Campos (Fermiones, Bosones, Fuerzas) que la IA aprende a usar. (Ver: [[THEORETICAL_FRAMEWORK]])
 
 Curriculum Evolutivo: El entrenamiento no es estático. Un EpochDetector monitorea la simulación y cambia las reglas (aumenta el ruido, activa la gravedad) cuando el universo alcanza hitos de complejidad.
 
