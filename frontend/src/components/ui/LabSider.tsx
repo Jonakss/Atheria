@@ -1,5 +1,5 @@
 // frontend/src/components/ui/LabSider.tsx
-import { ArrowRightLeft, BarChart3, Brain, ChevronLeft, FlaskConical, Play, RotateCcw, Upload, X } from 'lucide-react';
+import { ArrowRightLeft, Play, RotateCcw, Upload, X } from 'lucide-react';
 import React, { useState } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
@@ -13,12 +13,11 @@ import { TrainingCanvas } from '../training/TrainingCanvas';
 type LabSection = 'inference' | 'training' | 'analysis';
 
 interface LabSiderProps {
-    activeSection?: LabSection;
-    onSectionChange?: (section: LabSection) => void;
+    activeSection: LabSection;
     onClose?: () => void;
 }
 
-export function LabSider({ activeSection: externalActiveSection, onSectionChange, onClose }: LabSiderProps) {
+export function LabSider({ activeSection, onClose }: LabSiderProps) {
     const { 
         sendCommand, experimentsData, trainingStatus, trainingProgress,
         inferenceStatus, connectionStatus, selectedViz, setSelectedViz,
@@ -26,17 +25,6 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
     } = useWebSocket();
     
     const isConnected = connectionStatus === 'connected';
-    const [internalActiveSection, setInternalActiveSection] = useState<LabSection>('inference');
-    
-    // Usar la sección externa si está disponible, sino usar la interna
-    const activeSection = externalActiveSection ?? internalActiveSection;
-    const setActiveSection = (section: LabSection) => {
-        if (onSectionChange) {
-            onSectionChange(section);
-        } else {
-            setInternalActiveSection(section);
-        }
-    };
     
     // Estados para los inputs de entrenamiento
     const [selectedModel, setSelectedModel] = useState<string>('UNET');
@@ -50,7 +38,7 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
     const [gammaDecay, setGammaDecay] = useState(0.01);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     
-    // Estados para configuración de inferencia (movidos desde SettingsPanel)
+    // Estados para configuración de inferencia
     const [gridSizeInference, setGridSizeInference] = useState<number>(() => {
         const saved = localStorage.getItem('atheria_gridSizeInference');
         return saved ? parseInt(saved, 10) : 256;
@@ -119,7 +107,6 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
         }
         
         sendCommand('experiment', 'create', args);
-        setActiveSection('training'); // Cambiar a sección de entrenamiento
     };
 
     const handleContinueExperiment = () => {
@@ -165,11 +152,10 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
         if (activeExperiment) {
             const exp = experimentsData?.find(e => e.name === activeExperiment);
             if (exp && !exp.has_checkpoint) return;
-            // Incluir grid_size actual de la configuración (usar estado local)
             sendCommand('inference', 'load_experiment', { 
                 experiment_name: activeExperiment,
-                grid_size: gridSizeInference,  // Pasar grid_size configurado desde el estado local
-                force_engine: selectedEngine !== 'auto' ? selectedEngine : undefined // Pasar motor seleccionado si no es auto
+                grid_size: gridSizeInference,
+                force_engine: selectedEngine !== 'auto' ? selectedEngine : undefined
             }); 
         }
     };
@@ -178,7 +164,6 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
         if (!isConnected) return;
         if (window.confirm('¿Descargar el modelo cargado? Esto limpiará la memoria y dejará el laboratorio sin modelo activo.')) {
             sendCommand('inference', 'unload', {});
-            // Opcional: limpiar experimento activo en el frontend
             setActiveExperiment(null);
         }
     };
@@ -200,12 +185,8 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
 
     return (
         <div className="h-full w-full flex flex-col text-dark-200 relative bg-dark-950/80 backdrop-blur-md">
-            {/* Header simple */}
-            <div className="h-10 border-b border-white/5 flex items-center justify-between px-3 bg-dark-980/90 shrink-0">
-                <span className="text-[10px] font-bold text-dark-400 uppercase tracking-widest">
-                    {activeSection === 'inference' ? 'Inferencia' : activeSection === 'training' ? 'Entrenamiento' : 'Análisis'}
-                </span>
-
+            {/* Header simple - Solo Close Button */}
+            <div className="h-8 flex items-center justify-end px-2 bg-transparent shrink-0 absolute top-0 right-0 z-50">
                 {onClose && (
                     <button
                         onClick={onClose}
@@ -218,7 +199,7 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
             </div>
 
             {/* Contenido Scrollable */}
-            <div className={`flex-1 overflow-y-auto custom-scrollbar transition-all duration-300 ${
+            <div className={`flex-1 overflow-y-auto custom-scrollbar transition-all duration-300 pt-8 ${
                 activeSection === 'inference' ? 'bg-blue-900/10' :
                 activeSection === 'training' ? 'bg-teal-900/10' :
                 activeSection === 'analysis' ? 'bg-pink-900/10' :

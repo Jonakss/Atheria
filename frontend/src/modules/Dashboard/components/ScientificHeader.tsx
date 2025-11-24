@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Settings, Aperture, Power, Plug, ChevronRight, ChevronLeft, ChevronDown, Cpu, Gauge, RefreshCcw } from 'lucide-react';
-import { EpochBadge } from './EpochBadge';
+import { Settings, Aperture, Power, Plug, ChevronDown, Cpu, Gauge } from 'lucide-react';
 import { SettingsPanel } from './SettingsPanel';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { getFormattedVersion } from '../../../utils/version';
@@ -12,7 +11,6 @@ interface ScientificHeaderProps {
 
 export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch, onEpochChange }) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [epochsExpanded, setEpochsExpanded] = useState(false); // Badges colapsados por defecto
   const [engineDropdownOpen, setEngineDropdownOpen] = useState(false);
   const { connectionStatus, compileStatus, connect, disconnect, sendCommand, simData } = useWebSocket();
   
@@ -56,8 +54,8 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
       }
       
       return {
-        engineText: `Engine::${engineType}`,
-        statusText: 'Status::CONNECTED',
+        engineText: engineType,
+        statusText: 'CONNECTED',
         dotColor,
         textColor,
         pulse,
@@ -65,8 +63,8 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
       };
     } else if (connectionStatus === 'connecting') {
       return {
-        engineText: 'Engine::CONNECTING',
-        statusText: 'Status::CONNECTING',
+        engineText: 'CONNECTING',
+        statusText: 'CONNECTING',
         dotColor: 'bg-pink-400',
         textColor: 'text-pink-400',
         pulse: true,
@@ -74,8 +72,8 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
       };
     } else {
       return {
-        engineText: 'Engine::DISCONNECTED',
-        statusText: 'Status::DISCONNECTED',
+        engineText: 'OFFLINE',
+        statusText: 'DISCONNECTED',
         dotColor: 'bg-gray-500',
         textColor: 'text-gray-500',
         pulse: false,
@@ -91,7 +89,7 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
     if (connectionStatus !== 'connected') {
       return {
         type: 'disconnected' as const,
-        label: 'DESCONECTADO',
+        label: 'OFFLINE',
         color: 'text-gray-500',
         bgColor: 'bg-gray-500/10',
         borderColor: 'border-gray-500/20',
@@ -106,7 +104,7 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
     if (compileStatus?.is_native) {
       return {
         type: 'native' as const,
-        label: 'NATIVO (C++)',
+        label: 'NATIVE',
         color: 'text-teal-400',
         bgColor: 'bg-teal-500/10',
         borderColor: 'border-teal-500/30',
@@ -117,7 +115,7 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
     } else if (compileStatus?.is_compiled) {
       return {
         type: 'compiled' as const,
-        label: 'COMPILADO (PyTorch)',
+        label: 'COMPILED',
         color: 'text-teal-400',
         bgColor: 'bg-teal-500/10',
         borderColor: 'border-teal-500/30',
@@ -152,31 +150,23 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
 
   // Función para cambiar de motor
   const handleSwitchEngine = useCallback((targetEngine: 'native' | 'python') => {
-    console.log(`🔄 handleSwitchEngine llamado con: ${targetEngine}`);
-    console.log(`🔍 Estado: connectionStatus=${connectionStatus}, model_name=${compileStatus?.model_name}`);
-    
     if (connectionStatus !== 'connected') {
-      console.warn('⚠️ No se puede cambiar de motor: no hay conexión');
       setEngineDropdownOpen(false);
       return;
     }
     
     // Permitir cambiar de motor incluso sin modelo cargado
-    // Si no hay modelo, simplemente cambiar la preferencia para cuando se cargue uno
     const currentIsNative = compileStatus?.is_native || false;
     const targetIsNative = targetEngine === 'native';
     
     // Solo cambiar si es diferente al actual
     if (currentIsNative === targetIsNative) {
-      console.info(`ℹ️ Ya estás usando el motor ${targetEngine}`);
       setEngineDropdownOpen(false);
       return;
     }
     
-    console.log(`✅ Enviando comando switch_engine: ${currentIsNative ? 'Native' : 'Python'} → ${targetEngine}`);
     try {
       sendCommand('inference', 'switch_engine', { engine: targetEngine });
-      console.log(`✅ Comando enviado exitosamente`);
     } catch (error) {
       console.error(`❌ Error enviando comando:`, error);
     }
@@ -202,62 +192,7 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
         {/* Separador Vertical */}
         <div className="h-4 w-px bg-white/10" />
 
-        {/* Timeline de Épocas (Tabs interactivos) - Colapsable */}
-        <div 
-          className="relative flex items-center"
-          onMouseEnter={() => setEpochsExpanded(true)}
-          onMouseLeave={() => setEpochsExpanded(false)}
-        >
-          {/* Barra fina cuando está colapsado */}
-          {!epochsExpanded && (
-            <button
-              onClick={() => setEpochsExpanded(true)}
-              onMouseEnter={() => setEpochsExpanded(true)}
-              className="w-1 h-8 bg-white/10 hover:w-2 hover:bg-white/30 rounded-full transition-all duration-300 cursor-pointer group relative"
-              title="Expandir épocas - Click o hover para mostrar"
-            >
-              {/* Indicador de época activa en la barra */}
-              <div 
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full transition-all"
-                style={{
-                  top: `${(currentEpoch / 5) * 100}%`,
-                  backgroundColor: 'rgba(20, 184, 166, 0.6)',
-                  boxShadow: '0 0 4px rgba(20, 184, 166, 0.8)'
-                }}
-              />
-              <div className="w-full h-full bg-gradient-to-b from-teal-500/20 via-pink-500/20 to-teal-400/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-            </button>
-          )}
-          
-          {/* Badges de época cuando está expandido */}
-          {epochsExpanded && (
-            <div className="flex items-center gap-0.5 animate-in slide-in-from-left-2 duration-200">
-              {[0, 1, 2, 3, 4, 5].map(e => (
-                <EpochBadge 
-                  key={e}
-                  era={e} 
-                  current={currentEpoch}
-                  onClick={() => onEpochChange?.(e)}
-                />
-              ))}
-              {/* Botón para colapsar */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEpochsExpanded(false);
-                }}
-                className="ml-1 p-1 text-gray-500 hover:text-gray-300 transition-colors"
-                title="Colapsar épocas"
-              >
-                <ChevronLeft size={12} />
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4">
-        {/* Indicador de Estado del Sistema - Formato: Engine::<engine> Status::CONNECTED */}
+        {/* Indicador de Estado del Sistema - Minimalista */}
         <div className="flex items-center gap-3">
           {/* Badge del Engine (clickeable para cambiar) */}
           <div className="relative">
@@ -273,7 +208,7 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
               <div className={`w-1.5 h-1.5 rounded-full ${engineInfo.dotColor} ${
                 connectionStatus === 'connected' && compileStatus?.is_native ? 'animate-pulse' : ''
               }`} />
-              <span className={`text-[10px] font-mono ${engineInfo.color} tracking-wide`}>
+              <span className={`text-[10px] font-mono ${engineInfo.color} tracking-wide font-bold`}>
                 {systemStatus.engineText}
               </span>
               {connectionStatus === 'connected' && (
@@ -325,22 +260,6 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
                   
                   {/* Información de versión y device */}
                   <div className="px-3 py-2 text-[9px] text-gray-500 font-mono border-t border-white/10 pt-2 space-y-0.5">
-                    {compileStatus?.is_native && (
-                      <>
-                        {compileStatus?.native_version && (
-                          <div>Nativo: v{compileStatus.native_version}</div>
-                        )}
-                        {compileStatus?.wrapper_version && (
-                          <div>Wrapper: v{compileStatus.wrapper_version}</div>
-                        )}
-                      </>
-                    )}
-                    {!compileStatus?.is_native && compileStatus?.python_version && (
-                      <div>Python: v{compileStatus.python_version}</div>
-                    )}
-                    {engineInfo.version && !compileStatus?.is_native && (
-                      <div>Versión: {engineInfo.version}</div>
-                    )}
                     {engineInfo.device && engineInfo.device !== 'N/A' && (
                       <div>Device: {engineInfo.device}</div>
                     )}
@@ -355,12 +274,14 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
             <div className={`w-1.5 h-1.5 rounded-full ${systemStatus.dotColor} ${
               systemStatus.pulse ? `animate-pulse ${systemStatus.shadow}` : ''
             }`} />
-            <span className={`text-[10px] font-mono ${systemStatus.textColor} tracking-wide`}>
+            <span className={`text-[10px] font-mono ${systemStatus.textColor} tracking-wide font-bold`}>
               {systemStatus.statusText}
             </span>
           </div>
         </div>
-        
+      </div>
+
+      <div className="flex items-center gap-4">
         {/* FPS y Velocidad */}
         {connectionStatus === 'connected' && (
           <div className="flex items-center gap-2 px-2 py-1 bg-white/5 rounded border border-white/5">

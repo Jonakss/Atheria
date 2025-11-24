@@ -206,7 +206,6 @@ export const DashboardLayout: React.FC = () => {
           <aside className="flex-col border-r border-white/5 bg-dark-980/40 backdrop-blur-md z-40 shrink-0 transition-all duration-300 w-[380px] flex overflow-hidden relative">
             <LabSider 
               activeSection={activeLabSection} 
-              onSectionChange={setActiveLabSection}
               onClose={() => setLabPanelOpen(false)}
             />
           </aside>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Zap, ChevronRight, MoreHorizontal, AlertCircle, Microscope, ChevronLeft } from 'lucide-react';
+import { Settings, Zap, ChevronRight, AlertCircle, Microscope, ChevronLeft } from 'lucide-react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 
 interface PhysicsInspectorProps {
@@ -11,7 +11,7 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
   isCollapsed = false, 
   onToggleCollapse 
 }) => {
-  const { sendCommand, allLogs, connectionStatus } = useWebSocket();
+  const { sendCommand, allLogs } = useWebSocket();
   const [gammaDecay, setGammaDecay] = useState(0.015);
   const [thermalNoise, setThermalNoise] = useState(0.002);
   const [selectedLayer, setSelectedLayer] = useState(0);
@@ -34,9 +34,6 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
   const handleThermalNoiseChange = (value: number) => {
     setThermalNoise(value);
     // TODO: Thermal noise aún no está implementado en el backend
-    // Por ahora solo guardamos el estado local
-    // Cuando esté implementado, enviar con:
-    // sendCommand('inference', 'set_config', { thermal_noise: value })
   };
 
   // Filtrar logs recientes (últimos 2)
@@ -45,13 +42,13 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
   return (
     <aside className={`${collapsed ? 'w-10' : 'w-72'} border-l border-white/5 bg-dark-950/80 backdrop-blur-md flex flex-col z-40 shrink-0 flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden`} style={{ minWidth: collapsed ? '2.5rem' : '18rem', maxWidth: collapsed ? '2.5rem' : '18rem' }}>
       {/* Título Panel - Con botón de colapsar */}
-      <div className="h-10 border-b border-white/5 flex items-center justify-between px-4 bg-dark-980/90 shrink-0">
+      <div className="h-10 border-b border-white/5 flex items-center justify-between px-3 bg-dark-980/90 shrink-0">
         {!collapsed && (
           <span className="text-[10px] font-bold text-dark-400 uppercase tracking-widest">Inspector Físico</span>
         )}
         <button
           onClick={handleToggle}
-          className="w-6 h-6 flex items-center justify-center text-dark-500 hover:text-dark-300 hover:bg-white/5 rounded transition-all"
+          className="p-1.5 text-dark-500 hover:text-dark-300 transition-colors rounded hover:bg-white/5"
           title={collapsed ? 'Expandir Inspector' : 'Colapsar Inspector'}
         >
           {collapsed ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
@@ -59,13 +56,10 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
       </div>
 
       {!collapsed && (
-      <div className="flex-1 overflow-y-auto p-4 space-y-8" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+      <div className="flex-1 overflow-y-auto p-4 space-y-6" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
         
         {/* Sección: Parámetros Globales */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-gray-200 text-xs font-bold uppercase tracking-wider mb-2">
-            <Settings size={12} className="text-blue-500" /> Variables de Entorno
-          </div>
+        <div className="space-y-4">
           
           {/* Control Slider Refinado - Gamma */}
           <div className="space-y-1.5">

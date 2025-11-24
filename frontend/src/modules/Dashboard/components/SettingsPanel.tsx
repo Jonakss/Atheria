@@ -1,9 +1,9 @@
 // frontend/src/modules/Dashboard/components/SettingsPanel.tsx
+import { Power, RotateCcw, Save, X } from 'lucide-react';
 import React, { useState } from 'react';
-import { X, Save, RotateCcw, Power } from 'lucide-react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
-import { GlassPanel } from './GlassPanel';
 import { getFormattedVersion } from '../../../utils/version';
+import { GlassPanel } from './GlassPanel';
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -160,7 +160,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center pointer-events-none">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/80 backdrop-blur-sm pointer-events-auto"
