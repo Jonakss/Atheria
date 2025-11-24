@@ -142,6 +142,18 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     const [showOverlayControls, setShowOverlayControls] = useState(false);
     const [autoROIEnabled, setAutoROIEnabled] = useState(false);
     const lastROIUpdate = useRef<number>(0);
+
+    // DEBUG: Log simulation_info when it changes to diagnose FPS display
+    useEffect(() => {
+        if (simData?.simulation_info) {
+            console.log('[FPS DEBUG] simulation_info:', {
+                fps: simData.simulation_info.fps,
+                step: simData.simulation_info.step,
+                live_feed_enabled: simData.simulation_info.live_feed_enabled
+            });
+        }
+    }, [simData?.simulation_info?.fps, simData?.simulation_info?.step]);
+
     const roiUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const ROIUpdateThrottle = 300; // Throttle: mínimo tiempo entre actualizaciones (300ms)
     const ROIDebounceDelay = 500; // Debounce: esperar 500ms después de la última interacción antes de actualizar
@@ -890,19 +902,6 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                     </GlassPanel>
                 </div>
             )}
-            
-            {/* DEBUG: Log simulation_info when it changes */}
-            {React.useEffect(() => {
-                if (simData?.simulation_info) {
-                    console.log('[FPS DEBUG] simulation_info:', {
-                        fps: simData.simulation_info.fps,
-                        step: simData.simulation_info.step,
-                        live_feed_enabled: simData.simulation_info.live_feed_enabled,
-                        full_info: simData.simulation_info
-                    });
-                }
-            }, [simData?.simulation_info])}
-            
             
             {/* Controles de overlay */}
             <Box className="absolute top-2.5 right-2.5 z-20 flex flex-col gap-2">
