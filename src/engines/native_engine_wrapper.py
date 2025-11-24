@@ -576,7 +576,9 @@ class NativeEngineWrapper:
             try:
                 # Intentar obtener coordenadas activas (si el motor nativo lo expone)
                 if hasattr(self.native_engine, 'get_active_coords'):
+                    logging.debug("🔍 Solicitando coordenadas activas al motor nativo...")
                     active_coords_list = self.native_engine.get_active_coords()
+                    logging.debug(f"✅ Coordenadas activas recibidas: {len(active_coords_list) if active_coords_list else 0}")
                     if active_coords_list and len(active_coords_list) > 0:
                         # CRÍTICO: Filtrar duplicados Y coordenadas fuera del plano Z=0
                         # El motor nativo es 3D y puede propagar a Z!=0, pero la visualización es 2D

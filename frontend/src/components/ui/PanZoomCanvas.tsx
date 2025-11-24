@@ -142,6 +142,18 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     const [showOverlayControls, setShowOverlayControls] = useState(false);
     const [autoROIEnabled, setAutoROIEnabled] = useState(false);
     const lastROIUpdate = useRef<number>(0);
+
+    // DEBUG: Log simulation_info when it changes to diagnose FPS display
+    useEffect(() => {
+        if (simData?.simulation_info) {
+            console.log('[FPS DEBUG] simulation_info:', {
+                fps: simData.simulation_info.fps,
+                step: simData.simulation_info.step,
+                live_feed_enabled: simData.simulation_info.live_feed_enabled
+            });
+        }
+    }, [simData?.simulation_info?.fps, simData?.simulation_info?.step]);
+
     const roiUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const ROIUpdateThrottle = 300; // Throttle: mínimo tiempo entre actualizaciones (300ms)
     const ROIDebounceDelay = 500; // Debounce: esperar 500ms después de la última interacción antes de actualizar
@@ -872,6 +884,23 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                         Simulación en ejecución (Paso: {simData.step || simData.simulation_info?.step || '...'})
                     </Text>
                 </Box>
+            )}
+
+            {/* FPS Indicator - Top Left */}
+            {simData?.simulation_info?.fps !== undefined && (
+                <div className="absolute top-2.5 left-2.5 z-20 pointer-events-none">
+                    <GlassPanel className="px-2 py-1 bg-black/40 backdrop-blur-sm border-white/10">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">FPS</span>
+                            <span className={`text-xs font-mono font-bold ${
+                                (simData.simulation_info.fps || 0) > 30 ? 'text-emerald-400' : 
+                                (simData.simulation_info.fps || 0) > 15 ? 'text-amber-400' : 'text-red-400'
+                            }`}>
+                                {(simData.simulation_info.fps || 0).toFixed(1)}
+                            </span>
+                        </div>
+                    </GlassPanel>
+                </div>
             )}
             
             {/* Controles de overlay */}

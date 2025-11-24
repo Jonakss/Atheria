@@ -80,3 +80,27 @@ Cuando cargas un experimento desde el frontend:
 - `src/pipelines/pipeline_server.py`: Función `handle_load_experiment()` (línea ~1015)
 - `src/engines/native_engine_wrapper.py`: Wrapper del motor nativo
 
+## Troubleshooting
+
+### Problemas Comunes
+
+#### 1. Bloqueo al cargar experimento (Timeout)
+**Síntoma**: La carga del experimento se queda colgada en "Cargando modelo TorchScript..." o falla con timeout.
+**Causa**: El modelo JIT puede tardar en cargar, o hay un conflicto con CUDA.
+**Solución**:
+- El sistema ahora intenta cargar primero en CPU y luego mover a CUDA.
+- Si persiste, intenta reiniciar el servidor (`ath dev`).
+
+#### 2. Partículas "Fantasma" (Estado Vacío)
+**Síntoma**: El experimento carga, pero al dar Play no se ve nada (pantalla negra/gris) y los logs dicen "0 partículas activas".
+**Causa**: Posible desincronización entre el `matter_map` de C++ y el wrapper de Python.
+**Solución**:
+- Ejecuta el script de diagnóstico: `python test_native_state_recovery.py`
+- Si el script falla, hay un problema en el motor nativo. Reportar como bug.
+- Workaround: Usar el motor Python temporalmente (configurar `FORCE_NATIVE_ENGINE = False` en `config.py`).
+
+#### 3. Error "Version Mismatch"
+**Síntoma**: Error al cargar `model_jit.pt` diciendo que fue guardado con una versión diferente de PyTorch.
+**Solución**:
+- Borrar el archivo `.pt` antiguo: `rm output/training_checkpoints/<exp>/model_jit.pt`
+- Recargar el experimento para forzar una re-exportación con la versión actual.

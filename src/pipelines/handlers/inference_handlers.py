@@ -109,75 +109,81 @@ async def handle_play(args):
     
     # Enviar frame inicial si es posible (mejor esfuerzo - no bloquear la simulación)
     if motor_is_native and hasattr(motor, 'get_dense_state'):
-        try:
-            # OPTIMIZACIÓN: Timeout más largo (30s) y fallback si falla
-            # La visualización puede actualizarse después - no bloquear Play
-            logging.info("📤 Intentando enviar frame inicial (mejor esfuerzo, no bloqueante)...")
-            loop = asyncio.get_event_loop()
-            psi = await asyncio.wait_for(
-                loop.run_in_executor(
-                    None,
-                    lambda: motor.get_dense_state(check_pause_callback=lambda: g_state.get('is_paused', False))
-                ),
-                timeout=30.0  # Timeout más largo para grids grandes
-            )
-            if psi is not None and isinstance(psi, torch.Tensor) and psi.numel() > 0:
-                psi_abs_max = psi.abs().max().item()
-                if psi_abs_max > 1e-10:
-                    viz_type = g_state.get('viz_type', 'density')
-                    delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
-                    viz_data = get_visualization_data(psi, viz_type, delta_psi=delta_psi, motor=motor)
-                    
-                    if viz_data and isinstance(viz_data, dict):
-                        map_data = viz_data.get("map_data", [])
-                        # Verificar si hay datos válidos (soporte para listas y numpy arrays)
-            has_data = False
-            if map_data is not None:
-                if isinstance(map_data, list):
-                    has_data = len(map_data) > 0
-                elif hasattr(map_data, 'size'): # Numpy array
-                    has_data = map_data.size > 0
-            
-            if has_data:
-                            map_data_np = np.array(map_data) if not isinstance(map_data, np.ndarray) else map_data
-                            min_val = np.min(map_data_np)
-                            max_val = np.max(map_data_np)
-                            range_val = max_val - min_val
+        # OPTIMIZACIÓN: Si el grid es muy grande (>128), saltar frame inicial para evitar freeze
+        # El motor nativo puede tardar en la primera conversión. Mejor esperar al primer step.
+        grid_size = getattr(motor, 'grid_size', 256)
+        if grid_size > 128:
+             logging.info(f"⏩ Saltando frame inicial para motor nativo (grid={grid_size} > 128) para evitar bloqueo.")
+        else:
+            try:
+                # OPTIMIZACIÓN: Timeout más largo (30s) y fallback si falla
+                # La visualización puede actualizarse después - no bloquear Play
+                logging.info("📤 Intentando enviar frame inicial (mejor esfuerzo, no bloqueante)...")
+                loop = asyncio.get_event_loop()
+                psi = await asyncio.wait_for(
+                    loop.run_in_executor(
+                        None,
+                        lambda: motor.get_dense_state(check_pause_callback=lambda: g_state.get('is_paused', False))
+                    ),
+                    timeout=30.0  # Timeout más largo para grids grandes
+                )
+                if psi is not None and isinstance(psi, torch.Tensor) and psi.numel() > 0:
+                    psi_abs_max = psi.abs().max().item()
+                    if psi_abs_max > 1e-10:
+                        viz_type = g_state.get('viz_type', 'density')
+                        delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
+                        viz_data = get_visualization_data(psi, viz_type, delta_psi=delta_psi, motor=motor)
+                        
+                        if viz_data and isinstance(viz_data, dict):
+                            map_data = viz_data.get("map_data", [])
+                            # Verificar si hay datos válidos (soporte para listas y numpy arrays)
+                            has_data = False
+                            if map_data is not None:
+                                if isinstance(map_data, list):
+                                    has_data = len(map_data) > 0
+                                elif hasattr(map_data, 'size'): # Numpy array
+                                    has_data = map_data.size > 0
                             
-                            if range_val > 1e-6:
-                                current_step = g_state.get('simulation_step', 0)
-                                frame_payload_raw = {
-                                    "step": current_step,
-                                    "timestamp": asyncio.get_event_loop().time(),
-                                    "map_data": map_data,
-                                    "hist_data": viz_data.get("hist_data", {}),
-                                    "poincare_coords": viz_data.get("poincare_coords", []),
-                                    "phase_attractor": viz_data.get("phase_attractor"),
-                                    "flow_data": viz_data.get("flow_data"),
-                                    "phase_hsv_data": viz_data.get("phase_hsv_data"),
-                                    "complex_3d_data": viz_data.get("complex_3d_data"),
-                                    "simulation_info": {
+                            if has_data:
+                                map_data_np = np.array(map_data) if not isinstance(map_data, np.ndarray) else map_data
+                                min_val = np.min(map_data_np)
+                                max_val = np.max(map_data_np)
+                                range_val = max_val - min_val
+                                
+                                if range_val > 1e-6:
+                                    current_step = g_state.get('simulation_step', 0)
+                                    frame_payload_raw = {
                                         "step": current_step,
-                                        "is_paused": False,
-                                        "live_feed_enabled": g_state.get('live_feed_enabled', True),
-                                        "fps": g_state.get('current_fps', 0.0)
+                                        "timestamp": asyncio.get_event_loop().time(),
+                                        "map_data": map_data,
+                                        "hist_data": viz_data.get("hist_data", {}),
+                                        "poincare_coords": viz_data.get("poincare_coords", []),
+                                        "phase_attractor": viz_data.get("phase_attractor"),
+                                        "flow_data": viz_data.get("flow_data"),
+                                        "phase_hsv_data": viz_data.get("phase_hsv_data"),
+                                        "complex_3d_data": viz_data.get("complex_3d_data"),
+                                        "simulation_info": {
+                                            "step": current_step,
+                                            "is_paused": False,
+                                            "live_feed_enabled": g_state.get('live_feed_enabled', True),
+                                            "fps": g_state.get('current_fps', 0.0)
+                                        }
                                     }
-                                }
-                                # CRÍTICO: Optimizar payload antes de enviar (maneja numpy arrays)
-                                frame_payload = await optimize_frame_payload(
-                                    frame_payload_raw,
-                                    enable_compression=g_state.get('data_compression_enabled', True),
-                                    downsample_factor=g_state.get('downsample_factor', 1),
-                                    viz_type=viz_type
-                                )
-                                await broadcast({"type": "simulation_frame", "payload": frame_payload})
-                                logging.info(f"📤 Frame inicial enviado al frontend (step={current_step})")
-        except asyncio.TimeoutError:
-            # Timeout es aceptable - la visualización se actualizará en el siguiente step
-            logging.warning("⏱️ Timeout enviando frame inicial (30s). La visualización se actualizará después.")
-        except Exception as e:
-            # Error es aceptable - la visualización se actualizará en el siguiente step
-            logging.warning(f"⚠️ Error enviando frame inicial: {e}. La visualización se actualizará después.")
+                                    # CRÍTICO: Optimizar payload antes de enviar (maneja numpy arrays)
+                                    frame_payload = await optimize_frame_payload(
+                                        frame_payload_raw,
+                                        enable_compression=g_state.get('data_compression_enabled', True),
+                                        downsample_factor=g_state.get('downsample_factor', 1),
+                                        viz_type=viz_type
+                                    )
+                                    await broadcast({"type": "simulation_frame", "payload": frame_payload})
+                                    logging.info(f"📤 Frame inicial enviado al frontend (step={current_step})")
+            except asyncio.TimeoutError:
+                # Timeout es aceptable - la visualización se actualizará en el siguiente step
+                logging.warning("⏱️ Timeout enviando frame inicial (30s). La visualización se actualizará después.")
+            except Exception as e:
+                # Error es aceptable - la visualización se actualizará en el siguiente step
+                logging.warning(f"⚠️ Error enviando frame inicial: {e}. La visualización se actualizará después.")
     
     logging.info(f"Simulación iniciada. Motor: {type(motor).__name__}, Step: {g_state.get('simulation_step', 0)}")
     

@@ -1,9 +1,9 @@
 // frontend/src/modules/Dashboard/components/SettingsPanel.tsx
+import { Power, RotateCcw, Save, X } from 'lucide-react';
 import React, { useState } from 'react';
-import { X, Save, RotateCcw, Power } from 'lucide-react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
-import { GlassPanel } from './GlassPanel';
 import { getFormattedVersion } from '../../../utils/version';
+import { GlassPanel } from './GlassPanel';
 
 interface SettingsPanelProps {
   isOpen: boolean;
