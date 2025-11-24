@@ -56,10 +56,16 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     
     // Detectar si WebGL está disponible para usar shaders (GPU rendering)
     const webglAvailable = useMemo(() => isWebGLAvailable(), []);
-    // Usar shaders cuando WebGL está disponible y no es una visualización compleja
-    // Shaders funcionan bien para: density, phase, energy, real, imag
-    // No funcionan bien para: poincare, flow, phase_attractor, phase_hsv (requieren Canvas 2D)
-    const useShaderRendering = webglAvailable && !['poincare', 'flow', 'phase_attractor', 'phase_hsv'].includes(selectedViz);
+    
+    // Estado para controlar el modo de renderizado (WebGL vs Canvas2D)
+    // El usuario puede alternar manualmente entre modos con un botón
+    const shaderShouldBeAvailable = webglAvailable && !['poincare', 'flow', 'phase_attractor', 'phase_hsv'].includes(selectedViz);
+    const [useShaderRendering, setUseShaderRendering] = useState(shaderShouldBeAvailable);
+    
+    // Actualizar automáticamente si cambia la disponibilidad de shaders (ej: cambio de viz)
+    useEffect(() => {
+        setUseShaderRendering(shaderShouldBeAvailable);
+    }, [shaderShouldBeAvailable]);
     
     // Usar historyFrame si está disponible, sino usar simData actual
     const dataToRender = historyFrame ? historyFrame : simData;
@@ -885,6 +891,32 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                             <ZoomOut size={16} />
                         </ActionIcon>
                     </Tooltip>
+                    {/* Toggle WebGL (Shaders) vs Canvas2D */}
+                    {shaderShouldBeAvailable && (
+                        <Tooltip label={useShaderRendering ? "Cambiar a Canvas2D (CPU)" : "Cambiar a WebGL (GPU)"}>
+                            <ActionIcon
+                                variant={useShaderRendering ? "filled" : "light"}
+                                color={useShaderRendering ? "green" : "amber"}
+                                onClick={() => setUseShaderRendering(!useShaderRendering)}
+                                size="sm"
+                            >
+                                {useShaderRendering ? (
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect x="4" y="4" width="16" height="16" rx="2" />
+                                        <path d="M9 9h6v6" />
+                                        <path d="m9 15 6-6" />
+                                    </svg>
+                                ) : (
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                                        <path d="M7 7h10" />
+                                        <path d="M7 12h10" />
+                                        <path d="M7 17h10" />
+                                    </svg>
+                                )}
+                            </ActionIcon>
+                        </Tooltip>
+                    )}
                     <Tooltip label="Configurar overlays">
                         <ActionIcon
                             variant={showOverlayControls ? "filled" : "light"}
