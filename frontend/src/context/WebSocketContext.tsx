@@ -424,10 +424,43 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                             
                             // Usar función de actualización para evitar sobrescribir actualizaciones más recientes
                             setSimData(prev => {
-                                // Si hay un timestamp y el payload nuevo es más antiguo, ignorarlo
+                                // Si hay un timestamp y el payload nuevo es más antiguo
                                 if (prev?.timestamp && finalPayload.timestamp && 
                                     finalPayload.timestamp < prev.timestamp) {
+                                    
+                                    // EXCEPCIÓN CRÍTICA: Si el nuevo payload tiene map_data y el previo NO, aceptar los datos visuales
+                                    // Esto ocurre porque los status_update son más rápidos que los frames pesados
+                                    if (finalPayload.map_data && !prev.map_data) {
+                                        if (process.env.NODE_ENV === 'development') {
+                                            console.log(`🔄 WebSocketContext: Fusionando map_data tardío - frame step: ${finalPayload.step}, prev step: ${prev.step}`);
+                                        }
+                                        return {
+                                            ...prev, // Mantener estado más reciente (timestamp, info)
+                                            map_data: finalPayload.map_data, // Inyectar data visual
+                                            // También inyectar otros datos visuales si existen
+                                            complex_3d_data: finalPayload.complex_3d_data || prev.complex_3d_data,
+                                            flow_data: finalPayload.flow_data || prev.flow_data,
+                                            phase_hsv_data: finalPayload.phase_hsv_data || prev.phase_hsv_data
+                                        };
+                                    }
+                                    
                                     return prev;
+                                }
+                                
+                                // EXCEPCIÓN CRÍTICA: Si el nuevo payload tiene map_data y el previo NO, aceptar los datos visuales
+                                // Esto ocurre porque los status_update son más rápidos que los frames pesados
+                                if (finalPayload.map_data && !prev?.map_data) { // prev?.map_data para manejar el caso inicial donde prev es undefined
+                                    if (process.env.NODE_ENV === 'development') {
+                                        console.log(`🔄 WebSocketContext: Fusionando map_data tardío - frame step: ${finalPayload.step}, prev step: ${prev?.step}`);
+                                    }
+                                    return {
+                                        ...prev, // Mantener estado más reciente (timestamp, info)
+                                        map_data: finalPayload.map_data, // Inyectar data visual
+                                        // También inyectar otros datos visuales si existen
+                                        complex_3d_data: finalPayload.complex_3d_data || prev?.complex_3d_data,
+                                        flow_data: finalPayload.flow_data || prev?.flow_data,
+                                        phase_hsv_data: finalPayload.phase_hsv_data || prev?.phase_hsv_data
+                                    };
                                 }
                                 
                                 // DEBUG: Log cuando se actualiza simData
