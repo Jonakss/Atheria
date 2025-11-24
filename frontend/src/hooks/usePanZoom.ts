@@ -311,10 +311,6 @@ export const usePanZoom = (
         const mouseRelToCenterX = mouseX - containerWidth / 2;
         const mouseRelToCenterY = mouseY - containerHeight / 2;
 
-        // Convertir a coordenadas del canvas (antes del zoom y pan)
-        const canvasX = (mouseRelToCenterX - pan.x) / zoom;
-        const canvasY = (mouseRelToCenterY - pan.y) / zoom;
-
         // Aplicar zoom con factor más suave y progresivo
         const zoomFactor = 1.1; // Más suave para mejor control
         const delta = Math.abs(e.deltaY);
