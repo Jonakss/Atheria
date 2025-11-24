@@ -5,19 +5,18 @@
  * eliminando el overhead de procesamiento en CPU.
  */
 
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
-    isWebGLAvailable,
-    isWebGL2Available,
     createShaderProgram,
     createTextureFromData,
+    FRAGMENT_SHADER_DENSITY,
+    FRAGMENT_SHADER_ENERGY,
+    FRAGMENT_SHADER_IMAG,
+    FRAGMENT_SHADER_PHASE,
+    FRAGMENT_SHADER_REAL,
+    isWebGLAvailable,
     renderWithShader,
     VERTEX_SHADER_2D,
-    FRAGMENT_SHADER_DENSITY,
-    FRAGMENT_SHADER_PHASE,
-    FRAGMENT_SHADER_ENERGY,
-    FRAGMENT_SHADER_REAL,
-    FRAGMENT_SHADER_IMAG,
     type ShaderConfig
 } from '../../utils/shaderVisualization';
 
@@ -172,23 +171,22 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
             console.log(`🔍 ShaderCanvas: Normalización - dataMin: ${dataMin}, dataMax: ${dataMax}, range: ${dataMax - dataMin}, isPreNormalized: ${minValue === 0 && maxValue === 1}`);
         }
         
-        // Crear/actualizar textura
+        // Limpiar textura anterior para evitar fugas de memoria y artefactos grises
         if (textureRef.current) {
-            gl.deleteTexture(textureRef.current);
+          gl.deleteTexture(textureRef.current);
+          textureRef.current = null;
         }
-        
-        // Pasar min/max al crear la textura - estos se usarán para normalizar los datos a la textura
+        // Crear/actualizar textura
         const texture = createTextureFromData(gl, mapData, width, height, dataMin, dataMax);
         if (!texture) {
-            console.error('❌ ShaderCanvas: Error creando textura WebGL');
-            return;
+          console.error('❌ ShaderCanvas: Error creando textura WebGL');
+          return;
         }
+        textureRef.current = texture;
         
         if (process.env.NODE_ENV === 'development') {
             console.log(`✅ ShaderCanvas: Textura creada exitosamente - width: ${width}, height: ${height}`);
         }
-        
-        textureRef.current = texture;
         
         // Configurar shader
         // IMPORTANTE: Si los datos ya están normalizados [0, 1], el shader NO necesita minValue/maxValue

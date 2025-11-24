@@ -1,42 +1,43 @@
 /**
  * Utilidades para visualización con Shaders WebGL/GPU
- * 
+ *
  * Este módulo implementa visualizaciones procesadas en GPU del navegador
  * para reducir el overhead del backend y mejorar el rendimiento.
  */
 
 export interface ShaderConfig {
-    type: 'density' | 'phase' | 'energy' | 'complex' | 'real' | 'imag';
-    colormap?: 'viridis' | 'plasma' | 'inferno' | 'magma' | 'turbo';
-    minValue?: number;
-    maxValue?: number;
-    gamma?: number; // Corrección gamma para colormap
+  type: "density" | "phase" | "energy" | "complex" | "real" | "imag";
+  colormap?: "viridis" | "plasma" | "inferno" | "magma" | "turbo";
+  minValue?: number;
+  maxValue?: number;
+  gamma?: number; // Corrección gamma para colormap
 }
 
 /**
  * Detecta si WebGL está disponible en el navegador
  */
 export function isWebGLAvailable(): boolean {
-    try {
-        const canvas = document.createElement('canvas');
-        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-        return gl !== null;
-    } catch (e) {
-        return false;
-    }
+  try {
+    const canvas = document.createElement("canvas");
+    const gl =
+      canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    return gl !== null;
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
  * Detecta si WebGL2 está disponible (mejor que WebGL1)
  */
 export function isWebGL2Available(): boolean {
-    try {
-        const canvas = document.createElement('canvas');
-        const gl = canvas.getContext('webgl2');
-        return gl !== null;
-    } catch (e) {
-        return false;
-    }
+  try {
+    const canvas = document.createElement("canvas");
+    const gl = canvas.getContext("webgl2");
+    return gl !== null;
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
@@ -369,246 +370,237 @@ export const FRAGMENT_SHADER_IMAG = `
  * Crea un programa de shader WebGL
  */
 export function createShaderProgram(
-    gl: WebGLRenderingContext,
-    vertexSource: string,
-    fragmentSource: string
+  gl: WebGLRenderingContext,
+  vertexSource: string,
+  fragmentSource: string
 ): WebGLProgram | null {
-    const vertexShader = compileShader(gl, gl.VERTEX_SHADER, vertexSource);
-    const fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
-    
-    if (!vertexShader || !fragmentShader) {
-        return null;
-    }
-    
-    const program = gl.createProgram();
-    if (!program) {
-        return null;
-    }
-    
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-    
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        console.error('Error linking shader program:', gl.getProgramInfoLog(program));
-        gl.deleteProgram(program);
-        return null;
-    }
-    
-    return program;
+  const vertexShader = compileShader(gl, gl.VERTEX_SHADER, vertexSource);
+  const fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
+
+  if (!vertexShader || !fragmentShader) {
+    return null;
+  }
+
+  const program = gl.createProgram();
+  if (!program) {
+    return null;
+  }
+
+  gl.attachShader(program, vertexShader);
+  gl.attachShader(program, fragmentShader);
+  gl.linkProgram(program);
+
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    console.error(
+      "Error linking shader program:",
+      gl.getProgramInfoLog(program)
+    );
+    gl.deleteProgram(program);
+    return null;
+  }
+
+  return program;
 }
 
 /**
  * Compila un shader individual
  */
 function compileShader(
-    gl: WebGLRenderingContext,
-    type: number,
-    source: string
+  gl: WebGLRenderingContext,
+  type: number,
+  source: string
 ): WebGLShader | null {
-    const shader = gl.createShader(type);
-    if (!shader) {
-        return null;
-    }
-    
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error('Error compiling shader:', gl.getShaderInfoLog(shader));
-        gl.deleteShader(shader);
-        return null;
-    }
-    
-    return shader;
+  const shader = gl.createShader(type);
+  if (!shader) {
+    return null;
+  }
+
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    console.error("Error compiling shader:", gl.getShaderInfoLog(shader));
+    gl.deleteShader(shader);
+    return null;
+  }
+
+  return shader;
 }
 
 /**
  * Crea una textura WebGL desde datos de array 2D
- * 
+ *
  * NOTA: Esta función NO normaliza los datos. Los datos se pasan directamente
  * a la textura, y la normalización se hace en el shader usando u_minValue y u_maxValue.
  * Esto evita doble normalización que puede causar visualización incorrecta.
  */
 export function createTextureFromData(
-    gl: WebGLRenderingContext,
-    data: number[][],
-    width: number,
-    height: number,
-    minValue?: number,
-    maxValue?: number
+  gl: WebGLRenderingContext,
+  data: number[][],
+  width: number,
+  height: number,
+  minValue?: number,
+  maxValue?: number
 ): WebGLTexture | null {
-    const texture = gl.createTexture();
-    if (!texture) {
-        return null;
+  const texture = gl.createTexture();
+  if (!texture) return null;
+
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+
+  // Flatten 2D array
+  const flatData = new Float32Array(width * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      flatData[y * width + x] = data[y]?.[x] ?? 0;
     }
-    
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    
-    // Convertir array 2D a array plano (row-major order)
-    const flatData = new Float32Array(width * height);
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            flatData[y * width + x] = data[y]?.[x] || 0;
-        }
-    }
-    
-    // CRÍTICO: Los datos del backend ya vienen normalizados a [0, 1]
-    // Si minValue y maxValue están definidos y son 0 y 1, significa que los datos ya están normalizados
-    // En ese caso, NO debemos normalizar de nuevo, solo convertir a formato de textura [0, 255]
-    
-    // Calcular rango de datos si no se proporciona
-    let dataMin = minValue;
-    let dataMax = maxValue;
-    const isPreNormalized = (minValue === 0 && maxValue === 1) || (minValue === undefined && maxValue === undefined);
-    
-    if (dataMin === undefined || dataMax === undefined) {
-        let minVal = Infinity;
-        let maxVal = -Infinity;
-        for (let i = 0; i < flatData.length; i++) {
-            const val = flatData[i];
-            if (isFinite(val)) {
-                minVal = Math.min(minVal, val);
-                maxVal = Math.max(maxVal, val);
-            }
-        }
-        dataMin = minVal === Infinity ? 0 : minVal;
-        dataMax = maxVal === -Infinity ? 1 : maxVal;
-        
-        // Si los datos calculados están en [0, 1], asumir que ya están normalizados
-        if (dataMin >= 0 && dataMax <= 1 && (dataMax - dataMin) < 1.1) {
-            dataMin = 0;
-            dataMax = 1;
-        }
-    }
-    
-    // Si todos los valores son iguales, usar rango [0, 1] para evitar división por cero
-    const dataRange = dataMax - dataMin || 1;
-    const isNormalized = (dataMin === 0 && dataMax === 1) || (Math.abs(dataMin) < 0.01 && Math.abs(dataMax - 1) < 0.01);
-    
-    // Convertir a UNSIGNED_BYTE (0-255) como formato de almacenamiento
-    // IMPORTANTE: Si los datos ya están normalizados [0, 1], simplemente escalar a [0, 255]
-    // Si NO están normalizados, normalizar usando dataMin/dataMax antes de escalar
-    const textureData = new Uint8Array(width * height);
+  }
+
+  // Determine normalization
+  const isPreNormalized =
+    (minValue === 0 && maxValue === 1) ||
+    (minValue === undefined && maxValue === undefined);
+  let dataMin = minValue;
+  let dataMax = maxValue;
+  if (dataMin === undefined || dataMax === undefined) {
+    let minVal = Infinity;
+    let maxVal = -Infinity;
     for (let i = 0; i < flatData.length; i++) {
-        const val = flatData[i];
-        if (isFinite(val)) {
-            let normalized: number;
-            if (isNormalized || isPreNormalized) {
-                // Datos ya normalizados [0, 1]: solo escalar a [0, 255]
-                normalized = Math.max(0, Math.min(1, val));
-            } else {
-                // Datos raw: normalizar usando dataMin/dataMax, luego escalar a [0, 255]
-                normalized = (val - dataMin) / dataRange;
-                normalized = Math.max(0, Math.min(1, normalized));
-            }
-            textureData[i] = Math.round(normalized * 255);
-        } else {
-            textureData[i] = 0;
-        }
+      const v = flatData[i];
+      if (isFinite(v)) {
+        minVal = Math.min(minVal, v);
+        maxVal = Math.max(maxVal, v);
+      }
     }
-    
-    // Usar LUMINANCE para un solo canal (compatible con WebGL1 y WebGL2)
-    gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.LUMINANCE,
-        width,
-        height,
-        0,
-        gl.LUMINANCE,
-        gl.UNSIGNED_BYTE,
-        textureData
-    );
-    
-    // Configurar filtrado
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    
-    return texture;
+    dataMin = minVal === Infinity ? 0 : minVal;
+    dataMax = maxVal === -Infinity ? 1 : maxVal;
+    if (dataMin >= 0 && dataMax <= 1 && dataMax - dataMin < 1.1) {
+      dataMin = 0;
+      dataMax = 1;
+    }
+  }
+  const dataRange = dataMax - dataMin || 1;
+  const isNormalized =
+    (dataMin === 0 && dataMax === 1) ||
+    (Math.abs(dataMin) < 0.01 && Math.abs(dataMax - 1) < 0.01);
+
+  // Build RGBA Uint8Array (R = normalized value, G/B = 0, A = 255)
+  const rgbaData = new Uint8Array(width * height * 4);
+  for (let i = 0; i < flatData.length; i++) {
+    const val = flatData[i];
+    let normalized: number;
+    if (isFinite(val)) {
+      if (isNormalized || isPreNormalized) {
+        normalized = Math.max(0, Math.min(1, val));
+      } else {
+        normalized = (val - dataMin) / dataRange;
+        normalized = Math.max(0, Math.min(1, normalized));
+      }
+    } else {
+      normalized = 0;
+    }
+    const byte = Math.round(normalized * 255);
+    const idx = i * 4;
+    rgbaData[idx] = byte; // R
+    rgbaData[idx + 1] = 0; // G
+    rgbaData[idx + 2] = 0; // B
+    rgbaData[idx + 3] = 255; // A
+  }
+
+  // Upload texture as RGBA
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RGBA,
+    width,
+    height,
+    0,
+    gl.RGBA,
+    gl.UNSIGNED_BYTE,
+    rgbaData
+  );
+
+  // Set texture parameters
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  return texture;
 }
 
 /**
  * Renderiza datos usando shaders WebGL
  */
 export function renderWithShader(
-    gl: WebGLRenderingContext,
-    program: WebGLProgram,
-    texture: WebGLTexture,
-    config: ShaderConfig,
-    canvasWidth: number,
-    canvasHeight: number
+  gl: WebGLRenderingContext,
+  program: WebGLProgram,
+  texture: WebGLTexture,
+  config: ShaderConfig,
+  canvasWidth: number,
+  canvasHeight: number
 ): void {
-    gl.useProgram(program);
-    
-    // Configurar viewport
-    gl.viewport(0, 0, canvasWidth, canvasHeight);
-    gl.clearColor(0.1, 0.1, 0.1, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    
-    // Activar textura
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    
-    // Configurar uniforms
-    const resolutionLocation = gl.getUniformLocation(program, 'u_resolution');
-    const textureLocation = gl.getUniformLocation(program, 'u_texture');
-    const minValueLocation = gl.getUniformLocation(program, 'u_minValue');
-    const maxValueLocation = gl.getUniformLocation(program, 'u_maxValue');
-    const gammaLocation = gl.getUniformLocation(program, 'u_gamma');
-    const colormapLocation = gl.getUniformLocation(program, 'u_colormap');
-    
-    if (resolutionLocation) {
-        gl.uniform2f(resolutionLocation, canvasWidth, canvasHeight);
-    }
-    if (textureLocation) {
-        gl.uniform1i(textureLocation, 0);
-    }
-    // CRÍTICO: Los datos ya están normalizados [0, 1] en la textura
-    // El shader NO necesita usar u_minValue/u_maxValue porque lee directamente texel.r [0, 1]
-    // Pasamos 0 y 1 para compatibilidad, pero el shader no los usa
-    if (minValueLocation) {
-        gl.uniform1f(minValueLocation, 0);  // Shader no usa este valor, pero lo pasamos por compatibilidad
-    }
-    if (maxValueLocation) {
-        gl.uniform1f(maxValueLocation, 1);  // Shader no usa este valor, pero lo pasamos por compatibilidad
-    }
-    if (gammaLocation) {
-        gl.uniform1f(gammaLocation, config.gamma || 1.0);
-    }
-    if (colormapLocation) {
-        const colormapIndex = config.colormap === 'plasma' ? 1 : 0;
-        gl.uniform1i(colormapLocation, colormapIndex);
-    }
-    
-    // Renderizar cuadrilátero completo
-    const positionBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.bufferData(
-        gl.ARRAY_BUFFER,
-        new Float32Array([
-            -1, -1, 0, 1,
-             1, -1, 1, 1,
-            -1,  1, 0, 0,
-             1,  1, 1, 0
-        ]),
-        gl.STATIC_DRAW
-    );
-    
-    const positionLocation = gl.getAttribLocation(program, 'a_position');
-    const texCoordLocation = gl.getAttribLocation(program, 'a_texCoord');
-    
-    if (positionLocation >= 0) {
-        gl.enableVertexAttribArray(positionLocation);
-        gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 16, 0);
-    }
-    if (texCoordLocation >= 0) {
-        gl.enableVertexAttribArray(texCoordLocation);
-        gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 16, 8);
-    }
-    
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-}
+  gl.useProgram(program);
 
+  // Configurar viewport
+  gl.viewport(0, 0, canvasWidth, canvasHeight);
+  gl.clearColor(0.1, 0.1, 0.1, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+
+  // Activar textura
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+
+  // Configurar uniforms
+  const resolutionLocation = gl.getUniformLocation(program, "u_resolution");
+  const textureLocation = gl.getUniformLocation(program, "u_texture");
+  const minValueLocation = gl.getUniformLocation(program, "u_minValue");
+  const maxValueLocation = gl.getUniformLocation(program, "u_maxValue");
+  const gammaLocation = gl.getUniformLocation(program, "u_gamma");
+  const colormapLocation = gl.getUniformLocation(program, "u_colormap");
+
+  if (resolutionLocation) {
+    gl.uniform2f(resolutionLocation, canvasWidth, canvasHeight);
+  }
+  if (textureLocation) {
+    gl.uniform1i(textureLocation, 0);
+  }
+  // CRÍTICO: Los datos ya están normalizados [0, 1] en la textura
+  // El shader NO necesita usar u_minValue/u_maxValue porque lee directamente texel.r [0, 1]
+  // Pasamos 0 y 1 para compatibilidad, pero el shader no los usa
+  if (minValueLocation) {
+    gl.uniform1f(minValueLocation, 0); // Shader no usa este valor, pero lo pasamos por compatibilidad
+  }
+  if (maxValueLocation) {
+    gl.uniform1f(maxValueLocation, 1); // Shader no usa este valor, pero lo pasamos por compatibilidad
+  }
+  if (gammaLocation) {
+    gl.uniform1f(gammaLocation, config.gamma || 1.0);
+  }
+  if (colormapLocation) {
+    const colormapIndex = config.colormap === "plasma" ? 1 : 0;
+    gl.uniform1i(colormapLocation, colormapIndex);
+  }
+
+  // Renderizar cuadrilátero completo
+  const positionBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array([-1, -1, 0, 1, 1, -1, 1, 1, -1, 1, 0, 0, 1, 1, 1, 0]),
+    gl.STATIC_DRAW
+  );
+
+  const positionLocation = gl.getAttribLocation(program, "a_position");
+  const texCoordLocation = gl.getAttribLocation(program, "a_texCoord");
+
+  if (positionLocation >= 0) {
+    gl.enableVertexAttribArray(positionLocation);
+    gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 16, 0);
+  }
+  if (texCoordLocation >= 0) {
+    gl.enableVertexAttribArray(texCoordLocation);
+    gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 16, 8);
+  }
+
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
