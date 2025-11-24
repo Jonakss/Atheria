@@ -1,0 +1,1 @@
+- [[CI_CD_SETUP.md]] - Configuración de GitHub Actions y Gemini CLI
