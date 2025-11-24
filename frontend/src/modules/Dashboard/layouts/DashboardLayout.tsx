@@ -1,18 +1,18 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { ScientificHeader } from '../components/ScientificHeader';
-import { NavigationSidebar } from '../components/NavigationSidebar';
-import { PhysicsInspector } from '../components/PhysicsInspector';
-import { MetricsBar } from '../components/MetricsBar';
-import { Toolbar } from '../components/Toolbar';
-import { AnalysisView } from '../components/AnalysisView';
-import { HistoryView } from '../components/HistoryView';
-import { LogsView } from '../components/LogsView';
+import React, { useEffect, useMemo, useState } from 'react';
+import { LabSider } from '../../../components/ui/LabSider';
 import { PanZoomCanvas } from '../../../components/ui/PanZoomCanvas';
 import { TimelineViewer } from '../../../components/ui/TimelineViewer';
 import HolographicViewer from '../../../components/visualization/HolographicViewer';
-import { LabSider } from '../../../components/ui/LabSider';
 import { useWebSocket } from '../../../hooks/useWebSocket';
+import { AnalysisView } from '../components/AnalysisView';
 import { EPOCH_CONFIGS } from '../components/EpochBadge';
+import { HistoryView } from '../components/HistoryView';
+import { LogsView } from '../components/LogsView';
+import { MetricsBar } from '../components/MetricsBar';
+import { NavigationSidebar } from '../components/NavigationSidebar';
+import { PhysicsInspector } from '../components/PhysicsInspector';
+import { ScientificHeader } from '../components/ScientificHeader';
+import { Toolbar } from '../components/Toolbar';
 
 type TabType = 'lab' | 'analysis' | 'history' | 'logs';
 type LabSection = 'inference' | 'training' | 'analysis';
@@ -127,23 +127,22 @@ export const DashboardLayout: React.FC = () => {
                 <>
                   <PanZoomCanvas historyFrame={selectedTimelineFrame} />
                   {/* Timeline Viewer - Panel flotante */}
-                  {timelineOpen && (
-                    <div className="absolute bottom-20 left-4 z-50 w-80 max-h-96 overflow-y-auto">
+                  {/* TEMPORALMENTE DESHABILITADO - Revisar performance issues */}
+                  {false && timelineOpen && (
                       <TimelineViewer
+                        className="absolute bottom-0 left-0 right-0 z-30"
                         onFrameSelect={(frame) => {
                           if (frame) {
                             setSelectedTimelineFrame({
-                              step: frame.step,
-                              timestamp: new Date(frame.timestamp).toISOString(),
-                              map_data: frame.map_data,
+                              ...frame,
+                              roi_info: frame.roi_info || undefined,
                             });
                           } else {
                             setSelectedTimelineFrame(null);
                           }
                         }}
                       />
-                    </div>
-                  )}
+                    )}
                 </>
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-300 text-sm">
