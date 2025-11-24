@@ -1,10 +1,10 @@
 // frontend/src/components/CanvasOverlays.tsx
-import { useRef, useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Box } from '../../modules/Dashboard/components/Box';
-import { Stack } from '../../modules/Dashboard/components/Stack';
-import { Text } from '../../modules/Dashboard/components/Text';
-import { Switch } from '../../modules/Dashboard/components/Switch';
 import { Select } from '../../modules/Dashboard/components/Select';
+import { Stack } from '../../modules/Dashboard/components/Stack';
+import { Switch } from '../../modules/Dashboard/components/Switch';
+import { Text } from '../../modules/Dashboard/components/Text';
 
 // Helper para obtener color de un valor normalizado [0,1]
 function getColor(value: number): string {
@@ -482,6 +482,32 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config, roiInfo 
                 const padding = Math.max(1, 2 / (baseScale * zoom));
                 ctx.fillText(corner.label, corner.x + padding, corner.y + padding);
             });
+        }
+        
+        // ROI Box overlay - Mostrar el rectángulo de Region of Interest
+        if (roiInfo && roiInfo.enabled) {
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)'; // Cyan brillante
+            ctx.lineWidth = Math.max(1.5, 2 / (baseScale * zoom)); // Línea más gruesa, ajustada al zoom
+            ctx.setLineDash([8, 4]); // Línea punteada para distinguirlo de otros overlays
+            
+            // Dibujar rectángulo del ROI
+            ctx.strokeRect(
+                roiInfo.x,
+                roiInfo.y,
+                roiInfo.width,
+                roiInfo.height
+            );
+            
+            // Restaurar línea sólida
+            ctx.setLineDash([]);
+            
+            // Agregar etiqueta "ROI" en la esquina superior izquierda del ROI
+            const fontSize = Math.max(10, 14 / (baseScale * zoom));
+            ctx.font = `bold ${fontSize}px monospace`;
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.9)';
+            ctx.textBaseline = 'top';
+            const padding = Math.max(2, 3 / (baseScale * zoom));
+            ctx.fillText('ROI', roiInfo.x + padding, roiInfo.y + padding);
         }
         
         ctx.restore();
