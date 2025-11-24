@@ -22,7 +22,7 @@ interface LabSiderProps {
 export function LabSider({ activeSection: externalActiveSection, onSectionChange, isCollapsed = false, onToggleCollapse }: LabSiderProps) {
     const { 
         sendCommand, experimentsData, trainingStatus, trainingProgress,
-        inferenceStatus, connectionStatus, connect, disconnect, selectedViz, setSelectedViz,
+        inferenceStatus, connectionStatus, selectedViz, setSelectedViz,
         activeExperiment, setActiveExperiment, compileStatus
     } = useWebSocket();
     
@@ -187,20 +187,6 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
     const handleResetSimulation = () => {
         if (!isConnected) return;
         sendCommand('inference', 'reset');
-    };
-    
-    const togglePlayPause = () => {
-        if (!isConnected) return;
-        const command = inferenceStatus === 'running' ? 'pause' : 'play';
-        sendCommand('inference', command);
-    };
-
-    const handleConnectDisconnect = () => {
-        if (connectionStatus === 'connected') {
-            disconnect();
-        } else {
-            connect();
-        }
     };
 
     const handleVizChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
