@@ -841,13 +841,7 @@ async def simulation_loop():
                         except Exception as e:
                             # Si falla la captura, no afectar la simulación
                             logging.debug(f"Error capturando snapshot en paso {updated_step}: {e}")
-                    
-            except Exception as e:
-                logging.error(f"Error en el bucle de simulación: {e}", exc_info=True)
-                # Continuar el bucle en lugar de detenerlo
-                await asyncio.sleep(0.1)
-                continue
-            
+                     
             # Aplicar throttle adaptativo según live_feed
             live_feed_enabled = g_state.get('live_feed_enabled', True)
             if not live_feed_enabled and ideal_sleep < 0.001:
