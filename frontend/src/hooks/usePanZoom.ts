@@ -1,405 +1,436 @@
 // frontend/src/hooks/usePanZoom.ts
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 
 // Throttle para optimizar el pan (evitar demasiadas actualizaciones)
-function throttle<T extends (...args: any[]) => void>(func: T, limit: number): T {
-    let inThrottle: boolean;
-    return ((...args: any[]) => {
-        if (!inThrottle) {
-            func(...args);
-            inThrottle = true;
-            setTimeout(() => inThrottle = false, limit);
-        }
-    }) as T;
+function throttle<T extends (...args: any[]) => void>(
+  func: T,
+  limit: number
+): T {
+  let inThrottle: boolean;
+  return ((...args: any[]) => {
+    if (!inThrottle) {
+      func(...args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
+    }
+  }) as T;
 }
 
-export const usePanZoom = (canvasRef: React.RefObject<HTMLCanvasElement>, gridWidth?: number, gridHeight?: number, toroidalMode: boolean = false) => {
-    const [pan, setPan] = useState({ x: 0, y: 0 });
-    const [zoom, setZoom] = useState(1);
-    const [isPanning, setIsPanning] = useState(false);
-    const [isZooming, setIsZooming] = useState(false);
-    const [zoomCenter, setZoomCenter] = useState<{ x: number; y: number } | null>(null);
-    const isPanningRef = useRef(false);
-    const lastMousePos = useRef({ x: 0, y: 0 });
-    const panUpdateRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-    const initializedRef = useRef(false);
-    const lastGridSizeRef = useRef<{ width: number; height: number } | null>(null);
-    const zoomTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+export const usePanZoom = (
+  canvasRef: React.RefObject<HTMLCanvasElement>,
+  gridWidth?: number,
+  gridHeight?: number,
+  toroidalMode: boolean = false
+) => {
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [isPanning, setIsPanning] = useState(false);
+  const [isZooming, setIsZooming] = useState(false);
+  const [zoomCenter, setZoomCenter] = useState<{ x: number; y: number } | null>(
+    null
+  );
+  const isPanningRef = useRef(false);
+  const lastMousePos = useRef({ x: 0, y: 0 });
+  const panUpdateRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const initializedRef = useRef(false);
+  const lastGridSizeRef = useRef<{ width: number; height: number } | null>(
+    null
+  );
+  const zoomTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Función para calcular zoom y pan inicial centrado en el centro del grid
-    const calculateInitialView = useCallback(() => {
-        if (!canvasRef.current || !gridWidth || !gridHeight) {
-            return { pan: { x: 0, y: 0 }, zoom: 1 };
-        }
+  // Función para calcular zoom y pan inicial centrado en el centro del grid
+  const calculateInitialView = useCallback(() => {
+    if (!canvasRef.current || !gridWidth || !gridHeight) {
+      return { pan: { x: 0, y: 0 }, zoom: 1 };
+    }
 
-        const canvas = canvasRef.current;
-        // Obtener el tamaño del contenedor
-        const container = canvas.parentElement;
-        if (!container) {
-            return { pan: { x: 0, y: 0 }, zoom: 1 };
-        }
+    const canvas = canvasRef.current;
+    // Obtener el tamaño del contenedor
+    const container = canvas.parentElement;
+    if (!container) {
+      return { pan: { x: 0, y: 0 }, zoom: 1 };
+    }
 
-        const containerRect = container.getBoundingClientRect();
-        const containerWidth = containerRect.width;
-        const containerHeight = containerRect.height;
+    const containerRect = container.getBoundingClientRect();
+    const containerWidth = containerRect.width;
+    const containerHeight = containerRect.height;
 
-        if (containerWidth === 0 || containerHeight === 0) {
-            return { pan: { x: 0, y: 0 }, zoom: 1 };
-        }
+    if (containerWidth === 0 || containerHeight === 0) {
+      return { pan: { x: 0, y: 0 }, zoom: 1 };
+    }
 
-        // OPTIMIZACIÓN: Siempre mostrar TODO el grid, hacer zoom out si es necesario
-        // Calcular zoom para que TODO el grid quepa en el contenedor
-        // El canvas tiene dimensiones gridWidth x gridHeight píxeles (1 píxel = 1 unidad del grid)
-        // Queremos que TODO el grid (gridWidth unidades) quepa en `containerWidth` píxeles
-        // Zoom = containerSize / gridSize (si grid es mayor que container, zoom será < 1, es decir, zoom out)
-        const zoomX = containerWidth / gridWidth;
-        const zoomY = containerHeight / gridHeight;
-        const initialZoom = Math.min(zoomX, zoomY); // Usar el menor para asegurar que todo quepa
-        
-        // Aplicar margen de seguridad (90% para dejar un poco de espacio)
-        const initialZoomWithMargin = initialZoom * 0.9;
+    // OPTIMIZACIÓN: Siempre mostrar TODO el grid, hacer zoom out si es necesario
+    // Calcular zoom para que TODO el grid quepa en el contenedor
+    // El canvas tiene dimensiones gridWidth x gridHeight píxeles (1 píxel = 1 unidad del grid)
+    // Queremos que TODO el grid (gridWidth unidades) quepa en `containerWidth` píxeles
+    // Zoom = containerSize / gridSize (si grid es mayor que container, zoom será < 1, es decir, zoom out)
+    const zoomX = containerWidth / gridWidth;
+    const zoomY = containerHeight / gridHeight;
+    const initialZoom = Math.min(zoomX, zoomY); // Usar el menor para asegurar que todo quepa
 
-        // El canvas está posicionado con left: 50%, top: 50%, marginLeft: -gridWidth/2, marginTop: -gridHeight/2
-        // Esto centra el canvas en el contenedor
-        // Con transformOrigin: '0 0' y transform: scale() translate(), el origen de la transformación está en (0,0) del canvas
-        // Para centrar el centro del grid en el contenedor:
-        // - El centro del grid está en (gridWidth/2, gridHeight/2) en coordenadas del canvas
-        // - Después del scale, el centro del grid está en (gridWidth/2 * zoom, gridHeight/2 * zoom)
-        // - El centro del contenedor está en (containerWidth/2, containerHeight/2)
-        // - Necesitamos: pan.x + gridWidth/2 * zoom = containerWidth/2
-        // - Entonces: pan.x = containerWidth/2 - gridWidth/2 * zoom
-        
-        // Pero como el canvas está centrado con CSS, el punto (0,0) del canvas está en el centro del contenedor
-        // después de aplicar left: 50%, top: 50%, marginLeft, marginTop
-        // El transform se aplica DESPUÉS de este posicionamiento
-        // Entonces, para que el centro del grid esté en el centro del contenedor:
-        // Necesitamos mover el centro del grid (gridWidth/2, gridHeight/2) al origen (0,0)
-        // Después del scale, esto se convierte en (gridWidth/2 * zoom, gridHeight/2 * zoom)
-        // Necesitamos: pan.x - gridWidth/2 * zoom = 0, entonces pan.x = gridWidth/2 * zoom
-        // Pero esto no es correcto...
+    // Aplicar margen de seguridad (90% para dejar un poco de espacio)
+    const initialZoomWithMargin = initialZoom * 0.9;
 
-        // Revisando más cuidadosamente:
-        // - El canvas tiene width=gridWidth, height=gridHeight
-        // - Está centrado con CSS: left: 50%, top: 50%, marginLeft: -gridWidth/2, marginTop: -gridHeight/2
-        // - Esto coloca el punto (0,0) del canvas en el centro del contenedor
-        // - Con transformOrigin: '0 0', el origen de la transformación es (0,0) del canvas
-        // - Con transform: scale(zoom) translate(pan.x, pan.y):
-        //   * Primero se escala (el punto (0,0) sigue en (0,0) después del scale)
-        //   * Luego se traslada (el punto (0,0) se mueve a (pan.x, pan.y))
-        // - Para que el centro del grid (gridWidth/2, gridHeight/2) esté en el centro del contenedor:
-        //   * Después del scale: el centro está en (gridWidth/2 * zoom, gridHeight/2 * zoom)
-        //   * Después del translate: el centro está en (gridWidth/2 * zoom + pan.x, gridHeight/2 * zoom + pan.y)
-        //   * Queremos que esté en (0, 0) relativo al centro del contenedor (que es donde está el origen del canvas)
-        //   * Entonces: gridWidth/2 * zoom + pan.x = 0, por lo tanto pan.x = -gridWidth/2 * zoom
-        
-        const initialPan = {
-            x: -gridWidth / 2 * initialZoomWithMargin,
-            y: -gridHeight / 2 * initialZoomWithMargin
-        };
+    // El canvas está posicionado con left: 50%, top: 50%, marginLeft: -gridWidth/2, marginTop: -gridHeight/2
+    // Esto centra el canvas en el contenedor
+    // Con transformOrigin: '0 0' y transform: scale() translate(), el origen de la transformación está en (0,0) del canvas
+    // Para centrar el centro del grid en el contenedor:
+    // - El centro del grid está en (gridWidth/2, gridHeight/2) en coordenadas del canvas
+    // - Después del scale, el centro del grid está en (gridWidth/2 * zoom, gridHeight/2 * zoom)
+    // - El centro del contenedor está en (containerWidth/2, containerHeight/2)
+    // - Necesitamos: pan.x + gridWidth/2 * zoom = containerWidth/2
+    // - Entonces: pan.x = containerWidth/2 - gridWidth/2 * zoom
 
-        return { pan: initialPan, zoom: initialZoomWithMargin };
-    }, [canvasRef, gridWidth, gridHeight]);
+    // Pero como el canvas está centrado con CSS, el punto (0,0) del canvas está en el centro del contenedor
+    // después de aplicar left: 50%, top: 50%, marginLeft, marginTop
+    // El transform se aplica DESPUÉS de este posicionamiento
+    // Entonces, para que el centro del grid esté en el centro del contenedor:
+    // Necesitamos mover el centro del grid (gridWidth/2, gridHeight/2) al origen (0,0)
+    // Después del scale, esto se convierte en (gridWidth/2 * zoom, gridHeight/2 * zoom)
+    // Necesitamos: pan.x - gridWidth/2 * zoom = 0, entonces pan.x = gridWidth/2 * zoom
+    // Pero esto no es correcto...
 
-    // Inicializar vista cuando cambia el tamaño del grid
-    useEffect(() => {
-        if (!gridWidth || !gridHeight) return;
-        
-        const currentGridSize = { width: gridWidth, height: gridHeight };
-        const lastGridSize = lastGridSizeRef.current;
-        
-        // Solo inicializar si es la primera vez o si el tamaño del grid cambió
-        if (!initializedRef.current || 
-            !lastGridSize || 
-            lastGridSize.width !== currentGridSize.width || 
-            lastGridSize.height !== currentGridSize.height) {
-            
-            // Esperar un frame para que el contenedor tenga dimensiones
-            requestAnimationFrame(() => {
-                const initialView = calculateInitialView();
-                setPan(initialView.pan);
-                setZoom(initialView.zoom);
-                initializedRef.current = true;
-                lastGridSizeRef.current = currentGridSize;
-            });
-        }
-    }, [gridWidth, gridHeight, calculateInitialView]);
+    // Revisando más cuidadosamente:
+    // - El canvas tiene width=gridWidth, height=gridHeight
+    // - Está centrado con CSS: left: 50%, top: 50%, marginLeft: -gridWidth/2, marginTop: -gridHeight/2
+    // - Esto coloca el punto (0,0) del canvas en el centro del contenedor
+    // - Con transformOrigin: '0 0', el origen de la transformación es (0,0) del canvas
+    // - Con transform: scale(zoom) translate(pan.x, pan.y):
+    //   * Primero se escala (el punto (0,0) sigue en (0,0) después del scale)
+    //   * Luego se traslada (el punto (0,0) se mueve a (pan.x, pan.y))
+    // - Para que el centro del grid (gridWidth/2, gridHeight/2) esté en el centro del contenedor:
+    //   * Después del scale: el centro está en (gridWidth/2 * zoom, gridHeight/2 * zoom)
+    //   * Después del translate: el centro está en (gridWidth/2 * zoom + pan.x, gridHeight/2 * zoom + pan.y)
+    //   * Queremos que esté en (0, 0) relativo al centro del contenedor (que es donde está el origen del canvas)
+    //   * Entonces: gridWidth/2 * zoom + pan.x = 0, por lo tanto pan.x = -gridWidth/2 * zoom
 
-    // Función para resetear vista
-    const resetView = useCallback(() => {
+    const initialPan = {
+      x: (-gridWidth / 2) * initialZoomWithMargin,
+      y: (-gridHeight / 2) * initialZoomWithMargin,
+    };
+
+    return { pan: initialPan, zoom: initialZoomWithMargin };
+  }, [canvasRef, gridWidth, gridHeight]);
+
+  // Inicializar vista cuando cambia el tamaño del grid
+  useEffect(() => {
+    if (!gridWidth || !gridHeight) return;
+
+    const currentGridSize = { width: gridWidth, height: gridHeight };
+    const lastGridSize = lastGridSizeRef.current;
+
+    // Solo inicializar si es la primera vez o si el tamaño del grid cambió
+    if (
+      !initializedRef.current ||
+      !lastGridSize ||
+      lastGridSize.width !== currentGridSize.width ||
+      lastGridSize.height !== currentGridSize.height
+    ) {
+      // Esperar un frame para que el contenedor tenga dimensiones
+      requestAnimationFrame(() => {
         const initialView = calculateInitialView();
         setPan(initialView.pan);
         setZoom(initialView.zoom);
-    }, [calculateInitialView]);
+        initializedRef.current = true;
+        lastGridSizeRef.current = currentGridSize;
+      });
+    }
+  }, [gridWidth, gridHeight, calculateInitialView]);
 
-    // Limitar pan y zoom para mantener la grilla visible
-    const constrainPanZoom = useCallback((newPan: { x: number; y: number }, newZoom: number) => {
-        if (!canvasRef.current || !gridWidth || !gridHeight) {
-            return { pan: newPan, zoom: newZoom };
+  // Función para resetear vista
+  const resetView = useCallback(() => {
+    const initialView = calculateInitialView();
+    setPan(initialView.pan);
+    setZoom(initialView.zoom);
+  }, [calculateInitialView]);
+
+  // Limitar pan y zoom para mantener la grilla visible
+  const constrainPanZoom = useCallback(
+    (newPan: { x: number; y: number }, newZoom: number) => {
+      if (!canvasRef.current || !gridWidth || !gridHeight) {
+        return { pan: newPan, zoom: newZoom };
+      }
+
+      const container = canvasRef.current.parentElement;
+      if (!container) {
+        return { pan: newPan, zoom: newZoom };
+      }
+
+      const containerRect = container.getBoundingClientRect();
+      const containerWidth = containerRect.width;
+      const containerHeight = containerRect.height;
+
+      if (containerWidth === 0 || containerHeight === 0) {
+        return { pan: newPan, zoom: newZoom };
+      }
+
+      // Calcular límites de zoom
+      // Zoom mínimo: permitir zoom out suficiente para ver TODO el grid completo
+      // Si el procesamiento lo permite, permitir zoom out incluso más allá
+      const minZoomX = containerWidth / gridWidth;
+      const minZoomY = containerHeight / gridHeight;
+      // Permitir zoom out hasta un 50% más pequeño que lo necesario para ver todo el grid
+      // Esto permite ver el grid completo con espacio alrededor, o incluso más lejos
+      const minZoomRequired = Math.min(minZoomX, minZoomY);
+      const minZoom = minZoomRequired * 0.8; // 80% del zoom necesario = permite ver un poco más de área
+
+      // Límite absoluto mínimo más conservador para evitar zoom excesivo
+      const absoluteMinZoom = 0.1; // Límite absoluto (permite zoom out hasta ver 10x el viewport)
+      const finalMinZoom = Math.max(absoluteMinZoom, minZoom);
+
+      // Zoom máximo más conservador: máximo 10x o 1 píxel = 10 unidades del grid
+      const maxZoom = 10;
+
+      const constrainedZoom = Math.max(
+        finalMinZoom,
+        Math.min(newZoom, maxZoom)
+      );
+
+      // Calcular límites de pan
+      // El canvas está centrado con CSS:
+      // - left: 50%, top: 50%
+      // - marginLeft: -(gridWidth/2) + (pan.x/zoom)
+      // - marginTop: -(gridHeight/2) + (pan.y/zoom)
+      // - transform: scale(zoom)
+      // - transformOrigin: center center
+
+      // El tamaño del canvas escalado
+      const scaledWidth = gridWidth * constrainedZoom;
+      const scaledHeight = gridHeight * constrainedZoom;
+
+      // El canvas está centrado en el contenedor
+      // El centro del canvas está en el centro del contenedor (0,0 relativo al centro)
+      // Después del pan, el canvas se mueve: pan.x/zoom en X, pan.y/zoom en Y
+
+      // Límites de pan basados en el tamaño escalado del canvas y el contenedor
+      // Queremos que el canvas escalado no se salga completamente del contenedor
+      // Permitir que se mueva hasta que una esquina del canvas esté en el borde del contenedor
+
+      // Límite máximo de pan en píxeles del canvas (antes del scale)
+      // Cuando el canvas escalado es más grande que el contenedor:
+      // - Puede moverse hasta que una esquina toque el borde del contenedor
+      // - El canvas tiene tamaño gridWidth x gridHeight
+      // - El canvas escalado tiene tamaño scaledWidth x scaledHeight
+      // - El contenedor tiene tamaño containerWidth x containerHeight
+
+      // Si scaledWidth > containerWidth, el canvas puede moverse horizontalmente
+      // El desplazamiento máximo en píxeles del canvas (antes del scale) es:
+      // maxPanInCanvasPixels = (scaledWidth - containerWidth) / (2 * zoom)
+      // Pero pan.x está en píxeles del contenedor, no del canvas
+
+      // Conversión correcta:
+      // pan.x está en píxeles del contenedor (relativo al centro)
+      // El canvas se mueve pan.x/zoom píxeles antes del scale
+      // Después del scale, esto se convierte en pan.x píxeles del contenedor
+
+      // Si scaledWidth > containerWidth, el canvas puede moverse:
+      // - Hacia la izquierda: hasta que el borde derecho del canvas toque el borde derecho del contenedor
+      // - Hacia la derecha: hasta que el borde izquierdo del canvas toque el borde izquierdo del contenedor
+      // El desplazamiento máximo en píxeles del contenedor es:
+      // maxPanX = (scaledWidth - containerWidth) / 2
+
+      let maxPanX, maxPanY, minPanX, minPanY;
+
+      // Modo toroidal: pan infinito (wraparound)
+      if (toroidalMode) {
+        // En modo toroidal, permitir pan infinito pero aplicar wraparound visual
+        // Los límites son muy grandes para simular infinito
+        // El wraparound se hará visualmente en el renderizado
+        const veryLargeValue = 1e6; // Valor muy grande para simular infinito
+        maxPanX = veryLargeValue;
+        minPanX = -veryLargeValue;
+        maxPanY = veryLargeValue;
+        minPanY = -veryLargeValue;
+      } else {
+        // Modo normal: límites basados en tamaño del canvas
+        if (scaledWidth > containerWidth) {
+          // Canvas más ancho que el contenedor: puede moverse horizontalmente
+          // Permitir más margen para exploración (200% en lugar de 50%)
+          const extraMargin = scaledWidth * 0.5; // 50% adicional de margen
+          maxPanX = (scaledWidth - containerWidth) / 2 + extraMargin;
+          minPanX = -maxPanX;
+        } else {
+          // Canvas más estrecho que el contenedor: permitir más movimiento
+          // Permitir pan hasta que el canvas salga completamente del contenedor
+          const extraMargin = scaledWidth * 2; // 200% de margen adicional
+          maxPanX = (containerWidth - scaledWidth) / 2 + extraMargin;
+          minPanX = -maxPanX;
         }
 
-        const container = canvasRef.current.parentElement;
+        if (scaledHeight > containerHeight) {
+          // Canvas más alto que el contenedor: puede moverse verticalmente
+          // Permitir más margen para exploración (200% en lugar de 50%)
+          const extraMargin = scaledHeight * 0.5; // 50% adicional de margen
+          maxPanY = (scaledHeight - containerHeight) / 2 + extraMargin;
+          minPanY = -maxPanY;
+        } else {
+          // Canvas más bajo que el contenedor: permitir más movimiento
+          // Permitir pan hasta que el canvas salga completamente del contenedor
+          const extraMargin = scaledHeight * 2; // 200% de margen adicional
+          maxPanY = (containerHeight - scaledHeight) / 2 + extraMargin;
+          minPanY = -maxPanY;
+        }
+      }
+
+      const constrainedPan = {
+        x: Math.max(minPanX, Math.min(newPan.x, maxPanX)),
+        y: Math.max(minPanY, Math.min(newPan.y, maxPanY)),
+      };
+
+      return { pan: constrainedPan, zoom: constrainedZoom };
+    },
+    [canvasRef, gridWidth, gridHeight]
+  );
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      isPanningRef.current = true;
+      setIsPanning(true);
+      lastMousePos.current = { x: e.clientX, y: e.clientY };
+      panUpdateRef.current = { ...pan };
+    },
+    [pan]
+  );
+
+  // Throttled mouse move para mejor rendimiento
+  const handleMouseMoveThrottled = useCallback(
+    throttle((e: React.MouseEvent) => {
+      if (!isPanningRef.current) return;
+      // El pan debe ser directamente proporcional al movimiento del mouse (sin inversión)
+      // ya que pan.x, pan.y ya están en píxeles del canvas escalado
+      const dx = e.clientX - lastMousePos.current.x;
+      const dy = e.clientY - lastMousePos.current.y;
+      const newPan = {
+        x: panUpdateRef.current.x + dx,
+        y: panUpdateRef.current.y + dy,
+      };
+      const constrained = constrainPanZoom(newPan, zoom);
+      panUpdateRef.current = constrained.pan;
+      setPan(constrained.pan);
+      lastMousePos.current = { x: e.clientX, y: e.clientY };
+    }, 16), // ~60fps
+    [zoom, constrainPanZoom]
+  );
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      handleMouseMoveThrottled(e);
+    },
+    [handleMouseMoveThrottled]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    isPanningRef.current = false;
+    setIsPanning(false);
+  }, []);
+
+  const handleWheel = useCallback(
+    (e: React.WheelEvent) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+
+        // Calcular el punto del mouse en coordenadas del canvas antes del zoom
+        if (!gridWidth || !gridHeight) return;
+
+        // Obtener el contenedor (puede ser el div que envuelve el canvas o el canvas mismo)
+        let container: HTMLElement | null = null;
+        if (canvasRef.current) {
+          container = canvasRef.current.parentElement;
+        }
+
+        // Si no hay contenedor, usar el target del evento
+        if (!container && e.target) {
+          container = (e.target as HTMLElement).parentElement;
+        }
+
+        // Si todavía no hay contenedor, usar el elemento del evento
+        if (!container && e.currentTarget) {
+          container = e.currentTarget as HTMLElement;
+        }
+
         if (!container) {
-            return { pan: newPan, zoom: newZoom };
+          console.warn("⚠️ No se pudo obtener contenedor para zoom");
+          return;
         }
 
         const containerRect = container.getBoundingClientRect();
         const containerWidth = containerRect.width;
         const containerHeight = containerRect.height;
 
-        if (containerWidth === 0 || containerHeight === 0) {
-            return { pan: newPan, zoom: newZoom };
+        // Coordenadas del mouse relativas al contenedor
+        const mouseX = e.clientX - containerRect.left;
+        const mouseY = e.clientY - containerRect.top;
+
+        // Mostrar overlay de zoom centrado en el mouse
+        setIsZooming(true);
+        setZoomCenter({ x: mouseX, y: mouseY });
+
+        // Limpiar timeout anterior
+        if (zoomTimeoutRef.current) {
+          clearTimeout(zoomTimeoutRef.current);
         }
-        
-        // Calcular límites de zoom
-        // Zoom mínimo: permitir zoom out suficiente para ver TODO el grid completo
-        // Si el procesamiento lo permite, permitir zoom out incluso más allá
-        const minZoomX = containerWidth / gridWidth;
-        const minZoomY = containerHeight / gridHeight;
-        // Permitir zoom out hasta un 50% más pequeño que lo necesario para ver todo el grid
-        // Esto permite ver el grid completo con espacio alrededor, o incluso más lejos
-        const minZoomRequired = Math.min(minZoomX, minZoomY);
-        const minZoom = minZoomRequired * 0.5; // 50% del zoom necesario = permite ver 2x más área
-        
-        // Permitir zoom out incluso más si el grid es muy grande (límite absoluto muy bajo)
-        // Esto permite ver grids grandes desde muy lejos si el rendimiento lo permite
-        const absoluteMinZoom = 0.01; // Límite absoluto mínimo (permite ver hasta 100x el área del contenedor)
-        const finalMinZoom = Math.max(absoluteMinZoom, minZoom);
-        
-        // Zoom máximo: permitir zoom hasta 100x o hasta que 1 unidad = 1 píxel
-        const maxZoom = Math.max(100, Math.min(containerWidth, containerHeight));
-        
-        const constrainedZoom = Math.max(finalMinZoom, Math.min(newZoom, maxZoom));
-        
-        // Calcular límites de pan
-        // El canvas está centrado con CSS:
-        // - left: 50%, top: 50%
-        // - marginLeft: -(gridWidth/2) + (pan.x/zoom)
-        // - marginTop: -(gridHeight/2) + (pan.y/zoom)
-        // - transform: scale(zoom)
-        // - transformOrigin: center center
-        
-        // El tamaño del canvas escalado
-        const scaledWidth = gridWidth * constrainedZoom;
-        const scaledHeight = gridHeight * constrainedZoom;
-        
-        // El canvas está centrado en el contenedor
-        // El centro del canvas está en el centro del contenedor (0,0 relativo al centro)
-        // Después del pan, el canvas se mueve: pan.x/zoom en X, pan.y/zoom en Y
-        
-        // Límites de pan basados en el tamaño escalado del canvas y el contenedor
-        // Queremos que el canvas escalado no se salga completamente del contenedor
-        // Permitir que se mueva hasta que una esquina del canvas esté en el borde del contenedor
-        
-        // Límite máximo de pan en píxeles del canvas (antes del scale)
-        // Cuando el canvas escalado es más grande que el contenedor:
-        // - Puede moverse hasta que una esquina toque el borde del contenedor
-        // - El canvas tiene tamaño gridWidth x gridHeight
-        // - El canvas escalado tiene tamaño scaledWidth x scaledHeight
-        // - El contenedor tiene tamaño containerWidth x containerHeight
-        
-        // Si scaledWidth > containerWidth, el canvas puede moverse horizontalmente
-        // El desplazamiento máximo en píxeles del canvas (antes del scale) es:
-        // maxPanInCanvasPixels = (scaledWidth - containerWidth) / (2 * zoom)
-        // Pero pan.x está en píxeles del contenedor, no del canvas
-        
-        // Conversión correcta:
-        // pan.x está en píxeles del contenedor (relativo al centro)
-        // El canvas se mueve pan.x/zoom píxeles antes del scale
-        // Después del scale, esto se convierte en pan.x píxeles del contenedor
-        
-        // Si scaledWidth > containerWidth, el canvas puede moverse:
-        // - Hacia la izquierda: hasta que el borde derecho del canvas toque el borde derecho del contenedor
-        // - Hacia la derecha: hasta que el borde izquierdo del canvas toque el borde izquierdo del contenedor
-        // El desplazamiento máximo en píxeles del contenedor es:
-        // maxPanX = (scaledWidth - containerWidth) / 2
-        
-        let maxPanX, maxPanY, minPanX, minPanY;
-        
-        // Modo toroidal: pan infinito (wraparound)
-        if (toroidalMode) {
-            // En modo toroidal, permitir pan infinito pero aplicar wraparound visual
-            // Los límites son muy grandes para simular infinito
-            // El wraparound se hará visualmente en el renderizado
-            const veryLargeValue = 1e6; // Valor muy grande para simular infinito
-            maxPanX = veryLargeValue;
-            minPanX = -veryLargeValue;
-            maxPanY = veryLargeValue;
-            minPanY = -veryLargeValue;
-        } else {
-            // Modo normal: límites basados en tamaño del canvas
-            if (scaledWidth > containerWidth) {
-                // Canvas más ancho que el contenedor: puede moverse horizontalmente
-                // Permitir más margen para exploración (200% en lugar de 50%)
-                const extraMargin = scaledWidth * 0.5; // 50% adicional de margen
-                maxPanX = (scaledWidth - containerWidth) / 2 + extraMargin;
-                minPanX = -maxPanX;
-            } else {
-                // Canvas más estrecho que el contenedor: permitir más movimiento
-                // Permitir pan hasta que el canvas salga completamente del contenedor
-                const extraMargin = scaledWidth * 2; // 200% de margen adicional
-                maxPanX = (containerWidth - scaledWidth) / 2 + extraMargin;
-                minPanX = -maxPanX;
-            }
-            
-            if (scaledHeight > containerHeight) {
-                // Canvas más alto que el contenedor: puede moverse verticalmente
-                // Permitir más margen para exploración (200% en lugar de 50%)
-                const extraMargin = scaledHeight * 0.5; // 50% adicional de margen
-                maxPanY = (scaledHeight - containerHeight) / 2 + extraMargin;
-                minPanY = -maxPanY;
-            } else {
-                // Canvas más bajo que el contenedor: permitir más movimiento
-                // Permitir pan hasta que el canvas salga completamente del contenedor
-                const extraMargin = scaledHeight * 2; // 200% de margen adicional
-                maxPanY = (containerHeight - scaledHeight) / 2 + extraMargin;
-                minPanY = -maxPanY;
-            }
-        }
-        
-        const constrainedPan = {
-            x: Math.max(minPanX, Math.min(newPan.x, maxPanX)),
-            y: Math.max(minPanY, Math.min(newPan.y, maxPanY))
-        };
-        
-        return { pan: constrainedPan, zoom: constrainedZoom };
-    }, [canvasRef, gridWidth, gridHeight]);
 
-    const handleMouseDown = useCallback((e: React.MouseEvent) => {
-        isPanningRef.current = true;
-        setIsPanning(true);
-        lastMousePos.current = { x: e.clientX, y: e.clientY };
-        panUpdateRef.current = { ...pan };
-    }, [pan]);
+        // Ocultar overlay después de 300ms sin zoom
+        zoomTimeoutRef.current = setTimeout(() => {
+          setIsZooming(false);
+          setZoomCenter(null);
+        }, 300);
 
-    // Throttled mouse move para mejor rendimiento
-    const handleMouseMoveThrottled = useCallback(
-        throttle((e: React.MouseEvent) => {
-        if (!isPanningRef.current) return;
-        // El pan debe ser directamente proporcional al movimiento del mouse (sin inversión)
-        // ya que pan.x, pan.y ya están en píxeles del canvas escalado
-        const dx = (e.clientX - lastMousePos.current.x);
-        const dy = (e.clientY - lastMousePos.current.y);
-            const newPan = {
-                x: panUpdateRef.current.x + dx,
-                y: panUpdateRef.current.y + dy
-            };
-            const constrained = constrainPanZoom(newPan, zoom);
-            panUpdateRef.current = constrained.pan;
-            setPan(constrained.pan);
-        lastMousePos.current = { x: e.clientX, y: e.clientY };
-        }, 16), // ~60fps
-        [zoom, constrainPanZoom]
-    );
+        // Coordenadas del mouse relativas al centro del contenedor
+        const mouseRelToCenterX = mouseX - containerWidth / 2;
+        const mouseRelToCenterY = mouseY - containerHeight / 2;
 
-    const handleMouseMove = useCallback((e: React.MouseEvent) => {
-        handleMouseMoveThrottled(e);
-    }, [handleMouseMoveThrottled]);
+        // Convertir a coordenadas del canvas (antes del zoom y pan)
+        const canvasX = (mouseRelToCenterX - pan.x) / zoom;
+        const canvasY = (mouseRelToCenterY - pan.y) / zoom;
 
-    const handleMouseUp = useCallback(() => {
-        isPanningRef.current = false;
-        setIsPanning(false);
-    }, []);
+        // Aplicar zoom con factor más suave y progresivo
+        const zoomFactor = 1.1; // Más suave para mejor control
+        const delta = Math.abs(e.deltaY);
+        const smoothFactor = Math.min(1 + (delta / 100) * 0.05, 1.2); // Factor suave basado en velocidad
+        const newZoom =
+          e.deltaY < 0
+            ? zoom * zoomFactor * smoothFactor
+            : zoom / (zoomFactor * smoothFactor);
 
-    const handleWheel = useCallback((e: React.WheelEvent) => {
-        if (e.deltaY !== 0) {
-            e.preventDefault();
-            
-            // Calcular el punto del mouse en coordenadas del canvas antes del zoom
-            if (!gridWidth || !gridHeight) return;
-            
-            // Obtener el contenedor (puede ser el div que envuelve el canvas o el canvas mismo)
-            let container: HTMLElement | null = null;
-            if (canvasRef.current) {
-                container = canvasRef.current.parentElement;
-            }
-            
-            // Si no hay contenedor, usar el target del evento
-            if (!container && e.target) {
-                container = (e.target as HTMLElement).parentElement;
-            }
-            
-            // Si todavía no hay contenedor, usar el elemento del evento
-            if (!container && e.currentTarget) {
-                container = e.currentTarget as HTMLElement;
-            }
-            
-            if (!container) {
-                console.warn("⚠️ No se pudo obtener contenedor para zoom");
-                return;
-            }
-            
-            const containerRect = container.getBoundingClientRect();
-            const containerWidth = containerRect.width;
-            const containerHeight = containerRect.height;
-            
-            // Coordenadas del mouse relativas al contenedor
-            const mouseX = e.clientX - containerRect.left;
-            const mouseY = e.clientY - containerRect.top;
-            
-            // Mostrar overlay de zoom centrado en el mouse
-            setIsZooming(true);
-            setZoomCenter({ x: mouseX, y: mouseY });
-            
-            // Limpiar timeout anterior
-            if (zoomTimeoutRef.current) {
-                clearTimeout(zoomTimeoutRef.current);
-            }
-            
-            // Ocultar overlay después de 300ms sin zoom
-            zoomTimeoutRef.current = setTimeout(() => {
-                setIsZooming(false);
-                setZoomCenter(null);
-            }, 300);
-            
-            // Coordenadas del mouse relativas al centro del contenedor
-            const mouseRelToCenterX = mouseX - containerWidth / 2;
-            const mouseRelToCenterY = mouseY - containerHeight / 2;
-            
-            // Convertir a coordenadas del canvas (antes del zoom y pan)
-            const canvasX = (mouseRelToCenterX - pan.x) / zoom;
-            const canvasY = (mouseRelToCenterY - pan.y) / zoom;
-            
-            // Aplicar zoom con factor más suave y progresivo
-            const zoomFactor = 1.1; // Más suave para mejor control
-            const delta = Math.abs(e.deltaY);
-            const smoothFactor = Math.min(1 + (delta / 100) * 0.05, 1.2); // Factor suave basado en velocidad
-            const newZoom = e.deltaY < 0 
-                ? zoom * zoomFactor * smoothFactor 
-                : zoom / (zoomFactor * smoothFactor);
-            
-            // Usar constrainPanZoom para aplicar límites (incluye minZoom ajustado)
-            const constrainedZoom = constrainPanZoom(pan, newZoom).zoom;
-            
-            // Calcular nuevo pan para mantener el punto del canvas fijo bajo el mouse
-            const zoomRatio = constrainedZoom / zoom;
-            const newPanX = mouseRelToCenterX * (1 - zoomRatio) + pan.x * zoomRatio;
-            const newPanY = mouseRelToCenterY * (1 - zoomRatio) + pan.y * zoomRatio;
-            
-            const constrainedPanZoomResult = constrainPanZoom({ x: newPanX, y: newPanY }, constrainedZoom);
-            setZoom(constrainedPanZoomResult.zoom);
-            setPan(constrainedPanZoomResult.pan);
-        }
-    }, [zoom, pan, constrainPanZoom, canvasRef, gridWidth, gridHeight]);
+        // Usar constrainPanZoom para aplicar límites (incluye minZoom ajustado)
+        const constrainedZoom = constrainPanZoom(pan, newZoom).zoom;
 
-    // Cleanup timeout al desmontar
-    useEffect(() => {
-        return () => {
-            if (zoomTimeoutRef.current) {
-                clearTimeout(zoomTimeoutRef.current);
-            }
-        };
-    }, []);
+        // Calcular nuevo pan para mantener el punto del canvas fijo bajo el mouse
+        const zoomRatio = constrainedZoom / zoom;
+        const newPanX = mouseRelToCenterX * (1 - zoomRatio) + pan.x * zoomRatio;
+        const newPanY = mouseRelToCenterY * (1 - zoomRatio) + pan.y * zoomRatio;
 
-    return {
-        pan,
-        zoom,
-        handleMouseDown,
-        handleMouseMove,
-        handleMouseUp,
-        handleWheel,
-        resetView,
-        isPanning,
-        isZooming,
-        zoomCenter,
+        const constrainedPanZoomResult = constrainPanZoom(
+          { x: newPanX, y: newPanY },
+          constrainedZoom
+        );
+        setZoom(constrainedPanZoomResult.zoom);
+        setPan(constrainedPanZoomResult.pan);
+      }
+    },
+    [zoom, pan, constrainPanZoom, canvasRef, gridWidth, gridHeight]
+  );
+
+  // Cleanup timeout al desmontar
+  useEffect(() => {
+    return () => {
+      if (zoomTimeoutRef.current) {
+        clearTimeout(zoomTimeoutRef.current);
+      }
     };
+  }, []);
+
+  return {
+    pan,
+    zoom,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
+    handleWheel,
+    resetView,
+    isPanning,
+    isZooming,
+    zoomCenter,
+  };
 };
