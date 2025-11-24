@@ -55,9 +55,27 @@ async def simulation_loop():
             if motor:
                 current_step = g_state.get('simulation_step', 0)
                 
-                # OPTIMIZACIÓN CRÍTICA: Si live_feed está desactivado, ejecutar múltiples pasos rápidamente
-                # y solo mostrar frames cada X pasos configurados (sin ralentizar la simulación)
-                if not live_feed_enabled:
+                # OPTIMIZACIÓN CRÍTICA: Ejecutar múltiples pasos por frame según steps_interval
+                # Esto permite acelerar la simulación incluso con live_feed activado
+                # Si live_feed está desactivado, steps_interval controla la frecuencia de actualización de estado
+                # Si live_feed está activado, steps_interval controla cuántos pasos se ejecutan por cada frame visualizado
+                
+                # Obtener intervalo de pasos configurado (por defecto 10 si live_feed OFF, 1 si ON para mantener comportamiento anterior por defecto)
+                default_interval = 10 if not live_feed_enabled else 1
+                steps_interval = g_state.get('steps_interval', default_interval)
+                
+                # Forzar al menos 1 paso si no es modo manual/fullspeed
+                if steps_interval > 0:
+                    steps_interval = max(1, steps_interval)
+                
+                if 'steps_interval_counter' not in g_state:
+                    g_state['steps_interval_counter'] = 0
+                if 'last_frame_sent_step' not in g_state:
+                    g_state['last_frame_sent_step'] = -1  # Para forzar primer frame
+
+                # Lógica unificada para ejecución de pasos (con o sin live feed)
+                # Si steps_interval > 1, ejecutamos múltiples pasos en un bucle rápido
+                if True: # Bloque unificado (reemplaza el if not live_feed_enabled)
                     # Si live_feed está desactivado, ejecutar múltiples pasos en cada iteración
                     # para maximizar velocidad, pero solo mostrar cada X pasos
                     try:
@@ -475,7 +493,7 @@ async def simulation_loop():
                                 })
                             
                     except Exception as e:
-                        logging.error(f"Error evolucionando estado (live_feed desactivado): {e}", exc_info=True)
+                        logging.error(f"Error evolucionando estado: {e}", exc_info=True)
                     
                     # THROTTLE ADAPTATIVO: Ajustar según live_feed y velocidad objetivo
                     # - Si live_feed está OFF: Permitir velocidades más altas sin límite rígido
@@ -500,23 +518,28 @@ async def simulation_loop():
                             await asyncio.sleep(0)  # Yield al event loop
                     else:
                         # Con live feed: Usar throttle mínimo para evitar CPU spin
-                        sleep_time = max(0.016, ideal_sleep)  # Mínimo 16ms cuando hay live feed
-                        await asyncio.sleep(sleep_time)
-                    continue
-                
-                try:
-                    # Evolucionar el estado solo si live_feed está activo
-                    # Offload to thread pool
-                    await asyncio.get_event_loop().run_in_executor(None, g_state['motor'].evolve_internal_state)
-                    g_state['simulation_step'] = current_step + 1
+                        # PERO si steps_interval > 1, queremos ir rápido entre frames
+                        if steps_interval > 1:
+                             # Si estamos saltando pasos, permitir ir rápido
+                             await asyncio.sleep(0)
+                        else:
+                             sleep_time = max(0.016, ideal_sleep)  # Mínimo 16ms cuando hay live feed normal
+                             await asyncio.sleep(sleep_time)
                     
-                    # Validar que el motor tenga un estado válido
-                    # CRÍTICO: Para motor nativo, el estado está en C++, no en motor.state.psi
-                    motor_is_native = g_state.get('motor_is_native', False)
-                    if not motor_is_native and g_state['motor'].state.psi is None:
-                        logging.warning("Motor activo pero sin estado psi. Saltando frame.")
-                        await asyncio.sleep(0.1)
+                    # Si no se debe enviar frame, continuar al siguiente ciclo del while
+                    if not should_send_frame:
                         continue
+                
+                # AQUI CONTINUA LA LÓGICA DE VISUALIZACIÓN (solo si should_send_frame es True)
+                # El bloque 'else' original (líneas 507-511) se elimina porque ya ejecutamos los pasos arriba
+                
+                # Validar que el motor tenga un estado válido
+                # CRÍTICO: Para motor nativo, el estado está en C++, no en motor.state.psi
+                motor_is_native = g_state.get('motor_is_native', False)
+                if not motor_is_native and g_state['motor'].state.psi is None:
+                    logging.warning("Motor activo pero sin estado psi. Saltando frame.")
+                    await asyncio.sleep(0.1)
+                    continue
                     
                     # Detectar época periódicamente (cada 50 pasos para no saturar)
                     epoch_detector = g_state.get('epoch_detector')
@@ -824,17 +847,6 @@ async def simulation_loop():
                     # Continuar el bucle en lugar de detenerlo
                     await asyncio.sleep(0.1)
                     continue
-            
-            # Controla la velocidad de la simulación según simulation_speed y target_fps
-            simulation_speed = g_state.get('simulation_speed', 1.0)
-            target_fps = g_state.get('target_fps', 10.0)
-            frame_skip = g_state.get('frame_skip', 0)
-            
-            # THROTTLE ADAPTATIVO: Ajustar según estado y velocidad objetivo
-            # - Live feed OFF: Permitir velocidades más altas sin límite rígido
-            # - Live feed ON: Usar throttle mínimo para evitar CPU spin excesivo
-            base_fps = target_fps * simulation_speed
-            ideal_sleep = 1.0 / base_fps if base_fps > 0 else 0.001
             
             # Aplicar throttle adaptativo según live_feed
             live_feed_enabled = g_state.get('live_feed_enabled', True)
