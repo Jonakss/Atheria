@@ -3,12 +3,15 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# C extensions
+# C extensions (binaries compiled)
 *.so
 *.pyd
 *.dylib
 
-# PERMITIR .so en src/ pero ignorar en raíz
+# IMPORTANT: Ignore .so in root (build artifacts should not be committed)
+/*.so
+
+# Allow .so in src/ (native engine module needed for runtime)
 !/src/*.so
 
 # Distribution / packaging
