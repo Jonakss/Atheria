@@ -160,7 +160,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none">
+    <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center pointer-events-none">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/80 backdrop-blur-sm pointer-events-auto"
@@ -168,7 +168,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
       />
       
       {/* Panel de Configuración */}
-      <GlassPanel className="relative w-[600px] max-h-[80vh] bg-[#0a0a0a] border-white/20 pointer-events-auto flex flex-col overflow-hidden">
+      <GlassPanel className="relative w-[600px] max-h-[80vh] bg-[#0a0a0a] border-white/20 pointer-events-auto flex flex-col overflow-hidden my-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
           <h2 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Configuración Global</h2>
@@ -482,4 +482,3 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
     </div>
   );
 };
-
