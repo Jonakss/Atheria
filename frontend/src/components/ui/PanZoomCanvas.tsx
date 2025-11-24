@@ -59,13 +59,9 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     
     // Estado para controlar el modo de renderizado (WebGL vs Canvas2D)
     // El usuario puede alternar manualmente entre modos con un botón
+   // IMPORTANTE: No auto-resetear este estado, debe ser 100% manual
     const shaderShouldBeAvailable = webglAvailable && !['poincare', 'flow', 'phase_attractor', 'phase_hsv'].includes(selectedViz);
-    const [useShaderRendering, setUseShaderRendering] = useState(shaderShouldBeAvailable);
-    
-    // Actualizar automáticamente si cambia la disponibilidad de shaders (ej: cambio de viz)
-    useEffect(() => {
-        setUseShaderRendering(shaderShouldBeAvailable);
-    }, [shaderShouldBeAvailable]);
+    const [useShaderRendering, setUseShaderRendering] = useState(false); // EMPEZAR SIEMPRE EN CANVAS2D (más estable)
     
     // Usar historyFrame si está disponible, sino usar simData actual
     const dataToRender = historyFrame ? historyFrame : simData;
