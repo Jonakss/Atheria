@@ -20,7 +20,6 @@ type LabSection = 'inference' | 'training' | 'analysis';
 export const DashboardLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('lab');
   const [labPanelOpen, setLabPanelOpen] = useState(true); // Panel de laboratorio visible por defecto
-  const [labPanelCollapsed, setLabPanelCollapsed] = useState(false); // Panel de laboratorio colapsado
   const [activeLabSection, setActiveLabSection] = useState<LabSection>('inference'); // Sub-sección activa de Lab
   const [physicsInspectorCollapsed, setPhysicsInspectorCollapsed] = useState(false); // Inspector físico colapsado
   const [timelineOpen, setTimelineOpen] = useState(false); // Timeline viewer abierto/cerrado
@@ -183,28 +182,33 @@ export const DashboardLayout: React.FC = () => {
           activeTab={activeTab} 
           onTabChange={(tab) => {
             setActiveTab(tab);
-            // Si se selecciona 'lab', abrir/cerrar panel de laboratorio
+            // Si se selecciona 'lab', abrir/cerrar panel de laboratorio si ya estaba activo, o abrirlo si no
             if (tab === 'lab') {
-              setLabPanelOpen(!labPanelOpen);
+               // Si ya estábamos en lab, toggles. Si no, lo abre.
+               if (activeTab === 'lab') {
+                   setLabPanelOpen(!labPanelOpen);
+               } else {
+                   setLabPanelOpen(true);
+               }
             } else {
               setLabPanelOpen(false);
             }
           }}
-          labPanelOpen={labPanelOpen && !labPanelCollapsed}
+          labPanelOpen={labPanelOpen}
           activeLabSection={activeLabSection}
-          onLabSectionChange={(section) => setActiveLabSection(section)}
+          onLabSectionChange={(section) => {
+              setActiveLabSection(section);
+              if (!labPanelOpen) setLabPanelOpen(true);
+          }}
         />
 
-        {/* Panel de Laboratorio (Experimentos/Entrenamiento) - Colapsable como drawer, Glass */}
-        {labPanelOpen && (
-          <aside className={`flex-col border-r border-white/5 bg-dark-980/40 backdrop-blur-md z-40 shrink-0 transition-all duration-300 ${
-            labPanelCollapsed ? 'w-12' : 'w-[380px]'
-          } flex overflow-hidden relative`}>
+        {/* Panel de Laboratorio (Experimentos/Entrenamiento) - Controlado por NavigationSidebar */}
+        {labPanelOpen && activeTab === 'lab' && (
+          <aside className="flex-col border-r border-white/5 bg-dark-980/40 backdrop-blur-md z-40 shrink-0 transition-all duration-300 w-[380px] flex overflow-hidden relative">
             <LabSider 
               activeSection={activeLabSection} 
               onSectionChange={setActiveLabSection}
-              isCollapsed={labPanelCollapsed}
-              onToggleCollapse={() => setLabPanelCollapsed(!labPanelCollapsed)}
+              onClose={() => setLabPanelOpen(false)}
             />
           </aside>
         )}

@@ -31,7 +31,7 @@ const LAB_SUBMENU_ITEMS = [
  * NavigationSidebar: Sidebar de navegación con sub-menús deslizables.
  * 
  * Design System Spec:
- * - Ancho: w-12 (48px) o w-16 (64px) - usando w-12 según mockup
+ * - Ancho: w-12 (48px)
  * - Background: bg-[#050505] (Surface)
  * - Border: border-r border-white/5 (Sutil)
  * - Layout: flex flex-col items-center py-3 gap-2
@@ -40,11 +40,9 @@ const LAB_SUBMENU_ITEMS = [
 export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({ 
   activeTab, 
   onTabChange, 
-  labPanelOpen = false,
   activeLabSection = 'inference',
   onLabSectionChange
 }) => {
-  const isLabActive = activeTab === 'lab' && labPanelOpen;
   
   // Colores accent para cada sub-sección de Lab
   const accentColors = {
@@ -71,14 +69,12 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
     }
   };
 
-  // Calcular el índice del item "lab" para insertar sub-menús después
-  const labIndex = NAV_ITEMS.findIndex(item => item.id === 'lab');
-
   return (
     <aside className="w-12 border-r border-white/5 bg-dark-990 flex flex-col items-center py-3 gap-2 z-40 shrink-0 relative">
       {NAV_ITEMS.map((item, index) => {
         const isActive = activeTab === item.id;
-        const showSubmenu = item.id === 'lab' && isLabActive;
+        // Mostrar submenú si es Lab y la pestaña está activa
+        const showSubmenu = item.id === 'lab' && isActive;
         
         return (
           <React.Fragment key={item.id}>
@@ -91,13 +87,14 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
             />
             
             {/* Sub-menús de Lab - Se deslizan hacia abajo cuando Lab está activo */}
-            {item.id === 'lab' && showSubmenu && (
+            {item.id === 'lab' && (
               <div 
-                className="w-full flex flex-col gap-2 transition-all duration-300 ease-in-out"
+                className="w-full flex flex-col gap-2 overflow-hidden transition-all duration-300 ease-in-out"
                 style={{ 
-                  maxHeight: '200px',
-                  opacity: 1,
-                  transform: 'translateY(0)'
+                  maxHeight: showSubmenu ? '200px' : '0px',
+                  opacity: showSubmenu ? 1 : 0,
+                  transform: showSubmenu ? 'translateY(0)' : 'translateY(-10px)',
+                  marginBottom: showSubmenu ? '0.5rem' : '0px'
                 }}
               >
                 {LAB_SUBMENU_ITEMS.map((subItem) => {
@@ -106,22 +103,25 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
                   const colors = accentColors[subItem.id as keyof typeof accentColors];
                   
                   return (
-                    <div key={subItem.id} className="relative flex flex-col items-center w-full">
+                    <div key={subItem.id} className="relative flex flex-col items-center w-full group">
                       <button
-                        onClick={() => onLabSectionChange?.(subItem.id)}
-                        className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all relative group border ml-1 ${
+                        onClick={(e) => {
+                          e.stopPropagation(); // Evitar que burbujee si es necesario
+                          onLabSectionChange?.(subItem.id);
+                        }}
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all relative border ${
                           isSubActive 
                             ? `${colors.bg} ${colors.text} ${colors.border} ${colors.glow}`
-                            : 'border-transparent text-gray-600 hover:text-gray-300 hover:bg-white/5'
+                            : 'border-transparent text-gray-500 hover:text-gray-300 hover:bg-white/5'
                         }`}
                         title={subItem.label}
                       >
-                        <Icon size={18} strokeWidth={2.5} />
+                        <Icon size={16} strokeWidth={2.5} />
                       </button>
                       
                       {/* Indicador de punto cuando está activo */}
                       {isSubActive && (
-                        <div className={`absolute left-1/2 -translate-x-1/2 -bottom-1 w-1.5 h-1.5 rounded-full ${colors.bar} ${colors.glow} z-10`} />
+                        <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-3 rounded-r-full ${colors.bar} ${colors.glow} z-10`} />
                       )}
                     </div>
                   );
