@@ -75,7 +75,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   const labIndex = NAV_ITEMS.findIndex(item => item.id === 'lab');
 
   return (
-    <aside className="w-12 border-r border-white/5 bg-[#050505] flex flex-col items-center py-3 gap-2 z-40 shrink-0 relative">
+    <aside className="w-12 border-r border-white/5 bg-dark-990 flex flex-col items-center py-3 gap-2 z-40 shrink-0 relative">
       {NAV_ITEMS.map((item, index) => {
         const isActive = activeTab === item.id;
         const showSubmenu = item.id === 'lab' && isLabActive;

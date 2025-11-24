@@ -184,18 +184,18 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
   }, [connectionStatus, compileStatus, sendCommand]);
 
   return (
-    <header className="h-12 border-b border-white/10 bg-[#050505] flex items-center justify-between px-4 z-50 shrink-0">
+    <header className="h-12 border-b border-white/10 bg-dark-990/90 backdrop-blur-md flex items-center justify-between px-4 z-50 shrink-0">
       <div className="flex items-center gap-6">
         {/* Identidad */}
         <div className="flex items-center gap-3 group cursor-pointer opacity-90 hover:opacity-100 transition-opacity">
           <div className="relative w-6 h-6 flex items-center justify-center border border-white/10 rounded bg-white/5">
-            <Aperture size={14} className="text-gray-300" />
+            <Aperture size={14} className="text-dark-200" />
           </div>
           <div className="flex flex-col leading-none">
-            <span className="text-xs font-bold text-gray-200 tracking-wide">
+            <span className="text-xs font-bold text-dark-100 tracking-wide">
               ATHERIA<span className="text-teal-400">_LAB</span>
             </span>
-            <span className="text-[8px] text-gray-600 font-mono uppercase mt-0.5" title={`Frontend: ${getFormattedVersion()}`}>{getFormattedVersion()}</span>
+            <span className="text-[8px] text-dark-500 font-mono uppercase mt-0.5" title={`Frontend: ${getFormattedVersion()}`}>{getFormattedVersion()}</span>
           </div>
         </div>
 
@@ -284,8 +284,8 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
             {/* Dropdown para cambiar motor */}
             {engineDropdownOpen && connectionStatus === 'connected' && (
               <div className="absolute top-full left-0 mt-1 z-50 min-w-[220px]">
-                <div className="bg-[#0a0a0a] border border-white/20 rounded shadow-xl p-2 space-y-1">
-                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1">
+                <div className="bg-dark-950 border border-white/10 rounded shadow-xl shadow-black/50 p-2 space-y-1 backdrop-blur-sm">
+                  <div className="text-[10px] font-bold text-dark-400 uppercase tracking-wider px-2 py-1">
                     Cambiar Motor
                   </div>
                   

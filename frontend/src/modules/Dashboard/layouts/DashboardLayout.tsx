@@ -101,7 +101,7 @@ export const DashboardLayout: React.FC = () => {
         // Vista principal: 2D canvas o 3D holographic según selectedViz
         if (selectedViz === 'holographic' || selectedViz === '3d') {
           return (
-            <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#050505] to-black overflow-hidden">
+            <div className="absolute inset-0 z-0 bg-gradient-deep-space overflow-hidden">
               {flatMapData.length > 0 && gridWidth > 0 && gridHeight > 0 ? (
                 <HolographicViewer 
                   data={flatMapData}
@@ -109,12 +109,12 @@ export const DashboardLayout: React.FC = () => {
                   height={gridHeight}
                 />
               ) : (
-                <div className="flex items-center justify-center h-full text-gray-300 text-sm">
+                <div className="flex items-center justify-center h-full text-dark-300 text-sm">
                   Esperando datos de simulación...
                 </div>
               )}
               {/* Design System: text-[9px] font-mono text-gray-700 según mockup */}
-              <div className="absolute bottom-4 right-4 text-[9px] font-mono text-gray-700 pointer-events-none text-right">
+              <div className="absolute bottom-4 right-4 text-[9px] font-mono text-dark-500 pointer-events-none text-right">
                 VIEWPORT: ORTHOGRAPHIC<br/>
                 RENDER: WEBGL2 / HIGH_PRECISION
               </div>
@@ -123,7 +123,7 @@ export const DashboardLayout: React.FC = () => {
         } else {
           // Vista 2D con PanZoomCanvas
           return (
-            <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#050505] to-black overflow-hidden">
+            <div className="absolute inset-0 z-0 bg-gradient-deep-space overflow-hidden">
               {connectionStatus === 'connected' ? (
                 <>
                   <PanZoomCanvas historyFrame={selectedTimelineFrame} />
@@ -170,7 +170,7 @@ export const DashboardLayout: React.FC = () => {
   };
 
   return (
-    <div className="h-screen bg-[#020202] text-gray-300 font-sans selection:bg-blue-500/30 overflow-hidden flex flex-col">
+    <div className="h-screen bg-dark-bg text-dark-200 font-sans selection:bg-teal-500/30 overflow-hidden flex flex-col">
       
               {/* Header: Barra de Comando Técnica */}
               <ScientificHeader currentEpoch={currentEpoch} onEpochChange={handleEpochChange} />
@@ -197,7 +197,7 @@ export const DashboardLayout: React.FC = () => {
 
         {/* Panel de Laboratorio (Experimentos/Entrenamiento) - Colapsable como drawer, Glass */}
         {labPanelOpen && (
-          <aside className={`flex-col border-r border-white/5 bg-black/40 backdrop-blur-md z-40 shrink-0 transition-all duration-300 ${
+          <aside className={`flex-col border-r border-white/5 bg-dark-980/40 backdrop-blur-md z-40 shrink-0 transition-all duration-300 ${
             labPanelCollapsed ? 'w-12' : 'w-[380px]'
           } flex overflow-hidden relative`}>
             <LabSider 
@@ -211,7 +211,7 @@ export const DashboardLayout: React.FC = () => {
 
         {/* Área de Trabajo (Viewport + Paneles Flotantes) */}
         {/* Design System: flex-1 (Ocupa todo el espacio restante), relative para overlays */}
-        <main className="flex-1 relative bg-black flex flex-col overflow-hidden">
+        <main className="flex-1 relative bg-dark-990 flex flex-col overflow-hidden">
           
           {/* Barra de Herramientas Superior (Flotante) */}
           <Toolbar onToggleTimeline={() => setTimelineOpen(prev => !prev)} timelineOpen={timelineOpen} />

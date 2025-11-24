@@ -14,12 +14,7 @@ import { decode as cborDecode } from '@msgpack/msgpack'; // msgpack también sop
 
 // Intentar importar LZ4 (si está disponible)
 let lz4: any = null;
-try {
-  // @ts-ignore - lz4 puede no tener tipos TypeScript
-  lz4 = require('lz4js');
-} catch (e) {
-  console.warn('LZ4 no disponible. Se usará pako (zlib) como fallback.');
-}
+// LZ4 support removed to avoid unused dependency
 
 interface CompressedArray {
     data: string; // base64 (formato antiguo)
