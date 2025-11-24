@@ -31,7 +31,15 @@ async def handle_set_viz(args):
                 
                 if viz_data and isinstance(viz_data, dict):
                     map_data = viz_data.get("map_data", [])
-                    if map_data and len(map_data) > 0:
+                    # Verificar si hay datos (compatible con listas y numpy arrays)
+                    has_data = False
+                    if map_data is not None:
+                        if isinstance(map_data, list):
+                            has_data = len(map_data) > 0
+                        elif hasattr(map_data, 'size'):  # Numpy array
+                            has_data = map_data.size > 0
+                    
+                    if has_data:
                         compression_enabled = g_state.get('data_compression_enabled', True)
                         downsample_factor = g_state.get('downsample_factor', 1)
                         
@@ -94,7 +102,15 @@ async def handle_update_visualization(args):
         
         if viz_data and isinstance(viz_data, dict):
             map_data = viz_data.get("map_data", [])
-            if map_data and len(map_data) > 0:
+            # Verificar si hay datos (compatible con listas y numpy arrays)
+            has_data = False
+            if map_data is not None:
+                if isinstance(map_data, list):
+                    has_data = len(map_data) > 0
+                elif hasattr(map_data, 'size'):  # Numpy array
+                    has_data = map_data.size > 0
+            
+            if has_data:
                 compression_enabled = g_state.get('data_compression_enabled', True)
                 downsample_factor = g_state.get('downsample_factor', 1)
                 
