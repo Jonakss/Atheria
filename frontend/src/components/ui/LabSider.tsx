@@ -1,5 +1,5 @@
 // frontend/src/components/ui/LabSider.tsx
-import { ArrowRightLeft, BarChart3, Brain, ChevronLeft, FlaskConical, Play, RotateCcw, Upload, X } from 'lucide-react';
+import { ArrowRightLeft, Play, RotateCcw, Upload, X } from 'lucide-react';
 import React, { useState } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
@@ -13,13 +13,11 @@ import { TrainingCanvas } from '../training/TrainingCanvas';
 type LabSection = 'inference' | 'training' | 'analysis';
 
 interface LabSiderProps {
-    activeSection?: LabSection;
-    onSectionChange?: (section: LabSection) => void;
-    isCollapsed?: boolean;
-    onToggleCollapse?: () => void;
+    activeSection: LabSection;
+    onClose?: () => void;
 }
 
-export function LabSider({ activeSection: externalActiveSection, onSectionChange, isCollapsed = false, onToggleCollapse }: LabSiderProps) {
+export function LabSider({ activeSection, onClose }: LabSiderProps) {
     const { 
         sendCommand, experimentsData, trainingStatus, trainingProgress,
         inferenceStatus, connectionStatus, selectedViz, setSelectedViz,
@@ -27,17 +25,6 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
     } = useWebSocket();
     
     const isConnected = connectionStatus === 'connected';
-    const [internalActiveSection, setInternalActiveSection] = useState<LabSection>('inference');
-    
-    // Usar la sección externa si está disponible, sino usar la interna
-    const activeSection = externalActiveSection ?? internalActiveSection;
-    const setActiveSection = (section: LabSection) => {
-        if (onSectionChange) {
-            onSectionChange(section);
-        } else {
-            setInternalActiveSection(section);
-        }
-    };
     
     // Estados para los inputs de entrenamiento
     const [selectedModel, setSelectedModel] = useState<string>('UNET');
@@ -51,7 +38,7 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
     const [gammaDecay, setGammaDecay] = useState(0.01);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     
-    // Estados para configuración de inferencia (movidos desde SettingsPanel)
+    // Estados para configuración de inferencia
     const [gridSizeInference, setGridSizeInference] = useState<number>(() => {
         const saved = localStorage.getItem('atheria_gridSizeInference');
         return saved ? parseInt(saved, 10) : 256;
@@ -120,7 +107,6 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
         }
         
         sendCommand('experiment', 'create', args);
-        setActiveSection('training'); // Cambiar a sección de entrenamiento
     };
 
     const handleContinueExperiment = () => {
@@ -166,11 +152,10 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
         if (activeExperiment) {
             const exp = experimentsData?.find(e => e.name === activeExperiment);
             if (exp && !exp.has_checkpoint) return;
-            // Incluir grid_size actual de la configuración (usar estado local)
             sendCommand('inference', 'load_experiment', { 
                 experiment_name: activeExperiment,
-                grid_size: gridSizeInference,  // Pasar grid_size configurado desde el estado local
-                force_engine: selectedEngine !== 'auto' ? selectedEngine : undefined // Pasar motor seleccionado si no es auto
+                grid_size: gridSizeInference,
+                force_engine: selectedEngine !== 'auto' ? selectedEngine : undefined
             }); 
         }
     };
@@ -179,7 +164,6 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
         if (!isConnected) return;
         if (window.confirm('¿Descargar el modelo cargado? Esto limpiará la memoria y dejará el laboratorio sin modelo activo.')) {
             sendCommand('inference', 'unload', {});
-            // Opcional: limpiar experimento activo en el frontend
             setActiveExperiment(null);
         }
     };
@@ -199,33 +183,23 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
 
     const progressPercent = trainingProgress ? (trainingProgress.current_episode / trainingProgress.total_episodes) * 100 : 0;
 
-    const sectionButtons = [
-        { id: 'inference' as LabSection, icon: FlaskConical, label: 'Inferencia', color: 'blue' },
-        { id: 'training' as LabSection, icon: Brain, label: 'Entrenamiento', color: 'teal' },
-        { id: 'analysis' as LabSection, icon: BarChart3, label: 'Análisis', color: 'pink' },
-    ];
-
     return (
         <div className="h-full w-full flex flex-col text-dark-200 relative bg-dark-950/80 backdrop-blur-md">
-            {/* Header con título y botón de colapsar */}
-            <div className={`h-10 border-b border-white/5 flex items-center bg-dark-980/90 shrink-0 ${
-                isCollapsed ? 'px-1 justify-center' : 'px-2 justify-between'
-            }`}>
-                {!isCollapsed && (
-                    <span className="text-[10px] font-bold text-dark-400 uppercase tracking-widest">Laboratorio</span>
+            {/* Header simple - Solo Close Button */}
+            <div className="h-8 flex items-center justify-end px-2 bg-transparent shrink-0 absolute top-0 right-0 z-50">
+                {onClose && (
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 text-dark-500 hover:text-dark-300 transition-colors rounded hover:bg-white/5"
+                        title="Cerrar Panel"
+                    >
+                        <X size={14} />
+                    </button>
                 )}
-                <button 
-                    onClick={onToggleCollapse}
-                    className="p-1.5 text-dark-500 hover:text-dark-300 transition-colors rounded hover:bg-white/5"
-                    title={isCollapsed ? "Expandir Panel" : "Minimizar Panel"}
-                >
-                    <ChevronLeft size={14} className={`transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} />
-                </button>
             </div>
 
-            {/* Contenido Scrollable - Oculto cuando está colapsado */}
-            {!isCollapsed && (
-            <div className={`flex-1 overflow-y-auto custom-scrollbar transition-all duration-300 ${
+            {/* Contenido Scrollable */}
+            <div className={`flex-1 overflow-y-auto custom-scrollbar transition-all duration-300 pt-8 ${
                 activeSection === 'inference' ? 'bg-blue-900/10' :
                 activeSection === 'training' ? 'bg-teal-900/10' :
                 activeSection === 'analysis' ? 'bg-pink-900/10' :
@@ -811,41 +785,6 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
                     )}
                 </div>
             </div>
-            )}
-            
-            {/* Vista colapsada - Mostrar solo iconos de secciones */}
-            {isCollapsed && (
-                <div className="flex-1 flex flex-col items-center justify-start pt-2 gap-1.5 w-full">
-                    {sectionButtons.map((section) => {
-                        const Icon = section.icon;
-                        const isActive = activeSection === section.id;
-                        let activeClasses = '';
-                        if (isActive) {
-                            if (section.color === 'blue') {
-                                activeClasses = 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-                            } else if (section.color === 'emerald') {
-                                activeClasses = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-                            } else if (section.color === 'amber') {
-                                activeClasses = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-                            }
-                        }
-                        return (
-                            <button
-                                key={section.id}
-                                onClick={() => setActiveSection(section.id)}
-                                className={`w-8 h-8 flex items-center justify-center rounded transition-all border ${
-                                    isActive
-                                        ? activeClasses
-                                        : 'text-gray-600 hover:text-gray-400 hover:bg-white/5 border-transparent'
-                                }`}
-                                title={section.label}
-                            >
-                                <Icon size={16} />
-                            </button>
-                        );
-                    })}
-                </div>
-            )}
 
             {/* Transfer Learning Wizard Modal */}
             <TransferLearningWizard 
