@@ -63,13 +63,7 @@ async def on_cleanup(app):
     await service_manager.stop_all()
 
 async def main(shutdown_event=None, serve_frontend=True):
-    """
-    Punto de entrada principal.
-    
-    Args:
-        shutdown_event: asyncio.Event para señalizar shutdown graceful (opcional)
-        serve_frontend: bool, si True se sirve el frontend estático (por defecto True)
-    """
+    """Punto de entrada principal."""
     app = web.Application()
     
     # Configurar rutas
@@ -87,28 +81,29 @@ async def main(shutdown_event=None, serve_frontend=True):
             logging.info(f"📂 Sirviendo frontend desde: {frontend_path}")
         else:
             logging.warning(f"⚠️ Frontend no encontrado en: {frontend_path}")
-    else:
-        logging.info("🚫 Frontend desactivado (serve_frontend=False)")
     
-    # Configurar puerto y host
+    # Iniciar servidor
     port = int(os.environ.get('PORT', 8000))
-    host = os.environ.get('HOST', '0.0.0.0')
+    logging.info(f"🌍 Servidor escuchando en http://0.0.0.0:{port}")
     
-    logging.info(f"🌍 Servidor escuchando en http://{host}:{port}")
+    # Crear runner
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
     
-    # Si hay shutdown_event, configurar un runner para poder cerrar gracefully
+    # Si hay shutdown_event, esperar a que se active
     if shutdown_event:
-        runner = web.AppRunner(app)
-        await runner.setup()
-        site = web.TCPSite(runner, host, port)
-        await site.start()
-        
-        # Esperar shutdown
         await shutdown_event.wait()
         logging.info("🛑 Shutdown signal recibido, cerrando servidor...")
-        await runner.cleanup()
     else:
-        web.run_app(app, port=port)
+        # Si no hay shutdown_event, esperar indefinidamente
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            logging.info("🛑 Servidor interrumpido...")
+    
+    await runner.cleanup()
 
 if __name__ == '__main__':
     asyncio.run(main())
