@@ -351,11 +351,15 @@ async def handle_load_experiment(args):
         elif force_engine == 'python':
             use_native = False
         else:
-            # Auto-detectar
-            try:
-                import atheria_core
-                use_native = True
-            except ImportError:
+            # Auto-detectar: Respetar configuración global si no se fuerza
+            if global_cfg.USE_NATIVE_ENGINE:
+                try:
+                    import atheria_core
+                    use_native = True
+                except ImportError:
+                    logging.warning("USE_NATIVE_ENGINE=True pero atheria_core no está disponible. Usando Python.")
+                    use_native = False
+            else:
                 use_native = False
         
         # Cargar modelo

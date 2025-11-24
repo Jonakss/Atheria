@@ -1,14 +1,14 @@
 // frontend/src/components/ui/LabSider.tsx
-import React, { useState, useEffect } from 'react';
-import { Play, Pause, RefreshCw, Upload, ArrowRightLeft, ChevronLeft, ChevronRight, FlaskConical, Brain, BarChart3, X, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, BarChart3, Brain, ChevronLeft, FlaskConical, Play, RotateCcw, Upload, X } from 'lucide-react';
+import React, { useState } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
-import { modelOptions, vizOptions } from '../../utils/vizOptions';
-import { ExperimentManager } from '../experiments/ExperimentManager';
-import { CheckpointManager } from '../training/CheckpointManager';
-import { ExperimentInfo } from '../experiments/ExperimentInfo';
-import { TransferLearningWizard } from '../experiments/TransferLearningWizard';
-import { TrainingCanvas } from '../training/TrainingCanvas';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
+import { modelOptions, vizOptions } from '../../utils/vizOptions';
+import { ExperimentInfo } from '../experiments/ExperimentInfo';
+import { ExperimentManager } from '../experiments/ExperimentManager';
+import { TransferLearningWizard } from '../experiments/TransferLearningWizard';
+import { CheckpointManager } from '../training/CheckpointManager';
+import { TrainingCanvas } from '../training/TrainingCanvas';
 
 type LabSection = 'inference' | 'training' | 'analysis';
 
@@ -21,7 +21,7 @@ interface LabSiderProps {
 
 export function LabSider({ activeSection: externalActiveSection, onSectionChange, isCollapsed = false, onToggleCollapse }: LabSiderProps) {
     const { 
-        sendCommand, experimentsData, trainingStatus, trainingProgress, trainingSnapshots,
+        sendCommand, experimentsData, trainingStatus, trainingProgress,
         inferenceStatus, connectionStatus, connect, disconnect, selectedViz, setSelectedViz,
         activeExperiment, setActiveExperiment, compileStatus
     } = useWebSocket();
@@ -61,6 +61,8 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
         return saved || 'complex_noise';
     });
     const [transferWizardOpened, setTransferWizardOpened] = useState(false);
+
+    const [selectedEngine, setSelectedEngine] = useState<string>('auto');
 
     // Encontrar el experimento activo
     const currentExperiment = activeExperiment 
@@ -167,7 +169,8 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
             // Incluir grid_size actual de la configuración (usar estado local)
             sendCommand('inference', 'load_experiment', { 
                 experiment_name: activeExperiment,
-                grid_size: gridSizeInference  // Pasar grid_size configurado desde el estado local
+                grid_size: gridSizeInference,  // Pasar grid_size configurado desde el estado local
+                force_engine: selectedEngine !== 'auto' ? selectedEngine : undefined // Pasar motor seleccionado si no es auto
             }); 
         }
     };
@@ -280,6 +283,21 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
                                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">EXPERIMENTO ACTIVO</div>
                                 <ExperimentInfo />
                                 
+                                {/* Selector de Motor */}
+                                <div className="flex items-center gap-2 px-1">
+                                    <label className="text-[10px] text-gray-400 uppercase shrink-0 w-12">Motor:</label>
+                                    <select 
+                                        value={selectedEngine}
+                                        onChange={(e) => setSelectedEngine(e.target.value)}
+                                        disabled={!isConnected || inferenceStatus === 'running'}
+                                        className="flex-1 px-2 py-1 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                                    >
+                                        <option value="auto">Automático</option>
+                                        <option value="python">🐍 Python (Estable)</option>
+                                        <option value="native">⚡ Nativo C++ (Experimental)</option>
+                                    </select>
+                                </div>
+                                
                                 <div className="flex gap-2">
                                     <button
                                         onClick={handleLoadExperiment}
@@ -294,6 +312,19 @@ export function LabSider({ activeSection: externalActiveSection, onSectionChange
                                         Cargar
                                     </button>
                                     
+                                    <button
+                                        onClick={handleResetSimulation}
+                                        disabled={!isConnected || inferenceStatus === 'running'}
+                                        className={`flex items-center justify-center px-3 py-2 rounded text-xs font-bold border transition-all ${
+                                            isConnected && inferenceStatus !== 'running'
+                                                ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                                                : 'bg-white/5 text-gray-500 border-white/10'
+                                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                        title="Reiniciar Simulación"
+                                    >
+                                        <RotateCcw size={16} />
+                                    </button>
+
                                     <button
                                         onClick={handleUnloadModel}
                                         disabled={!isConnected || (!compileStatus?.is_native && !compileStatus?.is_compiled) || inferenceStatus === 'running'}
