@@ -23,9 +23,13 @@ def verify_lab_navigation():
 
             lab_tab.click()
             time.sleep(1) # Wait for animation
+            lab_tab.click()
+            # Wait for animation by waiting for the target element to become visible
+            expect(page.locator('button[title="Inferencia"]')).to_be_visible()
 
             # 3. Verify Submenu appears (Inferencia, Entrenamiento, Análisis)
             inference_btn = page.locator('button[title="Inferencia"]')
+            expect(inference_btn).to_be_visible()
             expect(inference_btn).to_be_visible()
 
             # Take screenshot of open menu
