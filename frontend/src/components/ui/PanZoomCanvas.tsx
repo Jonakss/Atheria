@@ -776,7 +776,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 }
             }
         }
-    }, [dataToRender, simData, selectedViz, pan, zoom, historyFrame, gridWidth, gridHeight]);
+    }, [dataToRender, simData, selectedViz, pan, zoom, historyFrame, gridWidth, gridHeight, useShaderRendering]);
 
     // Atajos de teclado para vistas rápidas
     useEffect(() => {
