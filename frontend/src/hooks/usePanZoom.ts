@@ -40,76 +40,10 @@ export const usePanZoom = (
 
   // Función para calcular zoom y pan inicial centrado en el centro del grid
   const calculateInitialView = useCallback(() => {
-    if (!canvasRef.current || !gridWidth || !gridHeight) {
-      return { pan: { x: 0, y: 0 }, zoom: 1 };
-    }
-
-    const canvas = canvasRef.current;
-    // Obtener el tamaño del contenedor
-    const container = canvas.parentElement;
-    if (!container) {
-      return { pan: { x: 0, y: 0 }, zoom: 1 };
-    }
-
-    const containerRect = container.getBoundingClientRect();
-    const containerWidth = containerRect.width;
-    const containerHeight = containerRect.height;
-
-    if (containerWidth === 0 || containerHeight === 0) {
-      return { pan: { x: 0, y: 0 }, zoom: 1 };
-    }
-
-    // OPTIMIZACIÓN: Siempre mostrar TODO el grid, hacer zoom out si es necesario
-    // Calcular zoom para que TODO el grid quepa en el contenedor
-    // El canvas tiene dimensiones gridWidth x gridHeight píxeles (1 píxel = 1 unidad del grid)
-    // Queremos que TODO el grid (gridWidth unidades) quepa en `containerWidth` píxeles
-    // Zoom = containerSize / gridSize (si grid es mayor que container, zoom será < 1, es decir, zoom out)
-    const zoomX = containerWidth / gridWidth;
-    const zoomY = containerHeight / gridHeight;
-    const initialZoom = Math.min(zoomX, zoomY); // Usar el menor para asegurar que todo quepa
-
-    // Aplicar margen de seguridad (90% para dejar un poco de espacio)
-    const initialZoomWithMargin = initialZoom * 0.9;
-
-    // El canvas está posicionado con left: 50%, top: 50%, marginLeft: -gridWidth/2, marginTop: -gridHeight/2
-    // Esto centra el canvas en el contenedor
-    // Con transformOrigin: '0 0' y transform: scale() translate(), el origen de la transformación está en (0,0) del canvas
-    // Para centrar el centro del grid en el contenedor:
-    // - El centro del grid está en (gridWidth/2, gridHeight/2) en coordenadas del canvas
-    // - Después del scale, el centro del grid está en (gridWidth/2 * zoom, gridHeight/2 * zoom)
-    // - El centro del contenedor está en (containerWidth/2, containerHeight/2)
-    // - Necesitamos: pan.x + gridWidth/2 * zoom = containerWidth/2
-    // - Entonces: pan.x = containerWidth/2 - gridWidth/2 * zoom
-
-    // Pero como el canvas está centrado con CSS, el punto (0,0) del canvas está en el centro del contenedor
-    // después de aplicar left: 50%, top: 50%, marginLeft, marginTop
-    // El transform se aplica DESPUÉS de este posicionamiento
-    // Entonces, para que el centro del grid esté en el centro del contenedor:
-    // Necesitamos mover el centro del grid (gridWidth/2, gridHeight/2) al origen (0,0)
-    // Después del scale, esto se convierte en (gridWidth/2 * zoom, gridHeight/2 * zoom)
-    // Necesitamos: pan.x - gridWidth/2 * zoom = 0, entonces pan.x = gridWidth/2 * zoom
-    // Pero esto no es correcto...
-
-    // Revisando más cuidadosamente:
-    // - El canvas tiene width=gridWidth, height=gridHeight
-    // - Está centrado con CSS: left: 50%, top: 50%, marginLeft: -gridWidth/2, marginTop: -gridHeight/2
-    // - Esto coloca el punto (0,0) del canvas en el centro del contenedor
-    // - Con transformOrigin: '0 0', el origen de la transformación es (0,0) del canvas
-    // - Con transform: scale(zoom) translate(pan.x, pan.y):
-    //   * Primero se escala (el punto (0,0) sigue en (0,0) después del scale)
-    //   * Luego se traslada (el punto (0,0) se mueve a (pan.x, pan.y))
-    // - Para que el centro del grid (gridWidth/2, gridHeight/2) esté en el centro del contenedor:
-    //   * Después del scale: el centro está en (gridWidth/2 * zoom, gridHeight/2 * zoom)
-    //   * Después del translate: el centro está en (gridWidth/2 * zoom + pan.x, gridHeight/2 * zoom + pan.y)
-    //   * Queremos que esté en (0, 0) relativo al centro del contenedor (que es donde está el origen del canvas)
-    //   * Entonces: gridWidth/2 * zoom + pan.x = 0, por lo tanto pan.x = -gridWidth/2 * zoom
-
-    const initialPan = {
-      x: (-gridWidth / 2) * initialZoomWithMargin,
-      y: (-gridHeight / 2) * initialZoomWithMargin,
-    };
-
-    return { pan: initialPan, zoom: initialZoomWithMargin };
+    // SIMPLIFICADO: Siempre empezar centrado con zoom 1 y pan 0
+    // Esto es consistente, predecible, y evita problemas de timing con dimensiones del contenedor
+    // El usuario puede hacer zoom out con la rueda del ratón si necesita ver más
+    return { pan: { x: 0, y: 0 }, zoom: 1 };
   }, [canvasRef, gridWidth, gridHeight]);
 
   // Inicializar vista cuando cambia el tamaño del grid
