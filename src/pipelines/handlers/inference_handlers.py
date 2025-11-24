@@ -435,7 +435,6 @@ async def handle_load_experiment(args):
                     if model is None:
                         raise ValueError(f"No se pudo cargar modelo de {exp_name}")
                     
-                    from ...engines.qca_engine import Aetheria_Motor
                     motor = Aetheria_Motor(
                         model_operator=model,
                         grid_size=g_state.get('inference_grid_size', global_cfg.GRID_SIZE_INFERENCE),
@@ -443,7 +442,9 @@ async def handle_load_experiment(args):
                         device=device,
                         cfg=exp_cfg
                     )
-                    motor.eval()
+                    # Aetheria_Motor no hereda de nn.Module, llamar eval en el modelo interno
+                    if hasattr(motor, 'model_operator'):
+                        motor.model_operator.eval()
                     return motor
                 
                 # Ejecutar en thread pool
