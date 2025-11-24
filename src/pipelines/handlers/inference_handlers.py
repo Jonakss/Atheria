@@ -109,10 +109,16 @@ async def handle_play(args):
     
     # Enviar frame inicial si es posible (mejor esfuerzo - no bloquear la simulación)
     if motor_is_native and hasattr(motor, 'get_dense_state'):
-        try:
-            # OPTIMIZACIÓN: Timeout más largo (30s) y fallback si falla
-            # La visualización puede actualizarse después - no bloquear Play
-            logging.info("📤 Intentando enviar frame inicial (mejor esfuerzo, no bloqueante)...")
+        # OPTIMIZACIÓN: Si el grid es muy grande (>128), saltar frame inicial para evitar freeze
+        # El motor nativo puede tardar en la primera conversión. Mejor esperar al primer step.
+        grid_size = getattr(motor, 'grid_size', 256)
+        if grid_size > 128:
+             logging.info(f"⏩ Saltando frame inicial para motor nativo (grid={grid_size} > 128) para evitar bloqueo.")
+        else:
+            try:
+                # OPTIMIZACIÓN: Timeout más largo (30s) y fallback si falla
+                # La visualización puede actualizarse después - no bloquear Play
+                logging.info("📤 Intentando enviar frame inicial (mejor esfuerzo, no bloqueante)...")
             loop = asyncio.get_event_loop()
             psi = await asyncio.wait_for(
                 loop.run_in_executor(
@@ -172,12 +178,12 @@ async def handle_play(args):
                                 )
                                 await broadcast({"type": "simulation_frame", "payload": frame_payload})
                                 logging.info(f"📤 Frame inicial enviado al frontend (step={current_step})")
-        except asyncio.TimeoutError:
-            # Timeout es aceptable - la visualización se actualizará en el siguiente step
-            logging.warning("⏱️ Timeout enviando frame inicial (30s). La visualización se actualizará después.")
-        except Exception as e:
-            # Error es aceptable - la visualización se actualizará en el siguiente step
-            logging.warning(f"⚠️ Error enviando frame inicial: {e}. La visualización se actualizará después.")
+            except asyncio.TimeoutError:
+                # Timeout es aceptable - la visualización se actualizará en el siguiente step
+                logging.warning("⏱️ Timeout enviando frame inicial (30s). La visualización se actualizará después.")
+            except Exception as e:
+                # Error es aceptable - la visualización se actualizará en el siguiente step
+                logging.warning(f"⚠️ Error enviando frame inicial: {e}. La visualización se actualizará después.")
     
     logging.info(f"Simulación iniciada. Motor: {type(motor).__name__}, Step: {g_state.get('simulation_step', 0)}")
     
