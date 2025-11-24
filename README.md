@@ -437,3 +437,9 @@ pip install -e .
 ---
 
 **AETHERIA** - Explorando la emergencia de complejidad en sistemas cuánticos 🚀
+
+## 🤖 Integración Continua (CI/CD)
+
+El proyecto incluye flujos de trabajo automatizados con Gemini AI para revisión de código y triaje.
+
+Ver [[CI_CD_SETUP.md]] para instrucciones de configuración (Secrets y Variables).
