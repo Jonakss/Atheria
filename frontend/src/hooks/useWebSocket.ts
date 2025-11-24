@@ -1,13 +1,12 @@
-// frontend/src/hooks/useWebSocket.ts
-import { useContext } from 'react';
-import { WebSocketContext } from '../context/WebSocketContext';
+import { useContext } from "react";
+import { WebSocketContext } from "../context/WebSocketContextDefinition";
 
 export function useWebSocket() {
-    const context = useContext(WebSocketContext);
-    
-    if (!context) {
-        throw new Error('useWebSocket must be used within a WebSocketProvider');
-    }
+  const context = useContext(WebSocketContext);
 
-    return context;
+  if (!context) {
+    throw new Error("useWebSocket must be used within a WebSocketProvider");
+  }
+
+  return context;
 }

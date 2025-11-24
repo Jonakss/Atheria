@@ -42,6 +42,27 @@ def _compress_array_sync(arr: np.ndarray, dtype: str = 'float32') -> Dict[str, A
         'compressed': True
     }
 
+def _downsample_array_sync(arr: np.ndarray, factor: int) -> np.ndarray:
+    """
+    Realiza downsampling de un array NumPy de forma síncrona.
+    """
+    if factor <= 1 or arr.size == 0:
+        return arr
+    
+    H, W = arr.shape[0], arr.shape[1]
+    new_H, new_W = H // factor, W // factor
+    
+    if new_H > 0 and new_W > 0:
+        # Downsample usando promedio
+        # Asegurar que las dimensiones sean divisibles por downsample_factor
+        h_crop = new_H * factor
+        w_crop = new_W * factor
+        arr_cropped = arr[:h_crop, :w_crop]
+        # Usar mean para downsampling suave
+        return arr_cropped.reshape(new_H, factor, new_W, factor).mean(axis=(1, 3)).astype(arr.dtype)
+    
+    return arr
+
 async def compress_array(arr: np.ndarray, dtype: str = 'float32') -> Dict[str, Any]:
     """
     Versión asíncrona de compress_array para no bloquear el event loop.
@@ -100,34 +121,55 @@ async def optimize_frame_payload(payload: Dict[str, Any], enable_compression: bo
     optimized = payload.copy()
     
     # Optimizar map_data (siempre se envía)
-    if 'map_data' in payload and payload['map_data']:
+    if 'map_data' in payload:
         map_data = payload['map_data']
         
-        # Si es lista de listas, convertir a numpy
-        if isinstance(map_data, list):
-            try:
-                map_array = np.array(map_data, dtype=np.float32)
-                
-                # Aplicar downsampling si se especifica
-                if downsample_factor > 1 and map_array.size > 0:
-                    H, W = map_array.shape[0], map_array.shape[1]
-                    new_H, new_W = H // downsample_factor, W // downsample_factor
-                    if new_H > 0 and new_W > 0:
-                        # Downsample usando promedio
-                        map_array = map_array[:new_H * downsample_factor, :new_W * downsample_factor]
-                        map_array = map_array.reshape(new_H, downsample_factor, new_W, downsample_factor).mean(axis=(1, 3))
-                
-                # Comprimir si está habilitado y el array es grande
-                # Usar threshold más alto (50k elementos) para evitar overhead en arrays pequeños
-                if enable_compression and map_array.size > 50000:  # Solo comprimir si > 50k elementos
-                    optimized['map_data'] = await compress_array(map_array)
-                else:
-                    optimized['map_data'] = map_array.tolist()
+        # Verificar si map_data es válido (no None y no vacío)
+        is_valid = False
+        if isinstance(map_data, np.ndarray):
+            is_valid = map_data.size > 0
+        elif isinstance(map_data, list):
+            is_valid = len(map_data) > 0
+        
+        if is_valid:
+            # Si es lista de listas, convertir a numpy
+            if isinstance(map_data, list):
+                try:
+                    map_array = np.array(map_data, dtype=np.float32)
+                except Exception:
+                    map_array = None
+            else:
+                # Ya es numpy array
+                map_array = map_data
+            
+            if map_array is not None:
+                try:
+                    # Aplicar downsampling si se especifica
+                    # Aplicar downsampling si se especifica
+                    if downsample_factor > 1 and map_array.size > 0:
+                        # Offload downsampling to thread pool
+                        map_array = await asyncio.get_event_loop().run_in_executor(
+                            None, 
+                            _downsample_array_sync, 
+                            map_array, 
+                            downsample_factor
+                        )
                     
-            except Exception as e:
-                logging.warning(f"Error optimizando map_data: {e}")
-                # Fallback a original
-                optimized['map_data'] = map_data
+                    # Comprimir si está habilitado y el array es grande
+                    # Usar threshold más alto (50k elementos) para evitar overhead en arrays pequeños
+                    if enable_compression and map_array.size > 50000:  # Solo comprimir si > 50k elementos
+                        optimized['map_data'] = await compress_array(map_array)
+                    else:
+                        # Convertir a lista si no se comprime, para asegurar serialización JSON/MsgPack
+                        optimized['map_data'] = map_array.tolist()
+                        
+                except Exception as e:
+                    logging.warning(f"Error optimizando map_data: {e}")
+                    # Fallback a lista si es numpy array para evitar error de serialización
+                    if isinstance(map_data, np.ndarray):
+                        optimized['map_data'] = map_data.tolist()
+                    else:
+                        optimized['map_data'] = map_data
     
     # Optimizar complex_3d_data solo si está presente y se necesita
     if 'complex_3d_data' in payload and payload['complex_3d_data']:

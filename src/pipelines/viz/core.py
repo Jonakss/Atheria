@@ -373,19 +373,27 @@ def select_map_data(viz_type: str, density: np.ndarray, phase: np.ndarray,
 
 
 def calculate_entropy_map(psi: torch.Tensor) -> np.ndarray:
-    """Calcula mapa de entropía de Shannon."""
+    """Calcula mapa de entropía de Shannon en GPU."""
     try:
-        psi_abs_sq = np.abs(psi.cpu().numpy())**2  # (H, W, d_state)
+        # Calcular en GPU
+        psi_abs_sq = psi.abs()**2  # (H, W, d_state)
         # Normalizar para obtener probabilidades
-        total_prob = np.sum(psi_abs_sq, axis=-1, keepdims=True)  # (H, W, 1)
-        probabilities = np.where(total_prob > 1e-10, 
+        total_prob = torch.sum(psi_abs_sq, dim=-1, keepdim=True)  # (H, W, 1)
+        
+        # Evitar división por cero
+        probabilities = torch.where(total_prob > 1e-10, 
                                 psi_abs_sq / (total_prob + 1e-10),
-                                1.0 / psi.shape[-1])  # Distribución uniforme si total es 0
-        # Calcular entropía
-        entropy = -np.sum(probabilities * np.log(probabilities + 1e-10), axis=-1)  # (H, W)
+                                torch.tensor(1.0 / psi.shape[-1], device=psi.device))
+        
+        # Calcular entropía: -sum(p * log(p))
+        # Añadir epsilon a log para estabilidad numérica
+        entropy = -torch.sum(probabilities * torch.log(probabilities + 1e-10), dim=-1)  # (H, W)
+        
         # Normalizar por entropía máxima (log(d_state))
         max_entropy = np.log(psi.shape[-1])
-        return entropy / (max_entropy + 1e-10)
+        entropy_normalized = entropy / (max_entropy + 1e-10)
+        
+        return tensor_to_numpy(entropy_normalized, "entropy_map")
     except Exception as e:
         logging.warning(f"Error calculando entropía: {e}")
         # Fallback a densidad
@@ -394,25 +402,28 @@ def calculate_entropy_map(psi: torch.Tensor) -> np.ndarray:
 
 
 def calculate_coherence_map(psi: torch.Tensor) -> np.ndarray:
-    """Calcula mapa de coherencia de fase."""
+    """Calcula mapa de coherencia de fase en GPU."""
     try:
-        psi_np = psi.cpu().numpy()  # (H, W, d_state) complejo
-        H, W, d_state = psi_np.shape
-        
+        # Calcular en GPU
         # Calcular coherencia horizontal (entre vecinos en x)
-        psi_shifted_x = np.roll(psi_np, shift=-1, axis=1)  # Desplazar en x
-        psi_shifted_x[:, -1, :] = 0  # Borde: sin vecino
+        psi_shifted_x = torch.roll(psi, shifts=-1, dims=1)  # Desplazar en x
         
-        # Producto interno: ⟨ψ | ψ_shifted⟩
-        inner_product = np.sum(psi_np * np.conj(psi_shifted_x), axis=-1)  # (H, W)
+        # Ajustar borde (última columna no tiene vecino derecho)
+        # Clonar para evitar modificar tensor original in-place si es necesario
+        # Pero roll crea copia, así que podemos modificar psi_shifted_x
+        psi_shifted_x[:, -1, :] = 0
+        
+        # Producto interno: ⟨ψ | ψ_shifted⟩ = sum(ψ * conj(ψ_shifted))
+        inner_product = torch.sum(psi * torch.conj(psi_shifted_x), dim=-1)  # (H, W)
         
         # Normas
-        norm_psi = np.sqrt(np.sum(np.abs(psi_np)**2, axis=-1))  # (H, W)
-        norm_shifted = np.sqrt(np.sum(np.abs(psi_shifted_x)**2, axis=-1))  # (H, W)
+        norm_psi = torch.sqrt(torch.sum(psi.abs()**2, dim=-1))  # (H, W)
+        norm_shifted = torch.sqrt(torch.sum(psi_shifted_x.abs()**2, dim=-1))  # (H, W)
         
-        # Coherencia
-        coherence = np.abs(inner_product) / (norm_psi * norm_shifted + 1e-10)  # (H, W)
-        return coherence
+        # Coherencia: |⟨ψ | ψ_shifted⟩| / (|ψ| * |ψ_shifted|)
+        coherence = inner_product.abs() / (norm_psi * norm_shifted + 1e-10)  # (H, W)
+        
+        return tensor_to_numpy(coherence, "coherence_map")
     except Exception as e:
         logging.warning(f"Error calculando coherencia: {e}")
         # Fallback a densidad
@@ -421,23 +432,31 @@ def calculate_coherence_map(psi: torch.Tensor) -> np.ndarray:
 
 
 def calculate_channel_activity_map(psi: torch.Tensor) -> np.ndarray:
-    """Calcula mapa de actividad por canal."""
+    """Calcula mapa de actividad por canal en GPU."""
     try:
-        psi_abs_sq = np.abs(psi.cpu().numpy())**2  # (H, W, d_state)
-        H, W = psi_abs_sq.shape[0], psi_abs_sq.shape[1]
+        # Calcular en GPU
+        psi_abs_sq = psi.abs()**2  # (H, W, d_state)
+        
         # Calcular actividad promedio por canal (promedio espacial)
-        channel_activity = np.mean(psi_abs_sq, axis=(0, 1))  # (d_state,)
+        # dim=(0, 1) reduce H y W
+        channel_activity = torch.mean(psi_abs_sq, dim=(0, 1))  # (d_state,)
+        
         # Encontrar el canal más activo para cada célula
-        dominant_channel = np.argmax(psi_abs_sq, axis=-1)  # (H, W)
-        # Normalizar por actividad del canal dominante
-        max_activity = np.max(channel_activity)
+        dominant_channel = torch.argmax(psi_abs_sq, dim=-1)  # (H, W) indices
+        
+        # Obtener el valor del canal dominante en cada posición
+        # gather requiere dimensiones coincidentes, expandimos dominant_channel
+        dominant_channel_expanded = dominant_channel.unsqueeze(-1)  # (H, W, 1)
+        dominant_values = torch.gather(psi_abs_sq, -1, dominant_channel_expanded).squeeze(-1)  # (H, W)
+        
+        # Normalizar por actividad máxima global de canales
+        max_activity = torch.max(channel_activity)
+        
         if max_activity > 0:
-            # Mapa: actividad del canal dominante en cada posición
-            map_data = np.array([[psi_abs_sq[y, x, dominant_channel[y, x]] / max_activity 
-                                 for x in range(W)] for y in range(H)])
-            return map_data
+            map_data = dominant_values / max_activity
+            return tensor_to_numpy(map_data, "channel_activity_map")
         else:
-            density = torch.sum(psi.abs()**2, dim=-1)
+            density = torch.sum(psi_abs_sq, dim=-1)
             return tensor_to_numpy(density)
     except Exception as e:
         logging.warning(f"Error calculando actividad de canales: {e}")

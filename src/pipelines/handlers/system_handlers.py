@@ -66,8 +66,34 @@ async def handle_refresh_experiments(args):
         if ws: await send_notification(ws, f"Error actualizando lista: {str(e)}", "error")
 
 
+async def handle_toggle_logs(args):
+    """Activa o desactiva el streaming de logs."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    enabled = args.get('enabled', True)
+    
+    # Buscar el handler de logs en el root logger
+    root_logger = logging.getLogger()
+    log_handler = None
+    for handler in root_logger.handlers:
+        if hasattr(handler, 'enabled') and handler.__class__.__name__ == 'WebSocketLogHandler':
+            log_handler = handler
+            break
+    
+    if log_handler:
+        log_handler.enabled = enabled
+        status = "activados" if enabled else "desactivados"
+        logging.info(f"Logs de WebSocket {status}")
+        if ws:
+            await send_notification(ws, f"Logs {status}", "info")
+    else:
+        logging.warning("No se encontró WebSocketLogHandler para configurar")
+        if ws:
+            await send_notification(ws, "Error: No se encontró el sistema de logs", "error")
+
+
 HANDLERS = {
     "shutdown": handle_shutdown,
     "refresh_experiments": handle_refresh_experiments,
+    "toggle_logs": handle_toggle_logs,
 }
 

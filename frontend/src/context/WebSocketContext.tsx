@@ -1,7 +1,15 @@
 // frontend/src/context/WebSocketContext.tsx
-import { createContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
-import { decompressIfNeeded, decodeBinaryFrame, processDecodedPayload } from '../utils/dataDecompression';
-import { saveFrameToTimeline, getTimelineStats } from '../utils/timelineStorage';
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { decodeBinaryFrame, decompressIfNeeded, processDecodedPayload } from '../utils/dataDecompression';
+import { getServerConfig, getWebSocketUrl, saveServerConfig, type ServerConfig } from '../utils/serverConfig';
+import { saveFrameToTimeline } from '../utils/timelineStorage';
+import {
+    CompileStatus,
+    SimData,
+    TrainingProgress,
+    TrainingSnapshot,
+    WebSocketContext
+} from './WebSocketContextDefinition';
 
 /**
  * Descomprime arrays comprimidos dentro de un payload (formato antiguo o nuevo).
@@ -15,7 +23,17 @@ function decompressPayloadArrays(payload: any): any {
     
     // Descomprimir map_data si existe
     if (result.map_data) {
+        if (process.env.NODE_ENV === 'development') {
+            const isComp = result.map_data.compressed === true;
+            console.log(`🔍 WebSocketContext: map_data recibido. Compressed: ${isComp}, Type: ${typeof result.map_data}, Keys: ${Object.keys(result.map_data)}`);
+        }
         result.map_data = decompressIfNeeded(result.map_data);
+        
+        if (process.env.NODE_ENV === 'development') {
+            const isArray = Array.isArray(result.map_data);
+            const length = isArray ? result.map_data.length : 'N/A';
+            console.log(`✅ WebSocketContext: map_data procesado. IsArray: ${isArray}, Length: ${length}`);
+        }
     }
     
     // Descomprimir complex_3d_data si existe
@@ -56,112 +74,6 @@ function decompressPayloadArrays(payload: any): any {
     
     return result;
 }
-import { getServerConfig, getWebSocketUrl, saveServerConfig, type ServerConfig } from '../utils/serverConfig';
-
-interface SimData {
-    complex_3d_data?: {
-        real: number[][];
-        imag: number[][];
-    };
-    map_data?: number[][];
-    hist_data?: Record<string, Array<{ bin: string; count: number }>>;
-    poincare_coords?: number[][];
-    step?: number | null;
-    timestamp?: number;
-    simulation_info?: {
-        step?: number;
-        is_paused?: boolean;
-        live_feed_enabled?: boolean;
-        gamma_decay?: number;
-        fps?: number;
-        epoch?: number;
-        epoch_metrics?: {
-            energy?: number;
-            clustering?: number;
-            symmetry?: number;
-        };
-        initial_step?: number;
-        checkpoint_step?: number;
-        checkpoint_episode?: number;
-        training_grid_size?: number;
-        inference_grid_size?: number;
-        grid_scaled?: boolean;
-    };
-    phase_attractor?: any;
-    flow_data?: {
-        dx: number[][];
-        dy: number[][];
-        magnitude?: number[][];
-    };
-    phase_hsv_data?: {
-        hue: number[][];
-        saturation: number[][];
-        value: number[][];
-    };
-    roi_info?: any;
-}
-
-interface TrainingProgress {
-    current_episode: number;
-    total_episodes: number;
-    avg_loss: number;
-    avg_reward?: number;
-}
-
-interface TrainingSnapshot {
-    episode: number;
-    step?: number;
-    map_data: number[][];
-    timestamp?: number;
-    loss?: number;
-    metrics?: {
-        survival?: number;
-        symmetry?: number;
-        complexity?: number;
-    };
-}
-
-interface CompileStatus {
-    is_compiled: boolean;
-    is_native: boolean;  // ← INDICADOR DE MOTOR NATIVO
-    model_name: string;
-    compiles_enabled: boolean;
-    device_str?: string;  // CPU/CUDA - CORREGIDO: usar device_str para consistencia
-    native_version?: string;  // Versión del motor C++ (SemVer)
-    wrapper_version?: string;  // Versión del wrapper Python (SemVer)
-    python_version?: string;  // Versión del motor Python (SemVer)
-}
-
-interface WebSocketContextType {
-    sendCommand: (scope: string, command: string, args?: Record<string, any>) => void;
-    connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'server_unavailable';
-    experimentsData: any[] | null;
-    trainingStatus: 'idle' | 'running';
-    inferenceStatus: 'paused' | 'running';
-    analysisStatus: 'idle' | 'running' | 'completed' | 'cancelled' | 'error'; // Estado del análisis
-    analysisType: 'universe_atlas' | 'cell_chemistry' | null; // Tipo de análisis actual
-    selectedViz: string;
-    setSelectedViz: (viz: string) => void;
-    connect: () => void;
-    reconnect: () => void; // Función para reconexión manual
-    disconnect: () => void; // Función para desconectar manualmente
-    simData: SimData | null;
-    trainingLog: string[];
-    allLogs: string[]; // Logs unificados
-    trainingProgress: TrainingProgress | null;
-    activeExperiment: string | null;
-    setActiveExperiment: (name: string | null) => void;
-    ws: WebSocket | null; // Exponer WebSocket para escuchar mensajes personalizados
-    snapshotCount: number; // Contador de snapshots capturados
-    trainingSnapshots: TrainingSnapshot[]; // Snapshots de entrenamiento
-    serverConfig: ServerConfig; // Configuración del servidor
-    updateServerConfig: (config: Partial<ServerConfig>) => void; // Actualizar configuración
-    compileStatus: CompileStatus | null; // Estado de compilación/motor
-    liveFeedEnabled: boolean; // Estado del live feed (sincronizado con backend)
-    setLiveFeedEnabled: (enabled: boolean) => void; // Función para cambiar live feed
-}
-
-export const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
 
 export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'server_unavailable'>('disconnected');
@@ -175,6 +87,8 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     const [serverConfig, setServerConfigState] = useState<ServerConfig>(getServerConfig());
     // Usar una referencia para acceder al valor actual de serverConfig en callbacks
     const serverConfigRef = useRef<ServerConfig>(serverConfig);
+    const simDataRef = useRef<SimData | null>(null);
+    const connectionStatusRef = useRef(connectionStatus);
 
     // --- Hooks de Estado para manejar la lógica de la aplicación ---
     const [experimentsData, setExperimentsData] = useState<any[] | null>(null);
@@ -202,6 +116,14 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         serverConfigRef.current = serverConfig;
     }, [serverConfig]);
+
+    useEffect(() => {
+        simDataRef.current = simData;
+    }, [simData]);
+
+    useEffect(() => {
+        connectionStatusRef.current = connectionStatus;
+    }, [connectionStatus]);
 
     // Función para actualizar la configuración del servidor
     const updateServerConfig = useCallback((config: Partial<ServerConfig>) => {
@@ -282,10 +204,10 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
             }
         };
         
-        socket.onerror = (error) => {
+        socket.onerror = () => {
             // Solo loguear errores persistentes, no durante la conexión inicial
             const now = Date.now();
-            if (now - lastErrorLog.current > 10000 && connectionStatus !== 'connecting') {
+            if (now - lastErrorLog.current > 10000 && connectionStatusRef.current !== 'connecting') {
                 if (process.env.NODE_ENV === 'development') {
                     console.debug("Error de WebSocket (ignorado durante conexión inicial)");
                 }
@@ -316,7 +238,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         if (frameData.metadata && frameData.arrays) {
                             // Procesar arrays binarios y reconstruir payload
                             // Capturar simData actual para differential compression
-                            const currentSimData = simData;
+                            const currentSimData = simDataRef.current;
                             message = {
                                 type: frameData.metadata.type || 'simulation_frame',
                                 payload: processDecodedPayload(frameData, currentSimData)
@@ -389,7 +311,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                             setCompileStatus(payload.compile_status as CompileStatus);
                         }
                         break;
-                    case 'experiments_updated':
+                    case 'experiments_updated': {
                         // Actualizar lista de experimentos cuando se crea/elimina un experimento
                         setExperimentsData(payload.experiments);
                         // Si el experimento activo fue eliminado, limpiar selección
@@ -398,6 +320,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                             setActiveExperiment(null);
                         }
                         break;
+                    }
                     case 'training_status_update':
                         setTrainingStatus(payload.status);
                         // Limpiar snapshots cuando el entrenamiento termina (opcional)
@@ -558,7 +481,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                             console.error("Error procesando simulation_state_update:", error);
                         }
                         break;
-                    case 'training_log':
+                    case 'training_log': {
                         // OPTIMIZACIÓN DE MEMORIA: Limitar tamaño de logs para evitar memory leaks
                         const MAX_LOGS_TRAINING = 500; // Reducido de 1000 a 500 para ahorrar memoria
                         setTrainingLog(prev => {
@@ -570,24 +493,32 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                             return newLogs.slice(-MAX_LOGS_TRAINING); // Mantener solo últimos N logs
                         });
                         break;
-                    case 'simulation_log':
+                    }
+                    case 'simulation_log': {
                         // OPTIMIZACIÓN DE MEMORIA: Limitar tamaño de logs para evitar memory leaks
                         const MAX_LOGS = 500; // Reducido de 1000 a 500 para ahorrar memoria
                         setAllLogs(prev => {
-                            const newLogs = [...prev, payload];
+                            // Extraer mensaje formateado si es un objeto, o usar payload si es string
+                            const logMessage = typeof payload === 'object' && payload.formatted 
+                                ? payload.formatted 
+                                : (typeof payload === 'string' ? payload : JSON.stringify(payload));
+                                
+                            const newLogs = [...prev, logMessage];
                             return newLogs.slice(-MAX_LOGS); // Mantener solo últimos N logs
                         });
                         break;
+                    }
                     case 'training_progress':
                         setTrainingProgress(payload);
                         break;
-                    case 'notification':
+                    case 'notification': {
                         // Mostrar notificación del servidor
                         const { status, message } = payload;
                         const title = status === 'error' ? 'Error' : status === 'warning' ? 'Advertencia' : status === 'success' ? 'Éxito' : 'Información';
                         console.log(`[${title}] ${message}`);
                         // TODO: Implementar sistema de notificaciones con Tailwind
                         break;
+                    }
                     case 'snapshot_count':
                         // Actualizar contador de snapshots
                         setSnapshotCount(payload.count || 0);

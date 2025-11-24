@@ -142,7 +142,15 @@ async def handle_play(args):
                     
                     if viz_data and isinstance(viz_data, dict):
                         map_data = viz_data.get("map_data", [])
-                        if map_data and len(map_data) > 0:
+                        # Verificar si hay datos válidos (soporte para listas y numpy arrays)
+            has_data = False
+            if map_data is not None:
+                if isinstance(map_data, list):
+                    has_data = len(map_data) > 0
+                elif hasattr(map_data, 'size'): # Numpy array
+                    has_data = map_data.size > 0
+            
+            if has_data:
                             map_data_np = np.array(map_data) if not isinstance(map_data, np.ndarray) else map_data
                             min_val = np.min(map_data_np)
                             max_val = np.max(map_data_np)

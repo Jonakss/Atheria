@@ -39,10 +39,12 @@ def serialize_frame_binary(payload: Dict[str, Any]) -> Tuple[bytes, str]:
     optimized_payload = payload.copy()
     
     # Optimizar map_data si existe (suele ser el más grande)
-    if 'map_data' in optimized_payload and isinstance(optimized_payload['map_data'], list):
-        # Convertir lista anidada a formato más eficiente
-        # (se mantiene como lista para compatibilidad, pero se optimiza la serialización)
-        pass
+    if 'map_data' in optimized_payload:
+        map_data = optimized_payload['map_data']
+        # Si es numpy array, convertir a lista para evitar error de serialización
+        # Esto es un fallback por si data_compression falló o no se usó
+        if hasattr(map_data, 'tolist'):
+            optimized_payload['map_data'] = map_data.tolist()
     
     # Intentar usar MessagePack primero (más eficiente para arrays numéricos)
     if MSGPACK_AVAILABLE:

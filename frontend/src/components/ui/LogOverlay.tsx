@@ -1,13 +1,13 @@
 // frontend/src/components/LogOverlay.tsx
-import { Paper, ScrollArea, Text, Box, Title, Center, Stack, Tabs, Collapse, Button, Group, ActionIcon } from '@mantine/core';
+import { ActionIcon, Box, Button, Center, Collapse, Group, Paper, ScrollArea, Stack, Tabs, Text, TextInput, Title } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
+import { IconChartBar, IconChevronDown, IconChevronUp, IconFileText, IconGripVertical, IconInfoCircle, IconMinus, IconSend, IconTerminal } from '@tabler/icons-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import classes from './LogOverlay.module.css';
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { IconInfoCircle, IconChevronUp, IconChevronDown, IconFileText, IconChartBar, IconMinus, IconGripVertical } from '@tabler/icons-react';
-import { useDisclosure } from '@mantine/hooks';
 
 export function LogOverlay() {
-    const { allLogs, trainingStatus, inferenceStatus, trainingProgress, experimentsData, activeExperiment } = useWebSocket();
+    const { allLogs, trainingStatus, inferenceStatus, trainingProgress, experimentsData, activeExperiment, sendCommand } = useWebSocket();
     const viewport = useRef<HTMLDivElement>(null);
     const [opened, { toggle }] = useDisclosure(false);
     const [minimized, setMinimized] = useState(false);
@@ -15,6 +15,45 @@ export function LogOverlay() {
     const [height, setHeight] = useState(300);
     const [isResizing, setIsResizing] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+    const [commandInput, setCommandInput] = useState('');
+
+    const handleCommandSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!commandInput.trim()) return;
+
+        // Parse command: "scope command arg1=val1 arg2=val2" or just "command arg1=val1" (default scope=system)
+        const parts = commandInput.trim().split(/\s+/);
+        let scope = 'system';
+        let command = parts[0];
+        let argsStartIndex = 1;
+
+        // Simple heuristic: if first part is a known scope, use it
+        const knownScopes = ['system', 'inference', 'training', 'simulation'];
+        if (knownScopes.includes(parts[0]) && parts.length > 1) {
+            scope = parts[0];
+            command = parts[1];
+            argsStartIndex = 2;
+        }
+
+        const args: Record<string, any> = {};
+        for (let i = argsStartIndex; i < parts.length; i++) {
+            const argPart = parts[i];
+            if (argPart.includes('=')) {
+                const [key, val] = argPart.split('=');
+                // Try to parse number or boolean
+                if (val === 'true') args[key] = true;
+                else if (val === 'false') args[key] = false;
+                else if (!isNaN(Number(val))) args[key] = Number(val);
+                else args[key] = val;
+            } else {
+                // Positional args or flags treated as true
+                args[argPart] = true;
+            }
+        }
+
+        sendCommand(scope, command, args);
+        setCommandInput('');
+    };
 
     // Scroll automático al final
     useEffect(() => {
@@ -302,6 +341,25 @@ export function LogOverlay() {
                             </Paper>
                         </Tabs.Panel>
                     </Tabs>
+                    
+                    {/* Command Console Input */}
+                    <Box p="xs" style={{ borderTop: '1px solid var(--mantine-color-dark-4)', backgroundColor: 'var(--mantine-color-dark-6)' }}>
+                        <form onSubmit={handleCommandSubmit}>
+                            <TextInput
+                                placeholder="Enter command (e.g., 'system toggle_logs', 'inference play')"
+                                value={commandInput}
+                                onChange={(e) => setCommandInput(e.currentTarget.value)}
+                                size="xs"
+                                leftSection={<IconTerminal size={14} />}
+                                rightSection={
+                                    <ActionIcon size="xs" variant="subtle" type="submit" disabled={!commandInput.trim()}>
+                                        <IconSend size={12} />
+                                    </ActionIcon>
+                                }
+                                rightSectionWidth={30}
+                            />
+                        </form>
+                    </Box>
                 </Box>
             </Collapse>
         </Box>

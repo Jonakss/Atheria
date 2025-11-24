@@ -1,19 +1,19 @@
 // frontend/src/components/PanZoomCanvas.tsx
-import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { useWebSocket } from '../../hooks/useWebSocket';
+import { Settings, ZoomOut } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePanZoom } from '../../hooks/usePanZoom';
-import { CanvasOverlays, OverlayControls, OverlayConfig } from './CanvasOverlays';
-import { ZoomOut, Settings, Eye, EyeOff, Maximize2, Minimize2 } from 'lucide-react';
-import { Group } from '../../modules/Dashboard/components/Group';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { ActionIcon } from '../../modules/Dashboard/components/ActionIcon';
-import { Tooltip } from '../../modules/Dashboard/components/Tooltip';
-import { Switch } from '../../modules/Dashboard/components/Switch';
-import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
-import { Stack } from '../../modules/Dashboard/components/Stack';
-import { Text } from '../../modules/Dashboard/components/Text';
 import { Box } from '../../modules/Dashboard/components/Box';
-import { ShaderCanvas } from './ShaderCanvas';
+import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
+import { Group } from '../../modules/Dashboard/components/Group';
+import { Stack } from '../../modules/Dashboard/components/Stack';
+import { Switch } from '../../modules/Dashboard/components/Switch';
+import { Text } from '../../modules/Dashboard/components/Text';
+import { Tooltip } from '../../modules/Dashboard/components/Tooltip';
 import { isWebGLAvailable } from '../../utils/shaderVisualization';
+import { CanvasOverlays, OverlayConfig, OverlayControls } from './CanvasOverlays';
+import { ShaderCanvas } from './ShaderCanvas';
 
 function getColor(value: number) {
     // Validar que value sea un número válido
@@ -51,7 +51,7 @@ interface PanZoomCanvasProps {
 
 export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const shaderCanvasRef = useRef<HTMLCanvasElement>(null);
+
     const { simData, selectedViz, inferenceStatus, sendCommand } = useWebSocket();
     
     // Detectar si WebGL está disponible para usar shaders (GPU rendering)
@@ -122,9 +122,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     const gridWidth = actualGridWidth;
     const gridHeight = actualGridHeight;
     
-    // mapDataWidth/mapDataHeight para renderizado (puede ser ROI)
-    const mapDataWidth = mapData?.[0]?.length || 0;
-    const mapDataHeight = mapData?.length || 0;
+
     
     // Estado de overlays (declarar ANTES de usarlo)
     const [overlayConfig, setOverlayConfig] = useState<OverlayConfig>({
@@ -928,86 +926,94 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
             </Box>
             
             {/* Canvas principal - Usar ShaderCanvas (WebGL) cuando WebGL está disponible y la visualización es compatible */}
-            {useShaderRendering && mapData && mapData.length > 0 && mapDataWidth > 0 && mapDataHeight > 0 ? (
+            {/* Canvas principal - Usar ShaderCanvas (WebGL) cuando WebGL está disponible y la visualización es compatible */}
+            <div
+                ref={containerRefShader}
+                className="absolute inset-0 overflow-hidden select-none"
+                style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={() => {
+                    handleMouseUp();
+                    handleCanvasMouseLeave();
+                }}
+            >
                 <div
-                    ref={containerRefShader}
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
-                    style={{ 
-                        position: 'absolute',
-                        left: '50%',
-                        top: '50%',
-                        marginLeft: `${-(gridWidth / 2) + (pan.x / zoom)}px`,
-                        marginTop: `${-(gridHeight / 2) + (pan.y / zoom)}px`,
-                        width: `${gridWidth}px`,
-                        height: `${gridHeight}px`,
-                        transform: `scale(${zoom})`,
+                    style={{
+                        transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
                         transformOrigin: 'center center',
-                        cursor: isPanning ? 'grabbing' : 'grab',
-                        pointerEvents: 'auto',
-                        visibility: (dataToRender?.map_data || simData?.map_data) ? 'visible' : 'hidden',
-                        zIndex: 10,
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        willChange: 'transform'
                     }}
                 >
-                    <ShaderCanvas
-                        mapData={mapData}
-                        width={mapDataWidth}
-                        height={mapDataHeight}
-                        selectedViz={selectedViz}
-                        minValue={0}  // CRÍTICO: Backend ya normaliza a [0, 1], pasar explícitamente
-                        maxValue={1}  // CRÍTICO: Backend ya normaliza a [0, 1], pasar explícitamente
-                        className="w-full h-full"
+                    {/* Capa de Shaders (GPU) - Fondo */}
+                    {useShaderRendering && (
+                        <div style={{ 
+                            position: 'absolute', 
+                            zIndex: 1,
+                            width: gridWidth,
+                            height: gridHeight,
+                            pointerEvents: 'none'
+                        }}>
+                            <ShaderCanvas
+                                mapData={mapData || []}
+                                width={gridWidth}
+                                height={gridHeight}
+                                selectedViz={selectedViz}
+                                minValue={0}
+                                maxValue={1}
+                                style={{ 
+                                    width: '100%', 
+                                    height: '100%',
+                                    imageRendering: 'pixelated' 
+                                }}
+                            />
+                        </div>
+                    )}
+
+                    {/* Capa de Canvas 2D (CPU) - Frente/Fallback/Overlays */}
+                    <canvas
+                        ref={canvasRef}
+                        className="pixelated"
+                        width={gridWidth}
+                        height={gridHeight}
                         style={{
-                            imageRendering: zoom > 2 ? 'pixelated' : 'auto',
-                            pointerEvents: 'none', // El canvas no debe interceptar eventos, el contenedor los maneja
+                            opacity: useShaderRendering ? 0 : 1, 
+                            zIndex: 2,
+                            pointerEvents: 'none'
                         }}
                     />
+                    
+                    {/* Overlay de bordes toroidales */}
+                    {overlayConfig.showToroidalBorders && (
+                        <div style={{
+                            position: 'absolute',
+                            top: -(gridHeight/2),
+                            left: -(gridWidth/2),
+                            width: gridWidth * 3,
+                            height: gridHeight * 3,
+                            border: '1px dashed rgba(255, 255, 255, 0.2)',
+                            zIndex: 3,
+                            pointerEvents: 'none',
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr 1fr',
+                            gridTemplateRows: '1fr 1fr 1fr'
+                        }}>
+                            {[...Array(9)].map((_, i) => (
+                                <div key={i} style={{
+                                    border: '1px dashed rgba(255, 255, 255, 0.1)',
+                                    boxSizing: 'border-box'
+                                }} />
+                            ))}
+                        </div>
+                    )}
                 </div>
-            ) : (
-                /* Fallback a Canvas 2D para visualizaciones complejas o cuando WebGL no está disponible */
-                <div
-                    ref={containerRefCanvas}
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
-                    style={{
-                        position: 'absolute',
-                        left: '50%',
-                        top: '50%',
-                        marginLeft: `${-(gridWidth / 2) + (pan.x / zoom)}px`,
-                        marginTop: `${-(gridHeight / 2) + (pan.y / zoom)}px`,
-                        width: `${gridWidth}px`,
-                        height: `${gridHeight}px`,
-                        transform: `scale(${zoom})`,
-                        transformOrigin: 'center center',
-                        cursor: isPanning ? 'grabbing' : 'grab',
-                        pointerEvents: 'auto',
-                        visibility: (dataToRender?.map_data || simData?.map_data) ? 'visible' : 'hidden',
-                    }}
-                >
-                <canvas
-                    ref={canvasRef}
-                    style={{ 
-                        position: 'absolute',
-                        left: '50%',
-                        top: '50%',
-                        marginLeft: `${-(gridWidth / 2) + (pan.x / zoom)}px`,
-                        marginTop: `${-(gridHeight / 2) + (pan.y / zoom)}px`,
-                        width: `${gridWidth}px`,
-                        height: `${gridHeight}px`,
-                        transform: `scale(${zoom})`,
-                        transformOrigin: 'center center',
-                        imageRendering: zoom > 2 ? 'pixelated' : 'auto',
-                        visibility: (dataToRender?.map_data || simData?.map_data) ? 'visible' : 'hidden',
-                        cursor: isPanning ? 'grabbing' : 'grab',
-                        pointerEvents: 'auto'
-                    }}
-                />
-                </div>
-            )}
+            </div>
             
             {/* Overlays */}
             {(overlayConfig.showGrid || overlayConfig.showCoordinates || overlayConfig.showQuadtree || overlayConfig.showStats || overlayConfig.showToroidalBorders) && (
@@ -1122,7 +1128,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                                 </div>
                             </div>
                         </div>
-        </div>
+                    </div>
                 </GlassPanel>
             </Box>
         </Box>

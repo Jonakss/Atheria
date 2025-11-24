@@ -109,15 +109,16 @@ async def simulation_loop():
                                     break
                             
                             if motor:
-                                motor.evolve_internal_state()
+                                # Offload evolution to thread pool to avoid blocking event loop
+                                await asyncio.get_event_loop().run_in_executor(None, motor.evolve_internal_state)
                             updated_step = current_step + step_idx + 1
                             g_state['simulation_step'] = updated_step
                             steps_executed_this_iteration += 1
                             
                             # CRÍTICO: Yield al event loop periódicamente para permitir procesar comandos WebSocket
                             # Esto previene que el simulation_loop bloquee el event loop y permita respuesta rápida a comandos
-                            # Yield cada 10 pasos para motor nativo (más frecuente), cada 50 para motor Python
-                            if (step_idx + 1) % (10 if motor_is_native else 50) == 0:
+                            # Yield cada paso para motor nativo (más frecuente), cada 10 para motor Python
+                            if (step_idx + 1) % (1 if motor_is_native else 10) == 0:
                                 await asyncio.sleep(0)  # Yield al event loop para permitir otros tasks
                             
                             # Para motor nativo: verificar pausa también DESPUÉS de cada paso
@@ -258,10 +259,26 @@ async def simulation_loop():
                                 def check_pause():
                                     return g_state.get('is_paused', True)
                                 
+                                # CRÍTICO: Verificar pausa ANTES de conversión costosa
+                                if g_state.get('is_paused', True):
+                                    logging.info("⏸️ Pausa detectada antes de get_dense_state. Saltando frame.")
+                                    await asyncio.sleep(0.1)
+                                    continue
+                                
                                 # Obtener estado denso (solo convierte si es necesario)
-                                psi = motor.get_dense_state(roi=roi, check_pause_callback=check_pause)
+                                # Offload to thread pool
+                                psi = await asyncio.get_event_loop().run_in_executor(
+                                    None, 
+                                    lambda: motor.get_dense_state(roi=roi, check_pause_callback=check_pause)
+                                )
                                 # CRÍTICO: Yield al event loop después de conversión bloqueante (puede tardar en grids grandes)
                                 await asyncio.sleep(0)  # Permitir procesar comandos WebSocket
+                                
+                                # CRÍTICO: Verificar pausa DESPUÉS de conversión costosa
+                                if g_state.get('is_paused', True):
+                                    logging.info("⏸️ Pausa detectada después de get_dense_state. Saltando frame.")
+                                    await asyncio.sleep(0.1)
+                                    continue
                             else:
                                 # Motor Python: acceder directamente (ya es denso)
                                 psi = motor.state.psi if hasattr(motor, 'state') and motor.state else None
@@ -280,34 +297,55 @@ async def simulation_loop():
                                 psi_mean = psi.abs().mean().item()
                                 if psi_abs_max < 1e-10:
                                     logging.error(f"❌ CRÍTICO: psi tiene valores muy pequeños (max abs={psi_abs_max:.6e}, mean={psi_mean:.6e}). El motor está vacío o no inicializado correctamente.")
-                                    # CRÍTICO: Si el motor está vacío, intentar inicializarlo
-                                    if motor_is_native and hasattr(motor, 'add_initial_particles'):
-                                        logging.info("🛠️ Intentando inicializar motor nativo con partículas aleatorias...")
-                                        try:
-                                            num_particles = min(100, (psi.shape[0] * psi.shape[1]) // 100)
-                                            motor.add_initial_particles(num_particles)
-                                            logging.info(f"✅ {num_particles} partículas aleatorias agregadas al motor nativo")
-                                            # Forzar reconversión del estado denso
-                                            motor._dense_state_stale = True
-                                            motor.state.psi = None
-                                            # Reintentar obtener estado
-                                            roi = None
-                                            roi_manager = g_state.get('roi_manager')
-                                            if roi_manager and roi_manager.roi_enabled:
-                                                roi = (
-                                                    roi_manager.roi_x,
-                                                    roi_manager.roi_y,
-                                                    roi_manager.roi_x + roi_manager.roi_width,
-                                                    roi_manager.roi_y + roi_manager.roi_height
-                                                )
-                                            psi = motor.get_dense_state(roi=roi, check_pause_callback=lambda: g_state.get('is_paused', True))
-                                            psi_abs_max_new = psi.abs().max().item() if psi is not None else 0.0
-                                            logging.info(f"📊 Después de inicialización: psi max abs={psi_abs_max_new:.6e}")
-                                        except Exception as init_error:
-                                            logging.error(f"❌ Error inicializando motor: {init_error}", exc_info=True)
-                                    else:
-                                        logging.error("❌ Motor no soporta inicialización automática. Verifica que el estado se haya cargado correctamente desde el checkpoint.")
-                                    continue
+                                    logging.warning(f"⚠️ CRÍTICO: psi tiene valores muy pequeños (max abs={psi_abs_max:.6e}, mean={psi_mean:.6e}). El motor está vacío o no inicializado correctamente.")
+                                    # NOTA: No inyectamos partículas artificialmente. Deben emerger del vacío o ser sembradas inicialmente.
+
+                                # 3. Generar frame de visualización (si corresponde)
+                                current_time = time.time()
+                                frame_data = None
+                                
+                                # Decidir si generar frame
+                                should_generate_frame = (
+                                    live_feed_enabled and 
+                                    (current_time - last_frame_time >= target_frame_time)
+                                )
+                                
+                                if should_generate_frame:
+                                    try:
+                                        # Generar datos de visualización
+                                        viz_start = time.time()
+                                        frame_data = await self.viz_pipeline.generate_frame(
+                                            state, 
+                                            step_count,
+                                            viz_type=self.viz_pipeline.current_viz_type
+                                        )
+                                        viz_time = time.time() - viz_start
+                                        
+                                        if frame_data:
+                                            # Añadir métricas de rendimiento
+                                            frame_data['simulation_info'] = {
+                                                'step': step_count,
+                                                'fps': 1.0 / (current_time - last_frame_time) if last_frame_time > 0 else 0,
+                                                'sim_time': step_time,
+                                                'viz_time': viz_time,
+                                                'live_feed_enabled': live_feed_enabled,
+                                                'inference_grid_size': state.get('grid_size', 0), # Tamaño real
+                                                'training_grid_size': state.get('training_grid_size', 0)
+                                            }
+                                            
+                                            # Log para debug de "trancado"
+                                            logging.info(f"Frame generado - Step: {step_count}, Viz Time: {viz_time:.4f}s, Map Data: {'map_data' in frame_data}")
+                                            
+                                            # Enviar al cliente
+                                            await broadcast(frame_data, binary=True)
+                                            last_frame_time = current_time
+                                        else:
+                                            logging.warning(f"Frame generado vacío en paso {step_count}")
+                                            
+                                    except Exception as e:
+                                        logging.error(f"Error generando/enviando frame: {e}")
+                                        import traceback
+                                        traceback.print_exc()
                             else:
                                 logging.error(f"⚠️ psi no es un torch.Tensor: {type(psi)}")
                                 continue
@@ -330,12 +368,15 @@ async def simulation_loop():
                                 logging.debug(f"🔄 Downsampling adaptativo activado: factor={adaptive_downsample} para grid {inference_grid_size}x{inference_grid_size}")
                             
                             delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
-                            viz_data = get_visualization_data(
-                                psi, 
-                                viz_type,
-                                delta_psi=delta_psi,
-                                motor=motor,
-                                downsample_factor=adaptive_downsample
+                            viz_data = await asyncio.get_event_loop().run_in_executor(
+                                None,
+                                lambda: get_visualization_data(
+                                    psi, 
+                                    viz_type,
+                                    delta_psi=delta_psi,
+                                    motor=motor,
+                                    downsample_factor=adaptive_downsample
+                                )
                             )
                             
                             # OPTIMIZACIÓN: Reutilizar coordenadas de Poincaré del frame anterior si no se recalcula
@@ -465,7 +506,8 @@ async def simulation_loop():
                 
                 try:
                     # Evolucionar el estado solo si live_feed está activo
-                    g_state['motor'].evolve_internal_state()
+                    # Offload to thread pool
+                    await asyncio.get_event_loop().run_in_executor(None, g_state['motor'].evolve_internal_state)
                     g_state['simulation_step'] = current_step + 1
                     
                     # Validar que el motor tenga un estado válido
@@ -519,10 +561,26 @@ async def simulation_loop():
                         def check_pause():
                             return g_state.get('is_paused', True)
                         
+                        # CRÍTICO: Verificar pausa ANTES de conversión costosa
+                        if g_state.get('is_paused', True):
+                            logging.info("⏸️ Pausa detectada antes de get_dense_state. Saltando frame.")
+                            await asyncio.sleep(0.1)
+                            continue
+                        
                         # Obtener estado denso (solo convierte si es necesario)
-                        psi = motor.get_dense_state(roi=roi, check_pause_callback=check_pause)
+                        # Offload to thread pool
+                        psi = await asyncio.get_event_loop().run_in_executor(
+                            None,
+                            lambda: motor.get_dense_state(roi=roi, check_pause_callback=check_pause)
+                        )
                         # CRÍTICO: Yield al event loop después de conversión bloqueante
                         await asyncio.sleep(0)  # Permitir procesar comandos WebSocket
+                        
+                        # CRÍTICO: Verificar pausa DESPUÉS de conversión costosa
+                        if g_state.get('is_paused', True):
+                            logging.info("⏸️ Pausa detectada después de get_dense_state. Saltando frame.")
+                            await asyncio.sleep(0.1)
+                            continue
                     else:
                         # Motor Python: acceder directamente (ya es denso)
                         psi = motor.state.psi if hasattr(motor, 'state') and motor.state else None
@@ -533,14 +591,24 @@ async def simulation_loop():
                         await asyncio.sleep(0.1)
                         continue
                     
+                    # CRÍTICO: Verificar pausa antes de cálculo de visualización
+                    if g_state.get('is_paused', True):
+                        logging.info("⏸️ Pausa detectada antes de get_visualization_data. Saltando frame.")
+                        await asyncio.sleep(0.1)
+                        continue
+                    
                     # Optimización: Usar inference_mode para mejor rendimiento GPU
                     # Obtener delta_psi si está disponible para visualizaciones de flujo
                     delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
-                    viz_data = get_visualization_data(
-                        psi, 
-                        g_state.get('viz_type', 'density'),
-                        delta_psi=delta_psi,
-                        motor=motor
+                    # Offload viz calculation to thread pool
+                    viz_data = await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda: get_visualization_data(
+                            psi, 
+                            g_state.get('viz_type', 'density'),
+                            delta_psi=delta_psi,
+                            motor=motor
+                        )
                     )
                     # CRÍTICO: Yield al event loop después de cálculo de visualización (puede ser bloqueante)
                     await asyncio.sleep(0)  # Permitir procesar comandos WebSocket

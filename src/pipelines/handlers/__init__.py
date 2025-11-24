@@ -5,7 +5,18 @@ from .system_handlers import HANDLERS as SYSTEM_HANDLERS
 from .analysis_handlers import HANDLERS as ANALYSIS_HANDLERS
 from .history_handlers import HANDLERS as HISTORY_HANDLERS
 
+# Agrupar todos los handlers por scope
+HANDLERS = {
+    "experiment": EXPERIMENT_HANDLERS,
+    "simulation": SIMULATION_HANDLERS,
+    "inference": INFERENCE_HANDLERS,
+    "system": SYSTEM_HANDLERS,
+    "analysis": ANALYSIS_HANDLERS,
+    "history": HISTORY_HANDLERS
+}
+
 __all__ = [
+    'HANDLERS',
     'EXPERIMENT_HANDLERS',
     'SIMULATION_HANDLERS',
     'INFERENCE_HANDLERS',
