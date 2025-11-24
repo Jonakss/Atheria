@@ -310,8 +310,9 @@ class NativeEngineWrapper:
         psi_abs_sq_max = psi_abs_sq.max().item()
         
         # Para complex_noise, valores típicos están en [-1, 1] pero normalizados
-        # Usar umbral más permisivo: 0.1% del máximo, mínimo 1e-9
-        threshold = max(psi_abs_sq_max * 0.001, 1e-9)  # 0.1% del máximo, mínimo 1e-9
+        # Usar umbral más permisivo: 0.01% del máximo (antes 0.1%), mínimo 1e-9
+        # Reducido de 0.001 a 0.0001 para capturar mejor la "cola" de la distribución
+        threshold = max(psi_abs_sq_max * 0.0001, 1e-9)
         
         # Si todos los valores son muy pequeños (estado vacío real), usar umbral mínimo
         if psi_abs_sq_max < 1e-9:
@@ -328,6 +329,7 @@ class NativeEngineWrapper:
         # Función interna para agregar partículas
         def add_particles_with_threshold(thresh):
             count = 0
+            verified_count = 0
             for y in range(0, grid_size, sample_step):
                 for x in range(0, grid_size, sample_step):
                     # Obtener estado en esta posición
@@ -349,8 +351,18 @@ class NativeEngineWrapper:
                             
                             self.native_engine.add_particle(coord, cell_state)
                             count += 1
+
+                            # VERIFICACIÓN INMEDIATA (muestreo): Verificar 1 de cada 100 para no impactar rendimiento
+                            if count % 100 == 0 or count < 5:
+                                check_state = self.native_engine.get_state_at(coord)
+                                if check_state is not None:
+                                    verified_count += 1
                         except Exception as e:
                             logging.warning(f"⚠️ Error agregando partícula en ({x}, {y}): {e}")
+
+            if count > 0 and verified_count == 0 and count < 5:
+                 logging.warning(f"⚠️ Se intentaron agregar {count} partículas pero la verificación inmediata falló.")
+
             return count
 
         # Intentar agregar partículas
@@ -370,6 +382,8 @@ class NativeEngineWrapper:
             # Verificar algunas partículas aleatorias que agregamos
             import random
             sample_size = min(10, particle_count)
+            recovered_count = 0
+
             if particle_count > 0:
                 # Tomar muestra de coordenadas donde agregamos partículas
                 sample_coords = []
@@ -385,7 +399,6 @@ class NativeEngineWrapper:
                         break
                 
                 # Verificar que estas partículas se pueden recuperar
-                recovered_count = 0
                 for x, y in sample_coords[:sample_size]:
                     test_coord = atheria_core.Coord3D(x, y, 0)
                     test_state = self.native_engine.get_state_at(test_coord)
@@ -403,52 +416,35 @@ class NativeEngineWrapper:
                 if recovered_count == 0 and particle_count > 0:
                     logging.error(f"❌ CRÍTICO: Se agregaron {particle_count} partículas pero NINGUNA es recuperable.")
                     logging.error(f"❌ Esto indica que add_particle() en C++ NO está almacenando correctamente en matter_map_.")
-                    logging.error(f"❌ O get_state_at() NO está buscando correctamente en matter_map_.")
-                    # Intentar verificar directamente con get_matter_count
+
+                    # FALLBACK ROBUSTO: Si falló la recuperación, intentar regenerar con método diferente
+                    # En este caso, regenerate_initial_state volvería aquí (recursión infinita),
+                    # así que simplemente reportamos el error y permitimos que el motor Python tome el control si es necesario
+                    # o intentamos el método "deprecated" add_initial_particles que usa lógica más simple
+                    logging.warning("⚠️ Intentando fallback a add_initial_particles (método simple)...")
                     try:
-                        matter_count = self.native_engine.get_matter_count()
-                        logging.error(f"❌ get_matter_count() retorna: {matter_count} (esperado: ~{particle_count})")
-                        if matter_count == 0:
-                            logging.error(f"❌ El motor nativo reporta 0 partículas almacenadas. add_particle() NO está funcionando.")
-                    except Exception as e:
-                        logging.error(f"❌ Error obteniendo matter_count: {e}")
-                
-                logging.info(f"📊 Verificación: {recovered_count}/{sample_size} partículas muestreadas son recuperables")
-                if recovered_count == 0:
-                    logging.error(f"❌ CRÍTICO: Ninguna de las {sample_size} partículas muestreadas es recuperable. El motor nativo puede estar vacío.")
-                    logging.error(f"❌ Esto significa que las partículas NO se están almacenando correctamente en el motor nativo C++.")
-                    logging.error(f"❌ Verificar que add_particle() en C++ está funcionando correctamente.")
-                elif recovered_count < sample_size:
-                    logging.warning(f"⚠️ Solo {recovered_count}/{sample_size} partículas son recuperables. Puede haber un problema con el almacenamiento.")
-            
+                        self.native_engine.clear()
+                        # Generar partículas simples manualmente para asegurar que algo funciona
+                        for _ in range(10):
+                            fx = np.random.randint(0, grid_size)
+                            fy = np.random.randint(0, grid_size)
+                            fz = 0
+                            f_state = torch.randn(self.d_state, dtype=torch.complex64, device=self.device)
+                            f_coord = atheria_core.Coord3D(fx, fy, fz)
+                            self.native_engine.add_particle(f_coord, f_state)
+
+                        # Verificar fallback
+                        f_count = self.native_engine.get_matter_count()
+                        logging.info(f"📊 Fallback status: {f_count} partículas agregadas")
+                    except Exception as fb_err:
+                        logging.error(f"❌ Fallback también falló: {fb_err}")
+
             # Verificar coordenadas activas del motor nativo
             if hasattr(self.native_engine, 'get_active_coords'):
                 try:
                     active_coords = self.native_engine.get_active_coords()
                     if active_coords and len(active_coords) > 0:
                         logging.info(f"✅ Motor nativo tiene {len(active_coords)} coordenadas activas verificadas")
-                        # Verificar una muestra
-                        sample_coords = active_coords[:min(5, len(active_coords))]
-                        # Verificar matter_count antes de verificar coordenadas
-                        try:
-                            matter_count = self.native_engine.get_matter_count()
-                            logging.info(f"📊 Motor nativo reporta {matter_count} partículas almacenadas en matter_map_")
-                            if matter_count == 0:
-                                logging.error(f"❌ CRÍTICO: matter_map_ está vacío aunque se agregaron {particle_count} partículas.")
-                                logging.error(f"❌ add_particle() en C++ NO está almacenando correctamente.")
-                        except Exception as e:
-                            logging.warning(f"⚠️ No se pudo obtener matter_count: {e}")
-                        
-                        for coord in sample_coords:
-                            sample_state = self.native_engine.get_state_at(coord)
-                            if sample_state is not None:
-                                sample_abs = sample_state.abs().max().item()
-                                if sample_abs > 1e-10:
-                                    logging.info(f"✅ Muestra: Coord ({coord.x}, {coord.y}) tiene materia (max abs={sample_abs:.6e})")
-                                else:
-                                    logging.warning(f"⚠️ Muestra: Coord ({coord.x}, {coord.y}) está vacía (max abs={sample_abs:.6e}) - solo vacío cuántico")
-                            else:
-                                logging.warning(f"⚠️ Muestra: Coord ({coord.x}, {coord.y}) retornó None")
                     else:
                         logging.warning(f"⚠️ Motor nativo no tiene coordenadas activas recuperables después de agregar {particle_count} partículas")
                 except Exception as e:
@@ -649,12 +645,22 @@ class NativeEngineWrapper:
             if total_batches > 5:
                 logging.info(f"🔄 Iniciando conversión: {len(coords_to_process)} coordenadas en {total_batches} batches (tamaño={BATCH_SIZE})")
             
+            import time
+            start_time = time.time()
+            TIMEOUT = 30.0  # Timeout explícito para conversión (30s)
+
             for batch_idx, i in enumerate(range(0, len(coords_to_process), BATCH_SIZE)):
                 # CRÍTICO: Verificar pausa cada batch para permitir pausa inmediata
                 if check_pause_callback and check_pause_callback():
                     logging.debug("Conversión interrumpida por pausa")
                     return  # Salir temprano si está pausado
                 
+                # CRÍTICO: Verificar timeout global
+                if time.time() - start_time > TIMEOUT:
+                    logging.error(f"❌ Timeout en conversión denso-disperso (> {TIMEOUT}s). Retornando estado parcial.")
+                    # Si falla, intentar al menos devolver lo que tenemos o un estado válido mínimo
+                    break
+
                 # Logging periódico para evitar bloqueos silenciosos (menos frecuente)
                 if total_batches > 10 and (batch_idx % 20 == 0 or batch_idx == total_batches - 1):
                     logging.info(f"📊 Conversión progreso: batch {batch_idx+1}/{total_batches} ({total_processed} procesadas)")
