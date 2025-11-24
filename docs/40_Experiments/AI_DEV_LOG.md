@@ -16,6 +16,8 @@
 
 ## 📋 Índice de Entradas
 
+
+- [[#2025-11-24 - CRÍTICO: Solución Crash Loop Backend por Conversión Bloqueante]]
 - [[#2025-11-23 - Optimizaciones Críticas de Live Feed y Rendimiento]]
 - [[#2025-11-23 - Refactorización de Arquitectura: Servicios Desacoplados]]
 - [[#2025-01-21 - Corrección Fundamental: Generación de Estado Inicial según Ley M]]

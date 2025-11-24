@@ -39,7 +39,7 @@ async def handle_play(args):
     motor_is_native = g_state.get('motor_is_native', False)
     
     if motor_is_native and hasattr(motor, 'native_engine'):
-        # Motor nativo: verificar que tenga partículas o estado inicializado
+        # Motor nativo: verificar que tenga modelo cargado usando verificaciones livianas
         try:
             # Verificar que el motor nativo esté inicializado
             if not hasattr(motor, 'model_loaded') or not motor.model_loaded:
@@ -48,64 +48,57 @@ async def handle_play(args):
                 if ws: await send_notification(ws, msg, "warning")
                 return
             
-            # Intentar obtener el estado denso para verificar que haya datos
-            import torch
-            logging.info("🔍 Verificando estado del motor nativo (get_dense_state con timeout 10s)...")
+            # OPTIMIZACIÓN CRÍTICA: Usar verificación liviana en lugar de get_dense_state()
+            # get_dense_state() puede tomar > 10s para grids grandes, bloqueando el event loop
+            # y causando timeout del WebSocket. Usamos get_matter_count() que es O(1).
+            logging.info("🔍 Verificando estado del motor nativo (verificación liviana)...")
             try:
-                loop = asyncio.get_event_loop()
-                psi = await asyncio.wait_for(
-                    loop.run_in_executor(
-                        None,
-                        lambda: motor.get_dense_state(check_pause_callback=lambda: False)
-                    ),
-                    timeout=10.0
-                )
-                logging.info(f"✅ Estado denso obtenido exitosamente (shape={psi.shape if psi is not None else None})")
-            except asyncio.TimeoutError:
-                logging.error("❌ Timeout obteniendo estado denso del motor nativo (10s). El motor puede estar bloqueado.")
-                msg = "⚠️ Timeout obteniendo estado del motor. Intenta reiniciar."
-                if ws: await send_notification(ws, msg, "error")
-                return
-            except Exception as conv_error:
-                logging.error(f"❌ Error obteniendo estado denso: {conv_error}", exc_info=True)
-                msg = "⚠️ Error obteniendo estado del motor. Intenta reiniciar."
-                if ws: await send_notification(ws, msg, "error")
-                return
-            
-            if psi is None or (isinstance(psi, torch.Tensor) and psi.numel() == 0):
-                logging.warning("⚠️ Motor nativo no tiene estado válido. Intentando inicializar...")
-                grid_size = g_state.get('inference_grid_size', 256)
-                num_particles = max(100, (grid_size * grid_size) // 100)
-                if hasattr(motor, 'add_initial_particles'):
-                    logging.info(f"🛠️ Agregando {num_particles} partículas al motor nativo...")
-                    try:
-                        loop = asyncio.get_event_loop()
-                        await asyncio.wait_for(
-                            loop.run_in_executor(
-                                None,
-                                lambda: motor.add_initial_particles(num_particles)
-                            ),
-                            timeout=5.0
-                        )
-                        logging.info(f"✅ {num_particles} partículas agregadas al motor nativo")
-                    except asyncio.TimeoutError:
-                        logging.error("❌ Timeout agregando partículas (5s).")
-                        msg = "⚠️ Timeout agregando partículas. Intenta reiniciar."
-                        if ws: await send_notification(ws, msg, "error")
-                        return
-                    except Exception as e:
-                        logging.error(f"❌ Error agregando partículas: {e}", exc_info=True)
-                        msg = "⚠️ Error agregando partículas. Intenta reiniciar."
-                        if ws: await send_notification(ws, msg, "error")
-                        return
-                    
-                    motor._dense_state_stale = True
-                    motor.state.psi = None
+                # Verificar si el motor nativo tiene partículas almacenadas
+                matter_count = 0
+                if hasattr(motor.native_engine, 'get_matter_count'):
+                    matter_count = motor.native_engine.get_matter_count()
+                    logging.info(f"✅ Motor nativo tiene {matter_count} partículas almacenadas")
                 else:
-                    msg = "⚠️ El motor nativo no tiene un estado válido y no se puede inicializar automáticamente."
-                    logging.error(msg)
-                    if ws: await send_notification(ws, msg, "error")
-                    return
+                    # Fallback: asumir que hay partículas si model_loaded=True
+                    logging.info("✅ Motor nativo inicializado (get_matter_count no disponible)")
+                    matter_count = 1  # Asumir que hay al menos una partícula
+                
+                # Si no hay partículas, intentar regenerar estado inicial
+                if matter_count == 0:
+                    logging.warning("⚠️ Motor nativo no tiene partículas. Intentando regenerar estado inicial...")
+                    if hasattr(motor, 'regenerate_initial_state'):
+                        logging.info("🛠️ Regenerando estado inicial según INITIAL_STATE_MODE_INFERENCE...")
+                        try:
+                            loop = asyncio.get_event_loop()
+                            await asyncio.wait_for(
+                                loop.run_in_executor(
+                                    None,
+                                    lambda: motor.regenerate_initial_state()
+                                ),
+                                timeout=15.0  # Timeout más largo para regeneración
+                            )
+                            logging.info(f"✅ Estado inicial regenerado")
+                        except asyncio.TimeoutError:
+                            logging.error("❌ Timeout regenerando estado inicial (15s).")
+                            msg = "⚠️ Timeout regenerando estado. Intenta reiniciar o usa motor Python."
+                            if ws: await send_notification(ws, msg, "error")
+                            return
+                        except Exception as e:
+                            logging.error(f"❌ Error regenerando estado inicial: {e}", exc_info=True)
+                            msg = "⚠️ Error regenerando estado. Intenta reiniciar o usa motor Python."
+                            if ws: await send_notification(ws, msg, "error")
+                            return
+                    else:
+                        msg = "⚠️ El motor nativo no tiene partículas y no se puede regenerar automáticamente."
+                        logging.error(msg)
+                        if ws: await send_notification(ws, msg, "error")
+                        return
+            
+            except Exception as check_error:
+                # Si la verificación liviana falla, loguear pero no detener
+                # El motor puede estar en un estado válido aún si get_matter_count() falla
+                logging.warning(f"⚠️ Error en verificación liviana del motor nativo: {check_error}")
+                logging.info("💡 Continuando con la simulación (el motor puede estar en estado válido)")
             
         except Exception as e:
             logging.error(f"❌ Error validando motor nativo: {e}", exc_info=True)
@@ -122,16 +115,19 @@ async def handle_play(args):
     
     g_state['is_paused'] = False
     
-    # Enviar frame inicial si es necesario
+    # Enviar frame inicial si es posible (mejor esfuerzo - no bloquear la simulación)
     if motor_is_native and hasattr(motor, 'get_dense_state'):
         try:
+            # OPTIMIZACIÓN: Timeout más largo (30s) y fallback si falla
+            # La visualización puede actualizarse después - no bloquear Play
+            logging.info("📤 Intentando enviar frame inicial (mejor esfuerzo, no bloqueante)...")
             loop = asyncio.get_event_loop()
             psi = await asyncio.wait_for(
                 loop.run_in_executor(
                     None,
-                    lambda: motor.get_dense_state(check_pause_callback=lambda: False)
+                    lambda: motor.get_dense_state(check_pause_callback=lambda: g_state.get('is_paused', False))
                 ),
-                timeout=10.0
+                timeout=30.0  # Timeout más largo para grids grandes
             )
             if psi is not None and isinstance(psi, torch.Tensor) and psi.numel() > 0:
                 psi_abs_max = psi.abs().max().item()
@@ -184,8 +180,12 @@ async def handle_play(args):
                                 )
                                 await broadcast({"type": "simulation_frame", "payload": frame_payload})
                                 logging.info(f"📤 Frame inicial enviado al frontend (step={current_step})")
+        except asyncio.TimeoutError:
+            # Timeout es aceptable - la visualización se actualizará en el siguiente step
+            logging.warning("⏱️ Timeout enviando frame inicial (30s). La visualización se actualizará después.")
         except Exception as e:
-            logging.error(f"Error enviando frame inicial al iniciar: {e}", exc_info=True)
+            # Error es aceptable - la visualización se actualizará en el siguiente step
+            logging.warning(f"⚠️ Error enviando frame inicial: {e}. La visualización se actualizará después.")
     
     logging.info(f"Simulación iniciada. Motor: {type(motor).__name__}, Step: {g_state.get('simulation_step', 0)}")
     
