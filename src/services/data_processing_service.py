@@ -64,10 +64,18 @@ class DataProcessingService(BaseService):
                 def check_pause():
                     return g_state.get('is_paused', True)
                 
-                psi = await asyncio.get_event_loop().run_in_executor(
-                    None, 
-                    lambda: motor.get_dense_state(roi=roi, check_pause_callback=check_pause)
-                )
+                # Obtener estado denso según tipo de motor
+                # Motor nativo tiene get_dense_state() con lazy conversion
+                # Motor Python tiene state.psi directamente
+                if hasattr(motor, 'get_dense_state'):
+                    # Motor nativo: usar get_dense_state() con ROI y verificación de pausa
+                    psi = await asyncio.get_event_loop().run_in_executor(
+                        None, 
+                        lambda: motor.get_dense_state(roi=roi, check_pause_callback=check_pause)
+                    )
+                else:
+                    # Motor Python: acceder directamente a state.psi
+                    psi = motor.state.psi
                 
                 if psi is None:
                     self.state_queue.task_done()
