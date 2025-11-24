@@ -40,6 +40,7 @@ async def handle_play(args):
     
     if motor_is_native and hasattr(motor, 'native_engine'):
         # Motor nativo: verificar que tenga modelo cargado usando verificaciones livianas
+        # OPTIMIZACIÓN: No llamar a get_dense_state() para validación, usar model_loaded y get_matter_count
         try:
             # Verificar que el motor nativo esté inicializado
             if not hasattr(motor, 'model_loaded') or not motor.model_loaded:
@@ -48,9 +49,7 @@ async def handle_play(args):
                 if ws: await send_notification(ws, msg, "warning")
                 return
             
-            # OPTIMIZACIÓN CRÍTICA: Usar verificación liviana en lugar de get_dense_state()
-            # get_dense_state() puede tomar > 10s para grids grandes, bloqueando el event loop
-            # y causando timeout del WebSocket. Usamos get_matter_count() que es O(1).
+            # Verificación liviana del estado (O(1))
             logging.info("🔍 Verificando estado del motor nativo (verificación liviana)...")
             try:
                 # Verificar si el motor nativo tiene partículas almacenadas
@@ -58,45 +57,38 @@ async def handle_play(args):
                 if hasattr(motor.native_engine, 'get_matter_count'):
                     matter_count = motor.native_engine.get_matter_count()
                     logging.info(f"✅ Motor nativo tiene {matter_count} partículas almacenadas")
+
+                    # Si no hay partículas, intentar regenerar estado inicial
+                    if matter_count == 0:
+                        logging.warning("⚠️ Motor nativo no tiene partículas. Intentando regenerar estado inicial...")
+                        if hasattr(motor, 'regenerate_initial_state'):
+                            logging.info("🛠️ Regenerando estado inicial según INITIAL_STATE_MODE_INFERENCE...")
+                            try:
+                                loop = asyncio.get_event_loop()
+                                await asyncio.wait_for(
+                                    loop.run_in_executor(
+                                        None,
+                                        lambda: motor.regenerate_initial_state()
+                                    ),
+                                    timeout=15.0  # Timeout más largo para regeneración
+                                )
+                                logging.info(f"✅ Estado inicial regenerado")
+                            except asyncio.TimeoutError:
+                                logging.error("❌ Timeout regenerando estado inicial (15s).")
+                                msg = "⚠️ Timeout regenerando estado. Intenta reiniciar o usa motor Python."
+                                if ws: await send_notification(ws, msg, "error")
+                                return
+                            except Exception as e:
+                                logging.error(f"❌ Error regenerando estado inicial: {e}", exc_info=True)
+                                msg = "⚠️ Error regenerando estado. Intenta reiniciar o usa motor Python."
+                                if ws: await send_notification(ws, msg, "error")
+                                return
                 else:
                     # Fallback: asumir que hay partículas si model_loaded=True
                     logging.info("✅ Motor nativo inicializado (get_matter_count no disponible)")
-                    matter_count = 1  # Asumir que hay al menos una partícula
-                
-                # Si no hay partículas, intentar regenerar estado inicial
-                if matter_count == 0:
-                    logging.warning("⚠️ Motor nativo no tiene partículas. Intentando regenerar estado inicial...")
-                    if hasattr(motor, 'regenerate_initial_state'):
-                        logging.info("🛠️ Regenerando estado inicial según INITIAL_STATE_MODE_INFERENCE...")
-                        try:
-                            loop = asyncio.get_event_loop()
-                            await asyncio.wait_for(
-                                loop.run_in_executor(
-                                    None,
-                                    lambda: motor.regenerate_initial_state()
-                                ),
-                                timeout=15.0  # Timeout más largo para regeneración
-                            )
-                            logging.info(f"✅ Estado inicial regenerado")
-                        except asyncio.TimeoutError:
-                            logging.error("❌ Timeout regenerando estado inicial (15s).")
-                            msg = "⚠️ Timeout regenerando estado. Intenta reiniciar o usa motor Python."
-                            if ws: await send_notification(ws, msg, "error")
-                            return
-                        except Exception as e:
-                            logging.error(f"❌ Error regenerando estado inicial: {e}", exc_info=True)
-                            msg = "⚠️ Error regenerando estado. Intenta reiniciar o usa motor Python."
-                            if ws: await send_notification(ws, msg, "error")
-                            return
-                    else:
-                        msg = "⚠️ El motor nativo no tiene partículas y no se puede regenerar automáticamente."
-                        logging.error(msg)
-                        if ws: await send_notification(ws, msg, "error")
-                        return
             
             except Exception as check_error:
                 # Si la verificación liviana falla, loguear pero no detener
-                # El motor puede estar en un estado válido aún si get_matter_count() falla
                 logging.warning(f"⚠️ Error en verificación liviana del motor nativo: {check_error}")
                 logging.info("💡 Continuando con la simulación (el motor puede estar en estado válido)")
             
