@@ -30,9 +30,14 @@ Este documento identifica **gaps críticos** en la Knowledge Base que limitan su
 - Actualizar `docs/30_Components/SPATIAL_INDEXING.md` con explicación de Morton Codes
 - Crear `docs/20_Concepts/STATE_STALENESS.md`
 
-### 2. Guía de Troubleshooting
+### 2. Guía de Troubleshooting & Tech Debt Report
 
-**Gap:** No existe documentación centralizada de problemas comunes y soluciones.
+**Gap:** No existe documentación centralizada de problemas comunes, soluciones y deuda técnica identificada.
+
+**Deuda Técnica Identificada (Critical):**
+- **Terminología "Grid" vs "Chunk/Hash Map":** A pesar de la regla en `AGENTS.md`, el término "Grid" es omnipresente en el código (`native_engine_wrapper.py`, docs) para referirse a la simulación densa.
+- **Implementación Parcial de Three.js:** Documentada como motor principal, pero el frontend aún depende de Canvas 2D para muchas visualizaciones.
+- **Componentes Faltantes:** `src/analysis/epoch_detector.py` referenciado en arquitectura pero no implementado.
 
 **Problemas frecuentes mencionados en logs pero no documentados:**
 - Servidor se cierra al limpiar motor nativo
@@ -42,6 +47,7 @@ Este documento identifica **gaps críticos** en la Knowledge Base que limitan su
 - Segmentation fault al cambiar de motor
 - Motor nativo vacío/no inicializado
 - FPS muy altos pero sin frames (pasos vs frames)
+- `EpochDetector` referenciado pero no implementado (`src/analysis/epoch_detector.py` missing)
 
 **Solución Propuesta:**
 - Crear `docs/99_Templates/TROUBLESHOOTING_GUIDE.md` con:
