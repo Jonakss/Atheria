@@ -11,7 +11,7 @@
 La transición a 3D no es meramente visual, sino una expansión fundamental del espacio de fases de la simulación.
 - **2D:** Superficie $N \times N$ con estado `d_state`.
 - **3D:** Volumen $D \times H \times W$ con estado `d_state`.
-
+- **3D:** Volumen con $(X, Y, Z)$ dimensiones y estado `d_state`.
 ## 2. Implementación del Motor
 
 ### A. Migración de Tensores (PyTorch)
