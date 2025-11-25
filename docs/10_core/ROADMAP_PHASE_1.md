@@ -20,7 +20,7 @@ Conectar el WebSocket para recibir viewport_tensor en lugar de map_data plano.
 
 Finalizar src/engines/harmonic_engine.py.
 
-Crear un script de prueba scripts/test_infinite_universe.py que inyecte una "Semilla de Génesis" y la deje correr.
+Crear un script de prueba tests/test_infinite_universe.py que inyecte una "Semilla de Génesis" y la deje correr.
 
 [ ] Detección de Épocas (Analysis):
 

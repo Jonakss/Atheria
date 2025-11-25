@@ -22,7 +22,7 @@ Sí, puedes usar un experimento entrenado en **Python CUDA** con el **motor nati
 Si quieres exportar manualmente un modelo a TorchScript:
 
 ```bash
-python scripts/test_native_engine.py --experiment NOMBRE_EXPERIMENTO
+python tests/test_native_engine.py --experiment NOMBRE_EXPERIMENTO
 ```
 
 Este script:
@@ -76,7 +76,7 @@ Cuando cargas un experimento desde el frontend:
 
 ## Referencias
 
-- `scripts/test_native_engine.py`: Función `export_model_to_torchscript()`
+- `tests/test_native_engine.py`: Función `export_model_to_torchscript()`
 - `src/pipelines/pipeline_server.py`: Función `handle_load_experiment()` (línea ~1015)
 - `src/engines/native_engine_wrapper.py`: Wrapper del motor nativo
 

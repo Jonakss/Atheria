@@ -7,7 +7,7 @@ from .base_service import BaseService
 from ..server.server_state import g_state
 from ..pipelines.handlers import HANDLERS
 from ..utils import get_experiment_list
-from ..utils import get_experiment_list
+from ..server.data_serialization import should_use_binary, serialize_frame_binary
 
 class WebSocketService(BaseService):
     """
@@ -139,15 +139,46 @@ class WebSocketService(BaseService):
                     self.broadcast_queue.task_done()
                     continue
                 
-                # Serializar una vez
-                json_str = json.dumps(message)
+                # Determinar si usar binario o JSON
+                use_binary = should_use_binary(message.get('type'), message.get('payload'))
                 
-                # Enviar a todos los clientes conectados
-                # Usamos gather para enviar en paralelo
-                tasks = []
-                for ws in self.active_websockets:
-                    if not ws.closed:
-                        tasks.append(ws.send_str(json_str))
+                if use_binary:
+                    # Serializar a binario (o JSON fallback optimizado)
+                    binary_data, format_used = serialize_frame_binary(message.get('payload', {}))
+                    
+                    # Enviar a todos los clientes
+                    tasks = []
+                    for ws in self.active_websockets:
+                        if not ws.closed:
+                            # Enviar primero el header/metadata si es necesario, o confiar en que el cliente
+                            # sabe manejar el binario.
+                            # En este caso, el protocolo espera que los frames binarios sean solo el payload.
+                            # Pero necesitamos decirle al cliente qué es.
+                            # El cliente actual (frontend) parece esperar un mensaje JSON con "type" y "payload".
+                            # Si enviamos binario puro, ¿cómo sabe el cliente qué es?
+                            
+                            # Revisando server_state.py broadcast_binary:
+                            # Envía primero un JSON con metadata y LUEGO el binario.
+                            # Pero aquí estamos reemplazando el mensaje completo.
+                            
+                            # Si usamos el protocolo existente de broadcast_binary:
+                            # 1. Enviar header JSON
+                            header = {
+                                "type": message.get("type"),
+                                "format": format_used,
+                                "is_binary": True
+                            }
+                            tasks.append(ws.send_json(header))
+                            
+                            # 2. Enviar payload binario
+                            tasks.append(ws.send_bytes(binary_data))
+                else:
+                    # Comportamiento normal JSON
+                    json_str = json.dumps(message)
+                    tasks = []
+                    for ws in self.active_websockets:
+                        if not ws.closed:
+                            tasks.append(ws.send_str(json_str))
                 
                 if tasks:
                     await asyncio.gather(*tasks, return_exceptions=True)

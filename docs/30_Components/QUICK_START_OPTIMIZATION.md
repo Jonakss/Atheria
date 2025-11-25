@@ -74,7 +74,7 @@ socket.onmessage = async (event) => {
 
 ```bash
 # Ejecutar benchmark comparativo
-python3 scripts/test_transfer_optimization.py
+python3 tests/test_transfer_optimization.py
 ```
 
 Esto mostrará:

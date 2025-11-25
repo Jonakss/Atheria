@@ -69,16 +69,26 @@ class SparseHarmonicEngine:
     Motor de Inferencia Masiva.
     Combina Materia Real (almacenada en diccionario) con Vacío Armónico (calculado).
     """
-    def __init__(self, model, d_state, device='cpu'):
+    def __init__(self, model, d_state, device='cpu', grid_size=256):
         self.model = model
         self.d_state = d_state
         self.device = device
+        self.grid_size = grid_size
         self.vacuum = HarmonicVacuum(d_state, device)
         
         # La Materia: Diccionario {(x,y,z): Tensor}
         self.matter = {} 
         self.active_coords = set()
         self.step_count = 0
+
+    def get_dense_state(self, check_pause_callback=None):
+        """
+        Retorna el estado denso completo del universo (o viewport).
+        Compatible con la interfaz de Aetheria_Motor.
+        """
+        # Usar centro del grid (0,0,0) y tamaño completo
+        # Nota: En universo infinito, esto solo muestra la región central
+        return self.get_viewport_tensor((0, 0, 0), self.grid_size, self.step_count * 0.1)
 
     def add_matter(self, x, y, z, state):
         """Inyecta materia real en el universo."""
@@ -127,6 +137,91 @@ class SparseHarmonicEngine:
 
     def step(self):
         self.step_count += 1
-        # Lógica de actualización física (Chunk-based inference) pendiente
-        # ...
+        
+        # 1. Identificar Chunks Activos (agrupar coordenadas en bloques de 16x16x16)
+        CHUNK_SIZE = 16
+        active_chunks = set()
+        
+        for (x, y, z) in self.active_coords:
+            cx, cy, cz = x // CHUNK_SIZE, y // CHUNK_SIZE, z // CHUNK_SIZE
+            active_chunks.add((cx, cy, cz))
+            
+            # Activar vecinos también para permitir propagación
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    active_chunks.add((cx + dx, cy + dy, cz))
+        
+        next_matter = {}
+        next_active_coords = set()
+        
+        # 2. Procesar cada Chunk
+        for (cx, cy, cz) in active_chunks:
+            # Coordenadas base del chunk
+            base_x, base_y, base_z = cx * CHUNK_SIZE, cy * CHUNK_SIZE, cz * CHUNK_SIZE
+            
+            # Crear grid denso para el chunk (con padding para contexto)
+            PADDING = 2 # Depende del kernel del modelo
+            grid_size = CHUNK_SIZE + 2 * PADDING
+            
+            # Tensor local: [1, C, D, H, W] o [1, C, H, W] si es 2D slice-based
+            # Asumimos modelo 2D slice-based por ahora (z-layer) para simplificar
+            # O si es 3D, necesitamos un tensor 5D. 
+            # Por simplicidad y compatibilidad con U-Net 2D, procesamos slice central Z
+            
+            # Generar coordenadas para el grid local
+            xs = torch.arange(base_x - PADDING, base_x + CHUNK_SIZE + PADDING, device=self.device)
+            ys = torch.arange(base_y - PADDING, base_y + CHUNK_SIZE + PADDING, device=self.device)
+            grid_x, grid_y = torch.meshgrid(xs, ys, indexing='xy')
+            
+            # Aplanar
+            coords_flat = torch.stack([
+                grid_x.flatten(),
+                grid_y.flatten(),
+                torch.full_like(grid_x.flatten(), base_z) # Procesamos plano Z del chunk
+            ], dim=1).float()
+            
+            # Obtener Vacío
+            local_state = self.vacuum.get_state(coords_flat, self.step_count * 0.1)
+            local_state = local_state.view(1, grid_size, grid_size, self.d_state)
+            local_state = local_state.permute(0, 3, 1, 2) # [1, C, H, W]
+            
+            # Superponer Materia Existente
+            # (Optimización: Solo iterar sobre materia conocida en este rango)
+            # Por ahora iteramos todo (lento, pero funcional para prototipo)
+            # TODO: Usar Spatial Hash para búsqueda rápida
+            for (mx, my, mz), m_state in self.matter.items():
+                if mz == base_z and \
+                   base_x - PADDING <= mx < base_x + CHUNK_SIZE + PADDING and \
+                   base_y - PADDING <= my < base_y + CHUNK_SIZE + PADDING:
+                    
+                    lx = int(mx - (base_x - PADDING))
+                    ly = int(my - (base_y - PADDING))
+                    local_state[0, :, ly, lx] = m_state
+            
+            # 3. Inferencia
+            with torch.no_grad():
+                # Asumimos que el modelo retorna delta o nuevo estado
+                # Entrada: [1, C, H, W] -> Salida: [1, C, H, W]
+                output = self.model(local_state)
+                
+            # 4. Actualizar Materia (Dispersión)
+            # Extraer solo la región central (sin padding)
+            center_output = output[0, :, PADDING:-PADDING, PADDING:-PADDING] # [C, 16, 16]
+            
+            # Thresholding para persistencia
+            # Si la energía > umbral, guardamos la partícula
+            energy = center_output.pow(2).sum(dim=0) # [16, 16]
+            active_indices = torch.nonzero(energy > 0.01) # Umbral de existencia
+            
+            for idx in active_indices:
+                ly, lx = idx[0].item(), idx[1].item()
+                gx, gy = base_x + lx, base_y + ly
+                
+                new_state = center_output[:, ly, lx]
+                next_matter[(gx, gy, base_z)] = new_state
+                next_active_coords.add((gx, gy, base_z))
+                
+        self.matter = next_matter
+        self.active_coords = next_active_coords
+        
         return len(self.matter)

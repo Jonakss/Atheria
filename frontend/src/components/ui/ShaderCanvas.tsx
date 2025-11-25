@@ -140,31 +140,57 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
         // significa que los datos ya están normalizados desde el backend
         // En ese caso, NO calcular min/max de los datos, usar los valores proporcionados
         const dataMin = minValue !== undefined ? minValue : (() => {
-            let min = Infinity;
+            // Implementación robusta usando percentiles (igual que PanZoomCanvas)
+            // para evitar que outliers o ruido de vacío distorsionen la visualización
+            const values: number[] = [];
+            // Muestreo para rendimiento en grids grandes
+            const step = Math.max(1, Math.floor(mapData.length * mapData[0].length / 10000));
+            
             for (let y = 0; y < mapData.length; y++) {
-                for (let x = 0; x < mapData[y]?.length || 0; x++) {
+                for (let x = 0; x < mapData[y]?.length || 0; x += step) {
                     const val = mapData[y]?.[x];
-                    if (typeof val === 'number' && !isNaN(val)) {
-                        min = Math.min(min, val);
+                    if (typeof val === 'number' && !isNaN(val) && isFinite(val)) {
+                        values.push(val);
                     }
                 }
             }
-            // Si el mínimo calculado está cerca de 0, asumir que ya está normalizado
-            return min === Infinity ? 0 : (min >= -0.01 ? 0 : min);
+            
+            if (values.length === 0) return 0;
+            
+            // Si hay pocos valores, usar min/max directo
+            if (values.length < 100) {
+                return Math.min(...values);
+            }
+            
+            // Ordenar para percentiles
+            values.sort((a, b) => a - b);
+            const p1Index = Math.floor(values.length * 0.01);
+            return values[p1Index];
         })();
         
         const dataMax = maxValue !== undefined ? maxValue : (() => {
-            let max = -Infinity;
+            // Implementación robusta usando percentiles
+            const values: number[] = [];
+            const step = Math.max(1, Math.floor(mapData.length * mapData[0].length / 10000));
+            
             for (let y = 0; y < mapData.length; y++) {
-                for (let x = 0; x < mapData[y]?.length || 0; x++) {
+                for (let x = 0; x < mapData[y]?.length || 0; x += step) {
                     const val = mapData[y]?.[x];
-                    if (typeof val === 'number' && !isNaN(val)) {
-                        max = Math.max(max, val);
+                    if (typeof val === 'number' && !isNaN(val) && isFinite(val)) {
+                        values.push(val);
                     }
                 }
             }
-            // Si el máximo calculado está cerca de 1, asumir que ya está normalizado
-            return max === -Infinity ? 1 : (max <= 1.01 ? 1 : max);
+            
+            if (values.length === 0) return 1;
+            
+            if (values.length < 100) {
+                return Math.max(...values);
+            }
+            
+            values.sort((a, b) => a - b);
+            const p99Index = Math.floor(values.length * 0.99);
+            return values[p99Index];
         })();
         
         if (process.env.NODE_ENV === 'development') {

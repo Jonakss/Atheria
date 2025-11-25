@@ -202,7 +202,7 @@ El motor nativo C++ está **disponible** (`NATIVE_AVAILABLE = True`), pero requi
 
 1. **Exportar modelo manualmente**:
    ```bash
-   python scripts/test_native_engine.py --experiment EXPERIMENT_NAME --export-only
+   python tests/test_native_engine.py --experiment EXPERIMENT_NAME --export-only
    ```
 
 2. **Verificar si hay modelo JIT**:

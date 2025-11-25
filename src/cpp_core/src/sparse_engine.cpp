@@ -2,7 +2,7 @@
 #include "../include/sparse_engine.h"
 #include <algorithm>
 #include <stdexcept>
-#include <omp.h>
+// #include <omp.h> // OpenMP disabled to prevent deadlocks with LibTorch
 
 namespace atheria {
 
@@ -98,21 +98,18 @@ int64_t Engine::step_native() {
     std::vector<Coord3D> processed_coords(active_region_.begin(), active_region_.end());
     
     // Agrupar coordenadas para procesamiento por batch
-    // PARALELIZACIÓN CON OPENMP
-    // Cada hilo tiene su propio buffer de batch y mapa local para evitar race conditions
+    // NOTA: OpenMP deshabilitado porque causa deadlocks con LibTorch en algunos entornos
+    // El overhead de threads vs la paralelización interna de PyTorch no compensa el riesgo
     
     const int64_t batch_size = 32; // Procesar en batches de 32
     
-    #pragma omp parallel
-    {
-        // Thread-local storage
-        std::vector<Coord3D> local_batch_coords;
-        std::vector<torch::Tensor> local_batch_states;
-        SparseMap local_next_matter_map;
-        std::unordered_set<Coord3D, Coord3DHash> local_next_active_region;
-        
-        #pragma omp for schedule(static)
-        for (size_t i = 0; i < processed_coords.size(); i++) {
+    // Thread-local storage (ahora single thread)
+    std::vector<Coord3D> local_batch_coords;
+    std::vector<torch::Tensor> local_batch_states;
+    SparseMap local_next_matter_map;
+    std::unordered_set<Coord3D, Coord3DHash> local_next_active_region;
+    
+    for (size_t i = 0; i < processed_coords.size(); i++) {
             const Coord3D& coord = processed_coords[i];
             
             // Obtener estado actual (materia o vacío)
@@ -198,77 +195,73 @@ int64_t Engine::step_native() {
                     local_batch_states.clear();
                 }
             }
-        } // Fin del loop for paralelo
+    } // Fin del loop for
+    
+    // Procesar batch restante (si quedó algo)
+    if (!local_batch_coords.empty()) {
+         // Construir entrada del batch
+        torch::Tensor batch_input = build_batch_input(local_batch_coords);
         
-        // Procesar batch restante (si quedó algo)
-        if (!local_batch_coords.empty()) {
-             // Construir entrada del batch
-            torch::Tensor batch_input = build_batch_input(local_batch_coords);
+        torch::NoGradGuard no_grad;
+        std::vector<torch::jit::IValue> inputs;
+        inputs.push_back(batch_input);
+        
+        torch::Tensor batch_output;
+        try {
+            auto output_ivalue = model_.forward(inputs);
             
-            torch::NoGradGuard no_grad;
-            std::vector<torch::jit::IValue> inputs;
-            inputs.push_back(batch_input);
-            
-            torch::Tensor batch_output;
-            try {
-                auto output_ivalue = model_.forward(inputs);
-                
-                if (output_ivalue.isTuple()) {
-                    auto output_tuple = output_ivalue.toTuple();
-                    if (output_tuple->elements().size() > 0) {
-                        batch_output = output_tuple->elements()[0].toTensor();
-                    }
-                } else if (output_ivalue.isTensor()) {
-                    batch_output = output_ivalue.toTensor();
+            if (output_ivalue.isTuple()) {
+                auto output_tuple = output_ivalue.toTuple();
+                if (output_tuple->elements().size() > 0) {
+                    batch_output = output_tuple->elements()[0].toTensor();
                 }
+            } else if (output_ivalue.isTensor()) {
+                batch_output = output_ivalue.toTensor();
+            }
+            
+            if (batch_output.defined()) {
+                int64_t center_idx = grid_size_ / 2;
                 
-                if (batch_output.defined()) {
-                    int64_t center_idx = grid_size_ / 2;
+                for (size_t j = 0; j < local_batch_coords.size(); j++) {
+                    torch::Tensor output_center = batch_output[j].select(2, center_idx).select(1, center_idx);
+                    torch::Tensor delta_real = output_center.slice(0, 0, d_state_);
+                    torch::Tensor delta_imag = output_center.slice(0, d_state_, 2 * d_state_);
+                    torch::Tensor delta_complex = torch::complex(delta_real, delta_imag);
                     
-                    for (size_t j = 0; j < local_batch_coords.size(); j++) {
-                        torch::Tensor output_center = batch_output[j].select(2, center_idx).select(1, center_idx);
-                        torch::Tensor delta_real = output_center.slice(0, 0, d_state_);
-                        torch::Tensor delta_imag = output_center.slice(0, d_state_, 2 * d_state_);
-                        torch::Tensor delta_complex = torch::complex(delta_real, delta_imag);
-                        
-                        torch::Tensor current_state_j = local_batch_states[j];
-                        if (!current_state_j.is_complex()) {
-                            current_state_j = torch::complex(current_state_j, torch::zeros_like(current_state_j));
-                        }
-                        
-                        torch::Tensor new_state = current_state_j + delta_complex;
-                        torch::Tensor abs_squared = torch::abs(new_state).pow(2);
-                        float norm = torch::sum(abs_squared).item<float>();
-                        if (norm > 1e-6f) {
-                            new_state = new_state / std::sqrt(norm);
-                        }
-                        
-                        if (norm > 0.01f) {
-                            local_next_matter_map.insert_tensor(local_batch_coords[j], new_state);
-                            update_active_region({local_batch_coords[j]}, local_next_active_region);
-                        }
+                    torch::Tensor current_state_j = local_batch_states[j];
+                    if (!current_state_j.is_complex()) {
+                        current_state_j = torch::complex(current_state_j, torch::zeros_like(current_state_j));
+                    }
+                    
+                    torch::Tensor new_state = current_state_j + delta_complex;
+                    torch::Tensor abs_squared = torch::abs(new_state).pow(2);
+                    float norm = torch::sum(abs_squared).item<float>();
+                    if (norm > 1e-6f) {
+                        new_state = new_state / std::sqrt(norm);
+                    }
+                    
+                    if (norm > 0.01f) {
+                        local_next_matter_map.insert_tensor(local_batch_coords[j], new_state);
+                        update_active_region({local_batch_coords[j]}, local_next_active_region);
                     }
                 }
-            } catch (...) {
-                // Ignorar errores en batch final para no romper todo el step
             }
+        } catch (...) {
+            // Ignorar errores en batch final para no romper todo el step
         }
-        
-        // Merge de resultados locales a globales (Sección Crítica)
-        #pragma omp critical
-        {
-            // Merge matter map
-            auto local_coords = local_next_matter_map.coord_keys();
-            for (const auto& coord : local_coords) {
-                next_matter_map.insert_tensor(coord, local_next_matter_map.get_tensor(coord));
-            }
-            
-            // Merge active region
-            for (const auto& coord : local_next_active_region) {
-                next_active_region.insert(coord);
-            }
-        }
-    } // Fin de region paralela
+    }
+    
+    // Merge de resultados (ya no es necesario critical section porque es single thread)
+    // Merge matter map
+    auto local_coords = local_next_matter_map.coord_keys();
+    for (const auto& coord : local_coords) {
+        next_matter_map.insert_tensor(coord, local_next_matter_map.get_tensor(coord));
+    }
+    
+    // Merge active region
+    for (const auto& coord : local_next_active_region) {
+        next_active_region.insert(coord);
+    }
     
     // Actualizar estado
     matter_map_ = std::move(next_matter_map);

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
@@ -57,6 +57,9 @@ const HolographicViewer: React.FC<HolographicViewerProps> = ({
         rendererRef.current = renderer;
         controlsRef.current = controls;
 
+        // Capturar ref actual para cleanup seguro
+        const currentMount = mountRef.current;
+
         // Loop de animación
         const animate = () => {
             requestAnimationFrame(animate);
@@ -67,10 +70,10 @@ const HolographicViewer: React.FC<HolographicViewerProps> = ({
 
         // Handler de resize que solo ajusta el renderer sin cambiar la vista
         const handleResize = () => {
-            if (!mountRef.current || !renderer || !camera) return;
+            if (!currentMount || !renderer || !camera) return;
             
-            const width = mountRef.current.clientWidth;
-            const height = mountRef.current.clientHeight;
+            const width = currentMount.clientWidth;
+            const height = currentMount.clientHeight;
             
             if (width === 0 || height === 0) return;
             
@@ -86,16 +89,16 @@ const HolographicViewer: React.FC<HolographicViewerProps> = ({
         
         // También ajustar si el contenedor cambia de tamaño
         const resizeObserver = new ResizeObserver(handleResize);
-        if (mountRef.current) {
-            resizeObserver.observe(mountRef.current);
+        if (currentMount) {
+            resizeObserver.observe(currentMount);
         }
 
         // Limpieza
         return () => {
             window.removeEventListener('resize', handleResize);
             resizeObserver.disconnect();
-            if (mountRef.current && renderer.domElement) {
-                mountRef.current.removeChild(renderer.domElement);
+            if (currentMount && renderer.domElement) {
+                currentMount.removeChild(renderer.domElement);
             }
             renderer.dispose();
         };
@@ -147,23 +150,52 @@ const HolographicViewer: React.FC<HolographicViewerProps> = ({
                 colors.push(colorHelper.r, colorHelper.g, colorHelper.b);
                 
                 // Tamaño basado en magnitud
-                sizes.push(magnitude * 2); 
+                // Aumentamos el multiplicador para que sean visibles con el shader
+                sizes.push(Math.max(2.0, magnitude * 8.0)); 
             }
         }
 
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
         geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-        // Nota: Para tamaños variables por partícula se requiere un shader custom, 
-        // aquí usamos tamaño fijo escalado por la cámara para simplicidad.
+        geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
 
-        const material = new THREE.PointsMaterial({
-            size: 2,
-            vertexColors: true,
+        // Shader para partículas circulares con tamaño variable
+        const vertexShader = `
+            attribute float size;
+            varying vec3 vColor;
+            void main() {
+                vColor = color;
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                // Size attenuation: escala el tamaño según la distancia a la cámara
+                gl_PointSize = size * (300.0 / -mvPosition.z);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `;
+
+        const fragmentShader = `
+            varying vec3 vColor;
+            void main() {
+                // Convertir punto cuadrado en círculo suave
+                vec2 coord = gl_PointCoord - vec2(0.5);
+                float dist = length(coord);
+                
+                if (dist > 0.5) discard;
+                
+                // Borde suave (antialiasing manual)
+                float alpha = 1.0 - smoothstep(0.4, 0.5, dist);
+                
+                gl_FragColor = vec4(vColor, alpha);
+            }
+        `;
+
+        const material = new THREE.ShaderMaterial({
+            uniforms: {},
+            vertexShader,
+            fragmentShader,
             transparent: true,
-            opacity: 0.8,
-            sizeAttenuation: true,
-            blending: THREE.AdditiveBlending // Efecto "brillante"
+            blending: THREE.AdditiveBlending,
+            depthWrite: false // Importante para transparencia correcta en partículas
         });
 
         const points = new THREE.Points(geometry, material);

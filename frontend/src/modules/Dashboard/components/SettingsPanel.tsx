@@ -11,7 +11,7 @@ interface SettingsPanelProps {
 }
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
-  const { sendCommand, connectionStatus, compileStatus, serverConfig, updateServerConfig, connect, activeExperiment, experimentsData, simData } = useWebSocket();
+  const { sendCommand, connectionStatus, compileStatus, serverConfig, updateServerConfig, connect } = useWebSocket();
   const isConnected = connectionStatus === 'connected';
   
   // Estados para configuraciones del servidor
@@ -28,11 +28,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
   const [frameRate, setFrameRate] = useState(30);
   const [maxFramesPerSecond, setMaxFramesPerSecond] = useState(60);
   const [logLevel, setLogLevel] = useState<'info' | 'warning' | 'error'>('info');
-  
-  // Obtener información del experimento activo (solo para mostrar)
-  const currentExperiment = activeExperiment 
-    ? experimentsData?.find(exp => exp.name === activeExperiment) 
-    : null;
   
   // Sincronizar estados del servidor cuando serverConfig cambia
   React.useEffect(() => {

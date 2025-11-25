@@ -44,14 +44,14 @@ Cuando `NATIVE_ENGINE_DEVICE` es `"auto"` (por defecto):
 
 ```bash
 export ATHERIA_NATIVE_DEVICE=cpu
-python3 scripts/test_native_engine.py --experiment ...
+python3 tests/test_native_engine.py --experiment ...
 ```
 
 ### Forzar CUDA
 
 ```bash
 export ATHERIA_NATIVE_DEVICE=cuda
-python3 scripts/test_native_engine.py --experiment ...
+python3 tests/test_native_engine.py --experiment ...
 ```
 
 ### Auto-detección (por defecto)
@@ -59,7 +59,7 @@ python3 scripts/test_native_engine.py --experiment ...
 ```bash
 # No es necesario establecer la variable
 export ATHERIA_NATIVE_DEVICE=auto  # Opcional
-python3 scripts/test_native_engine.py --experiment ...
+python3 tests/test_native_engine.py --experiment ...
 ```
 
 ## Uso en Código

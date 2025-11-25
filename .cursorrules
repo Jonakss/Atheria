@@ -109,6 +109,7 @@ Eres un Ingeniero de Física Digital y Experto en IA trabajando en el proyecto A
     - **Antes de commit:** Verifica que el código compila (backend y frontend).
     - **Frontend:** Ejecuta `npm run build` en `frontend/` para verificar errores TypeScript.
     - **Backend:** Verifica imports y sintaxis Python.
+    - **Tests:** Los tests se encuentran en la carpeta `tests/`. Ejecútalos con `pytest` o `python tests/test_nombre.py`.
 
 ## 🧰 TOOLKIT DE AGENTE (COMANDOS)
 

@@ -58,7 +58,7 @@
 
 ### 4. Tests de Verificación
 
-**Script de Test:** `scripts/test_cpp_binding.py`
+**Script de Test:** `tests/test_cpp_binding.py`
 
 **Tests Implementados:**
 1. ✅ `test_add_function()` - Verifica que `add(5, 3) == 8`
@@ -77,7 +77,7 @@
 2. ✅ **Migración de Lógica:**
    - ✅ `Engine::step_native()` implementado con batch processing
    - ✅ `HarmonicVacuum` genera estados complejos correctamente
-   - ✅ Script de prueba con modelos reales implementado (`scripts/test_native_engine.py`)
+   - ✅ Script de prueba con modelos reales implementado (`tests/test_native_engine.py`)
    - ✅ Script completo con exportación automática a TorchScript
    - ✅ Verificación de estado cuántico y métricas de rendimiento
    - ⏳ Ejecutar tests con modelos reales y registrar métricas

@@ -15,6 +15,7 @@ from ..core.status_helpers import build_inference_status_payload
 from ...model_loader import load_model
 from ... import config as global_cfg
 from ...engines.qca_engine import Aetheria_Motor, QuantumState
+from ...engines.harmonic_engine import SparseHarmonicEngine
 from ..viz import get_visualization_data
 from ...physics.analysis.EpochDetector import EpochDetector
 from ...utils import get_latest_checkpoint, get_latest_jit_model, load_experiment_config
@@ -348,6 +349,9 @@ async def handle_load_experiment(args):
             use_native = True
         elif force_engine == 'python':
             use_native = False
+        elif force_engine == 'harmonic':
+            use_native = False
+            # Harmonic engine is a special python engine
         else:
             # Auto-detectar: Respetar configuración global si no se fuerza
             if global_cfg.USE_NATIVE_ENGINE:
@@ -421,13 +425,13 @@ async def handle_load_experiment(args):
                 g_state['motor_is_native'] = True
                 g_state['motor_type'] = 'native'
             else:
-                # Motor Python
+                # Motor Python (Standard or Harmonic)
                 from ...utils import load_experiment_config
                 exp_cfg = load_experiment_config(exp_name)
                 if not exp_cfg:
                     raise ValueError(f"No se pudo cargar configuración de {exp_name}")
                 
-                if ws: await send_notification(ws, "Inicializando motor Python...", "info")
+                if ws: await send_notification(ws, f"Inicializando motor {'Harmónico' if force_engine == 'harmonic' else 'Python'}...", "info")
                 
                 checkpoint_path = get_latest_checkpoint(exp_name)
                 
@@ -437,16 +441,39 @@ async def handle_load_experiment(args):
                     if model is None:
                         raise ValueError(f"No se pudo cargar modelo de {exp_name}")
                     
-                    motor = Aetheria_Motor(
-                        model_operator=model,
-                        grid_size=g_state.get('inference_grid_size', global_cfg.GRID_SIZE_INFERENCE),
-                        d_state=exp_cfg.MODEL_PARAMS.d_state,
-                        device=device,
-                        cfg=exp_cfg
-                    )
-                    # Aetheria_Motor no hereda de nn.Module, llamar eval en el modelo interno
-                    if hasattr(motor, 'model_operator'):
-                        motor.model_operator.eval()
+                    if force_engine == 'harmonic':
+                        # Usar SparseHarmonicEngine
+                        motor = SparseHarmonicEngine(
+                            model=model,
+                            d_state=exp_cfg.MODEL_PARAMS.d_state,
+                            device=device,
+                            grid_size=g_state.get('inference_grid_size', global_cfg.GRID_SIZE_INFERENCE)
+                        )
+                        # Inyectar materia inicial si es necesario
+                        # Por ahora iniciamos vacío o con una semilla central
+                        initial_state = torch.randn(exp_cfg.MODEL_PARAMS.d_state, device=device)
+                        motor.add_matter(0, 0, 0, initial_state)
+                    else:
+                        # Usar Aetheria_Motor estándar
+                        motor = Aetheria_Motor(
+                            model_operator=model,
+                            grid_size=g_state.get('inference_grid_size', global_cfg.GRID_SIZE_INFERENCE),
+                            d_state=exp_cfg.MODEL_PARAMS.d_state,
+                            device=device,
+                            cfg=exp_cfg
+                        )
+                        # Aetheria_Motor no hereda de nn.Module, llamar eval en el modelo interno
+                        if hasattr(motor, 'model_operator'):
+                            motor.model_operator.eval()
+                            
+                        # Configurar estado inicial
+                        initial_mode = getattr(global_cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')
+                        motor.state = QuantumState(
+                            motor.grid_size,
+                            motor.d_state,
+                            motor.device,
+                            initial_mode=initial_mode
+                        )
                     return motor
                 
                 # Ejecutar en thread pool
@@ -454,16 +481,7 @@ async def handle_load_experiment(args):
                 motor = await loop.run_in_executor(None, create_python_motor)
                 
                 g_state['motor_is_native'] = False
-                g_state['motor_type'] = 'python'
-                
-                # Configurar estado inicial
-                initial_mode = getattr(global_cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')
-                motor.state = QuantumState(
-                    motor.grid_size,
-                    motor.d_state,
-                    motor.device,
-                    initial_mode=initial_mode
-                )
+                g_state['motor_type'] = 'harmonic' if force_engine == 'harmonic' else 'python'
             
             g_state['motor'] = motor
             g_state['active_experiment'] = exp_name

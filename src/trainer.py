@@ -42,6 +42,7 @@ def main():
     # Aceptamos un string JSON y lo cargamos como un diccionario
     parser.add_argument("--model_params", type=str, required=True, help='JSON string of model parameters')
     parser.add_argument("--continue_training", action="store_true")
+    parser.add_argument("--noise_level", type=float, default=0.05, help="Maximum noise level for training")
     
     args = parser.parse_args()
     
@@ -63,7 +64,8 @@ def main():
         "TOTAL_EPISODES": args.total_episodes,
         "MODEL_PARAMS": model_params_dict,
         "DEVICE": global_cfg.DEVICE,
-        "GAMMA_DECAY": getattr(global_cfg, 'GAMMA_DECAY', 0.01)  # Término Lindbladian (decaimiento)
+        "GAMMA_DECAY": getattr(global_cfg, 'GAMMA_DECAY', 0.01),  # Término Lindbladian (decaimiento)
+        "NOISE_LEVEL": args.noise_level
     }
     
     # Convertir MODEL_PARAMS a SimpleNamespace si es necesario para compatibilidad

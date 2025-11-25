@@ -9,6 +9,7 @@ Estrategia:
 import json
 import logging
 from typing import Any, Dict, Optional, Tuple
+import numpy as np
 
 # Intentar importar librerías de serialización binaria
 try:
@@ -38,6 +39,16 @@ def serialize_frame_binary(payload: Dict[str, Any]) -> Tuple[bytes, str]:
     # Convertir listas a arrays para mejor compresión
     optimized_payload = payload.copy()
     
+    # Helper para convertir numpy a lista recursivamente si es necesario
+    def convert_numpy(obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, dict):
+            return {k: convert_numpy(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_numpy(v) for v in obj]
+        return obj
+
     # Optimizar map_data si existe (suele ser el más grande)
     if 'map_data' in optimized_payload:
         map_data = optimized_payload['map_data']
@@ -46,11 +57,22 @@ def serialize_frame_binary(payload: Dict[str, Any]) -> Tuple[bytes, str]:
         if hasattr(map_data, 'tolist'):
             optimized_payload['map_data'] = map_data.tolist()
     
+    # Handler común para numpy
+    def numpy_default(obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, (np.float32, np.float64)):
+            return float(obj)
+        if isinstance(obj, (np.int32, np.int64)):
+            return int(obj)
+        raise TypeError(f"Object of type {type(obj)} is not serializable")
+
     # Intentar usar MessagePack primero (más eficiente para arrays numéricos)
     if MSGPACK_AVAILABLE:
         try:
             # MessagePack serializa arrays numéricos muy eficientemente
-            binary_data = msgpack.packb(optimized_payload, use_bin_type=True)
+            # Usamos default para manejar numpy arrays que no hayan sido convertidos
+            binary_data = msgpack.packb(optimized_payload, use_bin_type=True, default=numpy_default)
             return binary_data, "msgpack"
         except Exception as e:
             logging.warning(f"Error serializando con msgpack: {e}, usando fallback")
@@ -58,14 +80,32 @@ def serialize_frame_binary(payload: Dict[str, Any]) -> Tuple[bytes, str]:
     # Fallback a CBOR (bueno para arrays binarios)
     if CBOR_AVAILABLE:
         try:
-            binary_data = cbor2.dumps(optimized_payload)
+            binary_data = cbor2.dumps(optimized_payload, default=numpy_default)
             return binary_data, "cbor"
         except Exception as e:
             logging.warning(f"Error serializando con CBOR: {e}, usando JSON")
     
     # Fallback a JSON (último recurso)
-    json_str = json.dumps(optimized_payload, separators=(',', ':'))
-    return json_str.encode('utf-8'), "json"
+    # Usar un encoder personalizado para manejar cualquier numpy array remanente
+    class NumpyEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            if isinstance(obj, (np.float32, np.float64)):
+                return float(obj)
+            if isinstance(obj, (np.int32, np.int64)):
+                return int(obj)
+            return super().default(obj)
+
+    try:
+        json_str = json.dumps(optimized_payload, cls=NumpyEncoder, separators=(',', ':'))
+        return json_str.encode('utf-8'), "json"
+    except Exception as e:
+        logging.error(f"Error fatal serializando JSON: {e}")
+        # Intento desesperado de limpiar todo numpy
+        clean_payload = convert_numpy(optimized_payload)
+        json_str = json.dumps(clean_payload, separators=(',', ':'))
+        return json_str.encode('utf-8'), "json"
 
 
 def deserialize_frame_binary(data: bytes, format_hint: Optional[str] = None) -> Dict[str, Any]:

@@ -17,7 +17,7 @@ except ImportError:
 
 # Importamos componentes del sistema
 from ..engines.qca_engine import Aetheria_Motor
-from ..physics.analysis.noise import QuantumNoiseInjector
+from ..physics.noise import QuantumNoiseInjector
 from .. import config as global_cfg
 from ..utils.experiment_logger import ExperimentLogger
 
@@ -34,7 +34,7 @@ class QC_Trainer_v4:
     """
     def __init__(self, experiment_name, model_class=None, model_params=None, device=None, 
                  lr=1e-4, grid_size=64, qca_steps=100, gamma_decay=0.01, model=None,
-                 max_checkpoints_to_keep=5):
+                 max_checkpoints_to_keep=5, max_noise=0.05):
         """
         Inicializa QC_Trainer_v4.
         
@@ -49,6 +49,7 @@ class QC_Trainer_v4:
             gamma_decay: Término Lindbladian (decaimiento)
             model: Modelo ya instanciado (opcional, para checkpoints/transfer learning)
             max_checkpoints_to_keep: Número máximo de mejores checkpoints a retener (por defecto 5)
+            max_noise: Nivel máximo de ruido a inyectar (default 0.05)
         """
         self.experiment_name = experiment_name
         self.device = device
@@ -56,6 +57,7 @@ class QC_Trainer_v4:
         self.qca_steps = qca_steps
         self.gamma_decay = gamma_decay
         self.max_checkpoints_to_keep = max_checkpoints_to_keep
+        self.max_noise = max_noise
         
         # 1. Motor de Física (Ley M)
         # Si se proporciona un modelo ya instanciado, usarlo; sino, crear uno nuevo
@@ -101,7 +103,8 @@ class QC_Trainer_v4:
             'qca_steps': qca_steps,
             'gamma_decay': gamma_decay,
             'd_state': model_params.get('d_state', 'UNKNOWN') if isinstance(model_params, dict) else getattr(model_params, 'd_state', 'UNKNOWN'),
-            'max_checkpoints_to_keep': max_checkpoints_to_keep
+            'max_checkpoints_to_keep': max_checkpoints_to_keep,
+            'max_noise': max_noise
         }
         self.doc_logger.initialize_or_load(config_dict)
         
@@ -165,7 +168,7 @@ class QC_Trainer_v4:
         # --- Curriculum de Ruido ---
         # Empezamos sin ruido (para aprender física básica)
         # Aumentamos el ruido linealmente hasta el episodio 2000
-        max_noise = 0.05
+        max_noise = self.max_noise
         current_noise = min(max_noise, max_noise * (episode_num / 2000))
         
         # Simulación temporal

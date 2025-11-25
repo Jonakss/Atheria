@@ -79,7 +79,7 @@ El sistema actual envía datos de simulación vía WebSocket usando JSON, lo cua
 ### Test de Transferencia
 
 ```bash
-python scripts/test_transfer_optimization.py
+python tests/test_transfer_optimization.py
 ```
 
 Este script compara:
@@ -140,7 +140,7 @@ O usar el script:
 
 - **Componente**: [[30_Components/WORLD_DATA_TRANSFER_OPTIMIZATION]] - Documentación técnica completa
 - **Quick Start**: [[30_Components/QUICK_START_OPTIMIZATION]] - Guía rápida
-- **Benchmark Script**: `scripts/test_transfer_optimization.py`
+- **Benchmark Script**: `tests/test_transfer_optimization.py`
 
 ## Tags
 

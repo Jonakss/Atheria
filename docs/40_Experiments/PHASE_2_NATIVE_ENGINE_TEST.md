@@ -7,7 +7,7 @@
 
 ## 📋 Resumen
 
-Este documento describe el script de prueba `scripts/test_native_engine.py` que permite:
+Este documento describe el script de prueba `tests/test_native_engine.py` que permite:
 
 1. **Cargar modelos entrenados** desde checkpoints
 2. **Exportar automáticamente** a TorchScript
@@ -22,13 +22,13 @@ Este documento describe el script de prueba `scripts/test_native_engine.py` que 
 ### Ejecución Básica
 
 ```bash
-python scripts/test_native_engine.py --experiment UNET_32ch_D5_LR2e-5
+python tests/test_native_engine.py --experiment UNET_32ch_D5_LR2e-5
 ```
 
 ### Opciones
 
 ```bash
-python scripts/test_native_engine.py \
+python tests/test_native_engine.py \
     --experiment UNET_32ch_D5_LR2e-5 \
     --device cpu \
     --steps 10

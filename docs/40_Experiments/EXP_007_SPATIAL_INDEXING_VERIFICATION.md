@@ -79,7 +79,7 @@ def _extract_bits_3d_for_coord(self, codes: torch.Tensor, offset: int) -> torch.
 
 ### Script de Prueba Creado
 
-**Ubicación**: `scripts/test_spatial_indexing.py`
+**Ubicación**: `tests/test_spatial_indexing.py`
 
 ### Resultados de Tests
 
@@ -194,7 +194,7 @@ Coordenadas cercanas en espacio 3D:
 ## 📝 Referencias
 
 - **Implementación**: `src/utils/spatial.py`
-- **Tests**: `scripts/test_spatial_indexing.py`
+- **Tests**: `tests/test_spatial_indexing.py`
 - **Componente**: [[30_Components/SPATIAL_INDEXING]]
 
 ---

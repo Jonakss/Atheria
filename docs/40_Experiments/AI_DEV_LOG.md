@@ -17,6 +17,7 @@
 ## 📋 Índice de Entradas
 
 
+- [[#2025-11-25 - Finalización Fase 1 y Verificación Motor Nativo]]
 - [[#2025-11-24 - Correcciones UI y Rendimiento: Zoom, FPS, Throttling y Native Engine]]
 - [[#2025-11-24 - CRÍTICO: Solución Crash Loop Backend por Conversión Bloqueante]]
 - [[#2025-11-23 - Optimizaciones Críticas de Live Feed y Rendimiento]]
@@ -40,6 +41,29 @@
 - [[#2024-12-XX - Fase 3 Completada: Migración de Componentes UI]]
 - [[#2024-12-XX - Fase 2 Iniciada: Setup Motor Nativo C++]]
 - [[#2024-12-XX - Optimización de Logs y Reducción de Verbosidad]]
+
+---
+
+## 2025-11-25 - Finalización Fase 1 y Verificación Motor Nativo
+
+### Contexto
+Se completaron las tareas restantes de la Fase 1 del Roadmap y se inició la verificación de la Fase 2 (Motor Nativo).
+
+### Logros Fase 1 (Completada)
+1. **Epoch Detector**: Implementado en `src/physics/analysis/epoch_detector.py`. Analiza el estado de la simulación para determinar la era cosmológica.
+2. **Sparse Harmonic Engine**: Finalizado en `src/engines/harmonic_engine.py`. Implementa `step()` basado en chunks y `get_dense_state()` para compatibilidad.
+3. **Visualización 3D**: Conectada exitosamente. `HolographicViewer` recibe datos correctamente aplanados desde el backend.
+
+### Verificación Fase 2 (Motor Nativo)
+**Problema Detectado**: Al verificar el motor nativo con `scripts/test_native_infinite_universe.py`, se observó un conteo inicial de partículas de **65,536** (256x256).
+**Causa**: El `NativeEngineWrapper` inicializa por defecto con `complex_noise`, llenando todo el grid. El script de prueba inyectaba una semilla sin limpiar el estado previo.
+**Solución**: Se modificó el script de prueba para llamar a `engine.native_engine.clear()` antes de la inyección de la semilla.
+**Resultado**: Verificación exitosa. Conteo inicial: 1 partícula. Expansión confirmada (ej: 27 partículas en paso 1).
+
+### Archivos Relacionados
+- `src/physics/analysis/epoch_detector.py`
+- `src/engines/harmonic_engine.py`
+- `scripts/test_native_infinite_universe.py`
 
 ---
 
@@ -419,7 +443,7 @@ Implementación de paralelización multi-hilo en el motor nativo C++ para mejora
 - **Merge Seguro**: Solo al final del loop paralelo se fusionan los resultados en sección crítica.
 
 ### Verificación
-**Test:** `scripts/test_native_engine_openmp.py`
+**Test:** `tests/test_native_engine_openmp.py`
 - ✅ Conservación de partículas: 100% (648/648 mantenidas durante 10 pasos).
 - ✅ Determinismo (thread safety): Ambos motores producen el mismo resultado final.
 - ✅ Performance: **2318 steps/sec** sin modelo (CPU).
@@ -1592,7 +1616,7 @@ for i in range(0, len(coords_to_process), BATCH_SIZE):
 
 ### Tests Realizados
 
-**Script:** `scripts/test_native_engine_optimizations.py`
+**Script:** `tests/test_native_engine_optimizations.py`
 
 **Resultados:**
 ```
@@ -1626,7 +1650,7 @@ Total: 5 tests
    - Integrado con `ROIManager` para ROI
    - Verificación de pausa durante conversión
 
-3. **`scripts/test_native_engine_optimizations.py`** (nuevo)
+3. **`tests/test_native_engine_optimizations.py`** (nuevo)
    - Script de prueba para validar optimizaciones
 
 ### Resultados de Rendimiento
@@ -1670,7 +1694,7 @@ Total: 5 tests
 **Referencias:**
 - [[NATIVE_ENGINE_PERFORMANCE_ISSUES]] - Problemas identificados
 - `src/engines/native_engine_wrapper.py:271-372` - Código optimizado
-- `scripts/test_native_engine_optimizations.py` - Script de prueba
+- `tests/test_native_engine_optimizations.py` - Script de prueba
 
 ---
 

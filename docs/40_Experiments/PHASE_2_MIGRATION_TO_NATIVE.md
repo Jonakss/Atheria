@@ -66,10 +66,10 @@ pip install -e .
 
 ```bash
 # Ejecutar test con un modelo entrenado
-python scripts/test_native_engine.py --experiment UNET_32ch_D5_LR2e-5
+python tests/test_native_engine.py --experiment UNET_32ch_D5_LR2e-5 --steps 100
 
 # Con más pasos para medir rendimiento
-python scripts/test_native_engine.py --experiment UNET_32ch_D5_LR2e-5 --steps 100
+python tests/test_native_engine.py --experiment UNET_32ch_D5_LR2e-5 --steps 100 --steps 100
 ```
 
 **Verificaciones:**
@@ -174,7 +174,7 @@ ls -lh atheria_core*.so
 **Solución:**
 ```bash
 # Probar con CPU primero
-python scripts/test_native_engine.py --experiment ... --device cpu
+python tests/test_native_engine.py --experiment ... --device cpu
 
 # Verificar versiones
 python -c "import torch; print(torch.__version__)"
