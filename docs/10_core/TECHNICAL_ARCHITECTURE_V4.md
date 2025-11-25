@@ -3,8 +3,12 @@ Arquitectura Técnica: Atheria 4
 1. Estructura de Directorios
 
 src/
+├── cpp_core/          # Motor Nativo C++ (Producción)
+│   ├── include/       # Headers (.h)
+│   └── src/           # Implementación (.cpp, .cu)
 ├── engines/           # Motores de Simulación
-│   ├── harmonic_engine.py  # Motor Disperso con Vacío QFT (Producción)
+│   ├── native_engine_wrapper.py # Wrapper Híbrido (Native -> Python Fallback)
+│   ├── harmonic_engine.py  # Motor Disperso Python (Legacy/Fallback)
 │   └── qca_engine.py       # Motor Denso (Laboratorio/Entrenamiento)
 ├── models/            # Cerebros (PyTorch)
 │   ├── unet_unitary.py     # Arquitectura Principal
@@ -13,40 +17,45 @@ src/
 │   ├── noise.py            # Inyector de Ruido IonQ
 │   └── genesis.py          # Semillas iniciales (Big Bang)
 ├── analysis/          # Xenobiología
-│   ├── epoch_detector.py   # Clasificador de Eras
-│   └── structure_finder.py # (Pendiente) Detector de Gliders
-└── pipeline_server.py # Servidor Orquestador (aiohttp)
+│   ├── analysis.py         # t-SNE Atlas & Mapa Químico
+│   └── epoch_detector.py   # (Planificado) Clasificador de Eras
+└── run_server.py      # Entry Point del Servidor (usado por CLI)
 
 
 2. Flujo de Datos (Data Flow)
 
 A. Entrenamiento (The Lab)
 
-Trainer -> Dense Engine -> Noise Injector -> U-Net -> Loss (Stability + Symmetry) -> Update Weights
+Trainer -> Dense Engine (QCA) -> Noise Injector -> U-Net -> Loss (Stability + Symmetry) -> Update Weights
 
-B. Inferencia (The Universe)
+B. Inferencia (The Universe) - Arquitectura Híbrida
 
-Sparse Engine
+Native Engine (C++) / Sparse Engine (Python)
 
-Step Start: Identificar coordenadas activas.
+*Nota: El sistema prioriza el Motor Nativo (C++/CUDA). Si no está disponible, hace fallback transparente al Motor Python.*
 
-Vacuum Gen: Calcular valor del vacío (HarmonicVacuum) para vecinos vacíos.
+Step Start: Identificar coordenadas activas (Octree/Hash Map).
+
+Vacuum Gen: Calcular valor del vacío para vecinos vacíos.
 
 Local Tensor: Construir mini-grids (3x3) alrededor de la materia.
 
 Inference: Pasar mini-grids por la U-Net (pre-entrenada).
 
-Update: Actualizar Hash Map matter. Borrar celdas con $E < \epsilon$.
+Update: Actualizar estado disperso. Borrar celdas con $E < \epsilon$.
 
-Viewport: Muestrear región de cámara -> Enviar a Frontend.
+Viewport: Muestrear región de cámara (Lazy Conversion) -> Enviar a Frontend.
 
 3. Stack Tecnológico
 
 Backend: Python 3.10+, PyTorch (CUDA), Aiohttp.
+Core Engine: C++17 (CUDA opcional) para simulación de alto rendimiento.
 
-Estructuras: Diccionarios nativos de Python (prototipo) -> torch.sparse (futuro).
+Estructuras:
+- C++: Octree / Hash Map optimizado.
+- Python: `native_engine_wrapper.py` gestiona la conversión a Tensors densos para visualización.
 
-Frontend: React, Three.js (HolographicViewer), WebSockets.
+Frontend: React, Three.js (HolographicViewer - En Progreso), WebSockets.
 
 4. Reglas de Programación (Guidelines)
 

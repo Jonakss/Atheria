@@ -7,6 +7,7 @@
 ## 🌌 Física y Fundamentos
 
 - **[Vacío Armónico](../20_Concepts/HARMONIC_VACUUM_CONCEPT.md)** - Concepto fundamental del vacío cuántico armónico
+- **[Espacio de Estados 3D](../20_Concepts/3D_STATE_SPACE_CONCEPT.md)** - Conceptualización de la transición de superficie 2D a volumen 3D
 
 ## 🔧 Arquitecturas y Sistemas
 

@@ -320,5 +320,5 @@
 
 ---
 
-[[ROADMAP_PHASE_1|← Fase 1]] | [[ROADMAP_PHASE_2|← Fase 2]] | **Fase 3 (Actual)** | [[ROADMAP_PHASE_4|Fase 4 →]]
+[[ROADMAP_PHASE_1|← Fase 1]] | [[ROADMAP_PHASE_2|← Fase 2]] | **Fase 3 (Actual)** | [[ROADMAP_PHASE_4|Fase 4 (Futuro) →]]
 
