@@ -41,7 +41,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onToggleTimeline, timelineOpen
     prevIsPlaying.current = isPlaying;
   }, [isPlaying, simData?.step, simData?.simulation_info?.step, sessionStartStep]);
 
-  }, [isPlaying, simData?.step, simData?.simulation_info?.step]);
+  const [stepsInterval, setStepsInterval] = useState<number>(() => {
     const saved = localStorage.getItem('atheria_steps_interval');
     return saved ? parseInt(saved, 10) : 10;
   });
