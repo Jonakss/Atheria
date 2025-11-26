@@ -17,7 +17,7 @@ from ... import config as global_cfg
 from ...engines.qca_engine import Aetheria_Motor, QuantumState
 from ...engines.harmonic_engine import SparseHarmonicEngine
 from ..viz import get_visualization_data
-from ...physics.analysis.EpochDetector import EpochDetector
+from ...analysis.epoch_detector import EpochDetector
 from ...utils import get_latest_checkpoint, get_latest_jit_model, load_experiment_config
 
 logger = logging.getLogger(__name__)

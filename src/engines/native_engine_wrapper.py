@@ -798,11 +798,8 @@ class NativeEngineWrapper:
         """
         import numpy as np
         
-        logging.warning(f"⚠️ add_initial_particles() es DEPRECADO y NO respeta la ley M.")
-        logging.warning(f"⚠️ Las partículas deberían emerger del estado inicial según INITIAL_STATE_MODE_INFERENCE.")
-        logging.info(f"💡 Usando regenerate_initial_state() en su lugar...")
+        logging.warning(f"⚠️ add_initial_particles() es DEPRECADO. Usando regenerate_initial_state() en su lugar.")
         
-        # Usar el método correcto que respeta la ley M
         try:
             self.regenerate_initial_state()
         except Exception as e:
@@ -909,4 +906,45 @@ class NativeEngineWrapper:
         """
         if self.state.psi is None or self._dense_state_stale:
             self.get_dense_state(check_pause_callback=lambda: False)
+
+
+def export_model_to_jit(model, experiment_name: str, input_shape: tuple) -> str:
+    """
+    Exporta un modelo PyTorch a TorchScript (JIT) para uso en el motor nativo.
+    
+    Args:
+        model: Modelo PyTorch (nn.Module)
+        experiment_name: Nombre del experimento (para nombrar el archivo)
+        input_shape: Shape del input de ejemplo (B, C, H, W)
+        
+    Returns:
+        Path al archivo .pt exportado
+    """
+    import os
+    from pathlib import Path
+    
+    # Crear directorio de salida si no existe
+    output_dir = Path("output/jit_models")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    output_path = output_dir / f"{experiment_name}.pt"
+    
+    logging.info(f"🔄 Exportando modelo '{experiment_name}' a TorchScript...")
+    
+    try:
+        model.eval()
+        # Crear input de ejemplo en el mismo dispositivo que el modelo
+        device = next(model.parameters()).device
+        example_input = torch.randn(input_shape, device=device)
+        
+        # Tracing
+        traced_script_module = torch.jit.trace(model, example_input)
+        traced_script_module.save(str(output_path))
+        
+        logging.info(f"✅ Modelo exportado exitosamente a: {output_path}")
+        return str(output_path)
+        
+    except Exception as e:
+        logging.error(f"❌ Error exportando modelo a JIT: {e}")
+        raise
 

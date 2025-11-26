@@ -28,13 +28,14 @@ Eres un Ingeniero de Física Digital y Experto en IA trabajando en el proyecto A
       1. **CONSULTAR primero** la documentación existente en `docs/` para entender el contexto y decisiones anteriores
       2. Revisar si la documentación necesita actualización
       3. Actualizar documentación relevante en `docs/` (mantener la knowledge base actualizada)
-      4. Registrar cambios importantes en `docs/40_Experiments/AI_DEV_LOG.md`
-      5. Hacer commit de los cambios de código Y documentación juntos
+      4. Registrar cambios importantes creando una nueva entrada en `docs/40_Experiments/logs/YYYY-MM-DD_titulo.md`
+      5. Actualizar el índice en `docs/40_Experiments/AI_DEV_LOG.md` con el enlace a la nueva entrada
+      6. Hacer commit de los cambios de código Y documentación juntos
     - **Antes de hacer commit:** Verifica que:
       - Has consultado `docs/` para entender el contexto (no reinventar la rueda)
       - La documentación esté actualizada si el cambio la afecta
       - Los MOC (`00_*_MOC.md`) estén actualizados si agregaste nuevas entradas
-      - `AI_DEV_LOG.md` registre cambios importantes
+      - Has creado el log correspondiente en `docs/40_Experiments/logs/` y actualizado el índice
     - **Nuevas Funcionalidades:** Si creas una nueva funcionalidad:
       - Consulta primero `docs/30_Components/` para ver si hay componentes relacionados
       - Genera documentación en `docs/30_Components/` usando el template `docs/99_Templates/Component_Template.md`
