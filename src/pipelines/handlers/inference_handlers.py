@@ -13,11 +13,10 @@ from types import SimpleNamespace
 from ...server.server_state import g_state, broadcast, send_notification, send_to_websocket, optimize_frame_payload
 from ..core.status_helpers import build_inference_status_payload
 from ...model_loader import load_model
-from src import config as global_cfg
+from ... import config as global_cfg
 from ...engines.qca_engine import Aetheria_Motor, QuantumState
 from ...engines.harmonic_engine import SparseHarmonicEngine
 from ..viz import get_visualization_data
-from ...analysis.epoch_detector import EpochDetector
 from ...utils import get_latest_checkpoint, get_latest_jit_model, load_experiment_config
 
 logger = logging.getLogger(__name__)
@@ -319,9 +318,6 @@ async def handle_load_experiment(args):
         logging.info(f"Intentando cargar el experimento '{exp_name}'...")
         if ws: await send_notification(ws, f"Cargando modelo '{exp_name}'...", "info")
         
-        if 'epoch_detector' not in g_state:
-            g_state['epoch_detector'] = EpochDetector()
-        
         # Pausar y limpiar motor anterior
         g_state['is_paused'] = True
         status_payload = build_inference_status_payload("paused")
@@ -503,7 +499,7 @@ async def handle_load_experiment(args):
                         if ws: await send_notification(ws, scaling_msg, "info")
             except Exception as e:
                 logging.debug(f"No se pudo mostrar info de grid scaling: {e}")
-            
+
             # Notificar éxito
             msg = f"✅ Experimento '{exp_name}' cargado exitosamente ({'Nativo' if use_native else 'Python'})."
             logging.info(msg)
@@ -763,20 +759,6 @@ async def handle_set_inference_config(args):
                 "gamma_decay": global_cfg.GAMMA_DECAY
             }
         })
-        
-        # Si cambió el grid_size y hay un experimento activo, recargarlo para aplicar cambios
-        if grid_size is not None and g_state.get('active_experiment'):
-            logging.info(f"🔄 Recargando experimento '{g_state['active_experiment']}' para aplicar nuevo grid size: {new_size}")
-            if ws: await send_notification(ws, "Recargando simulación para aplicar cambio de grid...", "info")
-            
-            # Pequeña pausa para asegurar que el mensaje llegue
-            await asyncio.sleep(0.1)
-            
-            await handle_load_experiment({
-                'ws_id': args.get('ws_id'),
-                'experiment_name': g_state['active_experiment'],
-                'force_engine': g_state.get('motor_type', 'auto')
-            })
 
 
 HANDLERS = {

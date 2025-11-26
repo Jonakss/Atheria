@@ -2,7 +2,7 @@
 import logging
 from typing import Dict, Any, Optional
 
-from src.server.server_state import g_state
+from ...server.server_state import g_state
 
 
 def get_compile_status() -> Optional[Dict[str, Any]]:
