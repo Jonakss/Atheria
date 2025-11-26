@@ -486,6 +486,7 @@ async def handle_load_experiment(args):
             g_state['motor'] = motor
             g_state['active_experiment'] = exp_name
             g_state['simulation_step'] = 0
+            g_state['start_step'] = 0  # Inicializar el paso inicial
             g_state['current_epoch'] = 0
             g_state['epoch_metrics'] = {}
             

@@ -432,6 +432,8 @@ async def simulation_loop():
                                         "complex_3d_data": viz_data.get("complex_3d_data"),
                                         "simulation_info": {
                                             "step": updated_step,
+                                            "start_step": g_state.get('start_step', 0),
+                                            "total_steps": g_state.get('total_steps', 100000),
                                             "initial_step": g_state.get('initial_step', 0),
                                             "checkpoint_step": g_state.get('checkpoint_step', 0),
                                             "checkpoint_episode": g_state.get('checkpoint_episode', 0),
@@ -476,6 +478,8 @@ async def simulation_loop():
                                 "timestamp": asyncio.get_event_loop().time(),
                                 "simulation_info": {
                                     "step": updated_step,
+                                    "start_step": g_state.get('start_step', 0),
+                                    "total_steps": g_state.get('total_steps', 100000),
                                     "is_paused": False,
                                     "live_feed_enabled": False,
                                     "fps": g_state.get('current_fps', 0.0),
