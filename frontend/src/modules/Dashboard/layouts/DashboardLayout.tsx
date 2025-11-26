@@ -190,6 +190,13 @@ export const DashboardLayout: React.FC = () => {
           {/* Viewport (Fondo) - Design System: bg-[#050505] a black según mockup */}
           {renderContentView()}
 
+          {/* History Controls (Timeline Navigation) - Solo en vista Lab */}
+          {activeTab === 'lab' && (
+            <div className="px-4 py-2 border-t border-white/5 bg-dark-980/80 backdrop-blur-sm">
+              <HistoryControls />
+            </div>
+          )}
+
           {/* Panel Inferior (Métricas Críticas) - Design System: bg-[#050505]/95 backdrop-blur-sm */}
           <MetricsBar />
         </main>
