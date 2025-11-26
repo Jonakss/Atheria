@@ -42,3 +42,13 @@ docs/30_Components/: Tu espacio de trabajo técnico. Documenta aquí tus clases 
 docs/40_Experiments/: Tu cuaderno de laboratorio. Anota aquí qué funcionó y qué falló.
 
 Instrucción Global: Antes de escribir código complejo, verifica docs/10_Core/ATHERIA_GLOSSARY.md para usar la terminología correcta.
+
+4. Sincronización de Agentes
+
+Los siguientes archivos contienen las reglas de los agentes y deben mantenerse sincronizados:
+- `.cursorrules` (Cursor)
+- `.gemini/GEMINI.md` (Gemini)
+- `.lightning` (Lightning AI)
+- `AGENTS.md` (General / Inglés)
+
+**IMPORTANTE:** Al actualizar uno, actualiza los demás.

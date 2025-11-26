@@ -392,7 +392,7 @@ async def handle_load_experiment(args):
                     from ...engines.native_engine_wrapper import export_model_to_jit
                     d_state = exp_cfg.MODEL_PARAMS.d_state
                     grid_size = g_state.get('inference_grid_size', global_cfg.GRID_SIZE_INFERENCE)
-                    jit_path = export_model_to_jit(temp_model, exp_name, (1, d_state, grid_size, grid_size))
+                    jit_path = export_model_to_jit(temp_model, exp_name, (1, 2 * d_state, grid_size, grid_size))
                     del temp_model
                     gc.collect()
                     if torch.cuda.is_available(): torch.cuda.empty_cache()

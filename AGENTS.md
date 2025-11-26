@@ -122,3 +122,13 @@ If the user provides a command (starting with `/`), follow the steps rigorously.
 - **Obsidian Setup:** `docs/OBSIDIAN_SETUP.md`
 - **AI Dev Log:** `docs/40_Experiments/AI_DEV_LOG.md`
 - **Commit Tags:** `docs/99_Templates/COMMIT_VERSION_TAGS.md`
+
+## AGENT CONFIGURATION SYNC
+
+The following files contain the agent rules and must be kept in sync:
+- `.cursorrules` (Cursor)
+- `.gemini/GEMINI.md` (Gemini)
+- `.lightning` (Lightning AI)
+- `AGENTS.md` (General / English)
+
+**IMPORTANT:** When updating one of these files, you **MUST** update the others to ensure all agents (Cursor, Gemini, Lightning) operate with the same context and rules.
