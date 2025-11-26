@@ -11,6 +11,7 @@ import {
     createTextureFromData,
     FRAGMENT_SHADER_DENSITY,
     FRAGMENT_SHADER_ENERGY,
+    FRAGMENT_SHADER_HSV,
     FRAGMENT_SHADER_IMAG,
     FRAGMENT_SHADER_PHASE,
     FRAGMENT_SHADER_REAL,
@@ -75,6 +76,8 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
             fragmentShader = FRAGMENT_SHADER_REAL;
         } else if (selectedViz === 'imag') {
             fragmentShader = FRAGMENT_SHADER_IMAG;
+        } else if (selectedViz === 'phase_hsv') {
+            fragmentShader = FRAGMENT_SHADER_HSV;
         } else {
             // Default: density
             fragmentShader = FRAGMENT_SHADER_DENSITY;

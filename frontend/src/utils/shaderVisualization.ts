@@ -360,6 +360,62 @@ export const FRAGMENT_SHADER_IMAG = `
 `;
 
 /**
+ * Shader de fragment para visualización HSV de fase
+ * Mapea la fase a HSV: Hue = fase, Saturation = 1.0, Value = densidad/intensidad
+ * El backend envía la fase ya normalizada a [0, 1] donde representa phase_normalized = (phase + π) / (2π)
+ */
+export const FRAGMENT_SHADER_HSV = `
+    precision mediump float;
+    
+    uniform sampler2D u_texture;
+    uniform vec2 u_textureSize;
+    
+    varying vec2 v_texCoord;
+    
+    // Convertir HSV a RGB
+    // h: hue [0, 1], s: saturation [0, 1], v: value [0, 1]
+    vec3 hsvToRgb(float h, float s, float v) {
+        h = mod(h, 1.0) * 6.0; // h en [0, 6]
+        float c = v * s;       // chroma
+        float x = c * (1.0 - abs(mod(h, 2.0) - 1.0));
+        float m = v - c;
+        
+        vec3 rgb;
+        if (h < 1.0) {
+            rgb = vec3(c, x, 0.0);
+        } else if (h < 2.0) {
+            rgb = vec3(x, c, 0.0);
+        } else if (h < 3.0) {
+            rgb = vec3(0.0, c, x);
+        } else if (h < 4.0) {
+            rgb = vec3(0.0, x, c);
+        } else if (h < 5.0) {
+            rgb = vec3(x, 0.0, c);
+        } else {
+            rgb = vec3(c, 0.0, x);
+        }
+        
+        return rgb + m;
+    }
+    
+    void main() {
+        vec4 texel = texture2D(u_texture, v_texCoord);
+        
+        // La textura contiene phase_normalized en canal R [0, 1]
+        // donde phase_normalized = (phase + π) / (2π)
+        float hue = texel.r;
+        
+        // Usar saturation = 1.0 y value = 1.0 para colores vibrantes
+        // Si quisiéramos modular brightness por densidad, podríamos usar texel.g
+        float saturation = 1.0;
+        float value = 1.0;
+        
+        vec3 color = hsvToRgb(hue, saturation, value);
+        gl_FragColor = vec4(color, 1.0);
+    }
+`;
+
+/**
  * Crea un programa de shader WebGL
  */
 export function createShaderProgram(
