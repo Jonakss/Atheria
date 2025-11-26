@@ -16,6 +16,7 @@
 
 ## 📋 Índice de Entradas
 
+- [[logs/2025-11-26_fullspeed_websocket_fix|2025-11-26 - Fix Saturación WebSocket en Modo Full Speed]]
 - [[logs/2025-11-26_build_fixes_and_cli|2025-11-26 - Fix Crítico de Build y Mejoras CLI]]
 - [[logs/2025-11-26_native_optimization_and_fixes|2025-11-26 - Optimización Crítica Motor Nativo (<1ms) y Fix Live Feed]]
 - [[logs/2025-11-25_agent_config_sync|2025-11-25 - Sincronización de Configuración de Agentes (Lightning, Cursor, Gemini)]]
