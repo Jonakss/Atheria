@@ -16,6 +16,7 @@
 
 ## 📋 Índice de Entradas
 
+- [[#2025-11-26 - Fix: Debugging Grid, Canvas, Versioning]]
 - [[#2025-11-26 - Feature: Native Engine Parallelism (OpenMP)]]
 - [[#2025-11-26 - Fix: Persistent Frame Sending (Duplicate Logic Removal)]]
 - [[#2025-11-26 - Actualización Completa de Roadmaps (Fases 1-4)]]
@@ -45,6 +46,20 @@
 - [[#2024-12-XX - Fase 3 Completada: Migración de Componentes UI]]
 - [[#2024-12-XX - Fase 2 Iniciada: Setup Motor Nativo C++]]
 - [[#2024-12-XX - Optimización de Logs y Reducción de Verbosidad]]
+
+---
+
+## 2025-11-26 - Fix: Debugging Grid, Canvas, Versioning
+
+> **Nota:** Esta entrada ha sido migrada al nuevo formato de logs individuales.
+>
+> Ver documentación completa en: [[logs/2025-11-26_debugging_grid_canvas_versioning|2025-11-26 - Fix: Debugging Grid, Canvas, Versioning]]
+
+- **2025-11-26**: Corregido reinicio de grid size a 256 (ahora respeta configuración).
+- **2025-11-26**: Corregida alineación visual del ROI en frontend ("desfasadas").
+- **2025-11-26**: Corregido versionado en `ath dev` (ahora usa `src/__version__.py`) y agregado `--skip-install`.
+
+**Archivos:** `src/server/server_handlers.py`, `frontend/src/components/ui/PanZoomCanvas.tsx`, `setup.py`, `src/cli.py`
 
 ---
 

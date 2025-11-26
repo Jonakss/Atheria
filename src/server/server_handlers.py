@@ -601,9 +601,12 @@ async def handle_reset(args):
         # Intentar obtener el modo de inicialización del experimento activo o usar el global
         initial_mode = getattr(global_cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')
         
+        # Obtener grid size de la configuración global si está disponible, sino usar el del motor
+        grid_size = getattr(global_cfg, 'GRID_SIZE_INFERENCE', motor.grid_size)
+        
         # Reiniciar el estado cuántico con el modo de inicialización correcto
         motor.state = QuantumState(
-            motor.grid_size, 
+            grid_size, 
             motor.d_state, 
             motor.device,
             initial_mode=initial_mode

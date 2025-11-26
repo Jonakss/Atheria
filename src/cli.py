@@ -172,7 +172,7 @@ def clean():
         print(f"✅ Limpieza completada ({removed_count} items removidos)")
 
 
-def dev(no_frontend=True, port=None, host=None, fast=False):
+def dev(no_frontend=True, port=None, host=None, fast=False, skip_install=False):
     """Build + Install + Run (workflow completo de desarrollo)."""
     print("🔧 Modo desarrollo: Build + Install + Run")
     print("=" * 60)
@@ -183,7 +183,10 @@ def dev(no_frontend=True, port=None, host=None, fast=False):
         print()
         
         # Install
-        install(fast=fast)
+        if not skip_install:
+            install(fast=fast)
+        else:
+            print("⏩ Saltando instalación (--skip-install)")
         print()
         
         # Run
@@ -227,6 +230,8 @@ Ejemplos:
                            help='Host del servidor')
     dev_parser.add_argument('--fast', action='store_true',
                            help='Instalación rápida (sin aislamiento de build)')
+    dev_parser.add_argument('--skip-install', action='store_true',
+                           help='Saltar paso de instalación')
     
     # Comando: build
     subparsers.add_parser('build', help='Compilar extensiones C++')
@@ -278,7 +283,7 @@ Ejemplos:
     
     # Ejecutar comando
     if args.command == 'dev':
-        dev(no_frontend=not args.frontend, port=args.port, host=args.host, fast=args.fast)
+        dev(no_frontend=not args.frontend, port=args.port, host=args.host, fast=args.fast, skip_install=args.skip_install)
     elif args.command == 'build':
         build()
     elif args.command == 'install':

@@ -164,10 +164,21 @@ class CMakeBuildExt(build_ext):
             print(f"   Pattern: *atheria_core*")
 
 
+# Leer versión desde src/__version__.py
+def get_version():
+    version_path = Path(__file__).parent / "src" / "__version__.py"
+    if version_path.exists():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("version", version_path)
+        version_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(version_module)
+        return version_module.__version__
+    return "0.0.0"
+
 # Configuración del setup
 setup(
     name="atheria",
-    version="4.1.1",
+    version=get_version(),
     description="Atheria 4: Simulador de universo infinito con núcleo C++ de alto rendimiento",
     long_description=open("README.md").read() if Path("README.md").exists() else "",
     long_description_content_type="text/markdown",

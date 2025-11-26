@@ -1015,7 +1015,9 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                             zIndex: 1,
                             width: gridWidth,
                             height: gridHeight,
-                            pointerEvents: 'none'
+                            pointerEvents: 'none',
+                            left: simData?.roi_info?.enabled ? simData.roi_info.x : 0,
+                            top: simData?.roi_info?.enabled ? simData.roi_info.y : 0,
                         }}>
                             <ShaderCanvas
                                 mapData={mapData || []}
@@ -1042,7 +1044,10 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                         style={{
                             opacity: useShaderRendering ? 0 : 1, 
                             zIndex: 2,
-                            pointerEvents: 'none'
+                            pointerEvents: 'none',
+                            position: 'absolute',
+                            left: simData?.roi_info?.enabled ? simData.roi_info.x : 0,
+                            top: simData?.roi_info?.enabled ? simData.roi_info.y : 0,
                         }}
                     />
                     
