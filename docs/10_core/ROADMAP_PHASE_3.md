@@ -300,9 +300,10 @@
   - Fase HSV (H=fase, S=1, V=1) con shader WebGL
   - GPU-accelerated para mejor rendimiento
 
-### ⚠️ Pendiente
-- Verificación y testing manual del sistema de historial
-- Testing de nuevas visualizaciones (real/imag/hsv)
+### ⚠️ Pendiente (Testing Manual)
+- [ ] Verificación y testing manual del sistema de historial
+- [ ] Testing de nuevas visualizaciones (real/imag/hsv)
+- [ ] Ver checklist detallado: [[PHASE_3_TESTING_CHECKLIST|Phase 3 Testing Checklist]]
 
 ### 🔮 Futuro
 - Persistencia de historial en disco
@@ -325,8 +326,8 @@
 
 ---
 
-**Última actualización:** 2025-11-26
-**Estado:** Fase 3 ~98% completado - Sistema de historial/buffer completado, visualizaciones avanzadas pendientes
+**Última actualización:** 2025-11-26  
+**Estado:** Fase 3 100% implementado - Pendiente testing manual antes de merge
 
 ---
 
