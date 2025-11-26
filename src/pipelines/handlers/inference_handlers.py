@@ -13,7 +13,79 @@ from types import SimpleNamespace
 from ...server.server_state import g_state, broadcast, send_notification, send_to_websocket, optimize_frame_payload
 from ..core.status_helpers import build_inference_status_payload
 from ...model_loader import load_model
-from ... import config as global_cfg
+from src import config as global_cfg
+
+# ... (existing imports)
+
+async def handle_set_inference_config(args):
+    """Configura parámetros de inferencia."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    
+    grid_size = args.get("grid_size")
+    initial_state_mode = args.get("initial_state_mode")
+    gamma_decay = args.get("gamma_decay")
+    
+    changes = []
+    
+    if grid_size is not None:
+        new_size = int(grid_size)
+        global_cfg.GRID_SIZE_INFERENCE = new_size
+        g_state['inference_grid_size'] = new_size
+        changes.append(f"Grid size: {new_size}")
+        
+        roi_manager = g_state.get('roi_manager')
+        if roi_manager:
+            roi_manager.grid_size = new_size
+            roi_manager.clear_roi()
+        else:
+            from ...managers.roi_manager import ROIManager
+            g_state['roi_manager'] = ROIManager(grid_size=new_size)
+    
+    if initial_state_mode is not None:
+        global_cfg.INITIAL_STATE_MODE_INFERENCE = str(initial_state_mode)
+        changes.append(f"Inicialización: {initial_state_mode}")
+    
+    if gamma_decay is not None:
+        new_gamma = float(gamma_decay)
+        if new_gamma < 0: new_gamma = 0.0
+        elif new_gamma > 10.0: new_gamma = 10.0
+        global_cfg.GAMMA_DECAY = new_gamma
+        
+        motor = g_state.get('motor')
+        if motor:
+            if hasattr(motor, 'cfg') and motor.cfg:
+                motor.cfg.GAMMA_DECAY = new_gamma
+            elif not hasattr(motor, 'cfg') or motor.cfg is None:
+                motor.cfg = SimpleNamespace(GAMMA_DECAY=new_gamma)
+        
+        changes.append(f"Gamma Decay: {new_gamma}")
+    
+    if changes:
+        msg = f"✅ Configuración actualizada: {', '.join(changes)}"
+        if ws: await send_notification(ws, msg, "success")
+        
+        await broadcast({
+            "type": "inference_config_update",
+            "payload": {
+                "grid_size": global_cfg.GRID_SIZE_INFERENCE,
+                "initial_state_mode": global_cfg.INITIAL_STATE_MODE_INFERENCE,
+                "gamma_decay": global_cfg.GAMMA_DECAY
+            }
+        })
+        
+        # Si cambió el grid_size y hay un experimento activo, recargarlo para aplicar cambios
+        if grid_size is not None and g_state.get('active_experiment'):
+            logging.info(f"🔄 Recargando experimento '{g_state['active_experiment']}' para aplicar nuevo grid size: {new_size}")
+            if ws: await send_notification(ws, "Recargando simulación para aplicar cambio de grid...", "info")
+            
+            # Pequeña pausa para asegurar que el mensaje llegue
+            await asyncio.sleep(0.1)
+            
+            await handle_load_experiment({
+                'ws_id': args.get('ws_id'),
+                'experiment_name': g_state['active_experiment'],
+                'force_engine': g_state.get('motor_type', 'auto')
+            })
 from ...engines.qca_engine import Aetheria_Motor, QuantumState
 from ...engines.harmonic_engine import SparseHarmonicEngine
 from ..viz import get_visualization_data
@@ -704,61 +776,7 @@ async def handle_inject_energy(args):
         if ws: await send_notification(ws, f"Error: {str(e)}", "error")
 
 
-async def handle_set_inference_config(args):
-    """Configura parámetros de inferencia."""
-    ws = g_state['websockets'].get(args.get('ws_id'))
-    
-    grid_size = args.get("grid_size")
-    initial_state_mode = args.get("initial_state_mode")
-    gamma_decay = args.get("gamma_decay")
-    
-    changes = []
-    
-    if grid_size is not None:
-        new_size = int(grid_size)
-        global_cfg.GRID_SIZE_INFERENCE = new_size
-        g_state['inference_grid_size'] = new_size
-        changes.append(f"Grid size: {new_size}")
-        
-        roi_manager = g_state.get('roi_manager')
-        if roi_manager:
-            roi_manager.grid_size = new_size
-            roi_manager.clear_roi()
-        else:
-            from ...managers.roi_manager import ROIManager
-            g_state['roi_manager'] = ROIManager(grid_size=new_size)
-    
-    if initial_state_mode is not None:
-        global_cfg.INITIAL_STATE_MODE_INFERENCE = str(initial_state_mode)
-        changes.append(f"Inicialización: {initial_state_mode}")
-    
-    if gamma_decay is not None:
-        new_gamma = float(gamma_decay)
-        if new_gamma < 0: new_gamma = 0.0
-        elif new_gamma > 10.0: new_gamma = 10.0
-        global_cfg.GAMMA_DECAY = new_gamma
-        
-        motor = g_state.get('motor')
-        if motor:
-            if hasattr(motor, 'cfg') and motor.cfg:
-                motor.cfg.GAMMA_DECAY = new_gamma
-            elif not hasattr(motor, 'cfg') or motor.cfg is None:
-                motor.cfg = SimpleNamespace(GAMMA_DECAY=new_gamma)
-        
-        changes.append(f"Gamma Decay: {new_gamma}")
-    
-    if changes:
-        msg = f"✅ Configuración actualizada: {', '.join(changes)}"
-        if ws: await send_notification(ws, msg, "success")
-        
-        await broadcast({
-            "type": "inference_config_update",
-            "payload": {
-                "grid_size": global_cfg.GRID_SIZE_INFERENCE,
-                "initial_state_mode": global_cfg.INITIAL_STATE_MODE_INFERENCE,
-                "gamma_decay": global_cfg.GAMMA_DECAY
-            }
-        })
+
 
 
 HANDLERS = {
