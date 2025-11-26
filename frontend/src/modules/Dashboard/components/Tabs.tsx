@@ -1,4 +1,4 @@
-import React, { useState, ReactElement } from 'react';
+import React, { ReactElement, useState } from 'react';
 
 interface TabsProps {
   defaultValue?: string;
@@ -88,7 +88,6 @@ export const TabList: React.FC<TabListProps & { activeValue?: string; onTabChang
 };
 
 export const Tab: React.FC<TabProps & { isActive?: boolean; onClick?: () => void }> = ({ 
-  value, 
   label, 
   icon, 
   rightSection,
@@ -114,7 +113,7 @@ export const Tab: React.FC<TabProps & { isActive?: boolean; onClick?: () => void
   );
 };
 
-export const TabPanel: React.FC<TabPanelProps> = ({ value, children }) => {
+export const TabPanel: React.FC<TabPanelProps> = ({ children }) => {
   return <div>{children}</div>;
 };
 

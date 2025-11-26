@@ -1,14 +1,14 @@
 // frontend/src/components/ui/TimelineViewer.tsx
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Clock, Database, Pause, Play, Settings, SkipBack, SkipForward, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
-import { 
-        loadTimeline, 
-        getTimelineStats, 
-        clearTimeline,
-        TimelineFrame 
-    } from '../../utils/timelineStorage';
-import { Play, Pause, SkipBack, SkipForward, Trash2, Clock, Database, Settings } from 'lucide-react';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
+import {
+    clearTimeline,
+    getTimelineStats,
+    loadTimeline,
+    TimelineFrame
+} from '../../utils/timelineStorage';
 
 interface TimelineViewerProps {
     onFrameSelect?: (frame: TimelineFrame | null) => void;
@@ -57,31 +57,6 @@ export function TimelineViewer({ onFrameSelect, className = '' }: TimelineViewer
         loadFrames();
     }, [loadFrames]);
 
-    // Cargar frames desde localStorage
-    const loadFrames = useCallback(() => {
-        const timeline = loadTimeline(activeExperiment, maxFrames);
-        setFrames(timeline.frames);
-        
-        const timelineStats = getTimelineStats(activeExperiment);
-        if (timelineStats) {
-            setStats({
-                total_frames: timelineStats.total_frames,
-                min_step: timelineStats.min_step,
-                max_step: timelineStats.max_step,
-                max_frames: timelineStats.max_frames,
-            });
-        } else {
-            setStats(null);
-        }
-        
-        // Establecer índice al último frame si hay frames
-        if (timeline.frames.length > 0) {
-            setCurrentFrameIndex(timeline.frames.length - 1);
-        } else {
-            setCurrentFrameIndex(-1);
-        }
-    }, [activeExperiment, maxFrames]);
-
     // Cargar límite de frames desde localStorage
     useEffect(() => {
         const savedMaxFrames = localStorage.getItem('atheria_timeline_max_frames');
@@ -104,14 +79,14 @@ export function TimelineViewer({ onFrameSelect, className = '' }: TimelineViewer
                 });
             }, 1000 / playSpeed); // Convertir FPS a intervalo en ms
             
-            setPlayIntervalRef(interval);
+            playIntervalRef.current = interval;
             return () => {
                 clearInterval(interval);
-                setPlayIntervalRef(null);
+                playIntervalRef.current = null;
             };
-        } else if (playIntervalRef) {
-            clearInterval(playIntervalRef);
-            setPlayIntervalRef(null);
+        } else if (playIntervalRef.current) {
+            clearInterval(playIntervalRef.current);
+            playIntervalRef.current = null;
         }
     }, [isPlaying, frames.length, currentFrameIndex, playSpeed]);
 
@@ -157,13 +132,6 @@ export function TimelineViewer({ onFrameSelect, className = '' }: TimelineViewer
         setCurrentFrameIndex(clampedIndex);
         setIsPlaying(false);
     }, [frames.length]);
-
-    const goToStep = useCallback((step: number) => {
-        const frameIndex = frames.findIndex(f => f.step === step);
-        if (frameIndex >= 0) {
-            goToFrame(frameIndex);
-        }
-    }, [frames, goToFrame]);
 
     const handlePrevious = useCallback(() => {
         goToFrame(currentFrameIndex - 1);
