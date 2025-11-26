@@ -13,6 +13,9 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to commit and push auto-fixes
+      pull-requests: write # Needed to comment on the PR
 
     steps:
       - name:  Checkout code
@@ -40,9 +43,45 @@ jobs:
         run: npm ci
         working-directory: ./frontend
 
+      - name: Configure Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
       - name: Lint Frontend
-        run: npm run lint
-        working-directory: ./frontend
+        id: lint
+        run: npm run lint --prefix frontend
+        continue-on-error: true
+
+      - name: Auto-fix Lint Errors
+        id: auto-fix
+        if: steps.lint.outcome == 'failure'
+        run: |
+          echo "⚠️ Lint check failed. Attempting to auto-fix..."
+          npm run lint --prefix frontend -- --fix
+
+      - name: Commit and Request Review
+        id: commit-and-review
+        if: steps.auto-fix.outcome == 'success'
+        run: |
+          # Check if there are any changes to commit
+          if ! git diff --quiet --exit-code; then
+            echo "📝 Auto-fix applied changes. Committing, pushing, and requesting review..."
+            git add .
+            git commit -m "chore(lint): apply automatic lint fixes [by Atheria CI]"
+            git push
+
+            # Post a comment to trigger a new review
+            gh pr comment ${{ github.event.pull_request.number }} --body "I've applied automatic lint fixes. Requesting a new review: @gemini-cli /review"
+
+            # Fail the job to stop the current run and let the new pushed commit trigger a new CI run
+            echo "Failing this run to allow the new commit to trigger a fresh CI check."
+            exit 1
+          else
+            echo "❌ Auto-fix did not produce any changes, but lint is still failing. Manual intervention required."
+            # Fail the job to indicate that auto-fix was not successful
+            exit 1
+          fi
 
       - name: Build Frontend
         id: build_frontend

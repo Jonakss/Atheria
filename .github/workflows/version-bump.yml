@@ -48,19 +48,36 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0 # Necesario para obtener el historial completo
+          fetch-depth: 0 # Necesario para comparar commits
 
-      - name: Verificar si solo son cambios de documentación (solo para PRs)
+      - name: Verificar si solo son cambios de documentación
         id: check-docs-only
-        if: github.event_name == 'pull_request'
         run: |
-          echo "Verificando archivos en el PR..."
-          # Obtener la lista de archivos del PR
-          files=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" | \
-            jq -r '.[].filename')
+          # Default to not skipping
+          echo "skip=false" >> $GITHUB_OUTPUT
 
-          # Verificar si todos los archivos están en docs/
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "Verificando archivos en el PR #${{ github.event.pull_request.number }}..."
+            files=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" | \
+              jq -r '.[].filename')
+          elif [ "${{ github.event_name }}" == "push" ]; then
+            echo "Verificando archivos en el push (commit ${{ github.sha }})..."
+            # Compara el último commit (HEAD) con su predecesor (HEAD~1).
+            # Esto funciona bien para el commit de merge que crea GitHub al fusionar un PR.
+            files=$(git diff --name-only HEAD~1 HEAD)
+          else
+            files=""
+          fi
+
+          if [ -z "$files" ]; then
+            echo "No se detectaron archivos modificados para analizar. Procediendo..."
+            exit 0
+          fi
+
+          echo "Archivos modificados:"
+          echo "$files"
+
           is_docs_only=true
           for file in $files; do
             if [[ ! "$file" == docs/* ]]; then

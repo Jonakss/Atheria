@@ -23,7 +23,12 @@ Este workflow es el **guardián de la calidad del código**.
 2.  **Setup Entornos:** Configura los entornos de Python (3.10) y Node.js (18).
 3.  **Frontend Check:**
     - Instala dependencias (`npm ci`).
-    - Valida el estilo del código (`npm run lint`).
+    - **Valida y auto-corrige el estilo del código (`npm run lint`):**
+      - **Paso 1: Chequeo Inicial.** Se ejecuta `npm run lint`. Si pasa, el proceso continúa.
+      - **Paso 2: Auto-Corrección.** Si el chequeo falla, el sistema intenta corregir los errores automáticamente ejecutando `npm run lint -- --fix`.
+      - **Paso 3: Commit Automático.** Si se aplican arreglos, el bot `github-actions[bot]` crea un commit con los cambios y un mensaje descriptivo.
+      - **Paso 4: Solicitud de Revisión.** Después de subir el commit, el bot publica un comentario en el PR (`@gemini-cli /review`) para solicitar una revisión de los cambios automáticos a un agente de IA.
+      - **Paso 5: Re-verificación.** El flujo de trabajo se detiene y se reinicia desde el principio para validar el nuevo código corregido. Si el `lint` sigue fallando, el proceso se detiene definitivamente para intervención manual.
     - Construye el proyecto para producción (`npm run build`) para asegurar que compila.
 4.  **Backend Check:**
     - Instala dependencias de Python (`pip install -e .`).
