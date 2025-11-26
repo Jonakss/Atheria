@@ -17,6 +17,7 @@
 ## 📋 Índice de Entradas
 
 
+- [[#2025-11-26 - Fix: Import Path de EpochDetector]]
 - [[#2025-11-25 - Finalización Fase 1 y Verificación Motor Nativo]]
 - [[#2025-11-24 - Correcciones UI y Rendimiento: Zoom, FPS, Throttling y Native Engine]]
 - [[#2025-11-24 - CRÍTICO: Solución Crash Loop Backend por Conversión Bloqueante]]
@@ -41,6 +42,41 @@
 - [[#2024-12-XX - Fase 3 Completada: Migración de Componentes UI]]
 - [[#2024-12-XX - Fase 2 Iniciada: Setup Motor Nativo C++]]
 - [[#2024-12-XX - Optimización de Logs y Reducción de Verbosidad]]
+
+---
+
+## 2025-11-26 - Fix: Import Path de EpochDetector
+
+### Problema
+El servidor fallaba al iniciar con el error: `No module named 'src.physics.analysis.EpochDetector'`
+
+### Causa Raíz
+El archivo `src/pipelines/handlers/inference_handlers.py` intentaba importar `EpochDetector` desde una ruta incorrecta:
+```python
+from ...physics.analysis.EpochDetector import EpochDetector  # ❌ No existe
+```
+
+El archivo `EpochDetector` está realmente ubicado en `src/analysis/epoch_detector.py`, NO en `src/physics/analysis/`.
+
+### Solución
+**Archivo Modificado:** `src/pipelines/handlers/inference_handlers.py` (línea 20)
+
+Corregida la importación:
+```python
+from ...analysis.epoch_detector import EpochDetector  # ✅ Ruta correcta
+```
+
+### Resultado
+- ✅ Servidor inicia correctamente
+- ✅ Importación de `EpochDetector` funciona
+- ✅ Todas las funcionalidades del servidor restauradas
+
+### Archivos Relacionados
+- [inference_handlers.py](file:///home/jonathan.correa/Projects/Atheria/src/pipelines/handlers/inference_handlers.py#L20)
+- [epoch_detector.py](file:///home/jonathan.correa/Projects/Atheria/src/analysis/epoch_detector.py)
+
+### Commit
+- `8823b3b` - fix: corregir ruta de importación de EpochDetector [version:bump:patch]
 
 ---
 
