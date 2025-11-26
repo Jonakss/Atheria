@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Database, Info, Trash2, Check, Clock, ArrowRightLeft, X, Save, UploadCloud } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
+import { InferenceSnapshot } from '../../context/WebSocketContextDefinition';
 
 interface ExperimentNode {
     name: string;
@@ -655,7 +656,7 @@ export function ExperimentManager() {
                                         </h3>
                                         {inferenceSnapshots && inferenceSnapshots.length > 0 ? (
                                             <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar pr-2">
-                                                {inferenceSnapshots.map((snapshot, index) => (
+                                                {inferenceSnapshots.map((snapshot: InferenceSnapshot, index: number) => (
                                                     <div key={index} className="flex items-center justify-between p-2 bg-white/5 rounded">
                                                         <div>
                                                             <div className="text-xs font-mono text-gray-300">Paso: {snapshot.step.toLocaleString()}</div>

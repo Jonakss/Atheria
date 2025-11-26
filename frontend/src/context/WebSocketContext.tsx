@@ -5,6 +5,7 @@ import { getServerConfig, getWebSocketUrl, saveServerConfig, type ServerConfig }
 import { saveFrameToTimeline } from '../utils/timelineStorage';
 import {
     CompileStatus,
+    InferenceSnapshot,
     SimData,
     TrainingProgress,
     TrainingSnapshot,
@@ -102,11 +103,6 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     const [activeExperiment, setActiveExperiment] = useState<string | null>(null);
     const [snapshotCount, setSnapshotCount] = useState<number>(0);
     const [trainingSnapshots, setTrainingSnapshots] = useState<TrainingSnapshot[]>([]);
-    interface InferenceSnapshot {
-        step: number;
-        timestamp: string;
-        filepath_pt: string;
-    }
     const [inferenceSnapshots, setInferenceSnapshots] = useState<InferenceSnapshot[]>([]);
     const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'running' | 'completed' | 'cancelled' | 'error'>('idle');
     const [analysisType, setAnalysisType] = useState<'universe_atlas' | 'cell_chemistry' | null>(null);

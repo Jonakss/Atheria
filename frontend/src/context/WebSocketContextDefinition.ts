@@ -66,6 +66,12 @@ export interface TrainingSnapshot {
   };
 }
 
+export interface InferenceSnapshot {
+    step: number;
+    timestamp: string;
+    filepath_pt: string;
+}
+
 export interface CompileStatus {
   is_compiled: boolean;
   is_native: boolean; // ← INDICADOR DE MOTOR NATIVO
@@ -107,6 +113,7 @@ export interface WebSocketContextType {
   ws: WebSocket | null; // Exponer WebSocket para escuchar mensajes personalizados
   snapshotCount: number; // Contador de snapshots capturados
   trainingSnapshots: TrainingSnapshot[]; // Snapshots de entrenamiento
+  inferenceSnapshots: InferenceSnapshot[]; // Snapshots de inferencia
   serverConfig: ServerConfig; // Configuración del servidor
   updateServerConfig: (config: Partial<ServerConfig>) => void; // Actualizar configuración
   compileStatus: CompileStatus | null; // Estado de compilación/motor
