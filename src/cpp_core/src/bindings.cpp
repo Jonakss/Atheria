@@ -151,6 +151,9 @@ PYBIND11_MODULE(atheria_core, m) {
              py::arg("coord"), py::arg("radius") = 1)
         .def("get_active_coords", &Engine::get_active_coords,
              "Retorna una lista de todas las coordenadas activas")
+        .def("get_dense_tensor", &Engine::get_dense_tensor,
+             "Obtiene estado denso como tensor (vectorizado)",
+             py::arg("roi") = std::vector<int64_t>())
         .def("get_last_error", &Engine::get_last_error,
              "Obtiene el último mensaje de error (si hubo un error al cargar el modelo)");
 #endif

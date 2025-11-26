@@ -49,6 +49,11 @@ public:
     void clear();
     void activate_neighborhood(const Coord3D& coord, int radius = 1);
     std::vector<Coord3D> get_active_coords() const;
+    
+    // [NEW] Obtener estado denso como tensor (vectorizado)
+    // roi: [x_min, y_min, x_max, y_max] o vacío para todo el grid
+    torch::Tensor get_dense_tensor(const std::vector<int64_t>& roi = {});
+    
     std::string get_last_error() const;
     
 private:
