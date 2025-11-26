@@ -157,10 +157,190 @@ async def handle_load_history_file(args):
             await send_notification(ws, f"Error cargando archivo: {str(e)}", "error")
 
 
+async def handle_get_history_range(args):
+    """Obtiene el rango de steps disponibles en el buffer de historia para navegación en vivo."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    try:
+        history = g_state.get('simulation_history')
+        if not history or not history.frames:
+            # No hay historia disponible
+            if ws:
+                await send_to_websocket(ws, "history_range", {
+                    "available": False,
+                    "min_step": None,
+                    "max_step": None,
+                    "total_frames": 0
+                })
+            return
+        
+        stats = history.get_statistics()
+        
+        if ws:
+            await send_to_websocket(ws, "history_range", {
+                "available": True,
+                "min_step": stats.get('min_step'),
+                "max_step": stats.get('max_step'),
+                "total_frames": stats.get('total_frames'),
+                "current_step": g_state.get('simulation_step', 0)
+            })
+        
+    except Exception as e:
+        logging.error(f"Error obteniendo rango de historia: {e}", exc_info=True)
+        if ws:
+            await send_notification(ws, f"Error obteniendo rango de historia: {str(e)}", "error")
+
+
+async def handle_restore_history_step(args):
+    """Restaura el estado de la simulación a un step específico del historial."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    try:
+        target_step = args.get('step')
+        if target_step is None:
+            if ws:
+                await send_notification(ws, "⚠️ Número de step no proporcionado.", "warning")
+            return
+        
+        target_step = int(target_step)
+        
+        history = g_state.get('simulation_history')
+        if not history or not history.frames:
+            if ws:
+                await send_notification(ws, "⚠️ No hay historia disponible.", "warning")
+            return
+        
+        # Buscar el frame más cercano al step objetivo
+        target_frame = history.get_frame_by_step(target_step)
+        
+        if not target_frame:
+            if ws:
+                await send_notification(ws, f"⚠️ No se encontró frame para step {target_step}.", "warning")
+            return
+        
+        # Pausar la simulación antes de restaurar
+        g_state['is_paused'] = True
+        
+        motor = g_state.get('motor')
+        if not motor:
+            if ws:
+                await send_notification(ws, "⚠️ No hay modelo cargado.", "warning")
+            return
+        
+        # Restaurar estado cuántico si está disponible
+        if 'psi' in target_frame and target_frame['psi'] is not None:
+            import torch
+            from ...engines.qca_engine import QuantumState
+            
+            # Verificar si el motor es nativo o Python
+            motor_is_native = g_state.get('motor_is_native', False)
+            
+            if motor_is_native:
+                # Motor nativo: necesitamos convertir psi denso a sparse y cargarlo
+                if ws:
+                    await send_notification(ws, "⚠️ Restauración de historia no soportada aún en motor nativo.", "warning")
+                logging.warning("Restauración de historia no implementada para motor nativo")
+                return
+            else:
+                # Motor Python: restaurar psi directamente
+                psi = target_frame['psi']
+                
+                # Asegurar que psi esté en el dispositivo correcto
+                if isinstance(psi, torch.Tensor):
+                    psi = psi.to(motor.device)
+                    
+                    # Restaurar estado
+                    if hasattr(motor, 'state') and motor.state is not None:
+                        motor.state.psi = psi
+                    else:
+                        # Crear nuevo estado con psi restaurado
+                        motor.state = QuantumState(
+                            motor.grid_size,
+                            motor.d_state,
+                            motor.device,
+                            initial_mode='zeros'  # No importa, lo sobrescribiremos
+                        )
+                        motor.state.psi = psi
+                    
+                    # Actualizar step global
+                    g_state['simulation_step'] = target_frame.get('step', 0)
+                    
+                    # Enviar frame al frontend para visualización
+                    if ws:
+                        from ..viz import get_visualization_data
+                        
+                        viz_type = g_state.get('viz_type', 'density')
+                        delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
+                        
+                        viz_data = get_visualization_data(psi, viz_type, delta_psi=delta_psi, motor=motor)
+                        
+                        if viz_data and isinstance(viz_data, dict):
+                            import asyncio
+                            frame_payload = {
+                                "step": target_frame.get('step', 0),
+                                "timestamp": asyncio.get_event_loop().time(),
+                                "map_data": viz_data.get("map_data", []),
+                                "hist_data": viz_data.get("hist_data", {}),
+                                "poincare_coords": viz_data.get("poincare_coords", []),
+                                "phase_attractor": viz_data.get("phase_attractor"),
+                                "flow_data": viz_data.get("flow_data"),
+                                "phase_hsv_data": viz_data.get("phase_hsv_data"),
+                                "complex_3d_data": viz_data.get("complex_3d_data"),
+                                "simulation_info": {
+                                    "step": target_frame.get('step', 0),
+                                    "is_paused": True,
+                                    "from_history": True
+                                }
+                            }
+                            
+                            await broadcast({"type": "simulation_frame", "payload": frame_payload})
+                            await send_notification(ws, f"✅ Estado restaurado a step {target_frame.get('step', 0)}", "success")
+                            
+                            # Actualizar estado de inferencia
+                            await broadcast({
+                                "type": "inference_status_update",
+                                "payload": {
+                                    "status": "paused",
+                                    "step": target_frame.get('step', 0),
+                                    "from_history": True
+                                }
+                            })
+                else:
+                    if ws:
+                        await send_notification(ws, "⚠️ Estado psi no es un tensor válido.", "warning")
+        else:
+            # No hay psi guardado, solo podemos mostrar la visualización anterior
+            if ws:
+                await send_notification(ws, "⚠️ Frame no tiene estado psi guardado. Solo mostrando visualización.", "warning")
+            
+            # Enviar frame guardado (solo visualización, sin restaurar estado real)
+            import asyncio
+            frame_payload = {
+                "step": target_frame.get('step', 0),
+                "timestamp": asyncio.get_event_loop().time(),
+                "map_data": target_frame.get('map_data', []),
+                "hist_data": target_frame.get('hist_data', {}),
+                "simulation_info": {
+                    "step": target_frame.get('step', 0),
+                    "is_paused": True,
+                    "from_history": True,
+                    "visualization_only": True
+                }
+            }
+            
+            await broadcast({"type": "simulation_frame", "payload": frame_payload})
+        
+    except Exception as e:
+        logging.error(f"Error restaurando step de historia: {e}", exc_info=True)
+        if ws:
+            await send_notification(ws, f"Error restaurando step: {str(e)}", "error")
+
+
 HANDLERS = {
     "enable_history": handle_enable_history,
     "save_history": handle_save_history,
     "clear_history": handle_clear_history,
     "list_history_files": handle_list_history_files,
-    "load_history_file": handle_load_history_file
+    "load_history_file": handle_load_history_file,
+    # Navegación en vivo (rewind/replay)
+    "get_history_range": handle_get_history_range,
+    "restore_history_step": handle_restore_history_step
 }
