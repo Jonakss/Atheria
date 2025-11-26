@@ -5,9 +5,12 @@ Este wrapper proporciona una interfaz compatible con Aetheria_Motor para que
 el motor nativo de alto rendimiento pueda usarse como reemplazo directo.
 """
 import torch
+import torch.nn as nn
 import logging
 import numpy as np
 from typing import Optional
+from pathlib import Path
+import sys
 
 # Versión del wrapper
 try:
@@ -59,6 +62,55 @@ except Exception as e:
 
 from ..engines.qca_engine import QuantumState
 
+
+def export_model_to_jit(model: nn.Module, experiment_name: str, example_input_shape: tuple, output_dir: Optional[str] = None) -> str:
+    """
+    Exporta un modelo PyTorch a formato TorchScript (JIT).
+
+    Args:
+        model: Instancia del modelo PyTorch a exportar.
+        experiment_name: Nombre del experimento, usado para generar el nombre del archivo.
+        example_input_shape: Shape del tensor de entrada de ejemplo (ej: (1, 8, 256, 256)).
+        output_dir: Directorio de salida opcional. Si es None, usa el directorio de checkpoints.
+
+    Returns:
+        Ruta al archivo .pt exportado.
+    """
+    from ... import config as global_cfg
+    import os
+
+    if output_dir is None:
+        output_dir = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, experiment_name)
+    
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Usar un timestamp para nombre de archivo único para evitar problemas de caché
+    timestamp = int(torch.randint(0, 100000, (1,)).item())
+    output_path = os.path.join(output_dir, f"model_jit_{timestamp}.pt")
+
+    try:
+        logging.info(f"📦 Exportando modelo a TorchScript: {output_path}")
+        model.eval()
+        device = next(model.parameters()).device
+        example_input = torch.randn(example_input_shape, device=device)
+
+        with torch.no_grad():
+            traced_model = torch.jit.trace(model, example_input, strict=False)
+        
+        traced_model.save(output_path)
+        logging.info(f"✅ Modelo exportado exitosamente a: {output_path}")
+
+        # Verificación
+        logging.info("   Verificando modelo exportado...")
+        loaded_model = torch.jit.load(output_path, map_location=device)
+        test_output = loaded_model(example_input)
+        logging.info(f"✅ Modelo verificado. Salida de prueba: {test_output.shape}")
+
+        return output_path
+
+    except Exception as e:
+        logging.error(f"❌ Error al exportar modelo a JIT: {e}", exc_info=True)
+        raise
 
 class NativeEngineWrapper:
     """
@@ -909,4 +961,3 @@ class NativeEngineWrapper:
         """
         if self.state.psi is None or self._dense_state_stale:
             self.get_dense_state(check_pause_callback=lambda: False)
-
