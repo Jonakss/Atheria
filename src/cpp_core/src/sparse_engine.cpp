@@ -103,6 +103,9 @@ int64_t Engine::step_native() {
     // Parallel region
     #pragma omp parallel
     {
+        // Evitar que LibTorch lance su propio pool de threads dentro de OpenMP
+        torch::set_num_threads(1);
+
         // Thread-local storage
         std::vector<Coord3D> local_batch_coords;
         std::vector<torch::Tensor> local_batch_states;
@@ -128,67 +131,78 @@ int64_t Engine::step_native() {
                     
                     // Si el batch local está lleno, procesar
                     if (local_batch_coords.size() >= static_cast<size_t>(batch_size)) {
-                        
-                        // Construir entrada del batch
-                        torch::Tensor batch_input = build_batch_input(local_batch_coords);
-                        
-                        // Ejecutar inferencia con el modelo
-                        // IMPORTANTE: torch::jit::script::Module::forward es thread-safe para inferencia
-                        // pero debemos usar NoGradGuard localmente
-                        torch::NoGradGuard no_grad;
-                        std::vector<torch::jit::IValue> inputs;
-                        inputs.push_back(batch_input);
+                        try {
+                            // Construir entrada del batch
+                            torch::Tensor batch_input = build_batch_input(local_batch_coords);
+                            
+                            // Ejecutar inferencia con el modelo
+                            // IMPORTANTE: torch::jit::script::Module::forward es thread-safe para inferencia
+                            // pero debemos usar NoGradGuard localmente
+                            torch::NoGradGuard no_grad;
+                            std::vector<torch::jit::IValue> inputs;
+                            inputs.push_back(batch_input);
 
-                        torch::Tensor batch_output;
-                        auto output_ivalue = model_.forward(inputs);
+                            torch::Tensor batch_output;
+                            auto output_ivalue = model_.forward(inputs);
 
-                        if (output_ivalue.isTuple()) {
-                            auto output_tuple = output_ivalue.toTuple();
-                            if (output_tuple->elements().size() > 0) {
-                                batch_output = output_tuple->elements()[0].toTensor();
+                            if (output_ivalue.isTuple()) {
+                                auto output_tuple = output_ivalue.toTuple();
+                                if (output_tuple->elements().size() > 0) {
+                                    batch_output = output_tuple->elements()[0].toTensor();
+                                } else {
+                                    // En paralelo no podemos lanzar excepciones fácilmente, loggear o ignorar
+                                    local_batch_coords.clear();
+                                    local_batch_states.clear();
+                                    continue;
+                                }
+                            } else if (output_ivalue.isTensor()) {
+                                batch_output = output_ivalue.toTensor();
                             } else {
-                                // En paralelo no podemos lanzar excepciones fácilmente, loggear o ignorar
+                                local_batch_coords.clear();
+                                local_batch_states.clear();
                                 continue;
                             }
-                        } else if (output_ivalue.isTensor()) {
-                            batch_output = output_ivalue.toTensor();
-                        } else {
-                            continue;
-                        }
 
-                        // Procesar salida del modelo
-                        int64_t center_idx = grid_size_ / 2;
+                            // Procesar salida del modelo
+                            int64_t center_idx = grid_size_ / 2;
 
-                        for (size_t j = 0; j < local_batch_coords.size(); j++) {
-                            // Extraer salida del centro del patch
-                            torch::Tensor output_center = batch_output[j].select(2, center_idx).select(1, center_idx);
+                            for (size_t j = 0; j < local_batch_coords.size(); j++) {
+                                // Extraer salida del centro del patch
+                                torch::Tensor output_center = batch_output[j].select(2, center_idx).select(1, center_idx);
 
-                            // Dividir en real e imag
-                            torch::Tensor delta_real = output_center.slice(0, 0, d_state_);
-                            torch::Tensor delta_imag = output_center.slice(0, d_state_, 2 * d_state_);
-                            torch::Tensor delta_complex = torch::complex(delta_real, delta_imag);
+                                // Dividir en real e imag
+                                torch::Tensor delta_real = output_center.slice(0, 0, d_state_);
+                                torch::Tensor delta_imag = output_center.slice(0, d_state_, 2 * d_state_);
+                                torch::Tensor delta_complex = torch::complex(delta_real, delta_imag);
 
-                            // Obtener estado actual
-                            torch::Tensor current_state_j = local_batch_states[j];
-                            if (!current_state_j.is_complex()) {
-                                current_state_j = torch::complex(current_state_j, torch::zeros_like(current_state_j));
+                                // Obtener estado actual
+                                torch::Tensor current_state_j = local_batch_states[j];
+                                if (!current_state_j.is_complex()) {
+                                    current_state_j = torch::complex(current_state_j, torch::zeros_like(current_state_j));
+                                }
+
+                                // Aplicar delta
+                                torch::Tensor new_state = current_state_j + delta_complex;
+
+                                // Normalizar
+                                torch::Tensor abs_squared = torch::abs(new_state).pow(2);
+                                float norm = torch::sum(abs_squared).item<float>();
+                                if (norm > 1e-6f) {
+                                    new_state = new_state / std::sqrt(norm);
+                                }
+
+                                // Filtrar estados con energía muy baja
+                                if (norm > 0.01f) {
+                                    local_next_matter_map.insert_tensor(local_batch_coords[j], new_state);
+                                    update_active_region({local_batch_coords[j]}, local_next_active_region);
+                                }
                             }
-
-                            // Aplicar delta
-                            torch::Tensor new_state = current_state_j + delta_complex;
-
-                            // Normalizar
-                            torch::Tensor abs_squared = torch::abs(new_state).pow(2);
-                            float norm = torch::sum(abs_squared).item<float>();
-                            if (norm > 1e-6f) {
-                                new_state = new_state / std::sqrt(norm);
-                            }
-
-                            // Filtrar estados con energía muy baja
-                            if (norm > 0.01f) {
-                                local_next_matter_map.insert_tensor(local_batch_coords[j], new_state);
-                                update_active_region({local_batch_coords[j]}, local_next_active_region);
-                            }
+                        } catch (const c10::Error& e) {
+                             std::cerr << "LibTorch error in batch processing: " << e.msg() << std::endl;
+                        } catch (const std::exception& e) {
+                             std::cerr << "Standard exception in batch processing: " << e.what() << std::endl;
+                        } catch (...) {
+                             std::cerr << "Unknown error in batch processing." << std::endl;
                         }
 
                         // Limpiar batch local
@@ -247,8 +261,12 @@ int64_t Engine::step_native() {
                         }
                     }
                 }
+            } catch (const c10::Error& e) {
+                std::cerr << "LibTorch error in final batch: " << e.msg() << std::endl;
+            } catch (const std::exception& e) {
+                std::cerr << "Standard exception in final batch: " << e.what() << std::endl;
             } catch (...) {
-                // Ignorar errores en batch final para no romper todo el step
+                std::cerr << "Unknown error in final batch." << std::endl;
             }
         }
 

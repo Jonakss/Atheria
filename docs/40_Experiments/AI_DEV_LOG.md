@@ -57,6 +57,7 @@
 - **2025-11-26**: Implementada visualización nativa en C++ (`compute_visualization`) para evitar conversiones costosas a Python. Expuesto vía PyBind11 y actualizado `NativeEngineWrapper`.
 - **2025-11-26**: Implementado paralelismo OpenMP en el motor nativo (`sparse_engine.cpp`).
 - **2025-11-26**: Creada documentación de paralelismo nativo (`docs/20_Concepts/NATIVE_PARALLELISM.md`).
+- **2025-11-26**: Corregido conflicto de hilos entre OpenMP y LibTorch (`torch::set_num_threads(1)`) y mejorado manejo de excepciones en `sparse_engine.cpp` tras revisión.
 **Resumen:** Implementado paralelismo multi-hilo en el motor nativo C++ (`sparse_engine.cpp`) utilizando OpenMP. Esto permite escalar la simulación a miles de partículas activas distribuyendo la carga de trabajo entre múltiples núcleos de CPU.
 
 **Archivos:** `src/cpp_core/src/sparse_engine.cpp`, `CMakeLists.txt`
