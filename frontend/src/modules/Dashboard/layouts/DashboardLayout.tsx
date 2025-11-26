@@ -5,7 +5,6 @@ import { TimelineViewer } from '../../../components/ui/TimelineViewer';
 import HolographicViewer from '../../../components/visualization/HolographicViewer';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { AnalysisView } from '../components/AnalysisView';
-import { EPOCH_CONFIGS } from '../components/EpochBadge';
 import { HistoryView } from '../components/HistoryView';
 import { LogsView } from '../components/LogsView';
 import { MetricsBar } from '../components/MetricsBar';
@@ -16,8 +15,6 @@ import { Toolbar } from '../components/Toolbar';
 
 type TabType = 'lab' | 'analysis' | 'history' | 'logs';
 type LabSection = 'inference' | 'training' | 'analysis';
-
-import { useCallback } from 'react';
 
 export const DashboardLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('lab');
@@ -30,7 +27,7 @@ export const DashboardLayout: React.FC = () => {
     timestamp: string;
     map_data: number[][];
   } | null>(null);
-  const { simData, selectedViz, connectionStatus, sendCommand, setSelectedViz, inferenceStatus } = useWebSocket();
+  const { simData, selectedViz, connectionStatus, inferenceStatus } = useWebSocket();
 
   useEffect(() => {
     if (inferenceStatus === 'running' && selectedTimelineFrame !== null) {
@@ -38,26 +35,6 @@ export const DashboardLayout: React.FC = () => {
     }
   }, [inferenceStatus, selectedTimelineFrame]);
 
-  const detectedEpoch = useMemo(() => simData?.simulation_info?.epoch ?? 2, [simData?.simulation_info?.epoch]);
-  const [currentEpoch, setCurrentEpoch] = useState(detectedEpoch);
-
-  useEffect(() => {
-    if (detectedEpoch !== undefined) {
-      setCurrentEpoch(detectedEpoch);
-    }
-  }, [detectedEpoch]);
-
-  const handleEpochChange = useCallback((epoch: number) => {
-    setCurrentEpoch(epoch);
-    const config = EPOCH_CONFIGS[epoch];
-    if (config && connectionStatus === 'connected') {
-      sendCommand('inference', 'set_config', { gamma_decay: config.gammaDecay });
-      if (config.vizType && config.vizType !== selectedViz) {
-        setSelectedViz(config.vizType);
-        sendCommand('simulation', 'set_viz', { viz_type: config.vizType });
-      }
-    }
-  }, [connectionStatus, sendCommand, selectedViz, setSelectedViz]);
 
   // Obtener datos del mapa para renderizado
   const mapData = simData?.map_data;
@@ -127,7 +104,7 @@ export const DashboardLayout: React.FC = () => {
                           if (frame) {
                             setSelectedTimelineFrame({
                               ...frame,
-                              roi_info: frame.roi_info || undefined,
+                              timestamp: String(frame.timestamp),
                             });
                           } else {
                             setSelectedTimelineFrame(null);
@@ -163,7 +140,7 @@ export const DashboardLayout: React.FC = () => {
     <div className="h-screen bg-dark-bg text-dark-200 font-sans selection:bg-teal-500/30 overflow-hidden flex flex-col">
       
               {/* Header: Barra de Comando Técnica */}
-              <ScientificHeader currentEpoch={currentEpoch} onEpochChange={handleEpochChange} />
+              <ScientificHeader />
 
       {/* Contenedor Principal */}
       <div className="flex-1 flex overflow-hidden">
