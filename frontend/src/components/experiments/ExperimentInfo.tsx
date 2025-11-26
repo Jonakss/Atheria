@@ -12,7 +12,7 @@ export function ExperimentInfo() {
         const saved = localStorage.getItem('atheria_gridSizeInference');
         return saved ? parseInt(saved, 10) : 256;
     });
-    
+
     // Escuchar cambios en localStorage para actualizar en tiempo real
     useEffect(() => {
         const handleStorageChange = () => {
@@ -21,11 +21,11 @@ export function ExperimentInfo() {
                 setGridSizeInference(parseInt(saved, 10));
             }
         };
-        
+
         window.addEventListener('storage', handleStorageChange);
         return () => window.removeEventListener('storage', handleStorageChange);
     }, []);
-    
+
     if (!activeExperiment) {
         return (
             <GlassPanel className="p-3">
@@ -143,7 +143,7 @@ export function ExperimentInfo() {
                             <span className="text-sm font-medium text-cyan-400">{config.INITIAL_STATE_MODE_INFERENCE || 'complex_noise'}</span>
                         </div>
                     </div>
-                    
+
                     {/* Indicador de Grid Scaling */}
                     {isScaled && (
                         <div className="col-span-2 mt-1 p-2 bg-pink-500/10 border border-pink-500/30 rounded flex items-start gap-2">

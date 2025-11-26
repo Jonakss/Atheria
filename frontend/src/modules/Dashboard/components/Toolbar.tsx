@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Play, Pause, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { Play, Pause, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp, Clock, Save } from 'lucide-react';
 import { GlassPanel } from './GlassPanel';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 
@@ -76,6 +76,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onToggleTimeline, timelineOpen
     sendCommand('inference', 'reset');
   }, [canControlInference, sendCommand]);
 
+  const handleSaveSnapshot = useCallback(() => {
+    if (!canControlInference) return;
+    sendCommand('snapshot', 'save_snapshot');
+  }, [canControlInference, sendCommand]);
+
   const handleToggleLiveFeed = useCallback(() => {
     if (!isConnected) return;
     setLiveFeedEnabled(!liveFeedEnabled);
@@ -129,6 +134,19 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onToggleTimeline, timelineOpen
           title={canControlInference ? 'Reiniciar simulación' : 'Necesitas un experimento con checkpoint activo'}
         >
           <RefreshCw size={12} />
+        </button>
+
+        <button
+          onClick={handleSaveSnapshot}
+          disabled={!canControlInference}
+          className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1.5 transition-all border ${
+            !canControlInference
+              ? 'bg-white/5 text-gray-600 border-white/5 cursor-not-allowed opacity-50'
+              : 'bg-white/5 text-blue-400 border-white/10 hover:bg-white/10'
+          }`}
+          title={canControlInference ? 'Guardar Snapshot' : 'Necesitas una simulación activa para guardar'}
+        >
+          <Save size={12} />
         </button>
         
         <div className="w-px h-4 bg-white/10 mx-2" />

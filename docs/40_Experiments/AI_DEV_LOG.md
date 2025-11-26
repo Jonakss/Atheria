@@ -74,12 +74,12 @@
 ## 2025-11-26 - Fix: Saturación de WebSocket en Modo Full Speed
 
 > **Nota:** Esta entrada ha sido migrada al nuevo formato de logs individuales.
-> 
+>
 > Ver documentación completa en: [[logs/2025-11-26_fullspeed_websocket_fix|2025-11-26 - Fix Saturación WebSocket en Modo Full Speed]]
 
 **Resumen:** Corregido bug crítico donde `steps_interval = -1` (modo full speed) seguía enviando frames, state updates y logs al frontend. Tres fixes implementados en `simulation_loop.py` para eliminar 100% del overhead de comunicación en modo full speed.
 
-**Archivos:** `src/pipelines/core/simulation_loop.py`  
+**Archivos:** `src/pipelines/core/simulation_loop.py`
 **Commit:** `2ec69cc`
 
 ---

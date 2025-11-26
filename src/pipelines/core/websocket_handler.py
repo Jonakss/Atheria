@@ -6,7 +6,7 @@ import uuid
 
 from aiohttp import web
 
-from src.server.server_state import g_state, send_notification
+from ...server.server_state import g_state, send_notification
 from ...utils import get_experiment_list
 
 
