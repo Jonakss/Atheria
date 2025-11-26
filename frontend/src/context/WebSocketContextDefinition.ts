@@ -13,6 +13,8 @@ export interface SimData {
   timestamp?: number;
   simulation_info?: {
     step?: number;
+    start_step?: number;
+    total_steps?: number;
     is_paused?: boolean;
     live_feed_enabled?: boolean;
     gamma_decay?: number;

@@ -16,7 +16,9 @@
 
 ## 📋 Índice de Entradas
 
-
+- [[#2025-11-26 - Actualización Completa de Roadmaps (Fases 1-4)]]
+- [[#2025-11-26 - Fix: Saturación de WebSocket en Modo Full Speed]]
+- [[#2025-11-26 - Fix: Import Path de EpochDetector]]
 - [[#2025-11-25 - Finalización Fase 1 y Verificación Motor Nativo]]
 - [[#2025-11-24 - Correcciones UI y Rendimiento: Zoom, FPS, Throttling y Native Engine]]
 - [[#2025-11-24 - CRÍTICO: Solución Crash Loop Backend por Conversión Bloqueante]]
@@ -41,6 +43,79 @@
 - [[#2024-12-XX - Fase 3 Completada: Migración de Componentes UI]]
 - [[#2024-12-XX - Fase 2 Iniciada: Setup Motor Nativo C++]]
 - [[#2024-12-XX - Optimización de Logs y Reducción de Verbosidad]]
+
+---
+
+## 2025-11-26 - Actualización Completa de Roadmaps (Fases 1-4)
+
+### Cambios Implementados
+- ✅ **ROADMAP_PHASE_1.md**: Actualizado a ~80% completado.  Marcadas tareas completadas: Integración de Ruido, Visualización 3D, Motor Disperso. Pendiente: integración completa de EpochDetector.
+- ✅ **ROADMAP_PHASE_2.md**: Actualizado a ~70% completado. Motor nativo funcional. Pendientes: optimizaciones de paralelismo, SIMD, visualización C++, envío optimizado de datos. Impacto esperado: 10-50x mejora.
+- ✅ **ROADMAP_PHASE_3.md**: Actualizado timestamp a 2025-11-26. Estado ~95% completado. Pendientes: historial/buffer completo y más visualizaciones de campos.
+- ✅ **ROADMAP_PHASE_4. md**: Verificado en planificación futura (0%).
+
+### Beneficios
+- **Visibilidad clara** del progreso real
+- **Documentación sincronizada** con código actual
+- **Knowledge Base actualizada** para RAG
+
+### Archivos Modificados
+- `docs/10_core/ROADMAP_PHASE_1.md` - Completados 3/4 componentes
+- `docs/10_core/ROADMAP_PHASE_2.md` - Añadido resumen ejecutivo
+- `docs/10_core/ROADMAP_PHASE_3.md` - Actualizado timestamp
+- `docs/10_core/ROADMAP_PHASE_4.md` - Verificado (sin cambios)
+
+### Referencias
+- [[PHASE_STATUS_REPORT]] - Informe detallado de estado
+- [[PENDING_TASKS]] - Tareas pendientes del proyecto
+
+---
+
+## 2025-11-26 - Fix: Saturación de WebSocket en Modo Full Speed
+
+> **Nota:** Esta entrada ha sido migrada al nuevo formato de logs individuales.
+>
+> Ver documentación completa en: [[logs/2025-11-26_fullspeed_websocket_fix|2025-11-26 - Fix Saturación WebSocket en Modo Full Speed]]
+
+**Resumen:** Corregido bug crítico donde `steps_interval = -1` (modo full speed) seguía enviando frames, state updates y logs al frontend. Tres fixes implementados en `simulation_loop.py` para eliminar 100% del overhead de comunicación en modo full speed.
+
+**Archivos:** `src/pipelines/core/simulation_loop.py`
+**Commit:** `2ec69cc`
+
+---
+
+## 2025-11-26 - Fix: Import Path de EpochDetector
+
+### Problema
+El servidor fallaba al iniciar con el error: `No module named 'src.physics.analysis.EpochDetector'`
+
+### Causa Raíz
+El archivo `src/pipelines/handlers/inference_handlers.py` intentaba importar `EpochDetector` desde una ruta incorrecta:
+```python
+from ...physics.analysis.EpochDetector import EpochDetector  # ❌ No existe
+```
+
+El archivo `EpochDetector` está realmente ubicado en `src/analysis/epoch_detector.py`, NO en `src/physics/analysis/`.
+
+### Solución
+**Archivo Modificado:** `src/pipelines/handlers/inference_handlers.py` (línea 20)
+
+Corregida la importación:
+```python
+from ...analysis.epoch_detector import EpochDetector  # ✅ Ruta correcta
+```
+
+### Resultado
+- ✅ Servidor inicia correctamente
+- ✅ Importación de `EpochDetector` funciona
+- ✅ Todas las funcionalidades del servidor restauradas
+
+### Archivos Relacionados
+- [inference_handlers.py](file:///home/jonathan.correa/Projects/Atheria/src/pipelines/handlers/inference_handlers.py#L20)
+- [epoch_detector.py](file:///home/jonathan.correa/Projects/Atheria/src/analysis/epoch_detector.py)
+
+### Commit
+- `8823b3b` - fix: corregir ruta de importación de EpochDetector [version:bump:patch]
 
 ---
 

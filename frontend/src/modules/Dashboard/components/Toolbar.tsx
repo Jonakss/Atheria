@@ -154,48 +154,34 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onToggleTimeline, timelineOpen
         <div 
           className="flex flex-col px-2 cursor-help"
           title={(() => {
-            const initialStep = simData?.simulation_info?.initial_step ?? 0;
-            const checkpointStep = simData?.simulation_info?.checkpoint_step ?? 0;
-            const checkpointEpisode = simData?.simulation_info?.checkpoint_episode ?? 0;
-            if (checkpointStep > 0) {
-              return `Iniciado desde paso ${checkpointStep.toLocaleString()} (checkpoint episodio ${checkpointEpisode})`;
-            }
-            return initialStep > 0 ? `Iniciado desde paso ${initialStep.toLocaleString()}` : 'Paso inicial: 0';
+            const startStep = simData?.simulation_info?.start_step ?? 0;
+            const totalSteps = simData?.simulation_info?.total_steps ?? 100000;
+            const currentStepVal = currentStep || 0;
+            const percentage = totalSteps > 0 ? ((currentStepVal - startStep) / (totalSteps - startStep) * 100).toFixed(2) : 0;
+
+            return `Progreso: ${percentage}% (${currentStepVal.toLocaleString()} de ${totalSteps.toLocaleString()} pasos completados)`;
           })()}
         >
           <span className="text-[8px] text-gray-500 uppercase font-bold">Paso Actual</span>
           <span className="text-xs font-mono text-gray-200">
             {(() => {
-              const initialStep = simData?.simulation_info?.initial_step ?? 0;
-              const totalSteps = currentStep || 0;
-              
-              // Solo calcular pasos relativos si hay datos válidos
-              if (initialStep > 0 && totalSteps >= initialStep) {
-                const relativeSteps = totalSteps - initialStep;
+              const startStep = simData?.simulation_info?.start_step ?? 0;
+              const totalSteps = simData?.simulation_info?.total_steps ?? 100000;
+              const currentStepVal = currentStep || 0;
+
+              if (currentStepVal > 0) {
                 return (
                   <>
-                    <span>{totalSteps.toLocaleString()}</span>
-                    <span className="text-gray-500 mx-1">-</span>
-                    <span className="text-teal-400">{relativeSteps.toLocaleString()}</span>
-                  </>
-                );
-              } else if (initialStep > 0 && totalSteps < initialStep) {
-                // Si el step total es menor que el inicial, puede ser que aún no hay datos
-                // Mostrar solo el total o indicar que está cargando
-                if (totalSteps === 0) {
-                  return <span className="text-gray-500">N/A</span>;
-                }
-                // Si hay un step pero es menor que el inicial, puede ser un estado intermedio
-                return (
-                  <>
-                    <span>{totalSteps.toLocaleString()}</span>
-                    <span className="text-gray-500 mx-1">-</span>
-                    <span className="text-gray-500">cargando...</span>
+                    <span className="text-gray-500">{startStep.toLocaleString()}</span>
+                    <span className="text-gray-600 mx-1">/</span>
+                    <span className="text-teal-400 font-bold">{currentStepVal.toLocaleString()}</span>
+                    <span className="text-gray-600 mx-1">(</span>
+                    <span className="text-gray-500">{totalSteps.toLocaleString()}</span>
+                    <span className="text-gray-600">)</span>
                   </>
                 );
               }
-              // Sin step inicial, mostrar solo el total
-              return totalSteps > 0 ? totalSteps.toLocaleString() : <span className="text-gray-500">N/A</span>;
+              return <span className="text-gray-500">N/A</span>;
             })()}
           </span>
         </div>

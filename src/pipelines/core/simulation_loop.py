@@ -206,8 +206,12 @@ async def simulation_loop():
                         
                         # Enviar frame cada X pasos configurados
                         # Modo manual (steps_interval = 0): NO enviar frames automáticamente
-                        # También enviar frame si nunca se ha enviado uno (last_frame_sent_step == -1)
-                        if steps_interval == 0:
+                        # Modo fullspeed (steps_interval = -1): NO enviar frames NUNCA
+                        # También enviar frame si nunca se ha enviado uno (last_frame_sent_step == -1) EXCEPTO en fullspeed
+                        if steps_interval == -1:
+                            # Modo fullspeed: NUNCA enviar frames
+                            should_send_frame = False
+                        elif steps_interval == 0:
                             # Modo manual: NO enviar frames automáticamente
                             # Solo enviar el primer frame si nunca se ha enviado uno
                             should_send_frame = (g_state['last_frame_sent_step'] == -1)
@@ -428,6 +432,8 @@ async def simulation_loop():
                                         "complex_3d_data": viz_data.get("complex_3d_data"),
                                         "simulation_info": {
                                             "step": updated_step,
+                                            "start_step": g_state.get('start_step', 0),
+                                            "total_steps": g_state.get('total_steps', 100000),
                                             "initial_step": g_state.get('initial_step', 0),
                                             "checkpoint_step": g_state.get('checkpoint_step', 0),
                                             "checkpoint_episode": g_state.get('checkpoint_episode', 0),
@@ -459,10 +465,12 @@ async def simulation_loop():
                         
                         # THROTTLE: Solo enviar actualización de estado cada STATE_UPDATE_INTERVAL segundos
                         # para evitar saturar el WebSocket con demasiados mensajes
+                        # IMPORTANTE: NO enviar state_update en modo fullspeed (steps_interval == -1)
                         current_time = time.time()
                         time_since_last_update = current_time - last_state_update_time
                         
-                        if time_since_last_update >= STATE_UPDATE_INTERVAL:
+                        # Solo enviar actualización si NO estamos en modo fullspeed
+                        if steps_interval != -1 and time_since_last_update >= STATE_UPDATE_INTERVAL:
                             # Enviar actualización de estado (sin datos de visualización pesados)
                             # Esto permite que el frontend muestre el progreso aunque no haya visualización
                             state_update = {
@@ -470,6 +478,8 @@ async def simulation_loop():
                                 "timestamp": asyncio.get_event_loop().time(),
                                 "simulation_info": {
                                     "step": updated_step,
+                                    "start_step": g_state.get('start_step', 0),
+                                    "total_steps": g_state.get('total_steps', 100000),
                                     "is_paused": False,
                                     "live_feed_enabled": False,
                                     "fps": g_state.get('current_fps', 0.0),
@@ -484,7 +494,8 @@ async def simulation_loop():
                             last_state_update_time = current_time
                         
                         # Enviar log de simulación cada 100 pasos para no saturar los logs
-                        if updated_step % 100 == 0:
+                        # IMPORTANTE: NO enviar logs en modo fullspeed (steps_interval == -1)
+                        if steps_interval != -1 and updated_step % 100 == 0:
                             if steps_interval == 0:
                                 await broadcast({
                                     "type": "simulation_log",
