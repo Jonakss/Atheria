@@ -1,0 +1,25 @@
+[build-system]
+requires = [
+    "setuptools>=45",
+    "wheel",
+    "pybind11>=2.10.0",
+    "torch>=2.0.0",
+    "numpy"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atheria"
+version = "4.1.1"
+description = "Atheria 4: Simulador de universo infinito con núcleo C++ de alto rendimiento"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "torch",
+    "numpy",
+    "pybind11>=2.10.0",
+]
+
+[project.scripts]
+atheria = "src.cli:main"
+ath = "src.cli:main"

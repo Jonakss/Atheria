@@ -58,13 +58,17 @@ find_package(pybind11 REQUIRED)
 
 # Buscar LibTorch
 # LibTorch viene con PyTorch instalado, así que obtenemos su ubicación desde Python
-execute_process(
-    COMMAND "${Python3_EXECUTABLE}" -c "import torch; import os; print(os.path.dirname(torch.__file__))"
-    OUTPUT_VARIABLE TORCH_PYTHON_DIR
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_QUIET
-    RESULT_VARIABLE torch_result
-)
+if(NOT DEFINED TORCH_PYTHON_DIR)
+    execute_process(
+        COMMAND "${Python3_EXECUTABLE}" -c "import torch; import os; print(os.path.dirname(torch.__file__))"
+        OUTPUT_VARIABLE TORCH_PYTHON_DIR
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE torch_result
+    )
+else()
+    set(torch_result 0)
+endif()
 
 if(NOT torch_result AND TORCH_PYTHON_DIR)
     # LibTorch instala archivos CMake en share/cmake/Torch
@@ -140,6 +144,7 @@ set(CPP_SOURCES
     src/cpp_core/src/sparse_map.cpp
     src/cpp_core/src/harmonic_vacuum.cpp
     src/cpp_core/src/sparse_engine.cpp
+    src/cpp_core/src/chunk_manager.cpp
     src/cpp_core/src/bindings.cpp
 )
 
