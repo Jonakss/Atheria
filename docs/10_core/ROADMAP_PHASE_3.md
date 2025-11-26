@@ -294,10 +294,15 @@
   - Navegación temporal (rewind/replay)
   - Restauración completa de estado cuántico
   - Controles de timeline en frontend
+- **Visualizaciones avanzadas de campos** - ✅ **COMPLETADO (2025-11-26)**
+  - Parte Real (Re(ψ)) con shader WebGL
+  - Parte Imaginaria (Im(ψ)) con shader WebGL
+  - Fase HSV (H=fase, S=1, V=1) con shader WebGL
+  - GPU-accelerated para mejor rendimiento
 
 ### ⚠️ Pendiente
-- Agregar más visualizaciones de campos (Real/Imaginario, Fase HSV, etc.)
-- Verificación y testing del sistema de historial
+- Verificación y testing manual del sistema de historial
+- Testing de nuevas visualizaciones (real/imag/hsv)
 
 ### 🔮 Futuro
 - Persistencia de historial en disco
@@ -306,6 +311,7 @@
 - Exportar/importar historiales completos
 - Visualizaciones 3D mejoradas (Three.js optimizado)
 - Sistema de análisis comparativo entre experimentos
+- Modulación dinámica de HSV (S y V basados en densidad)
 
 ---
 
