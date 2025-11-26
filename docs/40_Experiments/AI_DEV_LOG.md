@@ -51,7 +51,8 @@
 
 > **Nota:** Esta entrada ha sido migrada al nuevo formato de logs individuales.
 >
-> Ver documentación completa en: [[logs/2025-11-26_fix_persistent_frame_sending|2025-11-26 - Fix Persistent Frame Sending]]
+> Ver documentación completa en: [[logs/- [2025-11-26: Fix FPS Calculation and Step Counting Logic](logs/2025-11-26_fix_fps_and_step_counting.md)
+- [2025-11-26: Fix Persistent Frame Sending](logs/2025-11-26_fix_persistent_frame_sending.md)]]
 
 **Resumen:** Eliminado bloque de código duplicado en `simulation_loop.py` que causaba la ejecución incondicional de la lógica de visualización, enviando frames incluso cuando el live feed estaba desactivado.
 
