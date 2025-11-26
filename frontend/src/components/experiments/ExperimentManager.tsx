@@ -67,7 +67,7 @@ export function ExperimentManager() {
             visited.add(expName);
             return findRoot(node.loadFrom, tree, visited);
         };
-    }, [experimentTree]);
+    }, []);
 
     // Obtener toda la cadena de transfer learning
     // Protección contra ciclos para evitar stack overflow
@@ -104,20 +104,23 @@ export function ExperimentManager() {
         const sorted = [...experimentsData];
         sorted.sort((a, b) => {
             switch (sortBy) {
-                case 'created':
+                case 'created': {
                     const aCreated = a.created_at || '';
                     const bCreated = b.created_at || '';
                     return bCreated.localeCompare(aCreated); // Más recientes primero
-                case 'updated':
+                }
+                case 'updated': {
                     const aUpdated = a.updated_at || '';
                     const bUpdated = b.updated_at || '';
                     return bUpdated.localeCompare(aUpdated); // Más recientes primero
+                }
                 case 'name':
                     return a.name.localeCompare(b.name);
-                case 'training_time':
+                case 'training_time': {
                     const aTime = a.total_training_time || 0;
                     const bTime = b.total_training_time || 0;
                     return bTime - aTime; // Más tiempo primero
+                }
                 default:
                     return 0;
             }

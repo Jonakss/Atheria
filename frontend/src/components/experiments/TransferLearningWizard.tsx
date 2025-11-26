@@ -85,7 +85,7 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
                 }
             }
         }
-    }, [baseExperiment, activeStep, experimentsData]);
+    }, [baseExperiment, activeStep, experimentsData, isExperimentNameManuallyEdited]);
 
     const generateExperimentName = (config: ExperimentConfig): string => {
         const arch = config.MODEL_ARCHITECTURE;

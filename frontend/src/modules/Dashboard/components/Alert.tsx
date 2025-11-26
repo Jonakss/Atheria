@@ -1,5 +1,5 @@
 import React from 'react';
-import { Info, AlertCircle, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Info, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 
 interface AlertProps {
   children: React.ReactNode;

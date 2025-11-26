@@ -1,87 +1,91 @@
-# src/pipelines/pipeline_train.py
+# src/pipeline_train.py
 import torch
 from types import SimpleNamespace
 import logging
 import os
 
 from .. import config as global_cfg
-from ..model_loader import instantiate_model, load_checkpoint_data, load_weights
+from ..model_loader import create_new_model, load_model
 from ..engines.qca_engine import Aetheria_Motor
 from ..trainers import QC_Trainer_v3, QC_Trainer_v4
-from ..utils import get_latest_checkpoint, load_experiment_config, update_simple_namespace
+from ..utils import get_latest_checkpoint, load_experiment_config
 
 def run_training_pipeline(exp_cfg: SimpleNamespace, checkpoint_path: str | None = None):
     """
     Ejecuta el pipeline de entrenamiento completo para una configuración de experimento dada.
+
+    Args:
+        exp_cfg: Configuración del experimento (SimpleNamespace)
+        checkpoint_path: Ruta al checkpoint si se está continuando entrenamiento (opcional)
     """
     device = global_cfg.get_device()
     logging.info(f"Pipeline de entrenamiento iniciado en el dispositivo: {device}")
 
+    # Determinar versión del trainer antes de cargar el modelo
+    # (V4 puede crear su propio modelo desde cero, V3 siempre necesita que se cargue primero)
     trainer_version = _determine_trainer_version(exp_cfg)
     logging.info(f"Usando entrenador: {trainer_version}")
 
+    # 1. Cargar o crear el modelo
+    # Para V3: siempre cargar/crear el modelo aquí
+    # Para V4: solo cargar si hay checkpoint o transfer learning, sino V4 lo crea internamente
     ley_M = None
-
-    if hasattr(exp_cfg, 'LOAD_FROM_EXPERIMENT') and exp_cfg.LOAD_FROM_EXPERIMENT:
-        # --- LÓGICA DE TRANSFER LEARNING REFACTORIZADA ---
-        logging.info(f"Iniciando Transfer Learning desde: '{exp_cfg.LOAD_FROM_EXPERIMENT}'")
-
-        base_checkpoint_path = get_latest_checkpoint(exp_cfg.LOAD_FROM_EXPERIMENT)
-        if not base_checkpoint_path:
-            logging.error(f"No se encontró checkpoint para el experimento base. Abortando.")
+    if checkpoint_path:
+        # Continuar entrenamiento: cargar modelo con checkpoint del mismo experimento
+        ley_M, state_dict = load_model(exp_cfg, checkpoint_path)
+        if ley_M is None:
+            logging.error("No se pudo cargar el modelo desde el checkpoint. Abortando entrenamiento.")
             return
-            
-        checkpoint_data = load_checkpoint_data(base_checkpoint_path)
-        if not checkpoint_data or 'exp_config' not in checkpoint_data:
-            logging.error(f"El checkpoint base no contiene configuración. Abortando.")
-            return
-            
-        # 1. Cargar y fusionar configuraciones
-        base_config_dict = checkpoint_data['exp_config']
-        base_exp_cfg = SimpleNamespace(**base_config_dict)
-        if isinstance(base_config_dict.get("MODEL_PARAMS"), dict):
-            base_exp_cfg.MODEL_PARAMS = SimpleNamespace(**base_config_dict["MODEL_PARAMS"])
-
-        # Sobrescribir con la nueva configuración (la del usuario)
-        update_simple_namespace(base_exp_cfg, exp_cfg)
-        exp_cfg = base_exp_cfg
-        logging.info(f"Configuración final para Transfer Learning: {exp_cfg}")
-
-        # 2. Instanciar el modelo con la nueva configuración fusionada
-        ley_M = instantiate_model(exp_cfg)
-
-        # 3. Cargar los pesos del checkpoint en el nuevo modelo
-        load_weights(ley_M, checkpoint_data)
+        # El modelo ya está en modo eval después de load_model, cambiar a train
         ley_M.train()
-        logging.info("✅ Transfer learning completado: modelo instanciado con nueva config y pesos cargados.")
+        logging.info(f"Modelo cargado desde checkpoint: {checkpoint_path}")
+    elif hasattr(exp_cfg, 'LOAD_FROM_EXPERIMENT') and exp_cfg.LOAD_FROM_EXPERIMENT:
+        # Transfer Learning: crear nuevo modelo y cargar pesos de otro experimento
+        try:
+            ley_M = create_new_model(exp_cfg)
+            logging.info(f"Nuevo modelo creado. Cargando pesos desde '{exp_cfg.LOAD_FROM_EXPERIMENT}' para transfer learning...")
+            
+            # Cargar checkpoint del experimento base
+            from ..utils import get_latest_checkpoint
+            base_checkpoint = get_latest_checkpoint(exp_cfg.LOAD_FROM_EXPERIMENT)
+            if base_checkpoint:
+                try:
+                    checkpoint = torch.load(base_checkpoint, map_location=device)
+                    model_state_dict = checkpoint.get('model_state_dict', checkpoint)
 
-    elif checkpoint_path:
-        # --- LÓGICA DE CONTINUAR ENTRENAMIENTO REFACTORIZADA ---
-        logging.info(f"Continuando entrenamiento desde: {checkpoint_path}")
+                    # Manejar prefijo _orig_mod. si existe
+                    if any(key.startswith('_orig_mod.') for key in model_state_dict.keys()):
+                        cleaned_state_dict = {}
+                        for key, value in model_state_dict.items():
+                            if key.startswith('_orig_mod.'):
+                                cleaned_state_dict[key.replace('_orig_mod.', '', 1)] = value
+                            else:
+                                cleaned_state_dict[key] = value
+                        model_state_dict = cleaned_state_dict
 
-        checkpoint_data = load_checkpoint_data(checkpoint_path)
-        if not checkpoint_data:
+                    # Cargar con strict=False para permitir diferencias de arquitectura
+                    ley_M.load_state_dict(model_state_dict, strict=False)
+                    logging.info(f"✅ Transfer learning: pesos cargados desde '{exp_cfg.LOAD_FROM_EXPERIMENT}'. Iniciando desde episodio 0.")
+                except Exception as e:
+                    logging.warning(f"⚠️ No se pudieron cargar pesos desde '{exp_cfg.LOAD_FROM_EXPERIMENT}': {e}. Iniciando desde cero.")
+            else:
+                logging.warning(f"⚠️ No se encontró checkpoint para '{exp_cfg.LOAD_FROM_EXPERIMENT}'. Iniciando desde cero.")
+            
+            ley_M.train()
+        except Exception as e:
+            logging.error(f"Error al crear el modelo: {e}", exc_info=True)
             return
-
-        # Si el checkpoint tiene config, usarla
-        if 'exp_config' in checkpoint_data:
-            loaded_config_dict = checkpoint_data['exp_config']
-            exp_cfg = SimpleNamespace(**loaded_config_dict)
-            if isinstance(loaded_config_dict.get("MODEL_PARAMS"), dict):
-                exp_cfg.MODEL_PARAMS = SimpleNamespace(**loaded_config_dict["MODEL_PARAMS"])
-            logging.info("Configuración del experimento actualizada desde el checkpoint.")
-
-        # Instanciar modelo y cargar pesos
-        ley_M = instantiate_model(exp_cfg)
-        load_weights(ley_M, checkpoint_data)
-        ley_M.train()
-        logging.info("Modelo cargado desde checkpoint.")
-
     elif trainer_version == "v3":
-        # V3 necesita el modelo creado explícitamente
-        ley_M = instantiate_model(exp_cfg)
-        ley_M.train()
-        logging.info("Nuevo modelo creado para entrenamiento (V3).")
+        # Para V3, siempre necesitamos crear el modelo (aunque sea desde cero)
+        # V4 puede crear su propio modelo, así que solo lo creamos aquí para V3
+        try:
+            ley_M = create_new_model(exp_cfg)
+            logging.info("Nuevo modelo creado para entrenamiento desde cero (V3).")
+            ley_M.train()
+        except Exception as e:
+            logging.error(f"Error al crear el modelo: {e}", exc_info=True)
+            return
+    # Para V4 desde cero, no creamos el modelo aquí - V4 lo crea internamente
 
     # 2. Inicializar el Entrenador según la versión
     if trainer_version == "v4":

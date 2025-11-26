@@ -31,22 +31,11 @@ class CMakeBuildExt(build_ext):
         ext_dir.mkdir(parents=True, exist_ok=True)
         
         # Configuración de CMake
-        try:
-            import torch
-            torch_path = os.path.dirname(torch.__file__)
-        except ImportError:
-            print("⚠️  Warning: Could not import torch to find its path.")
-            torch_path = ""
-
         cmake_args = [
             f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={ext_dir}",
             f"-DPYTHON_EXECUTABLE={sys.executable}",
-            f"-DPython3_EXECUTABLE={sys.executable}",  # Ensure CMake finds the same Python
             f"-DCMAKE_BUILD_TYPE={'Debug' if self.debug else 'Release'}",
         ]
-
-        if torch_path:
-            cmake_args.append(f"-DTORCH_PYTHON_DIR={torch_path}")
         
         # Configuración específica de plataforma
         if platform.system() == "Windows":

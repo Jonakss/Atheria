@@ -44,7 +44,7 @@ export const usePanZoom = (
     // Esto es consistente, predecible, y evita problemas de timing con dimensiones del contenedor
     // El usuario puede hacer zoom out con la rueda del ratón si necesita ver más
     return { pan: { x: 0, y: 0 }, zoom: 1 };
-  }, [canvasRef, gridWidth, gridHeight]);
+  }, []);
 
   // Inicializar vista cuando cambia el tamaño del grid
   useEffect(() => {
@@ -98,106 +98,38 @@ export const usePanZoom = (
         return { pan: newPan, zoom: newZoom };
       }
 
-      // Calcular límites de zoom
-      // Zoom mínimo: permitir zoom out suficiente para ver TODO el grid completo
-      // Si el procesamiento lo permite, permitir zoom out incluso más allá
-      // Límite absoluto mínimo más conservador para evitar zoom excesivo
-      const absoluteMinZoom = 0.1; // Límite absoluto (permite zoom out hasta ver 10x el viewport)
-
-      // FIX: Usar absoluteMinZoom como límite inferior real para permitir zoom out libre
-      // El cálculo anterior (minZoomRequired * 0.8) forzaba al grid a llenar la pantalla,
-      // impidiendo hacer zoom out si el grid era pequeño y el contenedor grande.
+      const absoluteMinZoom = 0.1;
       const finalMinZoom = absoluteMinZoom;
-
-      // Zoom máximo más conservador: máximo 10x o 1 píxel = 10 unidades del grid
       const maxZoom = 10;
-
-      const constrainedZoom = Math.max(
-        finalMinZoom,
-        Math.min(newZoom, maxZoom)
-      );
-
-      // Calcular límites de pan
-      // El canvas está centrado con CSS:
-      // - left: 50%, top: 50%
-      // - marginLeft: -(gridWidth/2) + (pan.x/zoom)
-      // - marginTop: -(gridHeight/2) + (pan.y/zoom)
-      // - transform: scale(zoom)
-      // - transformOrigin: center center
-
-      // El tamaño del canvas escalado
+      const constrainedZoom = Math.max(finalMinZoom, Math.min(newZoom, maxZoom));
       const scaledWidth = gridWidth * constrainedZoom;
       const scaledHeight = gridHeight * constrainedZoom;
 
-      // El canvas está centrado en el contenedor
-      // El centro del canvas está en el centro del contenedor (0,0 relativo al centro)
-      // Después del pan, el canvas se mueve: pan.x/zoom en X, pan.y/zoom en Y
-
-      // Límites de pan basados en el tamaño escalado del canvas y el contenedor
-      // Queremos que el canvas escalado no se salga completamente del contenedor
-      // Permitir que se mueva hasta que una esquina del canvas esté en el borde del contenedor
-
-      // Límite máximo de pan en píxeles del canvas (antes del scale)
-      // Cuando el canvas escalado es más grande que el contenedor:
-      // - Puede moverse hasta que una esquina toque el borde del contenedor
-      // - El canvas tiene tamaño gridWidth x gridHeight
-      // - El canvas escalado tiene tamaño scaledWidth x scaledHeight
-      // - El contenedor tiene tamaño containerWidth x containerHeight
-
-      // Si scaledWidth > containerWidth, el canvas puede moverse horizontalmente
-      // El desplazamiento máximo en píxeles del canvas (antes del scale) es:
-      // maxPanInCanvasPixels = (scaledWidth - containerWidth) / (2 * zoom)
-      // Pero pan.x está en píxeles del contenedor, no del canvas
-
-      // Conversión correcta:
-      // pan.x está en píxeles del contenedor (relativo al centro)
-      // El canvas se mueve pan.x/zoom píxeles antes del scale
-      // Después del scale, esto se convierte en pan.x píxeles del contenedor
-
-      // Si scaledWidth > containerWidth, el canvas puede moverse:
-      // - Hacia la izquierda: hasta que el borde derecho del canvas toque el borde derecho del contenedor
-      // - Hacia la derecha: hasta que el borde izquierdo del canvas toque el borde izquierdo del contenedor
-      // El desplazamiento máximo en píxeles del contenedor es:
-      // maxPanX = (scaledWidth - containerWidth) / 2
-
       let maxPanX, maxPanY, minPanX, minPanY;
 
-      // Modo toroidal: pan infinito (wraparound)
       if (toroidalMode) {
-        // En modo toroidal, permitir pan infinito pero aplicar wraparound visual
-        // Los límites son muy grandes para simular infinito
-        // El wraparound se hará visualmente en el renderizado
-        const veryLargeValue = 1e6; // Valor muy grande para simular infinito
+        const veryLargeValue = 1e6;
         maxPanX = veryLargeValue;
         minPanX = -veryLargeValue;
         maxPanY = veryLargeValue;
         minPanY = -veryLargeValue;
       } else {
-        // Modo normal: límites basados en tamaño del canvas
         if (scaledWidth > containerWidth) {
-          // Canvas más ancho que el contenedor: puede moverse horizontalmente
-          // Permitir más margen para exploración (200% en lugar de 50%)
-          const extraMargin = scaledWidth * 0.5; // 50% adicional de margen
+          const extraMargin = scaledWidth * 0.5;
           maxPanX = (scaledWidth - containerWidth) / 2 + extraMargin;
           minPanX = -maxPanX;
         } else {
-          // Canvas más estrecho que el contenedor: permitir más movimiento
-          // Permitir pan hasta que el canvas salga completamente del contenedor
-          const extraMargin = scaledWidth * 2; // 200% de margen adicional
+          const extraMargin = scaledWidth * 2;
           maxPanX = (containerWidth - scaledWidth) / 2 + extraMargin;
           minPanX = -maxPanX;
         }
 
         if (scaledHeight > containerHeight) {
-          // Canvas más alto que el contenedor: puede moverse verticalmente
-          // Permitir más margen para exploración (200% en lugar de 50%)
-          const extraMargin = scaledHeight * 0.5; // 50% adicional de margen
+          const extraMargin = scaledHeight * 0.5;
           maxPanY = (scaledHeight - containerHeight) / 2 + extraMargin;
           minPanY = -maxPanY;
         } else {
-          // Canvas más bajo que el contenedor: permitir más movimiento
-          // Permitir pan hasta que el canvas salga completamente del contenedor
-          const extraMargin = scaledHeight * 2; // 200% de margen adicional
+          const extraMargin = scaledHeight * 2;
           maxPanY = (containerHeight - scaledHeight) / 2 + extraMargin;
           minPanY = -maxPanY;
         }
@@ -210,7 +142,7 @@ export const usePanZoom = (
 
       return { pan: constrainedPan, zoom: constrainedZoom };
     },
-    [canvasRef, gridWidth, gridHeight]
+    [canvasRef, gridWidth, gridHeight, toroidalMode]
   );
 
   const handleMouseDown = useCallback(
@@ -223,12 +155,9 @@ export const usePanZoom = (
     [pan]
   );
 
-  // Throttled mouse move para mejor rendimiento
-  const handleMouseMoveThrottled = useCallback(
+  const handleMouseMove = useCallback(
     throttle((e: React.MouseEvent) => {
       if (!isPanningRef.current) return;
-      // El pan debe ser directamente proporcional al movimiento del mouse (sin inversión)
-      // ya que pan.x, pan.y ya están en píxeles del canvas escalado
       const dx = e.clientX - lastMousePos.current.x;
       const dy = e.clientY - lastMousePos.current.y;
       const newPan = {
@@ -239,15 +168,8 @@ export const usePanZoom = (
       panUpdateRef.current = constrained.pan;
       setPan(constrained.pan);
       lastMousePos.current = { x: e.clientX, y: e.clientY };
-    }, 16), // ~60fps
+    }, 16),
     [zoom, constrainPanZoom]
-  );
-
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      handleMouseMoveThrottled(e);
-    },
-    [handleMouseMoveThrottled]
   );
 
   const handleMouseUp = useCallback(() => {

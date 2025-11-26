@@ -1,8 +1,7 @@
 // frontend/src/modules/Dashboard/components/LogsView.tsx
 import React, { useRef, useEffect, useState } from 'react';
-import { Terminal, AlertCircle, Info, AlertTriangle, X, Download, Send, ChevronRight } from 'lucide-react';
+import { Terminal, AlertCircle, Info, AlertTriangle, Download, Send, ChevronRight } from 'lucide-react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
-import { GlassPanel } from './GlassPanel';
 
 export const LogsView: React.FC = () => {
   const { allLogs, connectionStatus, sendCommand } = useWebSocket();

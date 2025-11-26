@@ -213,9 +213,7 @@ async def simulation_loop():
                             should_send_frame = (g_state['last_frame_sent_step'] == -1)
                         else:
                             # Modo automático: enviar frame cada N pasos
-                            # CRÍTICO: Solo enviar si live_feed está habilitado
-                            # Si live_feed está desactivado, NO enviar frames (ahorra conversión y ancho de banda)
-                            should_send_frame = live_feed_enabled and ((steps_interval_counter >= steps_interval) or (g_state['last_frame_sent_step'] == -1))
+                            should_send_frame = (steps_interval_counter >= steps_interval) or (g_state['last_frame_sent_step'] == -1)
                         
                         if should_send_frame:
                             # Resetear contador

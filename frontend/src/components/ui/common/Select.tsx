@@ -10,7 +10,7 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, label, error, description, options, children, ...props }, ref) => {
+  function Select({ className, label, data, placeholder, error, ...props }, ref) {
     return (
       <div className="w-full space-y-1">
         {label && (

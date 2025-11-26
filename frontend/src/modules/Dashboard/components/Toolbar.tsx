@@ -8,6 +8,8 @@ interface ToolbarProps {
   timelineOpen?: boolean;
 }
 
+import { useCallback } from 'react';
+
 export const Toolbar: React.FC<ToolbarProps> = ({ onToggleTimeline, timelineOpen = false }) => {
   const { 
     inferenceStatus, 
@@ -21,48 +23,37 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onToggleTimeline, timelineOpen
   } = useWebSocket();
   const isPlaying = inferenceStatus === 'running';
   const isConnected = connectionStatus === 'connected';
-  
-  // Estado para el intervalo de pasos cuando live feed está desactivado
-  // -1 = fullspeed (no enviar frames), 0 = manual (solo con botón), >0 = cada N pasos
+
   const [stepsInterval, setStepsInterval] = useState<number>(() => {
     const saved = localStorage.getItem('atheria_steps_interval');
-    return saved ? parseInt(saved, 10) : 10; // Por defecto cada 10 pasos
+    return saved ? parseInt(saved, 10) : 10;
   });
   const [showIntervalControl, setShowIntervalControl] = useState(false);
-  
-  // Guardar intervalo en localStorage cuando cambia
+
   useEffect(() => {
     localStorage.setItem('atheria_steps_interval', stepsInterval.toString());
-    // Enviar al backend
     if (isConnected && !liveFeedEnabled) {
       sendCommand('simulation', 'set_steps_interval', { steps_interval: stepsInterval });
     }
   }, [stepsInterval, isConnected, liveFeedEnabled, sendCommand]);
-  
-  // Verificar si hay experimento activo con checkpoint o si hay un modelo cargado
-  const currentExperiment = activeExperiment 
-    ? experimentsData?.find(exp => exp.name === activeExperiment) 
-    : null;
-  const hasActiveExperiment = currentExperiment?.has_checkpoint || false;
-  // Permitir control si:
-  // 1. Hay un experimento activo con checkpoint, O
-  // 2. La simulación está corriendo (ya está iniciada), O
-  // 3. La simulación está pausada PERO hay un experimento activo (puede reanudar)
-  const canControlInference = isConnected && (
+
+  const hasActiveExperiment = useMemo(() => {
+    if (!activeExperiment || !experimentsData) return false;
+    const currentExperiment = experimentsData.find(exp => exp.name === activeExperiment);
+    return currentExperiment?.has_checkpoint || false;
+  }, [activeExperiment, experimentsData]);
+
+  const canControlInference = useMemo(() => isConnected && (
     hasActiveExperiment || 
     inferenceStatus === 'running' || 
     (inferenceStatus === 'paused' && activeExperiment !== null)
-  );
+  ), [isConnected, hasActiveExperiment, inferenceStatus, activeExperiment]);
   
   const currentStep = isConnected ? (simData?.step ?? simData?.simulation_info?.step ?? 0) : 0;
-  
-  // Obtener FPS real desde simulation_info
   const fps = isConnected ? (simData?.simulation_info?.fps ?? 0) : null;
   
-  // Calcular número de partículas solo si está conectado y hay datos
   const particleCount = useMemo(() => {
     if (!isConnected || !simData?.map_data) return null;
-    
     let count = 0;
     for (const row of simData.map_data) {
       if (Array.isArray(row)) {
@@ -74,21 +65,21 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onToggleTimeline, timelineOpen
     return count > 1000 ? `${(count / 1000).toFixed(1)}K` : count.toString();
   }, [simData?.map_data, isConnected]);
 
-  const handlePlayPause = () => {
+  const handlePlayPause = useCallback(() => {
     if (!canControlInference) return;
     const command = isPlaying ? 'pause' : 'play';
     sendCommand('inference', command);
-  };
+  }, [canControlInference, isPlaying, sendCommand]);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     if (!canControlInference) return;
     sendCommand('inference', 'reset');
-  };
+  }, [canControlInference, sendCommand]);
 
-  const handleToggleLiveFeed = () => {
+  const handleToggleLiveFeed = useCallback(() => {
     if (!isConnected) return;
     setLiveFeedEnabled(!liveFeedEnabled);
-  };
+  }, [isConnected, setLiveFeedEnabled, liveFeedEnabled]);
 
   return (
     <div className="absolute top-4 left-4 z-30 flex gap-2 pointer-events-none">

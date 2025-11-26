@@ -40,3 +40,5 @@ export const ActionIcon = React.forwardRef<HTMLButtonElement, ActionIconProps>(
     );
   }
 );
+
+ActionIcon.displayName = 'ActionIcon';

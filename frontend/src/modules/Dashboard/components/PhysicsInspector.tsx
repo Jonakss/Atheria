@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Zap, ChevronRight, AlertCircle, Microscope, ChevronLeft } from 'lucide-react';
+import { Zap, ChevronRight, AlertCircle, Microscope, ChevronLeft } from 'lucide-react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 
 interface PhysicsInspectorProps {
