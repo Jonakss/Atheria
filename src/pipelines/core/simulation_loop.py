@@ -199,24 +199,27 @@ async def simulation_loop():
                         
                         # Actualizar FPS en g_state (promediado con anterior)
                         # Para live_feed OFF: mostrar pasos/segundo (limitado a 10000)
-                        # Para live_feed ON: se actualizará con frames/segundo en el bloque de visualización
-                        if not live_feed_enabled:
-                            # Live feed OFF: mostrar pasos/segundo
-                            if 'current_fps' not in g_state or 'fps_samples' not in g_state:
-                                g_state['current_fps'] = min(steps_per_second, 10000.0)
-                                g_state['fps_samples'] = [min(steps_per_second, 10000.0)]
-                            else:
-                                # Promediar con últimos valores para suavizar
-                                fps_value = min(steps_per_second, 10000.0)
-                                g_state['fps_samples'].append(fps_value)
-                               # Calcular promedio (limitar a máximo razonable para pasos/segundo Sin live feed puede ser 1000+)
-                            if 'fps_samples' in g_state and len(g_state['fps_samples']) > 0:
-                                g_state['current_fps'] = sum(g_state['fps_samples']) / len(g_state['fps_samples'])
-                                
-                                # DEBUG: Log FPS calculation every 100 steps
-                                if updated_step % 100 == 0:
-                                    logging.info(f"📊 FPS calculado: {g_state['current_fps']:.1f} (live_feed={live_feed_enabled}, steps_interval={steps_interval})")
-                        # Si live_feed está ON, el FPS se actualizará en el bloque de visualización
+                        # Para live_feed ON: mostrar frames/segundo (o pasos/segundo si steps_interval > 1)
+                        
+                        # Lógica unificada de FPS:
+                        # Siempre calcular y actualizar current_fps basado en el rendimiento real
+                        if 'current_fps' not in g_state or 'fps_samples' not in g_state:
+                            g_state['current_fps'] = min(steps_per_second, 10000.0)
+                            g_state['fps_samples'] = [min(steps_per_second, 10000.0)]
+                        else:
+                            # Promediar con últimos valores para suavizar
+                            fps_value = min(steps_per_second, 10000.0)
+                            g_state['fps_samples'].append(fps_value)
+                            # Mantener ventana de muestras (ej: 10)
+                            if len(g_state['fps_samples']) > 10:
+                                g_state['fps_samples'].pop(0)
+                        
+                        if 'fps_samples' in g_state and len(g_state['fps_samples']) > 0:
+                            g_state['current_fps'] = sum(g_state['fps_samples']) / len(g_state['fps_samples'])
+                            
+                            # DEBUG: Log FPS calculation every 100 steps
+                            if updated_step % 100 == 0:
+                                logging.info(f"📊 FPS calculado: {g_state['current_fps']:.1f} (live_feed={live_feed_enabled}, steps_interval={steps_interval})")
                         
                         # Actualizar contador para frames (solo si no es modo manual)
                         steps_interval_counter = g_state.get('steps_interval_counter', 0)
@@ -401,9 +404,10 @@ async def simulation_loop():
                                             "complex_3d_data": viz_data.get("complex_3d_data"),
                                             "simulation_info": {
                                                 "step": updated_step,
-                                                "start_step": g_state.get('start_step', 0),
-                                                "total_steps": g_state.get('total_steps', 100000),
+                                                "start_step": g_state.get('start_step', 0), # Deprecated, use initial_step
                                                 "initial_step": g_state.get('initial_step', 0),
+                                                "session_steps": updated_step - g_state.get('initial_step', 0),
+                                                "total_steps": updated_step,
                                                 "checkpoint_step": g_state.get('checkpoint_step', 0),
                                                 "checkpoint_episode": g_state.get('checkpoint_episode', 0),
                                                 "is_paused": False,
@@ -467,7 +471,9 @@ async def simulation_loop():
                                 "simulation_info": {
                                     "step": updated_step,
                                     "start_step": g_state.get('start_step', 0),
-                                    "total_steps": g_state.get('total_steps', 100000),
+                                    "initial_step": g_state.get('initial_step', 0),
+                                    "session_steps": updated_step - g_state.get('initial_step', 0),
+                                    "total_steps": updated_step,
                                     "is_paused": False,
                                     "live_feed_enabled": False,
                                     "fps": g_state.get('current_fps', 0.0),

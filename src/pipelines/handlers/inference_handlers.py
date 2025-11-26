@@ -551,10 +551,32 @@ async def handle_load_experiment(args):
                 g_state['motor_is_native'] = False
                 g_state['motor_type'] = 'harmonic' if force_engine == 'harmonic' else 'python'
             
+            # Extraer paso inicial del nombre del archivo
+            initial_step = 0
+            try:
+                # Intentar extraer de snapshot (snapshot_..._step_123.pt)
+                import re
+                filename = os.path.basename(str(checkpoint_path)) if checkpoint_path else ""
+                step_match = re.search(r'step_(\d+)', filename)
+                if step_match:
+                    initial_step = int(step_match.group(1))
+                else:
+                    # Intentar extraer de checkpoint (checkpoint_ep123.pth)
+                    ep_match = re.search(r'_ep(\d+)', filename)
+                    if ep_match:
+                        episode = int(ep_match.group(1))
+                        # Estimar pasos basado en QCA_STEPS_TRAINING si está disponible
+                        qca_steps = getattr(exp_cfg, 'QCA_STEPS_TRAINING', 100) # Default 100
+                        initial_step = episode * qca_steps
+            except Exception as e:
+                logging.warning(f"No se pudo extraer paso inicial del archivo: {e}")
+                initial_step = 0
+
             g_state['motor'] = motor
             g_state['active_experiment'] = exp_name
-            g_state['simulation_step'] = 0
-            g_state['start_step'] = 0  # Inicializar el paso inicial
+            g_state['simulation_step'] = initial_step
+            g_state['initial_step'] = initial_step  # Guardar paso inicial para calcular session_steps
+            g_state['start_step'] = initial_step    # Compatibilidad
             g_state['current_epoch'] = 0
             g_state['epoch_metrics'] = {}
             
