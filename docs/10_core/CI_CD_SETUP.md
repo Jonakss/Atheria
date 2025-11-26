@@ -1,10 +1,62 @@
-# Configuración de GitHub Actions
+# Configuración de CI/CD y Automatización
 
-Atheria utiliza GitHub Actions y el CLI de Gemini para automatizar tareas como revisión de código, triaje de issues e invocación de comandos AI.
+Atheria utiliza GitHub Actions para dos propósitos principales:
 
-Este documento explica cómo configurar el repositorio para que estas acciones funcionen correctamente.
+1.  **CI/CD (Integración y Despliegue Continuo):** Automatización de pruebas y despliegue del proyecto.
+2.  **Automatización con IA (Gemini CLI):** Ayuda en tareas de desarrollo como revisión de código y triaje de issues.
 
-## 🔑 Secretos y Variables Requeridos
+Este documento explica la configuración y funcionamiento de ambos sistemas.
+
+## 1. Workflows de CI/CD del Proyecto
+
+Estos flujos de trabajo aseguran la calidad del código y automatizan el despliegue del frontend.
+
+### `ci.yml` - Integración Continua
+
+Este workflow es el **guardián de la calidad del código**.
+
+-   **Disparadores:** Se ejecuta automáticamente en cada `push` y `pull request` a la rama `main`.
+-   **Objetivo:** Verificar que los nuevos cambios no rompen ninguna parte del proyecto.
+
+**Proceso que ejecuta:**
+1.  **Checkout:** Descarga el código del repositorio.
+2.  **Setup Entornos:** Configura los entornos de Python (3.10) y Node.js (18).
+3.  **Frontend Check:**
+    - Instala dependencias (`npm install`).
+    - Valida el estilo del código (`npm run lint`).
+    - Construye el proyecto para producción (`npm run build`) para asegurar que compila.
+4.  **Backend Check:**
+    - Instala dependencias de Python (`pip install -e .`).
+    - Compila las extensiones nativas de C++ (`setup.py build_ext`).
+    - Ejecuta la suite de pruebas del backend (`pytest`).
+
+Si alguno de estos pasos falla, el workflow marcará el commit o PR como fallido, notificando al desarrollador para que corrija el problema antes de integrar el código.
+
+### `deploy-pages.yml` - Despliegue a GitHub Pages
+
+Este workflow es el **publicador automático del frontend**.
+
+-   **Disparadores:** Se ejecuta automáticamente solo cuando se hace un `push` a la rama `main`.
+-   **Objetivo:** Desplegar la última versión del frontend a GitHub Pages.
+
+**Proceso que ejecuta:**
+1.  **Checkout y Setup:** Descarga el código y configura Node.js.
+2.  **Build Frontend:** Instala dependencias y construye la versión de producción (`npm run build`).
+3.  **Deploy:** Sube los archivos generados (del directorio `frontend/dist`) a GitHub Pages.
+
+#### ⚠️ Acción Requerida
+
+Para que este despliegue funcione, un administrador del repositorio debe hacer lo siguiente **una única vez**:
+1.  Ir a **Settings** -> **Pages**.
+2.  En la sección "Build and deployment", cambiar la **Source** a **"GitHub Actions"**.
+
+---
+
+## 2. Automatización con IA (Gemini CLI)
+
+Atheria utiliza el CLI de Gemini para automatizar tareas como revisión de código, triaje de issues e invocación de comandos AI.
+
+## 🔑 Secretos y Variables Requeridos (Gemini)
 
 Para que los workflows de Gemini (`.github/workflows/gemini-*.yml`) funcionen, necesitas configurar los siguientes secretos y variables en tu repositorio.
 
