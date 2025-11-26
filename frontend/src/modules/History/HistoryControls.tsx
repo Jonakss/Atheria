@@ -27,7 +27,7 @@ export const HistoryControls: React.FC = () => {
     requestHistoryRange();
     const interval = setInterval(requestHistoryRange, 5000); // Actualizar cada 5s
     return () => clearInterval(interval);
-  }, []);
+  }, [requestHistoryRange]);
 
   // Escuchar mensajes del WebSocket
   useEffect(() => {
