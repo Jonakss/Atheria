@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
+import { EpochIndicator } from './EpochIndicator';
 import { FieldWidget } from './FieldWidget';
 
 export const MetricsBar: React.FC = () => {
