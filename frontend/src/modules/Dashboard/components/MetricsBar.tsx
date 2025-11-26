@@ -21,8 +21,6 @@ export const MetricsBar: React.FC = () => {
   const mapDataFirstLengthRef = useRef<number>(0);
   
   const mapData = simData?.map_data;
-  const mapDataLength = mapData?.length;
-  const mapDataFirstLength = mapData?.[0]?.length;
 
   const mapDataHash = useMemo(() => {
     if (!mapData || !Array.isArray(mapData) || mapData.length === 0) {
@@ -58,8 +56,7 @@ export const MetricsBar: React.FC = () => {
     
     mapDataHashRef.current = hash;
     return hash;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapData, mapDataLength, mapDataFirstLength]);
+  }, [mapData]);
   
   const mapDataString = useMemo(() => {
     if (mapDataHash === 0 || mapDataHash === mapDataLastHash.current) {
@@ -81,8 +78,7 @@ export const MetricsBar: React.FC = () => {
       mapDataRef.current = null;
       return null;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapDataHash]); // Solo depender del hash, no de simData?.map_data directamente
+  }, [mapDataHash, simData]); // Solo depender del hash, no de simData?.map_data directamente
   
   const vacuumEnergy = useMemo(() => {
     if (!isConnected || !mapDataString) return 'N/A';
