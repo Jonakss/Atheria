@@ -17,6 +17,7 @@
 ## 📋 Índice de Entradas
 
 
+- [[#2025-11-26 - Fix: Saturación de WebSocket en Modo Full Speed]]
 - [[#2025-11-26 - Fix: Import Path de EpochDetector]]
 - [[#2025-11-25 - Finalización Fase 1 y Verificación Motor Nativo]]
 - [[#2025-11-24 - Correcciones UI y Rendimiento: Zoom, FPS, Throttling y Native Engine]]
@@ -47,81 +48,14 @@
 
 ## 2025-11-26 - Fix: Saturación de WebSocket en Modo Full Speed
 
-### Problema
-El usuario reportó que cuando desactivaba el "live feed" o ponía `steps_interval = -1` (modo full speed), la visualización seguía actualizándose en tiempo real y saturaba la conexión WebSocket.
+> **Nota:** Esta entrada ha sido migrada al nuevo formato de logs individuales.
+> 
+> Ver documentación completa en: [[logs/2025-11-26_fullspeed_websocket_fix|2025-11-26 - Fix Saturación WebSocket en Modo Full Speed]]
 
-### Causa Raíz
-En `src/pipelines/core/simulation_loop.py`, había tres puntos donde se enviaban datos al frontend SIN verificar si `steps_interval == -1`:
+**Resumen:** Corregido bug crítico donde `steps_interval = -1` (modo full speed) seguía enviando frames, state updates y logs al frontend. Tres fixes implementados en `simulation_loop.py` para eliminar 100% del overhead de comunicación en modo full speed.
 
-1. **Líneas 210-216**: La condición `should_send_frame` para `steps_interval == -1` caía en el bloque `else`, calculando `steps_interval_counter >= -1`, que SIEMPRE es `True`. Esto causaba que se enviaran frames de visualización continuamente.
-
-2. **Líneas 469-488**: El throttled `state_update` se enviaba SIEMPRE que pasaba el `STATE_UPDATE_INTERVAL`, sin verificar el modo full speed.
-
-3. **Líneas 492-503**: Los logs de simulación se enviaban cada 100 pasos sin verificar el modo full speed.
-
-**Resultado**: En modo full speed (-1), el backend enviaba frames, state updates y logs continuamente, saturando el WebSocket y dando la impresión de que la simulación seguía "en tiempo real" incluso cuando debería estar corriendo a máxima velocidad sin visualización.
-
-### Solución Implementada
-
-**Archivo Modificado:** `src/pipelines/core/simulation_loop.py`
-
-#### 1. Fix: `should_send_frame` para Full Speed ✅
-```python
-# Antes (líneas 210-216)
-if steps_interval == 0:
-    should_send_frame = (g_state['last_frame_sent_step'] == -1)
-else:  # <-- PROBLEMA: -1 cae aquí
-    should_send_frame = (steps_interval_counter >= steps_interval) or ...
-
-# Después (líneas 207-220)
-if steps_interval == -1:
-    # Modo fullspeed: NUNCA enviar frames
-    should_send_frame = False
-elif steps_interval == 0:
-    # Modo manual: NO enviar frames automáticamente
-    should_send_frame = (g_state['last_frame_sent_step'] == -1)
-else:
-    # Modo automático: enviar frame cada N pasos
-    should_send_frame = (steps_interval_counter >= steps_interval) or ...
-```
-
-#### 2. Fix: State Update Throttling ✅
-```python
-# Antes (línea 469)
-if time_since_last_update >= STATE_UPDATE_INTERVAL:
-
-# Después (línea 471)
-if steps_interval != -1 and time_since_last_update >= STATE_UPDATE_INTERVAL:
-```
-
-#### 3. Fix: Simulation Log Throttling ✅
-```python
-# Antes (línea 493)
-if updated_step % 100 == 0:
-
-# Después (línea 494)
-if steps_interval != -1 and updated_step % 100 == 0:
-```
-
-### Resultado
-- ✅ Modo full speed (`steps_interval = -1`) ahora ejecuta pasos a máxima velocidad SIN enviar frames, state updates ni logs
-- ✅ WebSocket no se satura con datos innecesarios
-- ✅ El frontend muestra correctamente que no hay visualización cuando está en modo full speed
-- ✅ Máximo rendimiento de simulación sin overhead de comunicación
-
-### Impacto en Rendimiento
-
-| Modo | Antes | Ahora |
-|------|-------|-------|
-| **Full Speed (-1)** | Enviaba frames + updates + logs (saturación) | NO envía nada (máximo rendimiento) |
-| **Manual (0)** | Funcionaba correctamente | Sin cambios |
-| **Automático (N > 0)** | Funcionaba correctamente | Sin cambios |
-
-### Archivos Modificados
-- [simulation_loop.py](file:///home/jonathan.correa/Projects/Atheria/src/pipelines/core/simulation_loop.py#L207-L504)
-
-### Commit
-- `2ec69cc` - fix: prevenir envío de frames/updates en modo full speed (steps_interval=-1) [version:bump:patch]
+**Archivos:** `src/pipelines/core/simulation_loop.py`  
+**Commit:** `2ec69cc`
 
 ---
 
