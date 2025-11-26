@@ -111,7 +111,7 @@ export const HistoryControls: React.FC = () => {
   const { min_step, max_step, total_frames, current_step } = historyRange;
 
   return (
-    <div className="flex flex-col gap-3 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+    <div className="flex flex-col gap-3 p-4 bg-gray-800/50 rounded-lg border border-gray-700 relative z-10">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-200">Timeline de Simulación</h3>
