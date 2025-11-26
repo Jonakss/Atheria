@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { EPOCH_CONFIGS, EPOCH_LABELS } from './epochConfig';
 
-// Re-export for use in other components
-export { EPOCH_CONFIGS, EPOCH_LABELS };
 
 interface EpochBadgeProps {
   era: number;

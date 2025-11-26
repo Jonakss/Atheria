@@ -11,7 +11,7 @@ import {
     Trash2,
     X
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { Alert } from '../../modules/Dashboard/components/Alert';
 import { Badge } from '../../modules/Dashboard/components/Badge';
@@ -47,14 +47,31 @@ export function CheckpointManager() {
     const [activeTab, setActiveTab] = useState<string>('checkpoints');
     const [menuOpen, setMenuOpen] = useState<string | null>(null);
 
+    const loadCheckpoints = useCallback(async () => {
+        if (!activeExperiment) return;
+        setLoading(true);
+        sendCommand('experiment', 'list_checkpoints', { EXPERIMENT_NAME: activeExperiment });
+    }, [activeExperiment, sendCommand]);
+
+    const loadNotes = useCallback(() => {
+        if (!activeExperiment) return;
+        const savedNotes = localStorage.getItem(`experiment_notes_${activeExperiment}`);
+        if (savedNotes) {
+            try {
+                setNotes(JSON.parse(savedNotes));
+            } catch (e) {
+                console.error('Error loading notes:', e);
+            }
+        }
+    }, [activeExperiment]);
+
     // Cargar checkpoints y notas cuando se abre el modal
     useEffect(() => {
         if (opened && activeExperiment) {
             loadCheckpoints();
             loadNotes();
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [opened, activeExperiment]);
+    }, [opened, activeExperiment, loadCheckpoints, loadNotes]);
 
     useEffect(() => {
         const handleCheckpointsUpdate = (event: CustomEvent) => {
@@ -77,24 +94,6 @@ export function CheckpointManager() {
             window.removeEventListener('switch_to_notes_tab', handleSwitchToNotes);
         };
     }, []);
-
-    const loadCheckpoints = async () => {
-        if (!activeExperiment) return;
-        setLoading(true);
-        sendCommand('experiment', 'list_checkpoints', { EXPERIMENT_NAME: activeExperiment });
-    };
-
-    const loadNotes = () => {
-        if (!activeExperiment) return;
-        const savedNotes = localStorage.getItem(`experiment_notes_${activeExperiment}`);
-        if (savedNotes) {
-            try {
-                setNotes(JSON.parse(savedNotes));
-            } catch (e) {
-                console.error('Error loading notes:', e);
-            }
-        }
-    };
 
     const saveNotes = (updatedNotes: ExperimentNote[]) => {
         if (!activeExperiment) return;
