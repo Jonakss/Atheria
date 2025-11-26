@@ -1,27 +1,19 @@
-import React, { useState } from 'react';
-import { 
-  Activity, 
-  Cpu, 
-  Settings, 
-  Play, 
-  Pause, 
-  Maximize2, 
-  Database, 
-  Layers, 
-  Zap, 
-  Globe, 
-  Clock, 
-  BarChart2, 
-  Search,
-  Terminal,
-  Wind,
+import {
+  Activity,
+  AlertCircle,
   Aperture,
-  Share2,
-  Microscope,
   ChevronRight,
+  Database,
+  Microscope,
   MoreHorizontal,
-  AlertCircle
+  Pause,
+  Play,
+  Settings,
+  Share2,
+  Terminal,
+  Zap
 } from 'lucide-react';
+import React, { useState } from 'react';
 
 // --- SUBCOMPONENTES DE UI (REFINADOS) ---
 

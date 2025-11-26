@@ -1,17 +1,17 @@
 // frontend/src/components/experiments/TransferLearningWizard.tsx
-import { useState, useEffect, useMemo } from 'react';
-import { useWebSocket } from '../../hooks/useWebSocket';
 import {
-    Check, X, Info, ArrowRight,
-    ArrowRightLeft as TransferIcon, Settings, FileText, Star, ChevronRight
+    Check, Info,
+    ArrowRightLeft as TransferIcon
 } from 'lucide-react';
-import { Modal } from '../../modules/Dashboard/components/Modal';
-import { Stepper, Step, StepperCompleted } from '../../modules/Dashboard/components/Stepper';
+import { useEffect, useMemo, useState } from 'react';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { Alert } from '../../modules/Dashboard/components/Alert';
 import { Badge } from '../../modules/Dashboard/components/Badge';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
-import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../modules/Dashboard/components/Table';
+import { Modal } from '../../modules/Dashboard/components/Modal';
 import { NumberInput } from '../../modules/Dashboard/components/NumberInput';
+import { Step, Stepper, StepperCompleted } from '../../modules/Dashboard/components/Stepper';
+import { Table, TableBody, TableHead, TableRow, TableTd, TableTh } from '../../modules/Dashboard/components/Table';
 
 interface ExperimentConfig {
     MODEL_ARCHITECTURE: string;

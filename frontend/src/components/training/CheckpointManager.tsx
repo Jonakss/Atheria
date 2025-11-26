@@ -1,16 +1,24 @@
 // frontend/src/components/training/CheckpointManager.tsx
-import { useState, useEffect, useMemo } from 'react';
-import { useWebSocket } from '../../hooks/useWebSocket';
-import { 
-    Download, Trash2, Info, FileText, Clock, X, Edit, BookOpen,
-    Search, Star, MoreVertical, RefreshCw
+import {
+    BookOpen,
+    Clock,
+    Download,
+    Edit,
+    FileText,
+    Info,
+    MoreVertical, RefreshCw,
+    Search, Star,
+    Trash2,
+    X
 } from 'lucide-react';
-import { Modal } from '../../modules/Dashboard/components/Modal';
-import { Tabs, TabList, Tab, TabPanel } from '../../modules/Dashboard/components/Tabs';
-import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../modules/Dashboard/components/Table';
-import { Badge } from '../../modules/Dashboard/components/Badge';
+import { useEffect, useMemo, useState } from 'react';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { Alert } from '../../modules/Dashboard/components/Alert';
+import { Badge } from '../../modules/Dashboard/components/Badge';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
+import { Modal } from '../../modules/Dashboard/components/Modal';
+import { Table, TableBody, TableHead, TableRow, TableTd, TableTh } from '../../modules/Dashboard/components/Table';
+import { Tab, TabList, TabPanel, Tabs } from '../../modules/Dashboard/components/Tabs';
 
 interface CheckpointInfo {
     filename: string;
@@ -375,7 +383,7 @@ export function CheckpointManager() {
 
                             {!loading && filteredCheckpoints.length === 0 && checkpoints.length > 0 && (
                                 <Alert icon={<Search size={16} />} color="yellow" variant="light">
-                                    No se encontraron checkpoints que coincidan con "{searchQuery}"
+                                    No se encontraron checkpoints que coincidan con &quot;{searchQuery}&quot;
                                 </Alert>
                             )}
 

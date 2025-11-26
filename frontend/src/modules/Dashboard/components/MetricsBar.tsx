@@ -5,7 +5,7 @@ import { EpochIndicator } from './EpochIndicator';
 import { FieldWidget } from './FieldWidget';
 
 export const MetricsBar: React.FC = () => {
-  const { simData, allLogs, sendCommand, connectionStatus } = useWebSocket();
+  const { simData, allLogs, connectionStatus } = useWebSocket();
   const isConnected = connectionStatus === 'connected';
   const [expanded, setExpanded] = useState(false);
   const [collapsedWidgets, setCollapsedWidgets] = useState<Set<string>>(new Set()); // Widgets individuales colapsados
