@@ -85,6 +85,13 @@ related: [[10_core/00_CORE_MOC]], [[40_Experiments/00_EXPERIMENTS_MOC]]
 
 ---
 
+## 🧠 Agentes de IA
+
+- [[AGENT_RULES_MOC]] - Mapa de Contenido (MOC) para las reglas y mandamientos de todos los agentes.
+- [[AGENT_GEMINI_CLI]] - Definición específica para el agente Gemini CLI.
+
+---
+
 ## 🔗 Enlaces Relacionados
 
 - [[10_core/00_CORE_MOC]] - Documentación core
