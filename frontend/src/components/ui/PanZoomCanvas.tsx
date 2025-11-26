@@ -12,8 +12,101 @@ import { Switch } from '../../modules/Dashboard/components/Switch';
 import { Text } from '../../modules/Dashboard/components/Text';
 import { Tooltip } from '../../modules/Dashboard/components/Tooltip';
 import { isWebGLAvailable } from '../../utils/shaderVisualization';
-import { CanvasOverlays, OverlayConfig, OverlayControls } from './CanvasOverlays';
 import { ShaderCanvas } from './ShaderCanvas';
+import { Select } from '../../modules/Dashboard/components/Select';
+
+export interface OverlayConfig {
+    showGrid: boolean;
+    showCoordinates: boolean;
+    showQuadtree: boolean;
+    showStats: boolean;
+    showToroidalBorders: boolean;
+    gridSize: number;
+    quadtreeThreshold: number;
+}
+
+interface OverlayControlsProps {
+    config: OverlayConfig;
+    onConfigChange: (config: OverlayConfig) => void;
+}
+
+export function OverlayControls({ config, onConfigChange }: OverlayControlsProps) {
+    return (
+        <Stack gap={2} className="p-3 bg-[#080808] rounded">
+            <Text size="xs" weight="bold">Overlays</Text>
+
+            <Switch
+                label="Grid"
+                checked={config.showGrid}
+                onChange={(e) => onConfigChange({ ...config, showGrid: e.currentTarget.checked })}
+                size="xs"
+            />
+
+            <Switch
+                label="Coordenadas"
+                checked={config.showCoordinates}
+                onChange={(e) => onConfigChange({ ...config, showCoordinates: e.currentTarget.checked })}
+                size="xs"
+            />
+
+            <Switch
+                label="Quadtree"
+                checked={config.showQuadtree}
+                onChange={(e) => onConfigChange({ ...config, showQuadtree: e.currentTarget.checked })}
+                size="xs"
+            />
+
+            <Switch
+                label="Estadísticas"
+                checked={config.showStats}
+                onChange={(e) => onConfigChange({ ...config, showStats: e.currentTarget.checked })}
+                size="xs"
+            />
+
+            <Switch
+                label="Bordes Toroidales"
+                description="Mostrar bordes toroidales (indica dónde se conectan los bordes del grid)"
+                checked={config.showToroidalBorders}
+                onChange={(e) => onConfigChange({ ...config, showToroidalBorders: e.currentTarget.checked })}
+                size="xs"
+            />
+
+            {config.showGrid && (
+                <Box className="mt-2">
+                    <Text size="xs" color="dimmed" className="block mb-1">Tamaño Grid</Text>
+                    <Select
+                        value={config.gridSize.toString()}
+                        onChange={(val) => onConfigChange({ ...config, gridSize: parseInt(val || '10') })}
+                        data={[
+                            { value: '5', label: '5' },
+                            { value: '10', label: '10' },
+                            { value: '20', label: '20' },
+                            { value: '50', label: '50' }
+                        ]}
+                        size="xs"
+                    />
+                </Box>
+            )}
+
+            {config.showQuadtree && (
+                <Box className="mt-2">
+                    <Text size="xs" color="dimmed" className="block mb-1">Threshold Quadtree</Text>
+                    <Select
+                        value={config.quadtreeThreshold.toString()}
+                        onChange={(val) => onConfigChange({ ...config, quadtreeThreshold: parseFloat(val || '0.01') })}
+                        data={[
+                            { value: '0.001', label: '0.001' },
+                            { value: '0.01', label: '0.01' },
+                            { value: '0.1', label: '0.1' },
+                            { value: '0.5', label: '0.5' }
+                        ]}
+                        size="xs"
+                    />
+                </Box>
+            )}
+        </Stack>
+    );
+}
 
 function getColor(value: number) {
     // Validar que value sea un número válido
@@ -51,6 +144,7 @@ interface PanZoomCanvasProps {
 
 export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
 
     const { simData, selectedViz, inferenceStatus, sendCommand } = useWebSocket();
     
@@ -624,12 +718,22 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
             }
             }
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Loop for toroidal rendering
+            const renderCount = overlayConfig.showToroidalBorders ? 9 : 1;
+            for (let i = 0; i < renderCount; i++) {
+                const offsetX = (i % 3 - 1) * gridWidth;
+                const offsetY = (Math.floor(i / 3) - 1) * gridHeight;
 
-            // Si no hay datos de mapa (por ejemplo, live feed desactivado), terminar aquí
-            if (!mapData || mapData.length === 0) {
-                return;
-            }
+                ctx.save();
+                ctx.translate(offsetX, offsetY);
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Si no hay datos de mapa (por ejemplo, live feed desactivado), terminar aquí
+                if (!mapData || mapData.length === 0) {
+                    ctx.restore();
+                    return;
+                }
             
             // Verificar si es visualización HSV (solo funciona con datos en tiempo real)
             if (selectedViz === 'phase_hsv' && simData?.phase_hsv_data) {
@@ -784,7 +888,9 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 }
             }
         }
-    }, [dataToRender, simData, selectedViz, pan, zoom, historyFrame, gridWidth, gridHeight, useShaderRendering]);
+        ctx.restore();
+        }
+    }, [dataToRender, simData, selectedViz, pan, zoom, historyFrame, gridWidth, gridHeight, useShaderRendering, overlayConfig.showToroidalBorders]);
 
     // Atajos de teclado para vistas rápidas
     useEffect(() => {
@@ -816,6 +922,283 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
         window.addEventListener('keydown', handleKeyPress);
         return () => window.removeEventListener('keydown', handleKeyPress);
     }, [sendCommand, resetView]);
+
+    // Effect for drawing overlays
+    useEffect(() => {
+        const overlayCanvas = overlayCanvasRef.current;
+        if (!overlayCanvas) return;
+        const ctx = overlayCanvas.getContext('2d');
+        if (!ctx) return;
+
+        ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+        if (!mapData || mapData.length === 0) return;
+
+        const gridHeight = mapData.length;
+        const gridWidth = mapData[0].length;
+
+        if (gridWidth === 0 || gridHeight === 0) return;
+
+        const roiInfo= simData?.roi_info || null;
+
+        // Grid overlay
+        if (overlayConfig.showGrid) {
+            ctx.strokeStyle = 'rgba(100, 150, 255, 0.2)';
+            ctx.lineWidth = 0.5 / zoom;
+
+            const step = overlayConfig.gridSize;
+
+            const firstX = roiInfo?.enabled ? (step - (roiInfo.x % step)) % step : 0;
+            const firstY = roiInfo?.enabled ? (step - (roiInfo.y % step)) % step : 0;
+
+            for (let x = firstX; x <= gridWidth; x += step) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, gridHeight);
+                ctx.stroke();
+            }
+            for (let y = firstY; y <= gridHeight; y += step) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(gridWidth, y);
+                ctx.stroke();
+            }
+        }
+
+        // Quadtree overlay
+        if (overlayConfig.showQuadtree && mapData) {
+            const totalCells = gridWidth * gridHeight;
+            const maxCellsForQuadtree = 256 * 256;
+
+            if (totalCells > maxCellsForQuadtree) {
+                ctx.save();
+                ctx.resetTransform();
+                ctx.fillStyle = 'rgba(255, 200, 0, 0.8)';
+                ctx.font = '12px monospace';
+                ctx.fillText('Quadtree disabled for large grids (>256x256)', 10, 30);
+                ctx.restore();
+            } else {
+                ctx.strokeStyle = 'rgba(0, 255, 255, 0.6)';
+                const baseLineWidth = 1.5;
+                ctx.lineWidth = Math.max(0.5, baseLineWidth / zoom);
+
+                const threshold = Math.max(0.0001, overlayConfig.quadtreeThreshold);
+
+                const baseMaxDepth = 8;
+                const baseMinRegionSize = Math.max(2, Math.min(8, Math.floor(Math.sqrt(totalCells) / 32)));
+
+                const zoomFactor = Math.max(0.5, Math.min(2.0, zoom));
+                const depthMultiplier = Math.log(zoomFactor + 0.5) / Math.log(2.5);
+
+                let maxDepth = Math.floor(baseMaxDepth * (0.5 + depthMultiplier * 0.5));
+                if (totalCells > 128 * 128) {
+                    maxDepth = Math.max(4, Math.floor(maxDepth * 0.75));
+                } else if (totalCells > 64 * 64) {
+                    maxDepth = Math.max(5, Math.floor(maxDepth * 0.875));
+                }
+                maxDepth = Math.max(4, Math.min(10, maxDepth));
+
+                const regionSizeMultiplier = 1 / Math.max(0.5, zoomFactor);
+                const minRegionSize = Math.max(1, Math.floor(baseMinRegionSize * regionSizeMultiplier));
+
+                const roiBounds = roiInfo?.enabled ? {
+                    minX: roiInfo.x,
+                    minY: roiInfo.y,
+                    maxX: roiInfo.x + roiInfo.width,
+                    maxY: roiInfo.y + roiInfo.height
+                } : null;
+
+                const drawQuadtree = (minX: number, minY: number, maxX: number, maxY: number, depth: number) => {
+                    if (depth > maxDepth) return;
+
+                    if (roiBounds) {
+                        if (maxX < roiBounds.minX || minX > roiBounds.maxX ||
+                            maxY < roiBounds.minY || minY > roiBounds.maxY) {
+                            return;
+                        }
+                        minX = Math.max(minX, roiBounds.minX);
+                        minY = Math.max(minY, roiBounds.minY);
+                        maxX = Math.min(maxX, roiBounds.maxX);
+                        maxY = Math.min(maxY, roiBounds.maxY);
+                    }
+
+                    const width = maxX - minX;
+                    const height = maxY - minY;
+
+                    const currentMinSize = minRegionSize / zoom;
+                    if (width < currentMinSize || height < currentMinSize) {
+                        let hasData = false;
+                        for (let y = Math.floor(minY); y < Math.ceil(maxY) && y < gridHeight; y++) {
+                            for (let x = Math.floor(minX); x < Math.ceil(maxX) && x < gridWidth; x++) {
+                                const value = Math.abs(mapData[y]?.[x] || 0);
+                                if (value > threshold) {
+                                    hasData = true;
+                                    break;
+                                }
+                            }
+                            if (hasData) break;
+                        }
+
+                        if (hasData) {
+                            ctx.strokeRect(minX, minY, width, height);
+                        }
+                        return;
+                    }
+
+                    let hasData = false;
+                    let maxValue = 0;
+                    let sampleCount = 0;
+                    const maxSamples = Math.min(64, Math.floor(width * height / 4));
+
+                    const sampleStepX = Math.max(1, Math.floor(width / Math.sqrt(maxSamples)));
+                    const sampleStepY = Math.max(1, Math.floor(height / Math.sqrt(maxSamples)));
+
+                    for (let y = Math.floor(minY); y < Math.ceil(maxY) && y < gridHeight && sampleCount < maxSamples; y += sampleStepY) {
+                        for (let x = Math.floor(minX); x < Math.ceil(maxX) && x < gridWidth && sampleCount < maxSamples; x += sampleStepX) {
+                            const value = Math.abs(mapData[y]?.[x] || 0);
+                            if (value > threshold) {
+                                hasData = true;
+                                maxValue = Math.max(maxValue, value);
+                            }
+                            sampleCount++;
+                        }
+                    }
+
+                    if (hasData) {
+                        ctx.strokeRect(minX, minY, width, height);
+
+                        const subdivisionThreshold = currentMinSize * 2;
+                        if (width > subdivisionThreshold && height > subdivisionThreshold && depth < maxDepth) {
+                            const midX = (minX + maxX) / 2;
+                            const midY = (minY + maxY) / 2;
+
+                            drawQuadtree(minX, minY, midX, midY, depth + 1);
+                            drawQuadtree(midX, minY, maxX, midY, depth + 1);
+                            drawQuadtree(minX, midY, midX, maxY, depth + 1);
+                            drawQuadtree(midX, midY, maxX, maxY, depth + 1);
+                        }
+                    }
+                };
+
+                if (roiBounds) {
+                    drawQuadtree(roiBounds.minX, roiBounds.minY, roiBounds.maxX, roiBounds.maxY, 0);
+                } else {
+                    drawQuadtree(0, 0, gridWidth, gridHeight, 0);
+                }
+            }
+        }
+
+        // Toroidal borders
+        if (overlayConfig.showToroidalBorders) {
+            ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)';
+            ctx.lineWidth = Math.max(1, 2 / zoom);
+
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(gridWidth, 0);
+            ctx.moveTo(0, gridHeight);
+            ctx.lineTo(gridWidth, gridHeight);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, gridHeight);
+            ctx.moveTo(gridWidth, 0);
+            ctx.lineTo(gridWidth, gridHeight);
+            ctx.stroke();
+
+            ctx.setLineDash([]);
+
+            const cornerSize = Math.max(2, 4 / zoom);
+            ctx.fillStyle = 'rgba(255, 100, 0, 0.6)';
+
+            ctx.fillRect(0, 0, cornerSize, cornerSize);
+            ctx.fillRect(gridWidth - cornerSize, 0, cornerSize, cornerSize);
+            ctx.fillRect(0, gridHeight - cornerSize, cornerSize, cornerSize);
+            ctx.fillRect(gridWidth - cornerSize, gridHeight - cornerSize, cornerSize, cornerSize);
+        }
+
+        // Coordinates
+        if (overlayConfig.showCoordinates) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+            const fontSize = Math.max(8, 12 / zoom);
+            ctx.font = `${fontSize}px monospace`;
+            ctx.textBaseline = 'top';
+
+            const corners = [
+                { x: 0, y: 0, label: `(0, 0)` },
+                { x: gridWidth, y: 0, label: `(${gridWidth}, 0)` },
+                { x: 0, y: gridHeight, label: `(0, ${gridHeight})` },
+                { x: gridWidth, y: gridHeight, label: `(${gridWidth}, ${gridHeight})` }
+            ];
+
+            corners.forEach(corner => {
+                const padding = Math.max(1, 2 / zoom);
+                ctx.fillText(corner.label, corner.x + padding, corner.y + padding);
+            });
+        }
+
+        // ROI Box
+        if (roiInfo && roiInfo.enabled) {
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
+            ctx.lineWidth = Math.max(1.5, 2 / zoom);
+            ctx.setLineDash([8, 4]);
+
+            ctx.strokeRect(
+                roiInfo.x,
+                roiInfo.y,
+                roiInfo.width,
+                roiInfo.height
+            );
+
+            ctx.setLineDash([]);
+
+            const fontSize = Math.max(10, 14 / zoom);
+            ctx.font = `bold ${fontSize}px monospace`;
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.9)';
+            ctx.textBaseline = 'top';
+            const padding = Math.max(2, 3 / zoom);
+            ctx.fillText('ROI', roiInfo.x + padding, roiInfo.y + padding);
+        }
+
+        // Stats
+        if (overlayConfig.showStats && mapData) {
+            ctx.save();
+            ctx.resetTransform();
+
+            let sum = 0;
+            let count = 0;
+            let min = Infinity;
+            let max = -Infinity;
+
+            mapData.forEach(row => {
+                row.forEach(value => {
+                    if (typeof value === 'number' && isFinite(value)) {
+                        sum += value;
+                        count++;
+                        min = Math.min(min, value);
+                        max = Math.max(max, value);
+                    }
+                });
+            });
+
+            const avg = count > 0 ? sum / count : 0;
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(10, 10, 200, 100);
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.font = '12px monospace';
+            ctx.fillText(`Min: ${min.toFixed(4)}`, 15, 25);
+            ctx.fillText(`Max: ${max.toFixed(4)}`, 15, 40);
+            ctx.fillText(`Avg: ${avg.toFixed(4)}`, 15, 55);
+            ctx.fillText(`Grid: ${gridWidth}x${gridHeight}`, 15, 70);
+            ctx.fillText(`Zoom: ${zoom.toFixed(2)}x`, 15, 85);
+
+            ctx.restore();
+        }
+    }, [mapData, pan, zoom, overlayConfig, simData]);
 
     return (
         <Box 
@@ -1045,6 +1428,19 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                             pointerEvents: 'none'
                         }}
                     />
+
+                    {/* Overlay Canvas */}
+                    <canvas
+                        ref={overlayCanvasRef}
+                        className="pixelated"
+                        width={gridWidth}
+                        height={gridHeight}
+                        style={{
+                            position: 'absolute',
+                            zIndex: 3,
+                            pointerEvents: 'none'
+                        }}
+                    />
                     
                     {/* Overlay de bordes toroidales */}
                     {overlayConfig.showToroidalBorders && (
@@ -1071,18 +1467,6 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                     )}
                 </div>
             </div>
-            
-            {/* Overlays */}
-            {(overlayConfig.showGrid || overlayConfig.showCoordinates || overlayConfig.showQuadtree || overlayConfig.showStats || overlayConfig.showToroidalBorders) && (
-                <CanvasOverlays
-                    canvasRef={canvasRef}
-                    mapData={mapData}
-                    pan={pan}
-                    zoom={zoom}
-                    config={overlayConfig}
-                    roiInfo={simData?.roi_info || null}
-                />
-            )}
             
             {/* Tooltip de información del punto (tipo Google Maps) */}
             {tooltipData && tooltipData.visible && (
