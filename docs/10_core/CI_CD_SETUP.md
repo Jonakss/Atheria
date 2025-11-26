@@ -22,7 +22,7 @@ Este workflow es el **guardián de la calidad del código**.
 1.  **Checkout:** Descarga el código del repositorio.
 2.  **Setup Entornos:** Configura los entornos de Python (3.10) y Node.js (18).
 3.  **Frontend Check:**
-    - Instala dependencias (`npm install`).
+    - Instala dependencias (`npm ci`).
     - Valida el estilo del código (`npm run lint`).
     - Construye el proyecto para producción (`npm run build`) para asegurar que compila.
 4.  **Backend Check:**
@@ -44,7 +44,7 @@ Este workflow es el **publicador automático del frontend**.
 
 **Proceso que ejecuta:**
 1.  **Checkout y Setup:** Descarga el código y configura Node.js.
-2.  **Build Frontend:** Instala dependencias y construye la versión de producción (`npm run build`).
+2.  **Build Frontend:** Instala dependencias con `npm ci` y construye la versión de producción (`npm run build`).
 3.  **Deploy:** Sube los archivos generados (del directorio `frontend/dist`) a GitHub Pages.
 
 #### ⚠️ Acción Requerida
