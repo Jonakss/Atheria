@@ -261,9 +261,9 @@ int64_t Engine::step_native() {
     }
     
     // Actualizar estado
-    matter_map_ = std::move(next_matter_map);
-    chunk_manager_ = std::move(next_chunk_manager);
-    active_region_ = std::move(next_active_region); 
+    matter_map_ = std::move(new_matter_map);
+    chunk_manager_ = std::move(new_chunk_manager);
+    active_region_ = std::move(new_active_region); 
     
     return matter_map_.size();
 }
