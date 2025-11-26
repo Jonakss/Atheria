@@ -1,6 +1,6 @@
 import { BackwardIcon, ForwardIcon, PauseIcon, PlayIcon } from '@heroicons/react/24/solid';
 import React, { useCallback, useEffect, useState } from 'react';
-import { useWebSocket } from '../../contexts/WebSocketContext';
+import { useWebSocket } from '../../hooks/useWebSocket';
 
 interface HistoryRange {
   available: boolean;
@@ -11,7 +11,7 @@ interface HistoryRange {
 }
 
 export const HistoryControls: React.FC = () => {
-  const { sendMessage, lastMessage } = useWebSocket();
+  const { sendCommand, ws } = useWebSocket();
   const [historyRange, setHistoryRange] = useState<HistoryRange>({
     available: false,
     min_step: null,
@@ -22,54 +22,15 @@ export const HistoryControls: React.FC = () => {
   const [selectedStep, setSelectedStep] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // Solicitar rango de historia al iniciar
-  useEffect(() => {
-    requestHistoryRange();
-    const interval = setInterval(requestHistoryRange, 5000); // Actualizar cada 5s
-    return () => clearInterval(interval);
-  }, [requestHistoryRange]);
-
-  // Escuchar mensajes del WebSocket
-  useEffect(() => {
-    if (!lastMessage) return;
-
-    try {
-      const message = typeof lastMessage === 'string' ? JSON.parse(lastMessage) : lastMessage;
-
-      if (message.type === 'history_range') {
-        const range = message.payload;
-        setHistoryRange(range);
-        if (range.current_step !== undefined) {
-          setSelectedStep(range.current_step);
-        }
-      } else if (message.type === 'inference_status_update') {
-        const payload = message.payload;
-        setIsPlaying(payload.status === 'running');
-        if (payload.step !== undefined) {
-          setSelectedStep(payload.step);
-        }
-      }
-    } catch (error) {
-      console.error('Error parsing WebSocket message:', error);
-    }
-  }, [lastMessage]);
-
+  // Define callbacks before useEffect
   const requestHistoryRange = useCallback(() => {
-    sendMessage({
-      scope: 'history',
-      command: 'get_history_range',
-      args: {},
-    });
-  }, [sendMessage]);
+    sendCommand('history', 'get_history_range', {});
+  }, [sendCommand]);
 
   const handleRestoreStep = useCallback((step: number) => {
-    sendMessage({
-      scope: 'history',
-      command: 'restore_history_step',
-      args: { step },
-    });
+    sendCommand('history', 'restore_history_step', { step });
     setSelectedStep(step);
-  }, [sendMessage]);
+  }, [sendCommand]);
 
   const handleSliderChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const step = parseInt(event.target.value, 10);
@@ -94,11 +55,48 @@ export const HistoryControls: React.FC = () => {
 
   const handlePlayPause = () => {
     if (isPlaying) {
-      sendMessage({ scope: 'inference', command: 'pause', args: {} });
+      sendCommand('inference', 'pause', {});
     } else {
-      sendMessage({ scope: 'inference', command: 'play', args: {} });
+      sendCommand('inference', 'play', {});
     }
   };
+
+  // Solicitar rango de historia al iniciar
+  useEffect(() => {
+    requestHistoryRange();
+    const interval = setInterval(requestHistoryRange, 5000); // Actualizar cada 5s
+    return () => clearInterval(interval);
+  }, [requestHistoryRange]);
+
+  // Escuchar mensajes del WebSocket
+  useEffect(() => {
+    if (!ws) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const message = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+
+        if (message.type === 'history_range') {
+          const range = message.payload;
+          setHistoryRange(range);
+          if (range.current_step !== undefined) {
+            setSelectedStep(range.current_step);
+          }
+        } else if (message.type === 'inference_status_update') {
+          const payload = message.payload;
+          setIsPlaying(payload.status === 'running');
+          if (payload.step !== undefined) {
+            setSelectedStep(payload.step);
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+
+    ws.addEventListener('message', handleMessage);
+    return () => ws.removeEventListener('message', handleMessage);
+  }, [ws]);
 
   if (!historyRange.available) {
     return (
