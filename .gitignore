@@ -162,3 +162,4 @@ frontend/node_modules/
 # CMake build artifacts
 build/
 local_install/
+stress_test_model.pt
