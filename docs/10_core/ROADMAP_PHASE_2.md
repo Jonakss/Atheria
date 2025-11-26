@@ -161,5 +161,5 @@ Para que la "Ley M" (entrenada en Python) corra en el motor C++ sin salir de la 
 
 ---
 
-**Última actualización:** 2025-11-26
+**Última actualización:** 2025-11-26  
 **Próximos pasos:** Implementar optimizaciones de paralelismo y SIMD para alcanzar objetivo de 10-50x mejora

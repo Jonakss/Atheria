@@ -76,14 +76,14 @@ def export_model_to_jit(model: nn.Module, experiment_name: str, example_input_sh
     Returns:
         Ruta al archivo .pt exportado.
     """
-    from ... import config as global_cfg
+    from src import config as global_cfg
     import os
 
     if output_dir is None:
         output_dir = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, experiment_name)
-
+    
     os.makedirs(output_dir, exist_ok=True)
-
+    
     # Usar un timestamp para nombre de archivo único para evitar problemas de caché
     timestamp = int(torch.randint(0, 100000, (1,)).item())
     output_path = os.path.join(output_dir, f"model_jit_{timestamp}.pt")
@@ -96,7 +96,7 @@ def export_model_to_jit(model: nn.Module, experiment_name: str, example_input_sh
 
         with torch.no_grad():
             traced_model = torch.jit.trace(model, example_input, strict=False)
-
+        
         traced_model.save(output_path)
         logging.info(f"✅ Modelo exportado exitosamente a: {output_path}")
 
@@ -784,7 +784,7 @@ class NativeEngineWrapper:
         Args:
             cfg: Configuración del experimento (opcional, usa self.cfg si no se proporciona)
         """
-        from .. import config as global_cfg
+        from src import config as global_cfg
         
         logging.info("🔄 Regenerando estado inicial según INITIAL_STATE_MODE_INFERENCE...")
         

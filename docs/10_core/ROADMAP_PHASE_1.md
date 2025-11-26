@@ -55,5 +55,5 @@
 
 ---
 
-**Última actualización:** 2025-11-26
+**Última actualización:** 2025-11-26  
 **Próximos pasos:** Completar integración de EpochDetector en dashboard, continuar con optimizaciones de Fase 2

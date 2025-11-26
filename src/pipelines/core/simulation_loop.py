@@ -3,7 +3,7 @@ import asyncio
 import logging
 import time
 
-from ...server.server_state import (
+from src.server.server_state import (
     g_state, 
     broadcast, 
     optimize_frame_payload, 
@@ -128,7 +128,21 @@ async def simulation_loop():
                             
                             if motor:
                                 # Offload evolution to thread pool to avoid blocking event loop
-                                await asyncio.get_event_loop().run_in_executor(None, motor.evolve_internal_state)
+                                try:
+                                    # Timeout de 5s para evitar bloqueos infinitos en motor nativo
+                                    await asyncio.wait_for(
+                                        asyncio.get_event_loop().run_in_executor(None, motor.evolve_internal_state),
+                                        timeout=5.0
+                                    )
+                                except asyncio.TimeoutError:
+                                    logging.error("❌ Timeout crítico en motor.evolve_internal_state (5s). El motor nativo parece bloqueado.")
+                                    g_state['is_paused'] = True
+                                    await broadcast({"type": "error", "payload": {"message": "Motor nativo bloqueado (timeout). Pausando simulación."}})
+                                    break
+                                except Exception as e:
+                                    logging.error(f"❌ Error en motor.evolve_internal_state: {e}")
+                                    g_state['is_paused'] = True
+                                    break
                             updated_step = current_step + step_idx + 1
                             g_state['simulation_step'] = updated_step
                             steps_executed_this_iteration += 1
@@ -194,9 +208,8 @@ async def simulation_loop():
                             if 'fps_samples' in g_state and len(g_state['fps_samples']) > 0:
                                 g_state['current_fps'] = sum(g_state['fps_samples']) / len(g_state['fps_samples'])
                                 
-                                # DEBUG: Log FPS calculation every 100 steps
-                                if updated_step % 100 == 0:
-                                    logging.info(f"📊 FPS calculado: {g_state['current_fps']:.1f} (live_feed={live_feed_enabled}, steps_interval={steps_interval})")
+                                # DEBUG: Log FPS calculation every 100 steps (removed)
+                                pass
                         # Si live_feed está ON, el FPS se actualizará en el bloque de visualización
                         
                         # Actualizar contador para frames (solo si no es modo manual)
@@ -208,16 +221,22 @@ async def simulation_loop():
                         # Modo manual (steps_interval = 0): NO enviar frames automáticamente
                         # Modo fullspeed (steps_interval = -1): NO enviar frames NUNCA
                         # También enviar frame si nunca se ha enviado uno (last_frame_sent_step == -1) EXCEPTO en fullspeed
-                        if steps_interval == -1:
+                        
+                        # CRÍTICO: Si live_feed está desactivado, forzar comportamiento de fullspeed
+                        # a menos que steps_interval sea muy grande (>1000) para actualizaciones lentas
+                        effective_steps_interval = steps_interval
+                        if not live_feed_enabled and steps_interval != -1 and steps_interval < 1000:
+                            effective_steps_interval = -1
+                        
+                        if effective_steps_interval == -1:
                             # Modo fullspeed: NUNCA enviar frames
                             should_send_frame = False
-                        elif steps_interval == 0:
+                        elif effective_steps_interval == 0:
                             # Modo manual: NO enviar frames automáticamente
-                            # Solo enviar el primer frame si nunca se ha enviado uno
                             should_send_frame = (g_state['last_frame_sent_step'] == -1)
                         else:
                             # Modo automático: enviar frame cada N pasos
-                            should_send_frame = (steps_interval_counter >= steps_interval) or (g_state['last_frame_sent_step'] == -1)
+                            should_send_frame = (steps_interval_counter >= effective_steps_interval) or (g_state['last_frame_sent_step'] == -1)
                         
                         if should_send_frame:
                             # Resetear contador
