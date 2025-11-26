@@ -16,6 +16,7 @@
 
 ## 📋 Índice de Entradas
 
+- [[#2025-11-26 - Fix: Persistent Frame Sending (Duplicate Logic Removal)]]
 - [[#2025-11-26 - Actualización Completa de Roadmaps (Fases 1-4)]]
 - [[#2025-11-26 - Fix: Saturación de WebSocket en Modo Full Speed]]
 - [[#2025-11-26 - Fix: Import Path de EpochDetector]]
@@ -43,6 +44,18 @@
 - [[#2024-12-XX - Fase 3 Completada: Migración de Componentes UI]]
 - [[#2024-12-XX - Fase 2 Iniciada: Setup Motor Nativo C++]]
 - [[#2024-12-XX - Optimización de Logs y Reducción de Verbosidad]]
+
+---
+
+## 2025-11-26 - Fix: Persistent Frame Sending (Duplicate Logic Removal)
+
+> **Nota:** Esta entrada ha sido migrada al nuevo formato de logs individuales.
+>
+> Ver documentación completa en: [[logs/2025-11-26_fix_persistent_frame_sending|2025-11-26 - Fix Persistent Frame Sending]]
+
+**Resumen:** Eliminado bloque de código duplicado en `simulation_loop.py` que causaba la ejecución incondicional de la lógica de visualización, enviando frames incluso cuando el live feed estaba desactivado.
+
+**Archivos:** `src/pipelines/core/simulation_loop.py`
 
 ---
 

@@ -345,143 +345,112 @@ async def simulation_loop():
                                     logging.warning(f"⚠️ CRÍTICO: psi tiene valores muy pequeños (max abs={psi_abs_max:.6e}, mean={psi_mean:.6e}). El motor está vacío o no inicializado correctamente.")
                                     # NOTA: No inyectamos partículas artificialmente. Deben emerger del vacío o ser sembradas inicialmente.
 
-                                # 3. Generar frame de visualización (si corresponde)
-                                current_time = time.time()
-                                frame_data = None
+                                # OPTIMIZACIÓN PARA GRIDS GRANDES: Downsampling adaptativo y ROI automático
+                                inference_grid_size = g_state.get('inference_grid_size', 256)
+                                adaptive_downsample = calculate_adaptive_downsample(inference_grid_size)
                                 
-                                # Decidir si generar frame
-                                should_generate_frame = (
-                                    live_feed_enabled and 
-                                    (current_time - last_frame_time >= target_frame_time)
+                                # Aplicar ROI automático para grids muy grandes (>512)
+                                if inference_grid_size > 512 and motor_is_native and hasattr(motor, 'get_dense_state'):
+                                    adaptive_roi = calculate_adaptive_roi(inference_grid_size)
+                                    roi_manager = g_state.get('roi_manager')
+                                    if adaptive_roi and roi_manager and not roi_manager.roi_enabled:
+                                        # Activar ROI automático solo si no está ya habilitado manualmente
+                                        roi_manager.set_roi(*adaptive_roi)
+                                        roi_manager.roi_enabled = True
+                                        logging.info(f"🔍 ROI automático activado para grid grande ({inference_grid_size}x{inference_grid_size}): {adaptive_roi}")
+                                
+                                if adaptive_downsample > 1:
+                                    logging.debug(f"🔄 Downsampling adaptativo activado: factor={adaptive_downsample} para grid {inference_grid_size}x{inference_grid_size}")
+                                
+                                delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
+                                viz_data = await asyncio.get_event_loop().run_in_executor(
+                                    None,
+                                    lambda: get_visualization_data(
+                                        psi, 
+                                        viz_type,
+                                        delta_psi=delta_psi,
+                                        motor=motor,
+                                        downsample_factor=adaptive_downsample
+                                    )
                                 )
                                 
-                                if should_generate_frame:
-                                    try:
-                                        # Generar datos de visualización
-                                        viz_start = time.time()
-                                        frame_data = await self.viz_pipeline.generate_frame(
-                                            state, 
-                                            step_count,
-                                            viz_type=self.viz_pipeline.current_viz_type
-                                        )
-                                        viz_time = time.time() - viz_start
+                                # OPTIMIZACIÓN: Reutilizar coordenadas de Poincaré del frame anterior si no se recalcula
+                                if should_calc_poincare and not calc_poincare_this_frame and 'last_poincare_coords' in g_state:
+                                    viz_data['poincare_coords'] = g_state['last_poincare_coords']
+                                elif should_calc_poincare and calc_poincare_this_frame and 'poincare_coords' in viz_data:
+                                    g_state['last_poincare_coords'] = viz_data['poincare_coords']
+                                
+                                if viz_data and isinstance(viz_data, dict):
+                                    map_data = viz_data.get("map_data", [])
+                                    if map_data and len(map_data) > 0:
+                                        # DEBUG: Log cuando se envía frame con map_data
+                                        if logging.getLogger().isEnabledFor(logging.DEBUG):
+                                            map_data_min = min(min(row) if row else 0 for row in map_data) if map_data else 0
+                                            map_data_max = max(max(row) if row else 0 for row in map_data) if map_data else 0
+                                            logging.debug(f"📤 Enviando simulation_frame - step: {updated_step}, map_data shape: [{len(map_data)}, {len(map_data[0]) if map_data else 0}], map_data range: [{map_data_min:.6f}, {map_data_max:.6f}]")
                                         
-                                        if frame_data:
-                                            # Añadir métricas de rendimiento
-                                            frame_data['simulation_info'] = {
-                                                'step': step_count,
-                                                'fps': 1.0 / (current_time - last_frame_time) if last_frame_time > 0 else 0,
-                                                'sim_time': step_time,
-                                                'viz_time': viz_time,
-                                                'live_feed_enabled': live_feed_enabled,
-                                                'inference_grid_size': state.get('grid_size', 0), # Tamaño real
-                                                'training_grid_size': state.get('training_grid_size', 0)
-                                            }
-                                            
-                                            # Log para debug de "trancado"
-                                            logging.info(f"Frame generado - Step: {step_count}, Viz Time: {viz_time:.4f}s, Map Data: {'map_data' in frame_data}")
-                                            
-                                            # Enviar al cliente
-                                            await broadcast(frame_data, binary=True)
-                                            last_frame_time = current_time
-                                        else:
-                                            logging.warning(f"Frame generado vacío en paso {step_count}")
-                                            
-                                    except Exception as e:
-                                        logging.error(f"Error generando/enviando frame: {e}")
-                                        import traceback
-                                        traceback.print_exc()
-                            else:
-                                logging.error(f"⚠️ psi no es un torch.Tensor: {type(psi)}")
-                                continue
-                            
-                            # OPTIMIZACIÓN PARA GRIDS GRANDES: Downsampling adaptativo y ROI automático
-                            inference_grid_size = g_state.get('inference_grid_size', 256)
-                            adaptive_downsample = calculate_adaptive_downsample(inference_grid_size)
-                            
-                            # Aplicar ROI automático para grids muy grandes (>512)
-                            if inference_grid_size > 512 and motor_is_native and hasattr(motor, 'get_dense_state'):
-                                adaptive_roi = calculate_adaptive_roi(inference_grid_size)
-                                roi_manager = g_state.get('roi_manager')
-                                if adaptive_roi and roi_manager and not roi_manager.roi_enabled:
-                                    # Activar ROI automático solo si no está ya habilitado manualmente
-                                    roi_manager.set_roi(*adaptive_roi)
-                                    roi_manager.roi_enabled = True
-                                    logging.info(f"🔍 ROI automático activado para grid grande ({inference_grid_size}x{inference_grid_size}): {adaptive_roi}")
-                            
-                            if adaptive_downsample > 1:
-                                logging.debug(f"🔄 Downsampling adaptativo activado: factor={adaptive_downsample} para grid {inference_grid_size}x{inference_grid_size}")
-                            
-                            delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
-                            viz_data = await asyncio.get_event_loop().run_in_executor(
-                                None,
-                                lambda: get_visualization_data(
-                                    psi, 
-                                    viz_type,
-                                    delta_psi=delta_psi,
-                                    motor=motor,
-                                    downsample_factor=adaptive_downsample
-                                )
-                            )
-                            
-                            # OPTIMIZACIÓN: Reutilizar coordenadas de Poincaré del frame anterior si no se recalcula
-                            if should_calc_poincare and not calc_poincare_this_frame and 'last_poincare_coords' in g_state:
-                                viz_data['poincare_coords'] = g_state['last_poincare_coords']
-                            elif should_calc_poincare and calc_poincare_this_frame and 'poincare_coords' in viz_data:
-                                g_state['last_poincare_coords'] = viz_data['poincare_coords']
-                            
-                            if viz_data and isinstance(viz_data, dict):
-                                map_data = viz_data.get("map_data", [])
-                                if map_data and len(map_data) > 0:
-                                    # DEBUG: Log cuando se envía frame con map_data
-                                    if logging.getLogger().isEnabledFor(logging.DEBUG):
-                                        map_data_min = min(min(row) if row else 0 for row in map_data) if map_data else 0
-                                        map_data_max = max(max(row) if row else 0 for row in map_data) if map_data else 0
-                                        logging.debug(f"📤 Enviando simulation_frame - step: {updated_step}, map_data shape: [{len(map_data)}, {len(map_data[0]) if map_data else 0}], map_data range: [{map_data_min:.6f}, {map_data_max:.6f}]")
-                                    
-                                    frame_payload_raw = {
-                                        "step": updated_step,
-                                        "timestamp": asyncio.get_event_loop().time(),
-                                        "map_data": map_data,
-                                        "hist_data": viz_data.get("hist_data", {}),
-                                        "poincare_coords": viz_data.get("poincare_coords", []),
-                                        "phase_attractor": viz_data.get("phase_attractor"),
-                                        "flow_data": viz_data.get("flow_data"),
-                                        "phase_hsv_data": viz_data.get("phase_hsv_data"),
-                                        "complex_3d_data": viz_data.get("complex_3d_data"),
-                                        "simulation_info": {
+                                        frame_payload_raw = {
                                             "step": updated_step,
-                                            "start_step": g_state.get('start_step', 0),
-                                            "total_steps": g_state.get('total_steps', 100000),
-                                            "initial_step": g_state.get('initial_step', 0),
-                                            "checkpoint_step": g_state.get('checkpoint_step', 0),
-                                            "checkpoint_episode": g_state.get('checkpoint_episode', 0),
-                                            "is_paused": False,
-                                            "live_feed_enabled": False,
-                                            "fps": g_state.get('current_fps', 0.0),
-                                            "epoch": g_state.get('current_epoch', 0),
-                                            "epoch_metrics": g_state.get('epoch_metrics', {})
+                                            "timestamp": asyncio.get_event_loop().time(),
+                                            "map_data": map_data,
+                                            "hist_data": viz_data.get("hist_data", {}),
+                                            "poincare_coords": viz_data.get("poincare_coords", []),
+                                            "phase_attractor": viz_data.get("phase_attractor"),
+                                            "flow_data": viz_data.get("flow_data"),
+                                            "phase_hsv_data": viz_data.get("phase_hsv_data"),
+                                            "complex_3d_data": viz_data.get("complex_3d_data"),
+                                            "simulation_info": {
+                                                "step": updated_step,
+                                                "start_step": g_state.get('start_step', 0),
+                                                "total_steps": g_state.get('total_steps', 100000),
+                                                "initial_step": g_state.get('initial_step', 0),
+                                                "checkpoint_step": g_state.get('checkpoint_step', 0),
+                                                "checkpoint_episode": g_state.get('checkpoint_episode', 0),
+                                                "is_paused": False,
+                                                "live_feed_enabled": live_feed_enabled, # Use live_feed_enabled here
+                                                "fps": g_state.get('current_fps', 0.0),
+                                                "epoch": g_state.get('current_epoch', 0),
+                                                "epoch_metrics": g_state.get('epoch_metrics', {}),
+                                                "training_grid_size": g_state.get('training_grid_size'),
+                                                "inference_grid_size": g_state.get('inference_grid_size'),
+                                                "grid_scaled": g_state.get('grid_size_ratio', 1.0) != 1.0
+                                            }
                                         }
-                                    }
-                                    
-                                    # Aplicar optimizaciones si están habilitadas
-                                    compression_enabled = g_state.get('data_compression_enabled', True)
-                                    downsample_factor = g_state.get('downsample_factor', 1)
-                                    
-                                    if compression_enabled or downsample_factor > 1:
-                                        frame_payload = await optimize_frame_payload(
-                                            frame_payload_raw,
-                                            enable_compression=compression_enabled,
-                                            downsample_factor=downsample_factor,
-                                            viz_type=g_state.get('viz_type', 'density')
-                                        )
-                                    else:
-                                        frame_payload = frame_payload_raw
-                                    
-                                    await broadcast({"type": "simulation_frame", "payload": frame_payload})
-                                    frame_count += 1
-                                    g_state['last_frame_sent_step'] = updated_step  # Marcar que se envió un frame
-                        
+                                        
+                                        # Aplicar optimizaciones si están habilitadas
+                                        compression_enabled = g_state.get('data_compression_enabled', True)
+                                        downsample_factor = g_state.get('downsample_factor', 1)
+                                        
+                                        # 1. Aplicar ROI primero (reduce el tamaño de los datos)
+                                        roi_manager = g_state.get('roi_manager')
+                                        if roi_manager and roi_manager.roi_enabled:
+                                            from ...managers.roi_manager import apply_roi_to_payload
+                                            frame_payload_roi = apply_roi_to_payload(frame_payload_raw, roi_manager)
+                                        else:
+                                            frame_payload_roi = frame_payload_raw
+
+                                        if compression_enabled or downsample_factor > 1:
+                                            frame_payload = await optimize_frame_payload(
+                                                frame_payload_roi,
+                                                enable_compression=compression_enabled,
+                                                downsample_factor=downsample_factor,
+                                                viz_type=g_state.get('viz_type', 'density')
+                                            )
+                                        else:
+                                            frame_payload = frame_payload_roi
+                                        
+                                        await broadcast({"type": "simulation_frame", "payload": frame_payload})
+                                        frame_count += 1
+                                        g_state['last_frame_sent_step'] = updated_step  # Marcar que se envió un frame
+                                else:
+                                    logging.warning(f"⚠️ map_data está vacío o inválido en step {updated_step}. Saltando frame.")
+                                    # No continue here, just skip sending frame
+                            else:
+                                logging.warning(f"⚠️ viz_data es None o inválido en step {updated_step}. Saltando frame.")
+                                # No continue here, just skip sending frame
+                        else:
+                            logging.debug(f"Skipping frame generation for step {updated_step} (should_send_frame is False)")
+                            
                         # THROTTLE: Solo enviar actualización de estado cada STATE_UPDATE_INTERVAL segundos
                         # para evitar saturar el WebSocket con demasiados mensajes
                         # IMPORTANTE: NO enviar state_update en modo fullspeed (steps_interval == -1)
@@ -559,356 +528,7 @@ async def simulation_loop():
                         else:
                              sleep_time = max(0.016, ideal_sleep)  # Mínimo 16ms cuando hay live feed normal
                              await asyncio.sleep(sleep_time)
-                    
-                    # Si no se debe enviar frame, continuar al siguiente ciclo del while
-                    if not should_send_frame:
-                        continue
                 
-                # AQUI CONTINUA LA LÓGICA DE VISUALIZACIÓN (solo si should_send_frame es True)
-                # El bloque 'else' original (líneas 507-511) se elimina porque ya ejecutamos los pasos arriba
-                
-                # Validar que el motor tenga un estado válido
-                # CRÍTICO: Para motor nativo, el estado está en C++, no en motor.state.psi
-                motor_is_native = g_state.get('motor_is_native', False)
-                if not motor_is_native and g_state['motor'].state.psi is None:
-                    logging.warning("Motor activo pero sin estado psi. Saltando frame.")
-                    await asyncio.sleep(0.1)
-                    continue
-                    
-                    # Detectar época periódicamente (cada 50 pasos para no saturar)
-                    epoch_detector = g_state.get('epoch_detector')
-                    if epoch_detector:
-                        current_step = g_state.get('simulation_step', 0)
-                        if current_step % 50 == 0:
-                            try:
-                                psi_tensor = g_state['motor'].state.psi
-                                if psi_tensor is not None:
-                                    # Analizar estado y determinar época
-                                    metrics = epoch_detector.analyze_state(psi_tensor)
-                                    epoch = epoch_detector.determine_epoch(metrics)
-                                    g_state['current_epoch'] = epoch
-                                    g_state['epoch_metrics'] = {
-                                        'energy': float(metrics.get('energy', 0)),
-                                        'clustering': float(metrics.get('clustering', 0)),
-                                        'symmetry': float(metrics.get('symmetry', 0))
-                                    }
-                            except Exception as e:
-                                logging.debug(f"Error detectando época: {e}")
-                    
-                    # --- CALCULAR VISUALIZACIONES SOLO SI LIVE_FEED ESTÁ ACTIVO ---
-                    # OPTIMIZACIÓN CRÍTICA: Usar lazy conversion para motor nativo
-                    # Solo convertir estado denso cuando se necesita visualizar
-                    motor = g_state['motor']
-                    motor_is_native = g_state.get('motor_is_native', False)
-                    
-                    # Para motor nativo: usar get_dense_state() con ROI y verificación de pausa
-                    if motor_is_native and hasattr(motor, 'get_dense_state'):
-                        # Obtener ROI si está habilitada
-                        roi = None
-                        roi_manager = g_state.get('roi_manager')
-                        if roi_manager and roi_manager.roi_enabled:
-                            roi = (
-                                roi_manager.roi_x,
-                                roi_manager.roi_y,
-                                roi_manager.roi_x + roi_manager.roi_width,
-                                roi_manager.roi_y + roi_manager.roi_height
-                            )
-                        
-                        # Callback para verificar pausa durante conversión
-                        def check_pause():
-                            return g_state.get('is_paused', True)
-                        
-                        # CRÍTICO: Verificar pausa ANTES de conversión costosa
-                        if g_state.get('is_paused', True):
-                            logging.info("⏸️ Pausa detectada antes de get_dense_state. Saltando frame.")
-                            await asyncio.sleep(0.1)
-                            continue
-                        
-                        # Obtener estado denso (solo convierte si es necesario)
-                        # Offload to thread pool
-                        psi = await asyncio.get_event_loop().run_in_executor(
-                            None,
-                            lambda: motor.get_dense_state(roi=roi, check_pause_callback=check_pause)
-                        )
-                        # CRÍTICO: Yield al event loop después de conversión bloqueante
-                        await asyncio.sleep(0)  # Permitir procesar comandos WebSocket
-                        
-                        # CRÍTICO: Verificar pausa DESPUÉS de conversión costosa
-                        if g_state.get('is_paused', True):
-                            logging.info("⏸️ Pausa detectada después de get_dense_state. Saltando frame.")
-                            await asyncio.sleep(0.1)
-                            continue
-                    else:
-                        # Motor Python: acceder directamente (ya es denso)
-                        psi = motor.state.psi if hasattr(motor, 'state') and motor.state else None
-                    
-                    # Verificar que psi no sea None
-                    if psi is None:
-                        logging.warning("Estado psi es None. Saltando frame.")
-                        await asyncio.sleep(0.1)
-                        continue
-                    
-                    # CRÍTICO: Verificar pausa antes de cálculo de visualización
-                    if g_state.get('is_paused', True):
-                        logging.info("⏸️ Pausa detectada antes de get_visualization_data. Saltando frame.")
-                        await asyncio.sleep(0.1)
-                        continue
-                    
-                    # Optimización: Usar inference_mode para mejor rendimiento GPU
-                    # Obtener delta_psi si está disponible para visualizaciones de flujo
-                    delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
-                    # Offload viz calculation to thread pool
-                    viz_data = await asyncio.get_event_loop().run_in_executor(
-                        None,
-                        lambda: get_visualization_data(
-                            psi, 
-                            g_state.get('viz_type', 'density'),
-                            delta_psi=delta_psi,
-                            motor=motor
-                        )
-                    )
-                    # CRÍTICO: Yield al event loop después de cálculo de visualización (puede ser bloqueante)
-                    await asyncio.sleep(0)  # Permitir procesar comandos WebSocket
-                    
-                    # Validar que viz_data tenga los campos necesarios
-                    if not viz_data or not isinstance(viz_data, dict):
-                        logging.warning(f"⚠️ get_visualization_data retornó datos inválidos (tipo: {type(viz_data)}). Saltando frame.")
-                        await asyncio.sleep(0.1)
-                        continue
-                    
-                    # Validar que map_data no esté vacío
-                    # CRÍTICO: map_data ahora puede ser numpy array o lista
-                    map_data = viz_data.get("map_data", [])
-                    if map_data is None:
-                        logging.warning(f"⚠️ map_data es None en step {g_state.get('simulation_step', 0)}. Saltando frame.")
-                        await asyncio.sleep(0.1)
-                        continue
-                    
-                    # Validar tamaño según tipo
-                    import numpy as np
-                    if isinstance(map_data, np.ndarray):
-                        if map_data.size == 0:
-                            logging.warning(f"⚠️ map_data (numpy array) está vacío en step {g_state.get('simulation_step', 0)}. Saltando frame.")
-                            await asyncio.sleep(0.1)
-                            continue
-                    elif isinstance(map_data, list):
-                        if len(map_data) == 0:
-                            logging.warning(f"⚠️ map_data (lista) está vacío en step {g_state.get('simulation_step', 0)}. Saltando frame.")
-                            await asyncio.sleep(0.1)
-                            continue
-                    else:
-                        logging.warning(f"⚠️ map_data tiene tipo inesperado: {type(map_data)} en step {g_state.get('simulation_step', 0)}. Saltando frame.")
-                        await asyncio.sleep(0.1)
-                        continue
-                    
-                    # Construir frame_payload con información completa del paso del tiempo
-                    # IMPORTANTE: Usar el step actualizado después de evolve_internal_state
-                    updated_step = g_state.get('simulation_step', 0)
-                    current_time = asyncio.get_event_loop().time()
-                    frame_payload_raw = {
-                        "step": updated_step,  # Usar el step actualizado
-                        "timestamp": current_time,
-                        "map_data": map_data,  # Ya validado arriba
-                        "hist_data": viz_data.get("hist_data", {}),
-                        "poincare_coords": viz_data.get("poincare_coords", []),
-                        "phase_attractor": viz_data.get("phase_attractor"),
-                        "flow_data": viz_data.get("flow_data"),
-                        "phase_hsv_data": viz_data.get("phase_hsv_data"),
-                        "complex_3d_data": viz_data.get("complex_3d_data"),
-                        # Información adicional para la UI
-                        "simulation_info": {
-                            "step": updated_step,
-                            "initial_step": g_state.get('initial_step', 0),
-                            "checkpoint_step": g_state.get('checkpoint_step', 0),
-                            "checkpoint_episode": g_state.get('checkpoint_episode', 0),
-                            "is_paused": False,
-                            "live_feed_enabled": live_feed_enabled,
-                            "fps": g_state.get('current_fps', 0.0),
-                            "epoch": g_state.get('current_epoch', 0),
-                            "epoch_metrics": g_state.get('epoch_metrics', {}),
-                            "training_grid_size": g_state.get('training_grid_size'),
-                            "inference_grid_size": g_state.get('inference_grid_size'),
-                            "grid_scaled": g_state.get('grid_size_ratio', 1.0) != 1.0
-                        }
-                    }
-                    
-                    # Optimizar payload (ROI, compresión y downsampling)
-                    # 1. Aplicar ROI primero (reduce el tamaño de los datos)
-                    roi_manager = g_state.get('roi_manager')
-                    if roi_manager and roi_manager.roi_enabled:
-                        from ...managers.roi_manager import apply_roi_to_payload
-                        frame_payload_roi = apply_roi_to_payload(frame_payload_raw, roi_manager)
-                    else:
-                        frame_payload_roi = frame_payload_raw
-                    
-                    # 2. Aplicar compresión y downsampling
-                    compression_enabled = g_state.get('data_compression_enabled', True)
-                    downsample_factor = g_state.get('downsample_factor', 1)
-                    viz_type = g_state.get('viz_type', 'density')
-                    
-                    # Por ahora, solo aplicar optimización si está habilitada explícitamente
-                    # y el payload es grande (para no afectar rendimiento con payloads pequeños)
-                    if compression_enabled or downsample_factor > 1:
-                        frame_payload = await optimize_frame_payload(
-                            frame_payload_roi,
-                            enable_compression=compression_enabled,
-                            downsample_factor=downsample_factor,
-                            viz_type=viz_type
-                        )
-                        
-                        # Logging ocasional del tamaño del payload (cada 100 frames)
-                        if updated_step % 100 == 0:
-                            original_size = get_payload_size(frame_payload_raw)
-                            optimized_size = get_payload_size(frame_payload)
-                            compression_ratio = (1 - optimized_size / original_size) * 100 if original_size > 0 else 0
-                            roi_info = frame_payload.get('roi_info', {})
-                            roi_msg = f" (ROI: {roi_info.get('reduction_ratio', 1.0):.1f}x reducción)" if roi_info.get('enabled') else ""
-                            logging.debug(f"Payload size: {original_size/1024:.1f}KB → {optimized_size/1024:.1f}KB ({compression_ratio:.1f}% reducción){roi_msg}")
-                    else:
-                        frame_payload = frame_payload_roi
-                    
-                    # Guardar en historial si está habilitado
-                    # IMPORTANTE: Solo guardar si live_feed está activo para evitar guardar frames vacíos
-                    if g_state.get('history_enabled', False) and live_feed_enabled:
-                        try:
-                            # Solo guardar cada N frames para reducir uso de memoria
-                            # Por defecto, guardar cada 10 frames (reducción de 10x en memoria)
-                            history_interval = g_state.get('history_save_interval', 10)
-                            if updated_step % history_interval == 0:
-                                g_state['simulation_history'].add_frame(frame_payload)
-                        except Exception as e:
-                            logging.debug(f"Error guardando frame en historial: {e}")
-                    
-                    # Enviar frame solo si live_feed está activo
-                    # Verificar que el payload tenga step antes de enviar
-                    if 'step' not in frame_payload:
-                        logging.warning(f"⚠️ Frame sin step, añadiendo step={updated_step}")
-                        frame_payload['step'] = updated_step
-                    
-                    await broadcast({"type": "simulation_frame", "payload": frame_payload})
-                    frame_count += 1
-                    
-                    # CRÍTICO: Calcular FPS de frames cuando live_feed está ON
-                    # Cuando live_feed está ON, mostrar frames/segundo (no pasos/segundo)
-                    if live_feed_enabled:
-                        # Calcular FPS basado en frames reales enviados
-                        if 'last_frame_sent_time' not in g_state:
-                            g_state['last_frame_sent_time'] = time.time()
-                            g_state['frame_fps_samples'] = []
-                        
-                        current_time = time.time()
-                        last_frame_time = g_state.get('last_frame_sent_time', current_time)
-                        delta_time = current_time - last_frame_time
-                        
-                        if delta_time > 0:
-                            # Calcular FPS instantáneo (1 frame / delta_time)
-                            instant_fps = 1.0 / delta_time
-                            
-                            # Promediar para suavizar
-                            if 'frame_fps_samples' not in g_state:
-                                g_state['frame_fps_samples'] = []
-                            g_state['frame_fps_samples'].append(instant_fps)
-                            
-                            # Mantener solo últimos 30 samples (aproximadamente 0.5-1 segundo a 30-60 FPS)
-                            if len(g_state['frame_fps_samples']) > 30:
-                                g_state['frame_fps_samples'].pop(0)
-                            
-                            # Calcular promedio
-                            if len(g_state['frame_fps_samples']) > 0:
-                                avg_frame_fps = sum(g_state['frame_fps_samples']) / len(g_state['frame_fps_samples'])
-                                # Limitar a máximo razonable (ej: 120 FPS para frames)
-                                g_state['current_fps'] = min(avg_frame_fps, 120.0)
-                        
-                        g_state['last_frame_sent_time'] = current_time
-                    
-                    # Logging ocasional para debug (cada 100 frames para reducir overhead)
-                    if updated_step % 100 == 0:
-                        logging.debug(f"✅ Frame {updated_step} enviado. FPS: {g_state.get('current_fps', 0):.1f}")
-                    
-                    # OPTIMIZACIÓN: Enviar log de simulación con menor frecuencia (cada 100 pasos)
-                    # Reducir overhead de WebSocket
-                    if updated_step % 100 == 0:
-                        await broadcast({
-                            "type": "simulation_log",
-                            "payload": f"[Simulación] Paso {updated_step} completado"
-                        })
-                    
-                    # Capturar snapshot para análisis t-SNE (cada N pasos) - OPTIMIZADO
-                    # Solo capturar si está habilitado y en el intervalo correcto
-                    snapshot_interval = g_state.get('snapshot_interval', 500)  # Por defecto cada 500 pasos (más espaciado)
-                    snapshot_enabled = g_state.get('snapshot_enabled', False)  # Deshabilitado por defecto para no afectar rendimiento
-                    
-                    if snapshot_enabled and updated_step % snapshot_interval == 0:
-                        if 'snapshots' not in g_state:
-                            g_state['snapshots'] = []
-                        
-                        # Optimización: usar detach() antes de clone() para evitar grafo computacional
-                        # y mover a CPU de forma asíncrona si es necesario
-                        try:
-                            import torch
-                            psi_tensor = g_state['motor'].state.psi
-                            # Detach y clonar de forma más eficiente, mover a CPU inmediatamente
-                            with torch.no_grad():
-                                snapshot = psi_tensor.detach().cpu().clone() if hasattr(psi_tensor, 'detach') else psi_tensor.cpu().clone()
-                            
-                            g_state['snapshots'].append({
-                                'psi': snapshot,
-                                'step': updated_step,
-                                'timestamp': asyncio.get_event_loop().time()
-                            })
-                            
-                            # Limitar número de snapshots almacenados (mantener últimos 500 para reducir memoria)
-                            max_snapshots = g_state.get('max_snapshots', 500)
-                            if len(g_state['snapshots']) > max_snapshots:
-                                # Liberar memoria de los snapshots más antiguos antes de eliminarlos
-                                old_snapshots = g_state['snapshots'][:-max_snapshots]
-                                for old_snap in old_snapshots:
-                                    if 'psi' in old_snap and old_snap['psi'] is not None:
-                                        del old_snap['psi']  # Liberar tensor explícitamente
-                                
-                                # Eliminar los más antiguos de forma eficiente
-                                g_state['snapshots'] = g_state['snapshots'][-max_snapshots:]
-                                
-                                # Forzar garbage collection para liberar memoria inmediatamente
-                                import gc
-                                gc.collect()
-                        except Exception as e:
-                            # Si falla la captura, no afectar la simulación
-                            logging.debug(f"Error capturando snapshot en paso {updated_step}: {e}")
-                     
-            # Aplicar throttle adaptativo según live_feed
-            live_feed_enabled = g_state.get('live_feed_enabled', True)
-            if not live_feed_enabled and ideal_sleep < 0.001:
-                # Sin live feed + velocidad muy alta: yield sin sleep (cooperar con event loop)
-                sleep_time = 0
-            elif not live_feed_enabled:
-                # Sin live feed + velocidad razonable: usar sleep calculado (sin mínimo)
-                sleep_time = ideal_sleep
-            else:
-                # Con live feed: usar throttle mínimo para evitar CPU spin excesivo
-                sleep_time = max(0.016, ideal_sleep)  # Mínimo 16ms cuando hay live feed
-            
-            # Aplicar frame skip solo si live_feed está OFF
-            # Cuando live_feed está ON, siempre enviamos frames (no saltamos)
-            live_feed_enabled = g_state.get('live_feed_enabled', True)
-            if frame_skip > 0 and not live_feed_enabled and g_state.get('simulation_step', 0) % (frame_skip + 1) != 0:
-                # Saltar frame: solo evolución, no visualización
-                # SOLO cuando live_feed está OFF
-                if not is_paused and motor:
-                    try:
-                        motor = g_state['motor']
-                        if motor:
-                            motor.evolve_internal_state()
-                        g_state['simulation_step'] = g_state.get('simulation_step', 0) + 1
-                    except:
-                        pass
-            
-            # Sleep adaptativo: usar yield si sleep_time es 0, sino usar sleep normal
-            if sleep_time > 0:
-                await asyncio.sleep(sleep_time)
-            else:
-                # Yield al event loop para permitir otros tasks (sin delay)
-                await asyncio.sleep(0)
     except (SystemExit, asyncio.CancelledError):
         # Shutdown graceful - no loguear como error
         logging.info("Bucle de simulación detenido (shutdown graceful)")
