@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Play, Pause, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp, Clock, Save } from 'lucide-react';
 import { GlassPanel } from './GlassPanel';
 import { useWebSocket } from '../../../hooks/useWebSocket';
@@ -23,6 +23,23 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onToggleTimeline, timelineOpen
   } = useWebSocket();
   const isPlaying = inferenceStatus === 'running';
   const isConnected = connectionStatus === 'connected';
+  const [sessionStartStep, setSessionStartStep] = useState(0);
+  const prevIsPlaying = useRef(false);
+
+  useEffect(() => {
+    const currentStep = simData?.step ?? simData?.simulation_info?.step ?? 0;
+    // When playback starts, capture the current step as the session's start.
+    if (isPlaying && !prevIsPlaying.current) {
+      setSessionStartStep(currentStep);
+    }
+    // On first load or after a reset, if the simulation is paused,
+    // ensure the session start step is aligned with the current step.
+    else if (!isPlaying && (sessionStartStep === 0 || sessionStartStep > currentStep)) {
+      setSessionStartStep(currentStep);
+    }
+    // Update the previous playing state for the next render.
+    prevIsPlaying.current = isPlaying;
+  }, [isPlaying, simData?.step, simData?.simulation_info?.step, sessionStartStep]);
 
   const [stepsInterval, setStepsInterval] = useState<number>(() => {
     const saved = localStorage.getItem('atheria_steps_interval');
@@ -154,35 +171,26 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onToggleTimeline, timelineOpen
         <div 
           className="flex flex-col px-2 cursor-help"
           title={(() => {
-            const startStep = simData?.simulation_info?.start_step ?? 0;
-            const totalSteps = simData?.simulation_info?.total_steps ?? 100000;
-            const currentStepVal = currentStep || 0;
-            const percentage = totalSteps > 0 ? ((currentStepVal - startStep) / (totalSteps - startStep) * 100).toFixed(2) : 0;
-
-            return `Progreso: ${percentage}% (${currentStepVal.toLocaleString()} de ${totalSteps.toLocaleString()} pasos completados)`;
+            const totalSteps = currentStep || 0;
+            const sessionSteps = Math.max(0, currentStep - sessionStartStep);
+            return `Total steps: ${totalSteps.toLocaleString()} | Session steps: ${sessionSteps.toLocaleString()}`;
           })()}
         >
-          <span className="text-[8px] text-gray-500 uppercase font-bold">Paso Actual</span>
+          <span className="text-[8px] text-gray-500 uppercase font-bold">STEPS</span>
           <span className="text-xs font-mono text-gray-200">
-            {(() => {
-              const startStep = simData?.simulation_info?.start_step ?? 0;
-              const totalSteps = simData?.simulation_info?.total_steps ?? 100000;
-              const currentStepVal = currentStep || 0;
-
-              if (currentStepVal > 0) {
-                return (
-                  <>
-                    <span className="text-gray-500">{startStep.toLocaleString()}</span>
-                    <span className="text-gray-600 mx-1">/</span>
-                    <span className="text-teal-400 font-bold">{currentStepVal.toLocaleString()}</span>
-                    <span className="text-gray-600 mx-1">(</span>
-                    <span className="text-gray-500">{totalSteps.toLocaleString()}</span>
-                    <span className="text-gray-600">)</span>
-                  </>
-                );
-              }
-              return <span className="text-gray-500">N/A</span>;
-            })()}
+            {currentStep > 0 ? (
+              <>
+                <span className="text-gray-400">Total:</span>
+                <span className="text-teal-400 font-bold ml-1">{currentStep.toLocaleString()}</span>
+                <span className="text-gray-600 mx-2">|</span>
+                <span className="text-gray-400">Session:</span>
+                <span className="text-blue-400 font-bold ml-1">
+                  +{Math.max(0, currentStep - sessionStartStep).toLocaleString()}
+                </span>
+              </>
+            ) : (
+              <span className="text-gray-500">N/A</span>
+            )}
           </span>
         </div>
       </GlassPanel>
@@ -192,7 +200,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onToggleTimeline, timelineOpen
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-bold text-gray-500">FPS</span>
           <span className={`text-xs font-mono ${fps !== null && fps > 0 ? 'text-teal-400' : 'text-gray-600'}`}>
-            {fps !== null && fps > 0 ? fps.toFixed(1) : 'N/A'}
+            {fps !== null ? fps.toFixed(1) : 'N/A'}
           </span>
         </div>
         <div className="w-px h-3 bg-white/10" />
