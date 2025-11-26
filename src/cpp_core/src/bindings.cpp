@@ -152,6 +152,9 @@ PYBIND11_MODULE(atheria_core, m) {
         .def("get_active_coords", &Engine::get_active_coords,
              "Retorna una lista de todas las coordenadas activas")
         .def("get_last_error", &Engine::get_last_error,
-             "Obtiene el último mensaje de error (si hubo un error al cargar el modelo)");
+             "Obtiene el último mensaje de error (si hubo un error al cargar el modelo)")
+        .def("compute_visualization", &Engine::compute_visualization,
+             "Calcula la visualización directamente en C++",
+             py::arg("viz_type"));
 #endif
 }

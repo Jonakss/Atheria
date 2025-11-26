@@ -398,5 +398,71 @@ std::string Engine::get_last_error() const {
     return last_error_;
 }
 
+torch::Tensor Engine::compute_visualization(const std::string& viz_type) {
+    // Crear tensor de salida [H, W]
+    auto options = torch::TensorOptions()
+        .dtype(torch::kFloat32)
+        .device(device_);
+        
+    torch::Tensor viz_tensor = torch::zeros({grid_size_, grid_size_}, options);
+    
+    // Iterar sobre el mapa disperso
+    // Esto es mucho más eficiente que convertir todo a denso si la ocupación es baja
+    auto coord_keys = matter_map_.coord_keys();
+    
+    // Usar accessor para acceso rápido a CPU si el tensor está en CPU
+    // Si está en GPU, necesitamos otra estrategia o simplemente usar indexación de tensores
+    // Por simplicidad y compatibilidad inicial, usaremos indexación de tensores que funciona en ambos
+    
+    // TODO: Para máxima performance en GPU, esto debería ser un kernel CUDA custom
+    // o usar operaciones dispersas de PyTorch si matter_map_ fuera un tensor disperso.
+    // Por ahora, iteramos en C++ que es más rápido que Python.
+    
+    if (viz_type == "density") {
+        for (const auto& coord : coord_keys) {
+            // Verificar límites (solo visualizamos slice Z=0 por ahora)
+            if (coord.z != 0 || coord.x < 0 || coord.x >= grid_size_ || coord.y < 0 || coord.y >= grid_size_) {
+                continue;
+            }
+            
+            torch::Tensor state = matter_map_.get_tensor(coord);
+            // Densidad = sum(|psi|^2)
+            float density = torch::sum(torch::abs(state).pow(2)).item<float>();
+            
+            // Asignar al tensor de visualización
+            // Nota: viz_tensor[y][x]
+            viz_tensor[coord.y][coord.x] = density;
+        }
+    } else if (viz_type == "phase") {
+        for (const auto& coord : coord_keys) {
+            if (coord.z != 0 || coord.x < 0 || coord.x >= grid_size_ || coord.y < 0 || coord.y >= grid_size_) {
+                continue;
+            }
+            
+            torch::Tensor state = matter_map_.get_tensor(coord);
+            // Fase del primer componente (o promedio ponderado)
+            // Usamos el primer componente como referencia de fase global
+            float phase = torch::angle(state[0]).item<float>();
+            
+            // Normalizar fase a [0, 1] para visualización (opcional, el frontend suele esperar radianes o normalizado)
+            // Dejamos en radianes [-pi, pi]
+            viz_tensor[coord.y][coord.x] = phase;
+        }
+    } else if (viz_type == "energy") {
+        // Similar a densidad pero podría aplicar alguna transformación
+        for (const auto& coord : coord_keys) {
+            if (coord.z != 0 || coord.x < 0 || coord.x >= grid_size_ || coord.y < 0 || coord.y >= grid_size_) {
+                continue;
+            }
+            
+            torch::Tensor state = matter_map_.get_tensor(coord);
+            float energy = torch::sum(torch::abs(state).pow(2)).item<float>();
+            viz_tensor[coord.y][coord.x] = energy;
+        }
+    }
+    
+    return viz_tensor;
+}
+
 } // namespace atheria
 

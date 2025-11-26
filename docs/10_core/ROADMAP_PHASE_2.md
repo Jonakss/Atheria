@@ -138,7 +138,7 @@ Para que la "Ley M" (entrenada en Python) corra en el motor C++ sin salir de la 
 ### ⏳ Pendiente - Alta Prioridad
 - **Paralelismo (OpenMP/std::thread)** - Impacto 2-4x
 - **Optimizaciones SIMD** - Impacto 2-3x
-- **Visualización en C++** - Reducción ~2-5ms → ~0.5-1ms
+- **Visualización en C++** - ✅ Implementado (compute_visualization)
 - **Envío de Datos Optimizado** - Reducción adicional ~1-2ms
 
 ### ⏳ Pendiente - Media Prioridad

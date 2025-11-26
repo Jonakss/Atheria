@@ -766,6 +766,33 @@ class NativeEngineWrapper:
                     dtype=torch.complex64, device=self.device
                 )
     
+    def get_visualization_data(self, viz_type: str = "density"):
+        """
+        Obtiene datos de visualización directamente del motor nativo.
+        
+        Args:
+            viz_type: Tipo de visualización ("density", "phase", "energy")
+            
+        Returns:
+            Tensor denso [H, W] con los valores calculados, o None si falla.
+        """
+        try:
+            if hasattr(self.native_engine, 'compute_visualization'):
+                # Llamada directa a C++
+                viz_tensor = self.native_engine.compute_visualization(viz_type)
+                
+                # Asegurar que esté en el mismo dispositivo que self.device
+                if viz_tensor.device != self.device:
+                    viz_tensor = viz_tensor.to(self.device)
+                    
+                return viz_tensor
+            else:
+                logging.warning("Motor nativo no soporta compute_visualization. Usando fallback Python.")
+                return None
+        except Exception as e:
+            logging.error(f"Error en compute_visualization nativo: {e}")
+            return None
+    
     def get_model_for_params(self):
         """Retorna el modelo para acceso a parámetros (compatibilidad)."""
         return self.original_model if self.original_model else self
