@@ -14,21 +14,22 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
-      - name: Checkout code
-        uses: actions/checkout@v4
+    steps:
+      - name:  Checkout code
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
           node-version: '18'
 
       - name: Cache Node.js modules
-        uses: actions/cache@v4
+        uses: actions/cache@v3
         with:
           path: frontend/node_modules
           key: ${{ runner.os }}-node-${{ hashFiles('frontend/package-lock.json') }}
@@ -44,8 +45,52 @@ jobs:
         working-directory: ./frontend
 
       - name: Build Frontend
-        run: npm run build
+        id: build_frontend
+        run: npm run build > build_output.log 2>&1
         working-directory: ./frontend
+        continue-on-error: true
+
+      - name: Upload Frontend Build Log
+        if: steps.build_frontend.outcome == 'failure'
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend-build-log
+          path: frontend/build_output.log
+
+      - name: Report Frontend Build Failure
+        if: steps.build_frontend.outcome == 'failure' && github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const output = fs.readFileSync('frontend/build_output.log', 'utf8');
+            const commentBody = `
+            ## ❌ Frontend Build Failed
+
+            The \`npm run build\` command failed during the CI check.
+
+            <details>
+            <summary>Click to view the build log</summary>
+
+            \`\`\`
+            ${output}
+            \`\`\`
+            </details>
+
+            Please review the log above to identify and fix the issue.
+            `;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: commentBody
+            });
+
+      - name: Check Build Status
+        if: steps.build_frontend.outcome == 'failure'
+        run: |
+          echo "Frontend build failed. See the artifact and the PR comment for details."
+          exit 1
 
       - name: Cache pip dependencies
         uses: actions/cache@v3
@@ -56,7 +101,7 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Install Backend Dependencies
-        run: pip install -r requirements.txt
+        run: pip install -e .
 
       - name: Build C++ Extensions
         run: python setup.py build_ext --inplace

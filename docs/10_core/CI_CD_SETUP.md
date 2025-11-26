@@ -30,7 +30,10 @@ Este workflow es el **guardián de la calidad del código**.
     - Compila las extensiones nativas de C++ (`setup.py build_ext`).
     - Ejecuta la suite de pruebas del backend (`pytest`).
 
-Si alguno de estos pasos falla, el workflow marcará el commit o PR como fallido, notificando al desarrollador para que corrija el problema antes de integrar el código.
+Si alguno de estos pasos falla, el workflow marcará el commit o PR como fallido.
+
+**✨ Nueva Funcionalidad: Reporte de Errores en PRs**
+Si el paso "Build Frontend" (`npm run build`) falla durante la ejecución de un Pull Request, el workflow publicará automáticamente un comentario en el PR con el log del error. Esto permite a los desarrolladores diagnosticar y corregir problemas de compilación rápidamente sin necesidad de revisar los logs completos del workflow.
 
 ### `deploy-pages.yml` - Despliegue a GitHub Pages
 
