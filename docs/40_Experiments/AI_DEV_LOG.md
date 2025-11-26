@@ -16,7 +16,7 @@
 
 ## 📋 Índice de Entradas
 
-- [[#2025-11-26 - Feature: Advanced Field Visualizations (Real/Imag/HSV Phase)]]
+- [[logs/2025-11-26_advanced_field_visualizations|2025-11-26 - Feature: Advanced Field Visualizations (Real/Imag/HSV Phase)]]
 - [[#2025-11-26 - Feature: History Buffer System (Rewind/Replay)]]
 - [[#2025-11-26 - Fix: Debugging Grid, Canvas, Versioning]]
 - [[#2025-11-26 - Feature: Native Engine Parallelism (OpenMP)]]
