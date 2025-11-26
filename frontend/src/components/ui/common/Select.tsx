@@ -1,6 +1,6 @@
+import { ChevronDown } from 'lucide-react';
 import React from 'react';
 import { cn } from '../../../utils/cn';
-import { ChevronDown } from 'lucide-react';
 
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
@@ -10,7 +10,7 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
-  function Select({ className, label, data, placeholder, error, ...props }, ref) {
+  function Select({ className, label, error, description, options, children, ...props }, ref) {
     return (
       <div className="w-full space-y-1">
         {label && (

@@ -101,7 +101,10 @@ export const usePanZoom = (
       const absoluteMinZoom = 0.1;
       const finalMinZoom = absoluteMinZoom;
       const maxZoom = 10;
-      const constrainedZoom = Math.max(finalMinZoom, Math.min(newZoom, maxZoom));
+      const constrainedZoom = Math.max(
+        finalMinZoom,
+        Math.min(newZoom, maxZoom)
+      );
       const scaledWidth = gridWidth * constrainedZoom;
       const scaledHeight = gridHeight * constrainedZoom;
 
@@ -155,6 +158,7 @@ export const usePanZoom = (
     [pan]
   );
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleMouseMove = useCallback(
     throttle((e: React.MouseEvent) => {
       if (!isPanningRef.current) return;

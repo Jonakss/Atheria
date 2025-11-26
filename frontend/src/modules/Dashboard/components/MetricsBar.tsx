@@ -1,7 +1,7 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { FieldWidget } from './FieldWidget';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { FieldWidget } from './FieldWidget';
 
 export const MetricsBar: React.FC = () => {
   const { simData, allLogs, connectionStatus } = useWebSocket();
@@ -58,6 +58,7 @@ export const MetricsBar: React.FC = () => {
     
     mapDataHashRef.current = hash;
     return hash;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapData, mapDataLength, mapDataFirstLength]);
   
   const mapDataString = useMemo(() => {
@@ -80,6 +81,7 @@ export const MetricsBar: React.FC = () => {
       mapDataRef.current = null;
       return null;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapDataHash]); // Solo depender del hash, no de simData?.map_data directamente
   
   const vacuumEnergy = useMemo(() => {

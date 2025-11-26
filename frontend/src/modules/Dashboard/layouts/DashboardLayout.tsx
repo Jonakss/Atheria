@@ -59,32 +59,6 @@ export const DashboardLayout: React.FC = () => {
     }
   }, [connectionStatus, sendCommand, selectedViz, setSelectedViz]);
 
-  const handleTabChange = useCallback((tab: TabType) => {
-    setActiveTab(tab);
-    if (tab === 'lab') {
-      if (activeTab === 'lab') {
-        setLabPanelOpen(!labPanelOpen);
-      } else {
-        setLabPanelOpen(true);
-      }
-    } else {
-      setLabPanelOpen(false);
-    }
-  }, [activeTab, labPanelOpen]);
-
-  const handleLabSectionChange = useCallback((section: LabSection) => {
-    setActiveLabSection(section);
-    if (!labPanelOpen) setLabPanelOpen(true);
-  }, [labPanelOpen]);
-
-  const handleTogglePhysicsInspector = useCallback(() => {
-    setPhysicsInspectorCollapsed(prev => !prev);
-  }, []);
-
-  const handleToggleTimeline = useCallback(() => {
-    setTimelineOpen(prev => !prev);
-  }, []);
-
   // Obtener datos del mapa para renderizado
   const mapData = simData?.map_data;
   const gridWidth = mapData?.[0]?.length || 0;

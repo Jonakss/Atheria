@@ -53,6 +53,7 @@ export function CheckpointManager() {
             loadCheckpoints();
             loadNotes();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [opened, activeExperiment]);
 
     useEffect(() => {
