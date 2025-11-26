@@ -16,6 +16,7 @@
 
 ## 📋 Índice de Entradas
 
+- [[logs/2025-11-25_native_engine_optimization|2025-11-25 - Native Engine Optimization & Fixes]]
 - [[logs/2025-11-25_finalización-fase-1-y-verificación-motor-nativo|2025-11-25 - Finalización Fase 1 y Verificación Motor Nativo]]
 - [[logs/2025-11-24_correcciones-ui-y-rendimiento-zoom-fps-throttling-y-native-engine|2025-11-24 - Correcciones UI y Rendimiento: Zoom, FPS, Throttling y Native Engine]]
 - [[logs/2025-11-23_optimizaciones-críticas-de-live-feed-y-rendimiento|2025-11-23 - Optimizaciones Críticas de Live Feed y Rendimiento]]

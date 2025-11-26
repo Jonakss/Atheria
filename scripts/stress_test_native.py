@@ -101,8 +101,8 @@ def run_stress_test(args):
         
     else:
         # Python Engine (Dense)
-        engine = Aetheria_Motor(grid_size=args.grid_size, d_state=d_state, device=args.device)
-        engine.load_model(model_path)
+        model = torch.jit.load(model_path).to(device)
+        engine = Aetheria_Motor(model_operator=model, grid_size=args.grid_size, d_state=d_state, device=args.device)
         
         # Inject noise
         print(f"   🌱 Injecting noise (Density: {args.density})...")

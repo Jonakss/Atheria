@@ -19,8 +19,8 @@ El motor nativo (C++) mostraba un rendimiento subóptimo en inferencia por lotes
 
 ## Verificación
 - **Tests Funcionales**: `scripts/test_native_infinite_universe.py` pasó exitosamente, confirmando que la lógica de expansión y simulación se mantiene correcta.
-- **Stress Test**: `scripts/stress_test_native.py` se está ejecutando para cuantificar la mejora en SPS (Steps Per Second).
+- **Stress Test**: `scripts/stress_test_native.py` se ejecutó pero mostró tiempos de inicialización largos. Se requiere optimización adicional en la estructura de datos `SparseMap` para evitar overhead de copias individuales.
 
 ## Próximos Pasos
-- Analizar resultados del stress test.
-- Si el rendimiento sigue siendo bajo, considerar refactorizar `SparseMap` para usar un almacenamiento contiguo (Structure of Arrays) que permita `index_select` masivo.
+- Ejecutar benchmark comparativo con motor Python (`scripts/stress_test_native.py --engine python`).
+- Considerar refactorizar `SparseMap` para usar un almacenamiento contiguo (Structure of Arrays) que permita `index_select` masivo, eliminando el cuello de botella actual de 40k+ lanzamientos de kernel por paso.
