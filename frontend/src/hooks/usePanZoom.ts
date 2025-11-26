@@ -158,9 +158,8 @@ export const usePanZoom = (
     [pan]
   );
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const handleMouseMove = useCallback(
-    throttle((e: React.MouseEvent) => {
+  const throttledMouseMove = useRef(
+    throttle((e: React.MouseEvent, currentZoom: number, constrainedPanZoomFn: typeof constrainPanZoom, setPanFn: typeof setPan) => {
       if (!isPanningRef.current) return;
       const dx = e.clientX - lastMousePos.current.x;
       const dy = e.clientY - lastMousePos.current.y;
@@ -168,12 +167,18 @@ export const usePanZoom = (
         x: panUpdateRef.current.x + dx,
         y: panUpdateRef.current.y + dy,
       };
-      const constrained = constrainPanZoom(newPan, zoom);
+      const constrained = constrainedPanZoomFn(newPan, currentZoom);
       panUpdateRef.current = constrained.pan;
-      setPan(constrained.pan);
+      setPanFn(constrained.pan);
       lastMousePos.current = { x: e.clientX, y: e.clientY };
-    }, 16),
-    [zoom, constrainPanZoom]
+    }, 16)
+  ).current;
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      throttledMouseMove(e, zoom, constrainPanZoom, setPan);
+    },
+    [zoom, constrainPanZoom, setPan, throttledMouseMove]
   );
 
   const handleMouseUp = useCallback(() => {
