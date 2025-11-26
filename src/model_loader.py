@@ -97,3 +97,19 @@ def load_weights(model: nn.Module, checkpoint_data: dict):
         logging.warning(f"Claves inesperadas en los pesos: {unexpected_keys[:5]}...")
         
     logging.info("Pesos del modelo cargados exitosamente.")
+
+def load_model(exp_config: SimpleNamespace, checkpoint_path: str = None) -> nn.Module:
+    """
+    Carga un modelo completo: instancia la arquitectura y carga los pesos (si hay checkpoint).
+    Función de conveniencia que combina instantiate_model y load_weights.
+    """
+    # 1. Instanciar modelo
+    model = instantiate_model(exp_config)
+    
+    # 2. Cargar pesos si se proporciona checkpoint
+    if checkpoint_path:
+        checkpoint_data = load_checkpoint_data(checkpoint_path)
+        if checkpoint_data:
+            load_weights(model, checkpoint_data)
+            
+    return model

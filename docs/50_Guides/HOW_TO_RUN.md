@@ -44,6 +44,9 @@ atheria dev --frontend
 
 # Puerto personalizado
 atheria dev --port 8080 --frontend
+
+# Instalación rápida (salta aislamiento de build, usa torch del sistema)
+atheria dev --fast
 ```
 
 #### Comandos Individuales
