@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       version_type:
-        description: 'Tipo de bump de versión'
+        description: "Tipo de bump de versión"
         required: true
         type: choice
         options:
@@ -38,11 +38,11 @@ jobs:
       (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch'
-    
+
     permissions:
       contents: write
       pull-requests: write
-    
+
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
@@ -50,7 +50,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0 # Necesario para comparar commits
 
-      - name: Verificar si solo son cambios de documentación
+      - name: Verificar si solo son cambios de documentación o no-frontend
         id: check-docs-only
         run: |
           # Default to not skipping
@@ -79,18 +79,36 @@ jobs:
           echo "$files"
 
           is_docs_only=true
+          has_frontend_changes=false
           for file in $files; do
+            # Si hay cambios fuera de docs/, no es docs-only
             if [[ ! "$file" == docs/* ]]; then
               is_docs_only=false
-              break
+            fi
+            # Si hay cambios en frontend/, registrar
+            if [[ "$file" == frontend/* ]]; then
+              has_frontend_changes=true
             fi
           done
 
+          # Verificar si el commit tiene tag de versión explícito
+          COMMIT_MSG=$(git log -1 --format="%B" HEAD)
+          has_version_tag=false
+          if echo "$COMMIT_MSG" | grep -qi "\[version:bump:\|chore: bump version"; then
+            has_version_tag=true
+            echo "✅ Commit contiene tag de versión explícito"
+          fi
+
+          # Decidir si saltear el bump
           if $is_docs_only; then
             echo "✅ La operación solo contiene cambios en 'docs/'. Saltando bump de versión."
             echo "skip=true" >> $GITHUB_OUTPUT
+          elif ! $has_frontend_changes && ! $has_version_tag; then
+            echo "⏭️  No hay cambios en frontend/ ni tag de versión. Saltando bump de versión."
+            echo "skip=true" >> $GITHUB_OUTPUT
           else
-            echo "📝 La operación contiene cambios de código. Procediendo con el bump."
+            echo "📝 La operación contiene cambios de frontend o tag de versión. Procediendo con el bump."
+            echo "has_frontend_changes=$has_frontend_changes" >> $GITHUB_OUTPUT
           fi
 
       - name: Determinar tipo de bump
@@ -165,7 +183,7 @@ jobs:
           fi
           echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "📌 Versión actual: $CURRENT_VERSION"
-          
+
           # Parsear versión
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
           echo "major=$MAJOR" >> $GITHUB_OUTPUT
@@ -180,7 +198,7 @@ jobs:
           CURRENT_MAJOR="${{ steps.current-version.outputs.major }}"
           CURRENT_MINOR="${{ steps.current-version.outputs.minor }}"
           CURRENT_PATCH="${{ steps.current-version.outputs.patch }}"
-          
+
           case $BUMP_TYPE in
             major)
               NEW_MAJOR=$((CURRENT_MAJOR + 1))
@@ -198,7 +216,7 @@ jobs:
               NEW_PATCH=$((CURRENT_PATCH + 1))
               ;;
           esac
-          
+
           NEW_VERSION="${NEW_MAJOR}.${NEW_MINOR}.${NEW_PATCH}"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "major=$NEW_MAJOR" >> $GITHUB_OUTPUT
@@ -224,20 +242,20 @@ jobs:
           NEW_MAJOR="${{ steps.new-version.outputs.major }}"
           NEW_MINOR="${{ steps.new-version.outputs.minor }}"
           NEW_PATCH="${{ steps.new-version.outputs.patch }}"
-          
+
           echo "📝 Actualizando versiones en archivos..."
-          
+
           # 1. src/__version__.py
           sed -i "s/^__version__ = \".*\"/__version__ = \"$NEW_VERSION\"/" src/__version__.py
           sed -i "s/^__version_info__ = (.*)/__version_info__ = ($NEW_MAJOR, $NEW_MINOR, $NEW_PATCH)/" src/__version__.py
           echo "  ✅ src/__version__.py actualizado a $NEW_VERSION"
-          
+
           # 2. src/engines/__version__.py
           if [ -f "src/engines/__version__.py" ]; then
             sed -i "s/^ENGINE_VERSION = \".*\"/ENGINE_VERSION = \"$NEW_VERSION\"/" src/engines/__version__.py
             echo "  ✅ src/engines/__version__.py actualizado a $NEW_VERSION"
           fi
-          
+
           # 3. src/cpp_core/include/version.h
           if [ -f "src/cpp_core/include/version.h" ]; then
             sed -i "s/^#define ATHERIA_NATIVE_VERSION_MAJOR .*/#define ATHERIA_NATIVE_VERSION_MAJOR $NEW_MAJOR/" src/cpp_core/include/version.h
@@ -246,14 +264,14 @@ jobs:
             sed -i "s/^#define ATHERIA_NATIVE_VERSION_STRING \".*\"/#define ATHERIA_NATIVE_VERSION_STRING \"$NEW_VERSION\"/" src/cpp_core/include/version.h
             echo "  ✅ src/cpp_core/include/version.h actualizado a $NEW_VERSION"
           fi
-          
+
           # 4. frontend/package.json
           if [ -f "frontend/package.json" ]; then
             # Usar jq para manejar JSON correctamente
             jq ".version = \"$NEW_VERSION\"" frontend/package.json > frontend/package.json.tmp && mv frontend/package.json.tmp frontend/package.json
             echo "  ✅ frontend/package.json actualizado a $NEW_VERSION"
           fi
-          
+
           echo "✅ Todas las versiones actualizadas a $NEW_VERSION"
 
       - name: Verificar cambios
@@ -269,7 +287,7 @@ jobs:
         run: |
           git add -A
           git commit -m "chore: bump version to ${{ steps.new-version.outputs.version }} [skip ci]"
-          
+
           # Push del commit
           git push origin HEAD:main || git push origin HEAD:master
 
@@ -289,17 +307,17 @@ jobs:
           name: "Release v${{ steps.new-version.outputs.version }}"
           body: |
             ## 🚀 Release v${{ steps.new-version.outputs.version }}
-            
+
             **Tipo de bump:** ${{ steps.version-bump.outputs.type }}
-            
+
             ### 📝 Cambios
             ${{ github.event.pull_request.body || 'Ver commits para detalles' }}
-            
+
             ### 📦 Componentes actualizados
             - ✅ Backend Python: v${{ steps.new-version.outputs.version }}
             - ✅ Motor Nativo C++: v${{ steps.new-version.outputs.version }}
             - ✅ Frontend React: v${{ steps.new-version.outputs.version }}
-            
+
           draft: false
           prerelease: false
 
@@ -312,4 +330,3 @@ jobs:
           echo "- **Nueva versión:** ${{ steps.new-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Tipo de bump:** ${{ steps.version-bump.outputs.type }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Tag creado:** v${{ steps.new-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-
