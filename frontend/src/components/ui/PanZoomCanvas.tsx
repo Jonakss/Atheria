@@ -152,7 +152,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 live_feed_enabled: simData.simulation_info.live_feed_enabled
             });
         }
-    }, [simData?.simulation_info?.fps, simData?.simulation_info?.step]);
+    }, [simData?.simulation_info]);
 
     const roiUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const ROIUpdateThrottle = 300; // Throttle: mínimo tiempo entre actualizaciones (300ms)

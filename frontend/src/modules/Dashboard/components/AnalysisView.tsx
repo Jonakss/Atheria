@@ -5,7 +5,7 @@ import { useWebSocket } from '../../../hooks/useWebSocket';
 import { GlassPanel } from './GlassPanel';
 
 export const AnalysisView: React.FC = () => {
-  const { simData, trainingProgress, connectionStatus } = useWebSocket();
+  const { simData, connectionStatus } = useWebSocket();
   const isConnected = connectionStatus === 'connected';
   
   // Calcular estadísticas desde simData

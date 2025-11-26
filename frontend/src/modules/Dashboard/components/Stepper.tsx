@@ -39,7 +39,6 @@ export const Stepper: React.FC<StepperProps> = ({
           const stepProps = step.props;
           const isActive = index === active;
           const isPast = index < active;
-          const isFuture = index > active;
 
           return (
             <div key={index} className="flex gap-4">
@@ -100,7 +99,6 @@ export const Stepper: React.FC<StepperProps> = ({
           const stepProps = step.props;
           const isActive = index === active;
           const isPast = index < active;
-          const isFuture = index > active;
 
           return (
             <React.Fragment key={index}>

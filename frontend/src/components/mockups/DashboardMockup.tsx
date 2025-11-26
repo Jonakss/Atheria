@@ -1,20 +1,12 @@
 import React, { useState } from 'react';
 import { 
   Activity, 
-  Cpu, 
   Settings, 
   Play, 
   Pause, 
-  Maximize2, 
   Database, 
-  Layers, 
   Zap, 
-  Globe, 
-  Clock, 
-  BarChart2, 
-  Search,
   Terminal,
-  Wind,
   Aperture,
   Share2,
   Microscope,
@@ -72,7 +64,7 @@ const EpochBadge = ({ era, current }: { era: number, current: number }) => {
 const DashboardMockup: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'lab' | 'analysis' | 'history' | 'logs'>('lab');
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentEpoch, setCurrentEpoch] = useState(2); // Era de Partículas
+  const [currentEpoch] = useState(2); // Era de Partículas
 
   return (
     <div className="h-screen bg-[#020202] text-gray-300 font-sans selection:bg-blue-500/30 overflow-hidden flex flex-col">

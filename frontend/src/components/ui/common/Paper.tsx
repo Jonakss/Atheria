@@ -6,7 +6,7 @@ interface PaperProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 export const Paper = React.forwardRef<HTMLDivElement, PaperProps>(
-  ({ className, withBorder = true, ...props }, ref) => {
+  function Paper({ className, withBorder = true, ...props }, ref) {
     return (
       <div
         ref={ref}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Activity, Database, Terminal, Microscope, FlaskConical, Brain, BarChart3 } from 'lucide-react';
 import { NavButton } from './NavButton';
 
@@ -71,7 +71,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
 
   return (
     <aside className="w-12 border-r border-white/5 bg-dark-990 flex flex-col items-center py-3 gap-2 z-40 shrink-0 relative">
-      {NAV_ITEMS.map((item, index) => {
+      {NAV_ITEMS.map((item) => {
         const isActive = activeTab === item.id;
         // Mostrar submenú si es Lab y la pestaña está activa
         const showSubmenu = item.id === 'lab' && isActive;

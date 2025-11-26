@@ -5,11 +5,10 @@ import { useWebSocket } from '../../../hooks/useWebSocket';
 import { getFormattedVersion } from '../../../utils/version';
 
 interface ScientificHeaderProps {
-  currentEpoch: number;
-  onEpochChange?: (epoch: number) => void;
+  // No props are currently used, but the interface is kept for future reference.
 }
 
-export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch, onEpochChange }) => {
+export const ScientificHeader: React.FC<ScientificHeaderProps> = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [engineDropdownOpen, setEngineDropdownOpen] = useState(false);
   const { connectionStatus, compileStatus, connect, disconnect, sendCommand, simData } = useWebSocket();
@@ -23,7 +22,7 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
   };
   
   // Determinar estado del sistema según connectionStatus y compileStatus
-  const getSystemStatus = () => {
+  const systemStatus = useMemo(() => {
     if (connectionStatus === 'connected') {
       // Determinar tipo de motor
       const isNative = compileStatus?.is_native || false;
@@ -80,9 +79,7 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ currentEpoch
         shadow: ''
       };
     }
-  };
-  
-  const systemStatus = getSystemStatus();
+  }, [connectionStatus, compileStatus]);
 
   // Obtener información del engine y FPS
   const engineInfo = useMemo(() => {

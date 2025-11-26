@@ -2,8 +2,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import {
-    Check, X, Info, ArrowRight,
-    ArrowRightLeft as TransferIcon, Settings, FileText, Star, ChevronRight
+    Check, Info,
+    ArrowRightLeft as TransferIcon
 } from 'lucide-react';
 import { Modal } from '../../modules/Dashboard/components/Modal';
 import { Stepper, Step, StepperCompleted } from '../../modules/Dashboard/components/Stepper';
@@ -85,7 +85,7 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
                 }
             }
         }
-    }, [baseExperiment, activeStep, experimentsData]);
+    }, [baseExperiment, activeStep, experimentsData, isExperimentNameManuallyEdited]);
 
     const generateExperimentName = (config: ExperimentConfig): string => {
         const arch = config.MODEL_ARCHITECTURE;

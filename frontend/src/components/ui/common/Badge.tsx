@@ -8,7 +8,7 @@ interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 export const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
-  ({ className, variant = 'default', color = 'teal', size = 'xs', ...props }, ref) => {
+  ({ className, color = 'teal', size = 'xs', ...props }, ref) => {
     // Maps for colors in different variants
     const colorStyles = {
       teal: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
@@ -39,3 +39,5 @@ export const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
     );
   }
 );
+
+Badge.displayName = 'Badge';

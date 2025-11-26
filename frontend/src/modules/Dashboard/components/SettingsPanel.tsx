@@ -1,6 +1,6 @@
 // frontend/src/modules/Dashboard/components/SettingsPanel.tsx
 import { Power, RotateCcw, Save, X } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { getFormattedVersion } from '../../../utils/version';
 import { GlassPanel } from './GlassPanel';
@@ -29,36 +29,35 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
   const [maxFramesPerSecond, setMaxFramesPerSecond] = useState(60);
   const [logLevel, setLogLevel] = useState<'info' | 'warning' | 'error'>('info');
   
-  // Sincronizar estados del servidor cuando serverConfig cambia
-  React.useEffect(() => {
-    if (serverConfig) {
-      setServerHost(serverConfig.host);
-      setServerPort(serverConfig.port);
-      setServerProtocol(serverConfig.protocol);
-      setServerPath(serverConfig.path || '/ws');
+  const { host: configHost, port: configPort, protocol: configProtocol, path: configPath } = serverConfig || {};
+
+  useEffect(() => {
+    if (configHost && configPort && configProtocol) {
+      setServerHost(configHost);
+      setServerPort(configPort);
+      setServerProtocol(configProtocol);
+      setServerPath(configPath || '/ws');
       setServerConfigChanged(false);
     }
-  }, [serverConfig]);
+  }, [configHost, configPort, configProtocol, configPath]);
   
-  // Detectar cambios en la configuración del servidor
-  React.useEffect(() => {
-    const changed = serverConfig && (
-      serverHost !== serverConfig.host ||
-      serverPort !== serverConfig.port ||
-      serverProtocol !== serverConfig.protocol ||
-      serverPath !== (serverConfig.path || '/ws')
-    );
-    setServerConfigChanged(changed || false);
-  }, [serverHost, serverPort, serverProtocol, serverPath, serverConfig]);
+  useEffect(() => {
+    const changed = configHost ? (
+      serverHost !== configHost ||
+      serverPort !== configPort ||
+      serverProtocol !== configProtocol ||
+      serverPath !== (configPath || '/ws')
+    ) : false;
+    setServerConfigChanged(changed);
+  }, [serverHost, serverPort, serverProtocol, serverPath, configHost, configPort, configProtocol, configPath]);
   
   
-  const handleSaveSettings = () => {
+  const handleSaveSettings = useCallback(() => {
     if (!isConnected) {
       alert('⚠️ No hay conexión con el servidor.');
       return;
     }
     
-    // Enviar configuraciones al backend
     sendCommand('simulation', 'set_global_config', {
       compression_enabled: compressionEnabled,
       roi_enabled: roiEnabled,
@@ -68,7 +67,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
       log_level: logLevel
     });
     
-    // Guardar en localStorage para persistencia
     localStorage.setItem('atheria_global_config', JSON.stringify({
       compressionEnabled,
       roiEnabled,
@@ -79,9 +77,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
     }));
     
     alert('✅ Configuraciones guardadas correctamente.');
-  };
+  }, [isConnected, sendCommand, compressionEnabled, roiEnabled, autoRotate, frameRate, maxFramesPerSecond, logLevel]);
   
-  const handleSaveServerConfig = () => {
+  const handleSaveServerConfig = useCallback(() => {
     updateServerConfig({
       host: serverHost,
       port: serverPort,
@@ -89,14 +87,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
       path: serverPath
     });
     
-    // Reconectar con la nueva configuración
     setTimeout(() => {
       connect();
       alert('✅ Configuración del servidor guardada. Reconectando...');
     }, 100);
-  };
+  }, [updateServerConfig, serverHost, serverPort, serverProtocol, serverPath, connect]);
   
-  const handleResetSettings = () => {
+  const handleResetSettings = useCallback(() => {
     if (!confirm('¿Restablecer todas las configuraciones a sus valores por defecto?')) {
       return;
     }
@@ -107,7 +104,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
     setFrameRate(30);
     setMaxFramesPerSecond(60);
     setLogLevel('info');
-    // Resetear configuración del servidor
     if (updateServerConfig) {
       updateServerConfig({
         host: 'localhost',
@@ -118,9 +114,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
     }
     
     localStorage.removeItem('atheria_global_config');
-  };
+  }, [updateServerConfig]);
   
-  const handleShutdown = () => {
+  const handleShutdown = useCallback(() => {
     if (!isConnected) {
       alert('⚠️ No hay conexión con el servidor.');
       return;
@@ -130,12 +126,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
       return;
     }
     
-    // Enviar comando de shutdown con confirmación
     sendCommand('server', 'shutdown', { confirm: true });
-  };
+  }, [isConnected, sendCommand]);
   
-  // Cargar configuraciones desde localStorage al montar
-  React.useEffect(() => {
+  useEffect(() => {
     const saved = localStorage.getItem('atheria_global_config');
     if (saved) {
       try {

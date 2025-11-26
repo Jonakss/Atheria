@@ -4,7 +4,7 @@ import { useWebSocket } from '../../../hooks/useWebSocket';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 
 export const MetricsBar: React.FC = () => {
-  const { simData, allLogs, sendCommand, connectionStatus } = useWebSocket();
+  const { simData, allLogs, connectionStatus } = useWebSocket();
   const isConnected = connectionStatus === 'connected';
   const [expanded, setExpanded] = useState(false);
   const [collapsedWidgets, setCollapsedWidgets] = useState<Set<string>>(new Set()); // Widgets individuales colapsados
@@ -20,33 +20,31 @@ export const MetricsBar: React.FC = () => {
   const mapDataLengthRef = useRef<number>(0);
   const mapDataFirstLengthRef = useRef<number>(0);
   
+  const mapData = simData?.map_data;
+  const mapDataLength = mapData?.length;
+  const mapDataFirstLength = mapData?.[0]?.length;
+
   const mapDataHash = useMemo(() => {
-    const mapData = simData?.map_data;
     if (!mapData || !Array.isArray(mapData) || mapData.length === 0) {
       mapDataHashRef.current = 0;
       return 0;
     }
     
-    // Verificar si realmente cambió antes de recalcular
     const currentLength = mapData.length;
     const currentFirstLength = mapData[0]?.length || 0;
     
     if (currentLength === mapDataLengthRef.current && 
         currentFirstLength === mapDataFirstLengthRef.current &&
         mapDataHashRef.current !== 0) {
-      // No cambió significativamente, usar hash anterior
       return mapDataHashRef.current;
     }
     
-    // Actualizar referencias
     mapDataLengthRef.current = currentLength;
     mapDataFirstLengthRef.current = currentFirstLength;
     
-    // Hash simple: longitud + algunos valores clave
     let hash = mapData.length;
     if (mapData[0] && Array.isArray(mapData[0])) {
       hash = hash * 31 + mapData[0].length;
-      // Incluir algunos valores para detectar cambios reales
       if (mapData[0].length > 0) {
         hash = hash * 31 + (typeof mapData[0][0] === 'number' ? Math.floor(mapData[0][0] * 1000) : 0);
       }
@@ -60,10 +58,8 @@ export const MetricsBar: React.FC = () => {
     
     mapDataHashRef.current = hash;
     return hash;
-  }, [simData?.map_data?.length, simData?.map_data?.[0]?.length]);
+  }, [mapData, mapDataLength, mapDataFirstLength]);
   
-  // Solo actualizar mapDataString si el hash cambió
-  // NO incluir simData?.map_data en dependencias para evitar re-renders infinitos
   const mapDataString = useMemo(() => {
     if (mapDataHash === 0 || mapDataHash === mapDataLastHash.current) {
       return mapDataRef.current;
@@ -258,7 +254,7 @@ export const MetricsBar: React.FC = () => {
       const textLogs = allLogs.filter(log => typeof log === 'string' && log.trim().length > 0);
       logsRef.current = textLogs.slice(-2);
     }
-  }, [allLogs?.length]); // Solo depender de la longitud para evitar re-renders infinitos
+  }, [allLogs]);
   
   const recentLogs = logsRef.current;
 

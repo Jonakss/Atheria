@@ -17,55 +17,73 @@ import { Toolbar } from '../components/Toolbar';
 type TabType = 'lab' | 'analysis' | 'history' | 'logs';
 type LabSection = 'inference' | 'training' | 'analysis';
 
+import { useCallback } from 'react';
+
 export const DashboardLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('lab');
-  const [labPanelOpen, setLabPanelOpen] = useState(true); // Panel de laboratorio visible por defecto
-  const [activeLabSection, setActiveLabSection] = useState<LabSection>('inference'); // Sub-sección activa de Lab
-  const [physicsInspectorCollapsed, setPhysicsInspectorCollapsed] = useState(false); // Inspector físico colapsado
-  const [timelineOpen, setTimelineOpen] = useState(false); // Timeline viewer abierto/cerrado
+  const [labPanelOpen, setLabPanelOpen] = useState(true);
+  const [activeLabSection, setActiveLabSection] = useState<LabSection>('inference');
+  const [physicsInspectorCollapsed, setPhysicsInspectorCollapsed] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
   const [selectedTimelineFrame, setSelectedTimelineFrame] = useState<{
     step: number;
     timestamp: string;
     map_data: number[][];
   } | null>(null);
   const { simData, selectedViz, connectionStatus, sendCommand, setSelectedViz, inferenceStatus } = useWebSocket();
-  
-  // Si la simulación está corriendo, deseleccionar frame del timeline para mostrar datos en vivo
+
   useEffect(() => {
     if (inferenceStatus === 'running' && selectedTimelineFrame !== null) {
       setSelectedTimelineFrame(null);
     }
   }, [inferenceStatus, selectedTimelineFrame]);
-  
-  // Obtener época detectada del backend
+
   const detectedEpoch = useMemo(() => simData?.simulation_info?.epoch ?? 2, [simData?.simulation_info?.epoch]);
   const [currentEpoch, setCurrentEpoch] = useState(detectedEpoch);
-  
-  // Sincronizar época cuando cambie desde el backend
+
   useEffect(() => {
-    if (detectedEpoch !== undefined && detectedEpoch !== currentEpoch) {
+    if (detectedEpoch !== undefined) {
       setCurrentEpoch(detectedEpoch);
     }
-  }, [detectedEpoch, currentEpoch]);
-  
-  // Handler para cambio de época - aplicar configuración automáticamente
-  const handleEpochChange = (epoch: number) => {
+  }, [detectedEpoch]);
+
+  const handleEpochChange = useCallback((epoch: number) => {
     setCurrentEpoch(epoch);
     const config = EPOCH_CONFIGS[epoch];
-    
     if (config && connectionStatus === 'connected') {
-      // Cambiar gamma decay
-      sendCommand('inference', 'set_config', {
-        gamma_decay: config.gammaDecay
-      });
-      
-      // Cambiar tipo de visualización
+      sendCommand('inference', 'set_config', { gamma_decay: config.gammaDecay });
       if (config.vizType && config.vizType !== selectedViz) {
         setSelectedViz(config.vizType);
         sendCommand('simulation', 'set_viz', { viz_type: config.vizType });
       }
     }
-  };
+  }, [connectionStatus, sendCommand, selectedViz, setSelectedViz]);
+
+  const handleTabChange = useCallback((tab: TabType) => {
+    setActiveTab(tab);
+    if (tab === 'lab') {
+      if (activeTab === 'lab') {
+        setLabPanelOpen(!labPanelOpen);
+      } else {
+        setLabPanelOpen(true);
+      }
+    } else {
+      setLabPanelOpen(false);
+    }
+  }, [activeTab, labPanelOpen]);
+
+  const handleLabSectionChange = useCallback((section: LabSection) => {
+    setActiveLabSection(section);
+    if (!labPanelOpen) setLabPanelOpen(true);
+  }, [labPanelOpen]);
+
+  const handleTogglePhysicsInspector = useCallback(() => {
+    setPhysicsInspectorCollapsed(prev => !prev);
+  }, []);
+
+  const handleToggleTimeline = useCallback(() => {
+    setTimelineOpen(prev => !prev);
+  }, []);
 
   // Obtener datos del mapa para renderizado
   const mapData = simData?.map_data;

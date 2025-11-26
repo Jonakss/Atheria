@@ -1,11 +1,10 @@
 // frontend/src/components/ui/TimelineViewer.tsx
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { 
         loadTimeline, 
         getTimelineStats, 
-        clearTimeline, 
-        getFrameByStep,
+        clearTimeline,
         TimelineFrame 
     } from '../../utils/timelineStorage';
 import { Play, Pause, SkipBack, SkipForward, Trash2, Clock, Database, Settings } from 'lucide-react';
@@ -29,13 +28,34 @@ export function TimelineViewer({ onFrameSelect, className = '' }: TimelineViewer
         max_step: number;
         max_frames: number;
     } | null>(null);
-    const playIntervalRef = useState<NodeJS.Timeout | null>(null)[0];
-    const setPlayIntervalRef = useState<NodeJS.Timeout | null>(null)[1];
+    const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Cargar timeline cuando cambia el experimento activo
+    const loadFrames = useCallback(() => {
+        const timeline = loadTimeline(activeExperiment, maxFrames);
+        setFrames(timeline.frames);
+
+        const timelineStats = getTimelineStats(activeExperiment);
+        if (timelineStats) {
+            setStats({
+                total_frames: timelineStats.total_frames,
+                min_step: timelineStats.min_step,
+                max_step: timelineStats.max_step,
+                max_frames: timelineStats.max_frames,
+            });
+        } else {
+            setStats(null);
+        }
+
+        if (timeline.frames.length > 0) {
+            setCurrentFrameIndex(timeline.frames.length - 1);
+        } else {
+            setCurrentFrameIndex(-1);
+        }
+    }, [activeExperiment, maxFrames]);
+
     useEffect(() => {
         loadFrames();
-    }, [activeExperiment]);
+    }, [loadFrames]);
 
     // Cargar frames desde localStorage
     const loadFrames = useCallback(() => {
