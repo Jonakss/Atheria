@@ -334,3 +334,13 @@ def save_experiment_config(experiment_name: str, config_data: dict, is_update: b
         logging.info(f"Configuración del experimento guardada en: {config_path}")
     except Exception as e:
         logging.error(f"Error al guardar la configuración en '{config_path}': {e}", exc_info=True)
+
+def update_simple_namespace(target: SimpleNamespace, source: SimpleNamespace):
+    """
+    Actualiza recursivamente un SimpleNamespace con valores de otro.
+    """
+    for key, value in vars(source).items():
+        if isinstance(value, SimpleNamespace) and hasattr(target, key) and isinstance(getattr(target, key), SimpleNamespace):
+            update_simple_namespace(getattr(target, key), value)
+        else:
+            setattr(target, key, value)
