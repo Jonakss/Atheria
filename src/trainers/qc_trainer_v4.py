@@ -129,8 +129,12 @@ class QC_Trainer_v4:
             model_params_dict = vars(model_params)
         elif isinstance(model_params, dict):
             model_params_dict = model_params
-        else:
-            model_params_dict = {}
+        return {
+            "EXPERIMENT_NAME": experiment_name,
+            "MODEL_ARCHITECTURE": model_class.__name__,
+            "MODEL_PARAMS": model_params_dict,
+            "LR_RATE_M": lr,
+            "GRID_SIZE_TRAINING": grid_size,
 
         return {
             "EXPERIMENT_NAME": experiment_name,
