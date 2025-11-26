@@ -311,7 +311,7 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
                                         type="number"
                                         value={gridSizeInference}
                                         onChange={(e) => {
-                                            const val = Math.max(64, Math.min(1024, Number(e.target.value) || 256));
+                                            const val = Math.max(64, Math.min(8192, Number(e.target.value) || 256));
                                             setGridSizeInference(val);
                                             localStorage.setItem('atheria_gridSizeInference', val.toString());
                                         }}
@@ -324,7 +324,7 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
                                             });
                                         }}
                                         min={64}
-                                        max={1024}
+                                        max={8192}
                                         step={64}
                                         disabled={!isConnected}
                                         className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50 font-mono"
