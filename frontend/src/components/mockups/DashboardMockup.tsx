@@ -1,19 +1,19 @@
-import React, { useState } from 'react';
-import { 
-  Activity, 
-  Settings, 
-  Play, 
-  Pause, 
-  Database, 
-  Zap, 
-  Terminal,
+import {
+  Activity,
+  AlertCircle,
   Aperture,
-  Share2,
-  Microscope,
   ChevronRight,
+  Database,
+  Microscope,
   MoreHorizontal,
-  AlertCircle
+  Pause,
+  Play,
+  Settings,
+  Share2,
+  Terminal,
+  Zap
 } from 'lucide-react';
+import React, { useState } from 'react';
 
 // --- SUBCOMPONENTES DE UI (REFINADOS) ---
 
@@ -64,7 +64,7 @@ const EpochBadge = ({ era, current }: { era: number, current: number }) => {
 const DashboardMockup: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'lab' | 'analysis' | 'history' | 'logs'>('lab');
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentEpoch] = useState(2); // Era de Partículas
+  const [currentEpoch, setCurrentEpoch] = useState(2); // Era de Partículas
 
   return (
     <div className="h-screen bg-[#020202] text-gray-300 font-sans selection:bg-blue-500/30 overflow-hidden flex flex-col">

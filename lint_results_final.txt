@@ -1,0 +1,55 @@
+
+> frontend@4.1.25 lint
+> eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0
+
+
+/home/jonathan.correa/Projects/Atheria/frontend/src/components/experiments/TransferLearningWizard.tsx
+   5:12  error    'X' is defined but never used                                                                                                      @typescript-eslint/no-unused-vars
+   5:21  error    'ArrowRight' is defined but never used                                                                                             @typescript-eslint/no-unused-vars
+   6:37  error    'Settings' is defined but never used                                                                                               @typescript-eslint/no-unused-vars
+   6:47  error    'FileText' is defined but never used                                                                                               @typescript-eslint/no-unused-vars
+   6:57  error    'Star' is defined but never used                                                                                                   @typescript-eslint/no-unused-vars
+   6:63  error    'ChevronRight' is defined but never used                                                                                           @typescript-eslint/no-unused-vars
+  88:8   warning  React Hook useEffect has a missing dependency: 'isExperimentNameManuallyEdited'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/home/jonathan.correa/Projects/Atheria/frontend/src/components/mockups/DashboardMockup.tsx
+   4:3   error  'Cpu' is defined but never used                       @typescript-eslint/no-unused-vars
+   8:3   error  'Maximize2' is defined but never used                 @typescript-eslint/no-unused-vars
+  10:3   error  'Layers' is defined but never used                    @typescript-eslint/no-unused-vars
+  12:3   error  'Globe' is defined but never used                     @typescript-eslint/no-unused-vars
+  13:3   error  'Clock' is defined but never used                     @typescript-eslint/no-unused-vars
+  14:3   error  'BarChart2' is defined but never used                 @typescript-eslint/no-unused-vars
+  15:3   error  'Search' is defined but never used                    @typescript-eslint/no-unused-vars
+  17:3   error  'Wind' is defined but never used                      @typescript-eslint/no-unused-vars
+  75:24  error  'setCurrentEpoch' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/jonathan.correa/Projects/Atheria/frontend/src/components/training/CheckpointManager.tsx
+   48:8   warning  React Hook useEffect has missing dependencies: 'loadCheckpoints' and 'loadNotes'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  378:85  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                       react/no-unescaped-entities
+  378:99  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                       react/no-unescaped-entities
+
+/home/jonathan.correa/Projects/Atheria/frontend/src/components/ui/PanZoomCanvas.tsx
+  272:8  warning  React Hook useEffect has a missing dependency: 'simData.simulation_info'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/home/jonathan.correa/Projects/Atheria/frontend/src/hooks/usePanZoom.ts
+   47:6   warning  React Hook useCallback has unnecessary dependencies: 'canvasRef', 'gridHeight', and 'gridWidth'. Either exclude them or remove the dependency array  react-hooks/exhaustive-deps
+  213:5   warning  React Hook useCallback has a missing dependency: 'toroidalMode'. Either include it or remove the dependency array                                    react-hooks/exhaustive-deps
+  227:36  warning  React Hook useCallback received a function whose dependencies are unknown. Pass an inline function instead                                           react-hooks/exhaustive-deps
+
+/home/jonathan.correa/Projects/Atheria/frontend/src/modules/Dashboard/components/EpochBadge.tsx
+   9:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  12:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+/home/jonathan.correa/Projects/Atheria/frontend/src/modules/Dashboard/components/MetricsBar.tsx
+    8:29  error    'sendCommand' is assigned a value but never used                                                                                        @typescript-eslint/no-unused-vars
+   64:6   warning  React Hook useMemo has a missing dependency: 'simData?.map_data'. Either include it or remove the dependency array                      react-hooks/exhaustive-deps
+   64:34  warning  React Hook useMemo has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked  react-hooks/exhaustive-deps
+   88:6   warning  React Hook useMemo has a missing dependency: 'simData?.map_data'. Either include it or remove the dependency array                      react-hooks/exhaustive-deps
+  262:6   warning  React Hook useEffect has a missing dependency: 'allLogs'. Either include it or remove the dependency array                              react-hooks/exhaustive-deps
+
+/home/jonathan.correa/Projects/Atheria/frontend/src/modules/Dashboard/components/Stepper.tsx
+   42:17  error  'isFuture' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  103:17  error  'isFuture' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 32 problems (20 errors, 12 warnings)
+

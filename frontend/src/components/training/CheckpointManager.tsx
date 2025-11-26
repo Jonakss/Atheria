@@ -1,16 +1,24 @@
 // frontend/src/components/training/CheckpointManager.tsx
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useWebSocket } from '../../hooks/useWebSocket';
-import { 
-    Download, Trash2, Info, FileText, Clock, X, Edit, BookOpen,
-    Search, Star, MoreVertical, RefreshCw
+import {
+    BookOpen,
+    Clock,
+    Download,
+    Edit,
+    FileText,
+    Info,
+    MoreVertical, RefreshCw,
+    Search, Star,
+    Trash2,
+    X
 } from 'lucide-react';
-import { Modal } from '../../modules/Dashboard/components/Modal';
-import { Tabs, TabList, Tab, TabPanel } from '../../modules/Dashboard/components/Tabs';
-import { Table, TableHead, TableBody, TableRow, TableTh, TableTd } from '../../modules/Dashboard/components/Table';
-import { Badge } from '../../modules/Dashboard/components/Badge';
+import { useEffect, useMemo, useState } from 'react';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { Alert } from '../../modules/Dashboard/components/Alert';
+import { Badge } from '../../modules/Dashboard/components/Badge';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
+import { Modal } from '../../modules/Dashboard/components/Modal';
+import { Table, TableBody, TableHead, TableRow, TableTd, TableTh } from '../../modules/Dashboard/components/Table';
+import { Tab, TabList, TabPanel, Tabs } from '../../modules/Dashboard/components/Tabs';
 
 interface CheckpointInfo {
     filename: string;
@@ -39,31 +47,13 @@ export function CheckpointManager() {
     const [activeTab, setActiveTab] = useState<string>('checkpoints');
     const [menuOpen, setMenuOpen] = useState<string | null>(null);
 
-    const loadCheckpoints = useCallback(() => {
-        if (!activeExperiment) return;
-        setLoading(true);
-        sendCommand('experiment', 'list_checkpoints', { EXPERIMENT_NAME: activeExperiment });
-    }, [activeExperiment, sendCommand]);
-
-    const loadNotes = useCallback(() => {
-        if (!activeExperiment) return;
-        const savedNotes = localStorage.getItem(`experiment_notes_${activeExperiment}`);
-        if (savedNotes) {
-            try {
-                setNotes(JSON.parse(savedNotes));
-            } catch (e) {
-                console.error('Error loading notes:', e);
-            }
-        }
-    }, [activeExperiment]);
-
     // Cargar checkpoints y notas cuando se abre el modal
     useEffect(() => {
-        if (opened) {
+        if (opened && activeExperiment) {
             loadCheckpoints();
             loadNotes();
         }
-    }, [opened, loadCheckpoints, loadNotes]);
+    }, [opened, activeExperiment]);
 
     useEffect(() => {
         const handleCheckpointsUpdate = (event: CustomEvent) => {
@@ -86,6 +76,24 @@ export function CheckpointManager() {
             window.removeEventListener('switch_to_notes_tab', handleSwitchToNotes);
         };
     }, []);
+
+    const loadCheckpoints = async () => {
+        if (!activeExperiment) return;
+        setLoading(true);
+        sendCommand('experiment', 'list_checkpoints', { EXPERIMENT_NAME: activeExperiment });
+    };
+
+    const loadNotes = () => {
+        if (!activeExperiment) return;
+        const savedNotes = localStorage.getItem(`experiment_notes_${activeExperiment}`);
+        if (savedNotes) {
+            try {
+                setNotes(JSON.parse(savedNotes));
+            } catch (e) {
+                console.error('Error loading notes:', e);
+            }
+        }
+    };
 
     const saveNotes = (updatedNotes: ExperimentNote[]) => {
         if (!activeExperiment) return;
@@ -120,7 +128,10 @@ export function CheckpointManager() {
         const isBest = checkpoint?.is_best;
         
         if (window.confirm(
-            `¿Eliminar checkpoint "${checkpointName}"?\n\nEpisodio: ${checkpoint?.episode}\n${isBest ? '⚠️ Este es el mejor checkpoint.\n' : ''}Esta acción no se puede deshacer.`
+            `¿Eliminar checkpoint "${checkpointName}"?\n\n` +
+            `Episodio: ${checkpoint?.episode}\n` +
+            `${isBest ? '⚠️ Este es el mejor checkpoint.\n' : ''}` +
+            `Esta acción no se puede deshacer.`
         )) {
             sendCommand('experiment', 'delete_checkpoint', { 
                 EXPERIMENT_NAME: activeExperiment,
@@ -372,7 +383,7 @@ export function CheckpointManager() {
 
                             {!loading && filteredCheckpoints.length === 0 && checkpoints.length > 0 && (
                                 <Alert icon={<Search size={16} />} color="yellow" variant="light">
-                                    No se encontraron checkpoints que coincidan con "{searchQuery}"
+                                    No se encontraron checkpoints que coincidan con &quot;{searchQuery}&quot;
                                 </Alert>
                             )}
 

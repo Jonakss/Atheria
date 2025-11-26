@@ -1,0 +1,34 @@
+
+> frontend@4.1.24 lint
+> eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0
+
+
+/home/jonathan.correa/Projects/Atheria/frontend/src/components/training/CheckpointManager.tsx
+  375:85  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  375:99  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+/home/jonathan.correa/Projects/Atheria/frontend/src/components/ui/TimelineViewer.tsx
+  2:0  error  Parsing error: Merge conflict marker encountered
+
+/home/jonathan.correa/Projects/Atheria/frontend/src/components/ui/common/Select.tsx
+  13:39  error  'data' is defined but never used         @typescript-eslint/no-unused-vars
+  13:45  error  'placeholder' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/jonathan.correa/Projects/Atheria/frontend/src/hooks/usePanZoom.ts
+  158:27  warning  React Hook useCallback received a function whose dependencies are unknown. Pass an inline function instead  react-hooks/exhaustive-deps
+
+/home/jonathan.correa/Projects/Atheria/frontend/src/modules/Dashboard/components/MetricsBar.tsx
+  61:6  warning  React Hook useMemo has unnecessary dependencies: 'mapDataFirstLength' and 'mapDataLength'. Either exclude them or remove the dependency array  react-hooks/exhaustive-deps
+  83:6  warning  React Hook useMemo has a missing dependency: 'simData?.map_data'. Either include it or remove the dependency array                             react-hooks/exhaustive-deps
+
+/home/jonathan.correa/Projects/Atheria/frontend/src/modules/Dashboard/layouts/DashboardLayout.tsx
+  62:9  error  'handleTabChange' is assigned a value but never used               @typescript-eslint/no-unused-vars
+  75:9  error  'handleLabSectionChange' is assigned a value but never used        @typescript-eslint/no-unused-vars
+  80:9  error  'handleTogglePhysicsInspector' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  84:9  error  'handleToggleTimeline' is assigned a value but never used          @typescript-eslint/no-unused-vars
+
+/home/jonathan.correa/Projects/Atheria/frontend/src/utils/timelineStorage.ts
+  129:0  error  Parsing error: Merge conflict marker encountered
+
+✖ 13 problems (10 errors, 3 warnings)
+

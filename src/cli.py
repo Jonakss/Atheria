@@ -43,13 +43,17 @@ def build():
         sys.exit(1)
 
 
-def install():
+def install(fast=False):
     """Instala el paquete en modo desarrollo."""
     print("📥 Instalando paquete en modo desarrollo...")
     project_root = get_project_root()
-    success = run_command([
-        sys.executable, "-m", "pip", "install", "-e", "."
-    ], cwd=project_root)
+    cmd = [sys.executable, "-m", "pip", "install", "-e", "."]
+    
+    if fast:
+        print("⚡ Modo rápido: Saltando aislamiento de build (--no-build-isolation)")
+        cmd.append("--no-build-isolation")
+        
+    success = run_command(cmd, cwd=project_root)
     
     if success:
         print("✅ Instalación completada exitosamente")
@@ -168,7 +172,7 @@ def clean():
         print(f"✅ Limpieza completada ({removed_count} items removidos)")
 
 
-def dev(no_frontend=True, port=None, host=None):
+def dev(no_frontend=True, port=None, host=None, fast=False):
     """Build + Install + Run (workflow completo de desarrollo)."""
     print("🔧 Modo desarrollo: Build + Install + Run")
     print("=" * 60)
@@ -179,7 +183,7 @@ def dev(no_frontend=True, port=None, host=None):
         print()
         
         # Install
-        install()
+        install(fast=fast)
         print()
         
         # Run
@@ -221,12 +225,16 @@ Ejemplos:
                            help='Puerto del servidor')
     dev_parser.add_argument('--host', type=str, default=None,
                            help='Host del servidor')
+    dev_parser.add_argument('--fast', action='store_true',
+                           help='Instalación rápida (sin aislamiento de build)')
     
     # Comando: build
     subparsers.add_parser('build', help='Compilar extensiones C++')
     
     # Comando: install
-    subparsers.add_parser('install', help='Instalar paquete en modo desarrollo')
+    install_parser = subparsers.add_parser('install', help='Instalar paquete en modo desarrollo')
+    install_parser.add_argument('--fast', action='store_true',
+                               help='Instalación rápida (sin aislamiento de build)')
     
     # Comando: run
     run_parser = subparsers.add_parser('run', help='Ejecutar servidor')
@@ -270,11 +278,11 @@ Ejemplos:
     
     # Ejecutar comando
     if args.command == 'dev':
-        dev(no_frontend=not args.frontend, port=args.port, host=args.host)
+        dev(no_frontend=not args.frontend, port=args.port, host=args.host, fast=args.fast)
     elif args.command == 'build':
         build()
     elif args.command == 'install':
-        install()
+        install(fast=args.fast)
     elif args.command == 'run':
         run_server(no_frontend=not args.frontend, port=args.port, host=args.host)
     elif args.command == 'clean':

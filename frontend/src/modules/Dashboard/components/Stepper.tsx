@@ -1,5 +1,5 @@
-import React, { ReactElement } from 'react';
 import { Check, ChevronRight } from 'lucide-react';
+import React, { ReactElement } from 'react';
 
 interface StepperProps {
   active: number;
@@ -39,6 +39,7 @@ export const Stepper: React.FC<StepperProps> = ({
           const stepProps = step.props;
           const isActive = index === active;
           const isPast = index < active;
+
 
           return (
             <div key={index} className="flex gap-4">
@@ -99,6 +100,7 @@ export const Stepper: React.FC<StepperProps> = ({
           const stepProps = step.props;
           const isActive = index === active;
           const isPast = index < active;
+
 
           return (
             <React.Fragment key={index}>
