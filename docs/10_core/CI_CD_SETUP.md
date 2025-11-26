@@ -1,10 +1,70 @@
-# Configuración de GitHub Actions
+# Configuración de CI/CD y Automatización
 
-Atheria utiliza GitHub Actions y el CLI de Gemini para automatizar tareas como revisión de código, triaje de issues e invocación de comandos AI.
+Atheria utiliza GitHub Actions para dos propósitos principales:
 
-Este documento explica cómo configurar el repositorio para que estas acciones funcionen correctamente.
+1.  **CI/CD (Integración y Despliegue Continuo):** Automatización de pruebas y despliegue del proyecto.
+2.  **Automatización con IA (Gemini CLI):** Ayuda en tareas de desarrollo como revisión de código y triaje de issues.
 
-## 🔑 Secretos y Variables Requeridos
+Este documento explica la configuración y funcionamiento de ambos sistemas.
+
+## 1. Workflows de CI/CD del Proyecto
+
+Estos flujos de trabajo aseguran la calidad del código y automatizan el despliegue del frontend.
+
+### `ci.yml` - Integración Continua
+
+Este workflow es el **guardián de la calidad del código**.
+
+-   **Disparadores:** Se ejecuta automáticamente en cada `push` y `pull request` a la rama `main`.
+-   **Objetivo:** Verificar que los nuevos cambios no rompen ninguna parte del proyecto.
+
+**Proceso que ejecuta:**
+1.  **Checkout:** Descarga el código del repositorio.
+2.  **Setup Entornos:** Configura los entornos de Python (3.10) y Node.js (18).
+3.  **Frontend Check:**
+    - Instala dependencias (`npm ci`).
+    - **Valida y auto-corrige el estilo del código (`npm run lint`):**
+      - **Paso 1: Chequeo Inicial.** Se ejecuta `npm run lint`. Si pasa, el proceso continúa.
+      - **Paso 2: Auto-Corrección.** Si el chequeo falla, el sistema intenta corregir los errores automáticamente ejecutando `npm run lint -- --fix`.
+      - **Paso 3: Commit Automático.** Si se aplican arreglos, el bot `github-actions[bot]` crea un commit con los cambios y un mensaje descriptivo.
+      - **Paso 4: Solicitud de Revisión.** Después de subir el commit, el bot publica un comentario en el PR (`@gemini-cli /review`) para solicitar una revisión de los cambios automáticos a un agente de IA.
+      - **Paso 5: Re-verificación.** El flujo de trabajo se detiene y se reinicia desde el principio para validar el nuevo código corregido. Si el `lint` sigue fallando, el proceso se detiene definitivamente para intervención manual.
+    - Construye el proyecto para producción (`npm run build`) para asegurar que compila.
+4.  **Backend Check:**
+    - Instala dependencias de Python (`pip install -e .`).
+    - Compila las extensiones nativas de C++ (`setup.py build_ext`).
+    - Ejecuta la suite de pruebas del backend (`pytest`).
+
+Si alguno de estos pasos falla, el workflow marcará el commit o PR como fallido.
+
+**✨ Nueva Funcionalidad: Reporte de Errores en PRs**
+Si el paso "Build Frontend" (`npm run build`) falla durante la ejecución de un Pull Request, el workflow publicará automáticamente un comentario en el PR con el log del error. Esto permite a los desarrolladores diagnosticar y corregir problemas de compilación rápidamente sin necesidad de revisar los logs completos del workflow.
+
+### `deploy-pages.yml` - Despliegue a GitHub Pages
+
+Este workflow es el **publicador automático del frontend**.
+
+-   **Disparadores:** Se ejecuta automáticamente solo cuando se hace un `push` a la rama `main`.
+-   **Objetivo:** Desplegar la última versión del frontend a GitHub Pages.
+
+**Proceso que ejecuta:**
+1.  **Checkout y Setup:** Descarga el código y configura Node.js.
+2.  **Build Frontend:** Instala dependencias con `npm ci` y construye la versión de producción (`npm run build`).
+3.  **Deploy:** Sube los archivos generados (del directorio `frontend/dist`) a GitHub Pages.
+
+#### ⚠️ Acción Requerida
+
+Para que este despliegue funcione, un administrador del repositorio debe hacer lo siguiente **una única vez**:
+1.  Ir a **Settings** -> **Pages**.
+2.  En la sección "Build and deployment", cambiar la **Source** a **"GitHub Actions"**.
+
+---
+
+## 2. Automatización con IA (Gemini CLI)
+
+Atheria utiliza el CLI de Gemini para automatizar tareas como revisión de código, triaje de issues e invocación de comandos AI.
+
+## 🔑 Secretos y Variables Requeridos (Gemini)
 
 Para que los workflows de Gemini (`.github/workflows/gemini-*.yml`) funcionen, necesitas configurar los siguientes secretos y variables en tu repositorio.
 
