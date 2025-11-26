@@ -525,9 +525,10 @@ class NativeEngineWrapper:
         para compatibilidad con el frontend.
         
         OPTIMIZACIONES CRÍTICAS:
-        - Vectorización C++: Usa get_dense_tensor() para evitar bucles Python
         - Lazy conversion: solo se llama cuando se necesita
         - ROI support: solo convierte región visible si se proporciona
+        - Pause check: verifica pausa periódicamente durante conversión
+        - Duplicate filtering: filtra coordenadas duplicadas del motor nativo
         
         Args:
             roi: Region of Interest (x_min, y_min, x_max, y_max) opcional.
@@ -541,45 +542,6 @@ class NativeEngineWrapper:
                 1, self.grid_size, self.grid_size, self.d_state,
                 dtype=torch.complex64, device=self.device
             )
-        
-        # OPTIMIZACIÓN: Usar método vectorizado C++ si está disponible
-        if hasattr(self.native_engine, 'get_dense_tensor'):
-            try:
-                roi_list = []
-                if roi:
-                    # Asegurar que son int64
-                    roi_list = [int(x) for x in roi]
-                
-                # Llamada al motor nativo (extremadamente rápida)
-                # Retorna tensor [1, H, W, d] con vacío + materia
-                dense_tensor = self.native_engine.get_dense_tensor(roi_list)
-                
-                if roi:
-                    x_min, y_min, x_max, y_max = roi
-                    # Asegurar límites
-                    x_min = max(0, min(x_min, self.grid_size))
-                    y_min = max(0, min(y_min, self.grid_size))
-                    x_max = max(x_min, min(x_max, self.grid_size))
-                    y_max = max(y_min, min(y_max, self.grid_size))
-                    
-                    # Verificar dimensiones retornadas
-                    h, w = dense_tensor.shape[1], dense_tensor.shape[2]
-                    expected_h, expected_w = y_max - y_min, x_max - x_min
-                    
-                    if h == expected_h and w == expected_w:
-                        self.state.psi[0, y_min:y_max, x_min:x_max] = dense_tensor[0]
-                    else:
-                        logging.warning(f"⚠️ Mismatch dimensiones get_dense_tensor: got {h}x{w}, expected {expected_h}x{expected_w}")
-                else:
-                    self.state.psi = dense_tensor
-                
-                return
-            except Exception as e:
-                logging.error(f"❌ Error en get_dense_tensor nativo: {e}. Usando fallback lento.")
-                # Continuar con método lento
-        
-        # --- FALLBACK: Método lento (iteración Python) ---
-        logging.warning("⚠️ Usando conversión lenta (Python loop). Actualice el motor nativo.")
         
         # OPTIMIZACIÓN: Determinar región a convertir (ROI o todo el grid)
         if roi is not None:
@@ -596,6 +558,7 @@ class NativeEngineWrapper:
                 for y in range(y_min, y_max)
                 for x in range(x_min, x_max)
             ]
+            logging.debug(f"Convirtiendo solo ROI: ({x_min}, {y_min}) - ({x_max}, {y_max}), {len(coords_list)} coordenadas")
         else:
             # Sin ROI: convertir todo el grid (fallback)
             coords_list = [
@@ -603,6 +566,7 @@ class NativeEngineWrapper:
                 for y in range(self.grid_size)
                 for x in range(self.grid_size)
             ]
+            logging.debug(f"Convirtiendo todo el grid: {len(coords_list)} coordenadas")
         
         # OPTIMIZACIÓN: Usar batching y verificación de pausa
         try:
@@ -612,15 +576,21 @@ class NativeEngineWrapper:
             try:
                 # Intentar obtener coordenadas activas (si el motor nativo lo expone)
                 if hasattr(self.native_engine, 'get_active_coords'):
+                    logging.debug("🔍 Solicitando coordenadas activas al motor nativo...")
                     active_coords_list = self.native_engine.get_active_coords()
+                    logging.debug(f"✅ Coordenadas activas recibidas: {len(active_coords_list) if active_coords_list else 0}")
                     if active_coords_list and len(active_coords_list) > 0:
                         # CRÍTICO: Filtrar duplicados Y coordenadas fuera del plano Z=0
+                        # El motor nativo es 3D y puede propagar a Z!=0, pero la visualización es 2D
+                        # Filtramos para quedarnos solo con el slice Z=0 y evitar "duplicados" en la proyección 2D
                         unique_coords_set = set()
                         unique_active_coords = []
+                        z_filtered_count = 0
                         
                         for coord in active_coords_list:
                             # Solo procesar slice Z=0
                             if coord.z != 0:
+                                z_filtered_count += 1
                                 continue
                                 
                             coord_tuple = (coord.x, coord.y, coord.z)
@@ -628,6 +598,12 @@ class NativeEngineWrapper:
                                 unique_coords_set.add(coord_tuple)
                                 unique_active_coords.append(coord)
                         
+                        if z_filtered_count > 0:
+                            logging.debug(f"🔄 Filtrados {z_filtered_count} partículas fuera del plano Z=0")
+
+                        if len(unique_active_coords) < len(active_coords_list) - z_filtered_count:
+                            logging.debug(f"🔄 Filtrados {len(active_coords_list) - z_filtered_count - len(unique_active_coords)} duplicados reales en Z=0")
+
                         active_coords_list = unique_active_coords
 
                         # Filtrar coordenadas activas por ROI si aplica
@@ -640,12 +616,14 @@ class NativeEngineWrapper:
                         else:
                             active_coords = active_coords_list
             except Exception as e:
+                logging.warning(f"⚠️ Error obteniendo coordenadas activas: {e}")
                 pass
             
             # Si tenemos coordenadas activas, usar solo esas (mucho más rápido)
             if active_coords is not None and len(active_coords) > 0:
                 coords_to_process = active_coords
                 BATCH_SIZE = 1000  # Batch más grande para coordenadas activas
+                logging.debug(f"Usando {len(active_coords)} coordenadas activas (ROI aplicado)")
             else:
                 # Sin coordenadas activas: usar lista completa (ROI o todo el grid)
                 # OPTIMIZACIÓN: Sampling también para lista completa si es muy grande
@@ -653,14 +631,21 @@ class NativeEngineWrapper:
                 if total_coords > 100000:  # Para grids muy grandes
                     sample_rate = max(1, total_coords // 50000)  # Máximo 50k coordenadas
                     coords_to_process = coords_list[::sample_rate]
+                    logging.info(f"🔄 Sampling para lista completa: {len(coords_to_process)} de {total_coords} coordenadas (rate={sample_rate})")
                 else:
                     coords_to_process = coords_list
                 BATCH_SIZE = 1000  # Batch más grande para mejor rendimiento
+                logging.debug(f"Usando lista completa: {len(coords_to_process)} coordenadas")
             
             # Procesar en batches con verificación de pausa
+            non_zero_count = 0
             total_processed = 0
+            max_abs_value = 0.0
             
             total_batches = (len(coords_to_process) + BATCH_SIZE - 1) // BATCH_SIZE
+            # Solo loguear inicio si son muchos batches
+            if total_batches > 5:
+                logging.info(f"🔄 Iniciando conversión: {len(coords_to_process)} coordenadas en {total_batches} batches (tamaño={BATCH_SIZE})")
             
             import time
             start_time = time.time()
@@ -669,11 +654,18 @@ class NativeEngineWrapper:
             for batch_idx, i in enumerate(range(0, len(coords_to_process), BATCH_SIZE)):
                 # CRÍTICO: Verificar pausa cada batch para permitir pausa inmediata
                 if check_pause_callback and check_pause_callback():
+                    logging.debug("Conversión interrumpida por pausa")
                     return  # Salir temprano si está pausado
                 
                 # CRÍTICO: Verificar timeout global
                 if time.time() - start_time > TIMEOUT:
+                    logging.error(f"❌ Timeout en conversión denso-disperso (> {TIMEOUT}s). Retornando estado parcial.")
+                    # Si falla, intentar al menos devolver lo que tenemos o un estado válido mínimo
                     break
+
+                # Logging periódico para evitar bloqueos silenciosos (menos frecuente)
+                if total_batches > 10 and (batch_idx % 20 == 0 or batch_idx == total_batches - 1):
+                    logging.info(f"📊 Conversión progreso: batch {batch_idx+1}/{total_batches} ({total_processed} procesadas)")
 
                 batch_coords = coords_to_process[i:i+BATCH_SIZE]
                 for coord_idx, coord in enumerate(batch_coords):
@@ -686,17 +678,32 @@ class NativeEngineWrapper:
                         
                         # Verificar shape antes de copiar
                         if state_tensor.shape == (self.d_state,):
+                            # Verificar si el estado tiene datos válidos (no todo ceros)
+                            abs_value = state_tensor.abs().max().item()
+                            if abs_value > 1e-10:
+                                non_zero_count += 1
+                                max_abs_value = max(max_abs_value, abs_value)
+
                             # Mover a dispositivo correcto si es necesario
                             if state_tensor.device != self.device:
                                 state_tensor = state_tensor.to(self.device)
                             
                             # Copiar al estado denso (batch, H, W, d_state)
+                            # CRÍTICO: Verificar que las coordenadas estén dentro del rango válido
                             if 0 <= coord.x < self.grid_size and 0 <= coord.y < self.grid_size:
                                 self.state.psi[0, coord.y, coord.x] = state_tensor
                             
                             total_processed += 1
+                        else:
+                            # Silencioso para no saturar logs
+                            pass
                     except Exception as e:
+                        # Silencioso para no saturar logs
                         pass
+
+            # DEBUG: Logging de estadísticas de conversión (solo si hubo algo procesado)
+            if total_processed > 0 and non_zero_count == 0:
+                 logging.warning(f"⚠️ Conversión completada pero 0/{total_processed} coordenadas tienen estado no-cero. El motor nativo podría estar vacío.")
                         
         except Exception as e:
             logging.error(f"❌ Error convirtiendo estado disperso a denso: {e}", exc_info=True)
@@ -791,8 +798,11 @@ class NativeEngineWrapper:
         """
         import numpy as np
         
-        logging.warning(f"⚠️ add_initial_particles() es DEPRECADO. Usando regenerate_initial_state() en su lugar.")
+        logging.warning(f"⚠️ add_initial_particles() es DEPRECADO y NO respeta la ley M.")
+        logging.warning(f"⚠️ Las partículas deberían emerger del estado inicial según INITIAL_STATE_MODE_INFERENCE.")
+        logging.info(f"💡 Usando regenerate_initial_state() en su lugar...")
         
+        # Usar el método correcto que respeta la ley M
         try:
             self.regenerate_initial_state()
         except Exception as e:
@@ -899,45 +909,4 @@ class NativeEngineWrapper:
         """
         if self.state.psi is None or self._dense_state_stale:
             self.get_dense_state(check_pause_callback=lambda: False)
-
-
-def export_model_to_jit(model, experiment_name: str, input_shape: tuple) -> str:
-    """
-    Exporta un modelo PyTorch a TorchScript (JIT) para uso en el motor nativo.
-    
-    Args:
-        model: Modelo PyTorch (nn.Module)
-        experiment_name: Nombre del experimento (para nombrar el archivo)
-        input_shape: Shape del input de ejemplo (B, C, H, W)
-        
-    Returns:
-        Path al archivo .pt exportado
-    """
-    import os
-    from pathlib import Path
-    
-    # Crear directorio de salida si no existe
-    output_dir = Path("output/jit_models")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    output_path = output_dir / f"{experiment_name}.pt"
-    
-    logging.info(f"🔄 Exportando modelo '{experiment_name}' a TorchScript...")
-    
-    try:
-        model.eval()
-        # Crear input de ejemplo en el mismo dispositivo que el modelo
-        device = next(model.parameters()).device
-        example_input = torch.randn(input_shape, device=device)
-        
-        # Tracing
-        traced_script_module = torch.jit.trace(model, example_input)
-        traced_script_module.save(str(output_path))
-        
-        logging.info(f"✅ Modelo exportado exitosamente a: {output_path}")
-        return str(output_path)
-        
-    except Exception as e:
-        logging.error(f"❌ Error exportando modelo a JIT: {e}")
-        raise
 

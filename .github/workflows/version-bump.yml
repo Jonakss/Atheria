@@ -87,11 +87,10 @@ jobs:
           done
 
           if $is_docs_only; then
-            echo "✅ El PR solo contiene cambios en 'docs/'. Saltando bump de versión."
+            echo "✅ La operación solo contiene cambios en 'docs/'. Saltando bump de versión."
             echo "skip=true" >> $GITHUB_OUTPUT
           else
-            echo "📝 El PR contiene cambios de código. Procediendo con el bump."
-            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "📝 La operación contiene cambios de código. Procediendo con el bump."
           fi
 
       - name: Determinar tipo de bump

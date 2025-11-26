@@ -11,7 +11,8 @@ __pycache__/
 # IMPORTANT: Ignore .so in root (build artifacts should not be committed)
 /*.so
 
-
+# Allow .so in src/ (native engine module needed for runtime)
+!/src/*.so
 
 # Distribution / packaging
 .Python
@@ -162,4 +163,3 @@ frontend/node_modules/
 # CMake build artifacts
 build/
 local_install/
-stress_test_model.pt

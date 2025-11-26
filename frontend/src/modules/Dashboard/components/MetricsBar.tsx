@@ -1,8 +1,7 @@
-import { ChevronDown, ChevronUp } from 'lucide-react';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useWebSocket } from '../../../hooks/useWebSocket';
-import { EpochIndicator } from './EpochIndicator';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { FieldWidget } from './FieldWidget';
+import { useWebSocket } from '../../../hooks/useWebSocket';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 
 export const MetricsBar: React.FC = () => {
   const { simData, allLogs, connectionStatus } = useWebSocket();
@@ -313,8 +312,8 @@ export const MetricsBar: React.FC = () => {
         
         <div className={`grid transition-all duration-300 ease-in-out ${
           expanded 
-            ? 'grid-cols-6 gap-4' 
-            : 'grid-cols-6 gap-2'
+            ? 'grid-cols-5 gap-4'
+            : 'grid-cols-5 gap-2'
         }`}>
           {/* Widget de Energía de Vacío - con visualización de campo de densidad */}
           <FieldWidget
@@ -391,20 +390,6 @@ export const MetricsBar: React.FC = () => {
                 newCollapsed.delete('decay_rate');
               } else {
                 newCollapsed.add('decay_rate');
-              }
-              setCollapsedWidgets(newCollapsed);
-            }}
-          />
-          
-          {/* Widget de Época - NUEVO: Detector de Evolución del Universo */}
-          <EpochIndicator
-            isCollapsed={collapsedWidgets.has('epoch_detector')}
-            onToggleCollapse={() => {
-              const newCollapsed = new Set(collapsedWidgets);
-              if (newCollapsed.has('epoch_detector')) {
-                newCollapsed.delete('epoch_detector');
-              } else {
-                newCollapsed.add('epoch_detector');
               }
               setCollapsedWidgets(newCollapsed);
             }}

@@ -17,7 +17,7 @@ from ... import config as global_cfg
 from ...engines.qca_engine import Aetheria_Motor, QuantumState
 from ...engines.harmonic_engine import SparseHarmonicEngine
 from ..viz import get_visualization_data
-from ...analysis.epoch_detector import EpochDetector
+from ...physics.analysis.EpochDetector import EpochDetector
 from ...utils import get_latest_checkpoint, get_latest_jit_model, load_experiment_config
 
 logger = logging.getLogger(__name__)
@@ -392,7 +392,7 @@ async def handle_load_experiment(args):
                     from ...engines.native_engine_wrapper import export_model_to_jit
                     d_state = exp_cfg.MODEL_PARAMS.d_state
                     grid_size = g_state.get('inference_grid_size', global_cfg.GRID_SIZE_INFERENCE)
-                    jit_path = export_model_to_jit(temp_model, exp_name, (1, 2 * d_state, grid_size, grid_size))
+                    jit_path = export_model_to_jit(temp_model, exp_name, (1, d_state, grid_size, grid_size))
                     del temp_model
                     gc.collect()
                     if torch.cuda.is_available(): torch.cuda.empty_cache()

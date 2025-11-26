@@ -106,8 +106,6 @@ class QC_Trainer_v4:
             'max_checkpoints_to_keep': max_checkpoints_to_keep,
             'max_noise': max_noise
         }
-        # Guardar la configuración completa para referencia en save_checkpoint
-        self.exp_cfg = self._get_exp_config_from_params(experiment_name, model_class, model_params, lr, grid_size, qca_steps, gamma_decay, max_noise)
         self.doc_logger.initialize_or_load(config_dict)
         
         # Tensorboard (opcional)
@@ -117,36 +115,6 @@ class QC_Trainer_v4:
                 self.writer = SummaryWriter(log_dir=os.path.join(global_cfg.LOGS_DIR, experiment_name))
             except Exception as e:
                 logging.warning(f"No se pudo inicializar Tensorboard: {e}")
-
-    def _get_exp_config_from_params(self, experiment_name, model_class, model_params, lr, grid_size, qca_steps, gamma_decay, max_noise):
-        """
-        Construye un diccionario de configuración a partir de los parámetros del constructor.
-        """
-        from types import SimpleNamespace
-
-        # Convertir model_params a dict si es necesario
-        if isinstance(model_params, SimpleNamespace):
-            model_params_dict = vars(model_params)
-        elif isinstance(model_params, dict):
-            model_params_dict = model_params
-        return {
-            "EXPERIMENT_NAME": experiment_name,
-            "MODEL_ARCHITECTURE": model_class.__name__,
-            "MODEL_PARAMS": model_params_dict,
-            "LR_RATE_M": lr,
-            "GRID_SIZE_TRAINING": grid_size,
-
-        return {
-            "EXPERIMENT_NAME": experiment_name,
-            "MODEL_ARCHITECTURE": model_class.__name__ if model_class else "Unknown",
-            "MODEL_PARAMS": model_params_dict,
-            "LR_RATE_M": lr,
-            "GRID_SIZE_TRAINING": grid_size,
-            "QCA_STEPS_TRAINING": qca_steps,
-            "GAMMA_DECAY": gamma_decay,
-            "NOISE_LEVEL": max_noise,
-            "TRAINER_VERSION": "v4"
-        }
 
     def loss_function_evolutionary(self, psi_history, psi_initial):
         """
@@ -315,8 +283,7 @@ class QC_Trainer_v4:
             'scheduler_state_dict': self.scheduler.state_dict(),
             'loss': current_loss,
             'metrics': current_metrics.copy(),
-            'combined_metric': combined_metric,
-            'exp_config': self.exp_cfg
+            'combined_metric': combined_metric
         }
         torch.save(checkpoint_data, path)
         
