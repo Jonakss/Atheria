@@ -162,13 +162,25 @@ int64_t Engine::step_native() {
         auto indices_x = torch::tensor(idx_x, torch::kLong).to(device_);
         
         if (stacked_matter.is_complex()) {
-            auto real_part = torch::real(stacked_matter);
-            auto imag_part = torch::imag(stacked_matter);
+            auto real_part = torch::real(stacked_matter).t(); // [d, TotalN]
+            auto imag_part = torch::imag(stacked_matter).t(); // [d, TotalN]
             
-            batch_tensor.index_put_({torch::indexing::Slice(0, d_state_), indices_b, indices_y, indices_x}, real_part.t());
-            batch_tensor.index_put_({torch::indexing::Slice(d_state_, 2 * d_state_), indices_b, indices_y, indices_x}, imag_part.t());
+            for (int64_t c = 0; c < d_state_; ++c) {
+                auto c_tensor = torch::tensor(c, torch::kLong).to(device_);
+                auto c_imag_tensor = torch::tensor(c + d_state_, torch::kLong).to(device_);
+                
+                // Real: [b, c, y, x] = real_part[c]
+                batch_tensor.index_put_({indices_b, c_tensor, indices_y, indices_x}, real_part[c]);
+                
+                // Imag: [b, c+d, y, x] = imag_part[c]
+                batch_tensor.index_put_({indices_b, c_imag_tensor, indices_y, indices_x}, imag_part[c]);
+            }
         } else {
-            batch_tensor.index_put_({torch::indexing::Slice(0, d_state_), indices_b, indices_y, indices_x}, stacked_matter.t());
+            auto matter_t = stacked_matter.t(); // [d, TotalN]
+            for (int64_t c = 0; c < d_state_; ++c) {
+                auto c_tensor = torch::tensor(c, torch::kLong).to(device_);
+                batch_tensor.index_put_({indices_b, c_tensor, indices_y, indices_x}, matter_t[c]);
+            }
         }
     }
     
