@@ -11,10 +11,13 @@
             "id": "7a1f269a0d340ce6",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
-              "icon": "lucide-file",
-              "title": "New tab"
+              "type": "bases",
+              "state": {
+                "file": "Untitled.base",
+                "viewName": "Table"
+              },
+              "icon": "lucide-table",
+              "title": "Untitled"
             }
           }
         ]
@@ -164,6 +167,9 @@
   },
   "active": "7a1f269a0d340ce6",
   "lastOpenFiles": [
+    "Untitled.canvas",
+    "Untitled.base",
+    "OBSIDIAN_SETUP.md",
     "20_Concepts/SPARSE_ENGINE_ACTIVE_NEIGHBORS.md",
     "40_Experiments/SNN_UNET-d12-h128-g64-lr1e-4.md",
     "30_Components/UNIVERSE_ATLAS_ANALYSIS.md",
@@ -178,7 +184,6 @@
     "30_Components/ARCHITECTURE_V3.md",
     "README.md",
     "30_Components/Models.md",
-    "OBSIDIAN_SETUP.md",
     "30_Components/VOXEL_ENGINE_SUGGESTIONS.md",
     "30_Components/FRONTEND_IMPROVEMENTS.md",
     "40_Experiments/EXP_007_SPATIAL_INDEXING_VERIFICATION.md",
@@ -188,7 +193,6 @@
     "20_Concepts/00_CONCEPTS_MOC.md",
     "40_Experiments/00_EXPERIMENTS_MOC.md",
     "30_Components/00_COMPONENTS_MOC.md",
-    "10_core/00_CORE_MOC.md",
-    "20_Concepts/HARMONIC_VACUUM_CONCEPT.md"
+    "10_core/00_CORE_MOC.md"
   ]
 }

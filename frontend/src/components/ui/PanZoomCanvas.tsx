@@ -7,13 +7,13 @@ import { ActionIcon } from '../../modules/Dashboard/components/ActionIcon';
 import { Box } from '../../modules/Dashboard/components/Box';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
 import { Group } from '../../modules/Dashboard/components/Group';
+import { Select } from '../../modules/Dashboard/components/Select';
 import { Stack } from '../../modules/Dashboard/components/Stack';
 import { Switch } from '../../modules/Dashboard/components/Switch';
 import { Text } from '../../modules/Dashboard/components/Text';
 import { Tooltip } from '../../modules/Dashboard/components/Tooltip';
 import { isWebGLAvailable } from '../../utils/shaderVisualization';
 import { ShaderCanvas } from './ShaderCanvas';
-import { Select } from '../../modules/Dashboard/components/Select';
 
 export interface OverlayConfig {
     showGrid: boolean;
@@ -108,30 +108,53 @@ export function OverlayControls({ config, onConfigChange }: OverlayControlsProps
     );
 }
 
+// Viridis colormap implementation (continuous) to match Shader
+const VIRIDIS_LUT: string[] = [];
+
+// Initialize LUT
+(() => {
+    const c0 = [0.267004, 0.004874, 0.329415];
+    const c1 = [0.127568, 0.566949, 0.550556];
+    const c2 = [0.369214, 0.788888, 0.382914];
+    const c3 = [0.993248, 0.906157, 0.143936];
+
+    for (let i = 0; i < 256; i++) {
+        const t = i / 255;
+        let r, g, b;
+
+        if (t < 0.33) {
+            const factor = t * 3.0;
+            r = c0[0] * (1 - factor) + c1[0] * factor;
+            g = c0[1] * (1 - factor) + c1[1] * factor;
+            b = c0[2] * (1 - factor) + c1[2] * factor;
+        } else if (t < 0.66) {
+            const factor = (t - 0.33) * 3.0;
+            r = c1[0] * (1 - factor) + c2[0] * factor;
+            g = c1[1] * (1 - factor) + c2[1] * factor;
+            b = c1[2] * (1 - factor) + c2[2] * factor;
+        } else {
+            const factor = (t - 0.66) * 3.0;
+            r = c2[0] * (1 - factor) + c3[0] * factor;
+            g = c2[1] * (1 - factor) + c3[1] * factor;
+            b = c2[2] * (1 - factor) + c3[2] * factor;
+        }
+
+        VIRIDIS_LUT.push(`rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`);
+    }
+})();
+
 function getColor(value: number) {
     // Validar que value sea un número válido
     if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) {
-        return 'rgb(68, 1, 84)'; // Color por defecto (primero de la paleta)
+        return VIRIDIS_LUT[0]; 
     }
-    
-    const colors = [
-        [68, 1, 84], [72, 40, 120], [62, 74, 137], [49, 104, 142],
-        [38, 130, 142], [31, 158, 137], [53, 183, 121], [109, 205, 89],
-        [180, 222, 44], [253, 231, 37], [255, 200, 0], [255, 150, 0],
-        [255, 100, 0], [255, 50, 0], [255, 0, 0]
-    ];
     
     // Asegurar que value esté en el rango [0, 1]
     const normalizedValue = Math.max(0, Math.min(1, value));
-    const i = Math.min(Math.max(Math.floor(normalizedValue * (colors.length - 1)), 0), colors.length - 1);
-    const c = colors[i];
     
-    // Validar que el color existe
-    if (!c || !Array.isArray(c) || c.length < 3) {
-        return 'rgb(68, 1, 84)'; // Color por defecto
-    }
-    
-    return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+    // Map to 0-255 index
+    const index = Math.floor(normalizedValue * 255);
+    return VIRIDIS_LUT[index];
 }
 
 interface PanZoomCanvasProps {
