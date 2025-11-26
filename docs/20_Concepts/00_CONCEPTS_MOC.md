@@ -14,6 +14,11 @@
 - **[Arquitectura Sparse en V4](../20_Concepts/SPARSE_ARCHITECTURE_V4.md)** - Sparse como arquitectura base del motor nativo C++
 - **[Configuración de CUDA](../20_Concepts/CUDA_CONFIGURATION.md)** - Configuración y troubleshooting de CUDA para PyTorch y motor nativo
 - **[Paralelismo Nativo (OpenMP)](../20_Concepts/NATIVE_PARALLELISM.md)** - Documentación sobre la implementación de paralelismo en el motor C++
+- **[History Buffer Architecture](../20_Concepts/HISTORY_BUFFER_ARCHITECTURE.md)** - Sistema de buffer circular para navegación temporal (rewind/replay)
+
+## 🎨 Visualización y Rendering
+
+- **[WebGL Shaders](../20_Concepts/WEBGL_SHADERS.md)** - Guía completa para trabajar con shaders WebGL GPU-accelerated
 
 ---
 
