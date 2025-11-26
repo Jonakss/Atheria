@@ -12,6 +12,8 @@ from datetime import datetime
 from typing import Dict, List, Optional
 import torch
 
+from collections import deque
+
 HISTORY_DIR = Path("output/simulation_history")
 
 class SimulationHistory:
@@ -23,7 +25,8 @@ class SimulationHistory:
             max_frames: Número máximo de frames a mantener en memoria
         """
         self.max_frames = max_frames
-        self.frames: List[Dict] = []
+        # Usar deque para buffer circular eficiente O(1) en append/pop
+        self.frames: deque = deque(maxlen=max_frames)
         self.history_dir = HISTORY_DIR
         self.history_dir.mkdir(parents=True, exist_ok=True)
     
@@ -47,7 +50,6 @@ class SimulationHistory:
                         # Downsample tomando cada 2x2 bloque y promediando
                         if len(map_data.shape) == 2:
                             # Array 2D: [height, width]
-                            h, w = map_data.shape
                             downsampled = map_data[::2, ::2]  # Tomar cada 2 píxeles
                             map_data = downsampled.tolist() if not isinstance(map_data, list) else downsampled
                         elif isinstance(map_data, list) and len(map_data) > 0:
@@ -72,15 +74,12 @@ class SimulationHistory:
             'timestamp': frame_data.get('timestamp', datetime.now().isoformat()),
             'map_data': map_data,  # Ya optimizado con downsampling si es necesario
             'hist_data': frame_data.get('hist_data', {}),
+            'psi': frame_data.get('psi'),  # Guardar estado cuántico para restauración (solo en memoria)
             # No guardar poincare_coords, phase_attractor, flow_data (se pueden recalcular)
         }
         
         self.frames.append(optimized_frame)
-        
-        # Limitar tamaño - eliminar los más antiguos si excede el límite
-        if len(self.frames) > self.max_frames:
-            # Eliminar los frames más antiguos (mantener solo los últimos max_frames)
-            self.frames = self.frames[-self.max_frames:]
+        # deque maneja automáticamente el maxlen, no necesitamos eliminar manualmente
     
     def save_to_file(self, filename: Optional[str] = None) -> Path:
         """
@@ -106,6 +105,7 @@ class SimulationHistory:
                 'timestamp': frame['timestamp'],
                 'map_data': frame['map_data'].tolist() if isinstance(frame['map_data'], np.ndarray) else frame['map_data'],
                 'hist_data': frame['hist_data']
+                # 'psi' no se guarda en JSON (no serializable y muy pesado)
             }
             serializable_frames.append(serializable_frame)
         
@@ -138,7 +138,8 @@ class SimulationHistory:
             with open(filepath, 'r') as f:
                 data = json.load(f)
             
-            self.frames = data.get('frames', [])
+            loaded_frames = data.get('frames', [])
+            self.frames = deque(loaded_frames, maxlen=self.max_frames)
             logging.info(f"Historial cargado: {filepath} ({len(self.frames)} frames)")
             return True
         except Exception as e:
@@ -147,11 +148,12 @@ class SimulationHistory:
     
     def clear(self):
         """Limpia el historial."""
-        self.frames = []
+        self.frames.clear()
         logging.info("Historial limpiado")
     
     def get_frame(self, step: int) -> Optional[Dict]:
         """Obtiene un frame por su step."""
+        # Búsqueda lineal (optimizable si los steps son secuenciales, pero deque no tiene búsqueda binaria eficiente)
         for frame in self.frames:
             if frame['step'] == step:
                 return frame
@@ -166,11 +168,15 @@ class SimulationHistory:
         if not self.frames:
             return {}
         
-        steps = [f['step'] for f in self.frames]
+        # Convertir a lista para obtener min/max steps (costoso si es muy grande, pero necesario)
+        # Optimización: solo mirar el primero y el último si están ordenados (asumimos que sí)
+        first_frame = self.frames[0]
+        last_frame = self.frames[-1]
+        
         return {
             'total_frames': len(self.frames),
-            'min_step': min(steps),
-            'max_step': max(steps),
-            'step_range': max(steps) - min(steps) if steps else 0
+            'min_step': first_frame['step'],
+            'max_step': last_frame['step'],
+            'step_range': last_frame['step'] - first_frame['step']
         }
 
