@@ -16,6 +16,7 @@
 
 ## 📋 Índice de Entradas
 
+- [[#2025-11-26 - Feature: Native Engine Parallelism (OpenMP)]]
 - [[#2025-11-26 - Fix: Persistent Frame Sending (Duplicate Logic Removal)]]
 - [[#2025-11-26 - Actualización Completa de Roadmaps (Fases 1-4)]]
 - [[#2025-11-26 - Fix: Saturación de WebSocket en Modo Full Speed]]
@@ -44,6 +45,18 @@
 - [[#2024-12-XX - Fase 3 Completada: Migración de Componentes UI]]
 - [[#2024-12-XX - Fase 2 Iniciada: Setup Motor Nativo C++]]
 - [[#2024-12-XX - Optimización de Logs y Reducción de Verbosidad]]
+
+---
+
+## 2025-11-26 - Feature: Native Engine Parallelism (OpenMP)
+
+> **Nota:** Esta entrada ha sido migrada al nuevo formato de logs individuales.
+>
+> Ver documentación completa en: [[logs/2025-11-26_native_parallelism_openmp|2025-11-26 - Feature: Native Engine Parallelism (OpenMP)]]
+
+**Resumen:** Implementado paralelismo multi-hilo en el motor nativo C++ (`sparse_engine.cpp`) utilizando OpenMP. Esto permite escalar la simulación a miles de partículas activas distribuyendo la carga de trabajo entre múltiples núcleos de CPU.
+
+**Archivos:** `src/cpp_core/src/sparse_engine.cpp`, `CMakeLists.txt`
 
 ---
 

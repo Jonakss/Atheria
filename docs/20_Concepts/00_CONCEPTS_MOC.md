@@ -13,6 +13,7 @@
 
 - **[Arquitectura Sparse en V4](../20_Concepts/SPARSE_ARCHITECTURE_V4.md)** - Sparse como arquitectura base del motor nativo C++
 - **[Configuración de CUDA](../20_Concepts/CUDA_CONFIGURATION.md)** - Configuración y troubleshooting de CUDA para PyTorch y motor nativo
+- **[Paralelismo Nativo (OpenMP)](../20_Concepts/NATIVE_PARALLELISM.md)** - Documentación sobre la implementación de paralelismo en el motor C++
 
 ---
 
