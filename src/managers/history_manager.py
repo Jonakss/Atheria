@@ -176,7 +176,8 @@ class SimulationHistory:
         return {
             'total_frames': len(self.frames),
             'min_step': first_frame['step'],
-            'max_step': last_frame['step'],
-            'step_range': last_frame['step'] - first_frame['step']
-        }
+        # Optimización: se asume que los frames están ordenados por 'step' para evitar
+        # el coste de iterar toda la lista con min()/max(). Si se cargan datos
+        # desordenados, las estadísticas pueden ser incorrectas.
+        first_frame = self.frames[0]
 
