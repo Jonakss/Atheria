@@ -48,21 +48,52 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
+      - name: Detectar cambios en Frontend
+        id: check-frontend
+        run: |
+          echo "Detectando cambios en frontend/..."
+
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            files=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" | \
+              jq -r '.[].filename')
+          else
+            # Push directo: comparar con commit anterior
+            files=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+          fi
+
+          has_frontend_changes=false
+          for file in $files; do
+            if [[ "$file" == frontend/* ]]; then
+              has_frontend_changes=true
+              break
+            fi
+          done
+
+          if $has_frontend_changes; then
+            echo "✅ Detectados cambios en frontend/"
+            echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            echo "⏭️  No hay cambios en frontend/, saltando build"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Lint Frontend
         id: lint
+        if: steps.check-frontend.outputs.skip != 'true'
         run: npm run lint --prefix frontend
         continue-on-error: true
 
       - name: Auto-fix Lint Errors
         id: auto-fix
-        if: steps.lint.outcome == 'failure'
+        if: steps.lint.outcome == 'failure' && steps.check-frontend.outputs.skip != 'true'
         run: |
           echo "⚠️ Lint check failed. Attempting to auto-fix..."
           npm run lint --prefix frontend -- --fix
 
       - name: Commit and Request Review
         id: commit-and-review
-        if: steps.auto-fix.outcome == 'success'
+        if: steps.auto-fix.outcome == 'success' && steps.check-frontend.outputs.skip != 'true'
         run: |
           # Check if there are any changes to commit
           if ! git diff --quiet --exit-code; then
@@ -85,19 +116,20 @@ jobs:
 
       - name: Build Frontend
         id: build_frontend
+        if: steps.check-frontend.outputs.skip != 'true'
         run: npm run build > build_output.log 2>&1
         working-directory: ./frontend
         continue-on-error: true
 
       - name: Upload Frontend Build Log
-        if: steps.build_frontend.outcome == 'failure'
+        if: steps.build_frontend.outcome == 'failure' && steps.check-frontend.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: frontend-build-log
           path: frontend/build_output.log
 
       - name: Report Frontend Build Failure
-        if: steps.build_frontend.outcome == 'failure' && github.event_name == 'pull_request'
+        if: steps.build_frontend.outcome == 'failure' && github.event_name == 'pull_request' && steps.check-frontend.outputs.skip != 'true'
         uses: actions/github-script@v6
         with:
           script: |
@@ -126,7 +158,7 @@ jobs:
             });
 
       - name: Check Build Status
-        if: steps.build_frontend.outcome == 'failure'
+        if: steps.build_frontend.outcome == 'failure' && steps.check-frontend.outputs.skip != 'true'
         run: |
           echo "Frontend build failed. See the artifact and the PR comment for details."
           exit 1
