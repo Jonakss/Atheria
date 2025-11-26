@@ -206,8 +206,12 @@ async def simulation_loop():
                         
                         # Enviar frame cada X pasos configurados
                         # Modo manual (steps_interval = 0): NO enviar frames automáticamente
-                        # También enviar frame si nunca se ha enviado uno (last_frame_sent_step == -1)
-                        if steps_interval == 0:
+                        # Modo fullspeed (steps_interval = -1): NO enviar frames NUNCA
+                        # También enviar frame si nunca se ha enviado uno (last_frame_sent_step == -1) EXCEPTO en fullspeed
+                        if steps_interval == -1:
+                            # Modo fullspeed: NUNCA enviar frames
+                            should_send_frame = False
+                        elif steps_interval == 0:
                             # Modo manual: NO enviar frames automáticamente
                             # Solo enviar el primer frame si nunca se ha enviado uno
                             should_send_frame = (g_state['last_frame_sent_step'] == -1)

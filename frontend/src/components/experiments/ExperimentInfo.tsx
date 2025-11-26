@@ -1,10 +1,30 @@
 // frontend/src/components/ExperimentInfo.tsx
-import { Info, Brain, Settings, ArrowRightLeft } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, Brain, Info, Settings } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
 
 export function ExperimentInfo() {
     const { activeExperiment, experimentsData, compileStatus } = useWebSocket();
+    
+    // Obtener gridSizeInference desde localStorage (sincronizado con LabSider)
+    const [gridSizeInference, setGridSizeInference] = useState<number>(() => {
+        const saved = localStorage.getItem('atheria_gridSizeInference');
+        return saved ? parseInt(saved, 10) : 256;
+    });
+    
+    // Escuchar cambios en localStorage para actualizar en tiempo real
+    useEffect(() => {
+        const handleStorageChange = () => {
+            const saved = localStorage.getItem('atheria_gridSizeInference');
+            if (saved) {
+                setGridSizeInference(parseInt(saved, 10));
+            }
+        };
+        
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, []);
     
     if (!activeExperiment) {
         return (
@@ -31,6 +51,8 @@ export function ExperimentInfo() {
     
     const config = experiment.config || {};
     const modelParams = config.MODEL_PARAMS || {};
+    const trainingGridSize = config.GRID_SIZE_TRAINING || 64;
+    const isScaled = trainingGridSize < gridSizeInference;
     
     return (
         <GlassPanel className="p-4">
@@ -101,11 +123,13 @@ export function ExperimentInfo() {
                         </div>
                         <div>
                             <span className="text-[10px] text-gray-500 block">Grid Training</span>
-                            <span className="text-sm font-medium text-gray-200">{config.GRID_SIZE_TRAINING || 'N/A'}</span>
+                            <span className="text-sm font-medium text-gray-200">{trainingGridSize}x{trainingGridSize}</span>
                         </div>
                         <div>
-                            <span className="text-[10px] text-gray-500 block">Grid Inference</span>
-                            <span className="text-sm font-medium text-blue-400">256</span>
+                            <span className="text-[10px] text-gray-500 block">Grid Inferencia</span>
+                            <span className={`text-sm font-medium ${isScaled ? 'text-pink-400' : 'text-blue-400'}`}>
+                                {gridSizeInference}x{gridSizeInference}
+                            </span>
                         </div>
                         <div>
                             <span className="text-[10px] text-gray-500 block">Gamma Decay</span>
@@ -119,6 +143,22 @@ export function ExperimentInfo() {
                             <span className="text-sm font-medium text-cyan-400">{config.INITIAL_STATE_MODE_INFERENCE || 'complex_noise'}</span>
                         </div>
                     </div>
+                    
+                    {/* Indicador de Grid Scaling */}
+                    {isScaled && (
+                        <div className="col-span-2 mt-1 p-2 bg-pink-500/10 border border-pink-500/30 rounded flex items-start gap-2">
+                            <AlertTriangle size={14} className="text-pink-400 shrink-0 mt-0.5" />
+                            <div>
+                                <div className="text-[10px] font-bold text-pink-400 uppercase mb-0.5">Grid Escalado</div>
+                                <div className="text-[10px] text-pink-300">
+                                    {trainingGridSize}x{trainingGridSize} (original) → {gridSizeInference}x{gridSizeInference} (inferencia)
+                                </div>
+                                <div className="text-[9px] text-gray-500 mt-1">
+                                    El modelo replica el estado entrenado en un grid más grande
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
                 
                 {/* Información del Motor y Dispositivo */}
