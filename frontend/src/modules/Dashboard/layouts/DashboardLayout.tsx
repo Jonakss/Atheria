@@ -4,6 +4,7 @@ import { PanZoomCanvas } from '../../../components/ui/PanZoomCanvas';
 import { TimelineViewer } from '../../../components/ui/TimelineViewer';
 import HolographicViewer from '../../../components/visualization/HolographicViewer';
 import { useWebSocket } from '../../../hooks/useWebSocket';
+import { HistoryControls } from '../../../modules/History/HistoryControls';
 import { AnalysisView } from '../components/AnalysisView';
 import { HistoryView } from '../components/HistoryView';
 import { LogsView } from '../components/LogsView';
