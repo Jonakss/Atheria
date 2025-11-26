@@ -20,7 +20,7 @@ g_state = {
     "simulation_speed": 1.0,  # Multiplicador de velocidad
     "target_fps": 10.0,  # FPS objetivo
     "frame_skip": 0,  # Frames a saltar (0 = todos, 1 = cada otro, etc.)
-    "simulation_history": SimulationHistory(max_frames=500),  # Historial de simulación (reducido de 1000 a 500)
+    "simulation_history": SimulationHistory(max_frames=1000),  # Historial de simulación (1000 frames)
     "history_enabled": False,  # Habilitar/deshabilitar guardado de historia
     "history_save_interval": 10,  # Guardar cada N frames en el historial (reducción de memoria)
     "live_feed_enabled": True,  # Habilitar/deshabilitar envío de datos en tiempo real (optimización)

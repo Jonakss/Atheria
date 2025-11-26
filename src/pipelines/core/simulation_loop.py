@@ -446,6 +446,24 @@ async def simulation_loop():
                                         await broadcast({"type": "simulation_frame", "payload": frame_payload})
                                         frame_count += 1
                                         g_state['last_frame_sent_step'] = updated_step  # Marcar que se envió un frame
+                                        
+                                        # Agregar al historial (buffer circular)
+                                        # Usamos frame_payload_raw para tener los datos sin comprimir/serializar
+                                        if 'simulation_history' in g_state:
+                                            # Crear payload para historial que incluye el estado psi (si existe)
+                                            # Esto permite restaurar la simulación exacta, no solo visualizar
+                                            history_payload = frame_payload_raw.copy()
+                                            
+                                            # Si tenemos psi disponible (y no es None), guardarlo en CPU
+                                            # psi variable is available in this scope (from line 332/318)
+                                            if psi is not None and isinstance(psi, torch.Tensor):
+                                                # Detach y mover a CPU para no ocupar VRAM
+                                                history_payload['psi'] = psi.detach().cpu()
+                                            
+                                            # Solo guardar cada N frames para no saturar memoria si es muy rápido
+                                            # Pero para rewind suave idealmente queremos todos o casi todos
+                                            # El buffer es limitado (1000), así que se sobrescribirá
+                                            g_state['simulation_history'].add_frame(history_payload)
                                 else:
                                     logging.warning(f"⚠️ map_data está vacío o inválido en step {updated_step}. Saltando frame.")
                                     # No continue here, just skip sending frame
