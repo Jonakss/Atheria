@@ -463,10 +463,12 @@ async def simulation_loop():
                         
                         # THROTTLE: Solo enviar actualización de estado cada STATE_UPDATE_INTERVAL segundos
                         # para evitar saturar el WebSocket con demasiados mensajes
+                        # IMPORTANTE: NO enviar state_update en modo fullspeed (steps_interval == -1)
                         current_time = time.time()
                         time_since_last_update = current_time - last_state_update_time
                         
-                        if time_since_last_update >= STATE_UPDATE_INTERVAL:
+                        # Solo enviar actualización si NO estamos en modo fullspeed
+                        if steps_interval != -1 and time_since_last_update >= STATE_UPDATE_INTERVAL:
                             # Enviar actualización de estado (sin datos de visualización pesados)
                             # Esto permite que el frontend muestre el progreso aunque no haya visualización
                             state_update = {
@@ -488,7 +490,8 @@ async def simulation_loop():
                             last_state_update_time = current_time
                         
                         # Enviar log de simulación cada 100 pasos para no saturar los logs
-                        if updated_step % 100 == 0:
+                        # IMPORTANTE: NO enviar logs en modo fullspeed (steps_interval == -1)
+                        if steps_interval != -1 and updated_step % 100 == 0:
                             if steps_interval == 0:
                                 await broadcast({
                                     "type": "simulation_log",
