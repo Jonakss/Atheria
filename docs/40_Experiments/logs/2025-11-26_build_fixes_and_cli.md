@@ -22,9 +22,11 @@ Se resolvieron problemas críticos que impedían la instalación y ejecución de
 - **Solución:** Se agregó el flag `--fast` al comando `ath dev` y `ath install`.
 - **Comando:** `ath dev --fast` ejecuta `pip install -e . --no-build-isolation`, usando las librerías del sistema (mucho más rápido).
 
-### 3. Fix Runtime Import (`model_loader.py`)
-- **Problema:** Error `ImportError: cannot import name 'load_model'` al iniciar el servidor.
-- **Solución:** Se implementó la función `load_model` que faltaba en `src/model_loader.py`, unificando `instantiate_model` y `load_weights`.
+### 3. Fix Runtime Import y Signature (`model_loader.py`)
+- **Problema:** Error `ImportError: cannot import name 'load_model'` y posteriormente `TypeError: cannot unpack non-iterable` en `inference_handlers.py`.
+- **Solución:** 
+    - Se implementó la función `load_model` unificando `instantiate_model` y `load_weights`.
+    - Se corrigió el retorno de `load_model` para devolver una tupla `(model, checkpoint_data)` como esperan los handlers.
 
 ### 4. Estructura de Paquetes (`__init__.py`)
 - **Problema:** Error `package init file ... not found` durante la creación del wheel.
