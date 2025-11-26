@@ -128,7 +128,21 @@ async def simulation_loop():
                             
                             if motor:
                                 # Offload evolution to thread pool to avoid blocking event loop
-                                await asyncio.get_event_loop().run_in_executor(None, motor.evolve_internal_state)
+                                try:
+                                    # Timeout de 5s para evitar bloqueos infinitos en motor nativo
+                                    await asyncio.wait_for(
+                                        asyncio.get_event_loop().run_in_executor(None, motor.evolve_internal_state),
+                                        timeout=5.0
+                                    )
+                                except asyncio.TimeoutError:
+                                    logging.error("❌ Timeout crítico en motor.evolve_internal_state (5s). El motor nativo parece bloqueado.")
+                                    g_state['is_paused'] = True
+                                    await broadcast({"type": "error", "payload": {"message": "Motor nativo bloqueado (timeout). Pausando simulación."}})
+                                    break
+                                except Exception as e:
+                                    logging.error(f"❌ Error en motor.evolve_internal_state: {e}")
+                                    g_state['is_paused'] = True
+                                    break
                             updated_step = current_step + step_idx + 1
                             g_state['simulation_step'] = updated_step
                             steps_executed_this_iteration += 1

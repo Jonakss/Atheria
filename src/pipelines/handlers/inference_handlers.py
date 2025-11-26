@@ -763,6 +763,20 @@ async def handle_set_inference_config(args):
                 "gamma_decay": global_cfg.GAMMA_DECAY
             }
         })
+        
+        # Si cambió el grid_size y hay un experimento activo, recargarlo para aplicar cambios
+        if grid_size is not None and g_state.get('active_experiment'):
+            logging.info(f"🔄 Recargando experimento '{g_state['active_experiment']}' para aplicar nuevo grid size: {new_size}")
+            if ws: await send_notification(ws, "Recargando simulación para aplicar cambio de grid...", "info")
+            
+            # Pequeña pausa para asegurar que el mensaje llegue
+            await asyncio.sleep(0.1)
+            
+            await handle_load_experiment({
+                'ws_id': args.get('ws_id'),
+                'experiment_name': g_state['active_experiment'],
+                'force_engine': g_state.get('motor_type', 'auto')
+            })
 
 
 HANDLERS = {
