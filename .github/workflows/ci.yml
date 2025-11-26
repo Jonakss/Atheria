@@ -56,7 +56,7 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Install Backend Dependencies
-        run: pip install -e .
+        run: pip install -r requirements.txt
 
       - name: Build C++ Extensions
         run: python setup.py build_ext --inplace
