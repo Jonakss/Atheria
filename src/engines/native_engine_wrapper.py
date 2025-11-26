@@ -76,7 +76,7 @@ def export_model_to_jit(model: nn.Module, experiment_name: str, example_input_sh
     Returns:
         Ruta al archivo .pt exportado.
     """
-    from ... import config as global_cfg
+    from src import config as global_cfg
     import os
 
     if output_dir is None:
@@ -784,7 +784,7 @@ class NativeEngineWrapper:
         Args:
             cfg: Configuración del experimento (opcional, usa self.cfg si no se proporciona)
         """
-        from .. import config as global_cfg
+        from src import config as global_cfg
         
         logging.info("🔄 Regenerando estado inicial según INITIAL_STATE_MODE_INFERENCE...")
         

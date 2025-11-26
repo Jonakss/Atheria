@@ -4,7 +4,7 @@ import logging
 import os
 import glob
 from datetime import datetime
-from ... import config as global_cfg
+from src import config as global_cfg
 from ...server.server_state import g_state, broadcast, send_notification, send_to_websocket
 from ...utils import get_experiment_list, load_experiment_config, get_latest_checkpoint
 from ...server.server_handlers import create_experiment_handler

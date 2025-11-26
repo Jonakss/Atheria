@@ -13,7 +13,7 @@ from types import SimpleNamespace
 from ...server.server_state import g_state, broadcast, send_notification, send_to_websocket, optimize_frame_payload
 from ..core.status_helpers import build_inference_status_payload
 from ...model_loader import load_model
-from ... import config as global_cfg
+from src import config as global_cfg
 from ...engines.qca_engine import Aetheria_Motor, QuantumState
 from ...engines.harmonic_engine import SparseHarmonicEngine
 from ..viz import get_visualization_data
