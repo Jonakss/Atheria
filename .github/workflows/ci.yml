@@ -52,7 +52,7 @@ jobs:
 
       - name: Upload Frontend Build Log
         if: steps.build_frontend.outcome == 'failure'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: frontend-build-log
           path: frontend/build_output.log
