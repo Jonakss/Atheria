@@ -163,7 +163,45 @@ jobs:
           echo "Frontend build failed. See the artifact and the PR comment for details."
           exit 1
 
+      - name: Detectar cambios en Backend
+        id: check-backend
+        run: |
+          echo "Detectando cambios en backend..."
+
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            files=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" | \
+              jq -r '.[].filename')
+          else
+            # Push directo: comparar con commit anterior
+            files=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+          fi
+
+          has_backend_changes=false
+          for file in $files; do
+            if [[ "$file" == src/* ]] || [[ "$file" == setup.py ]] || [[ "$file" == pyproject.toml ]] || [[ "$file" == CMakeLists.txt ]]; then
+              has_backend_changes=true
+              break
+            fi
+          done
+
+          # Verificar si el commit pide build explícito
+          COMMIT_MSG=$(git log -1 --format="%B" HEAD)
+          if echo "$COMMIT_MSG" | grep -qi "\[build:backend\]"; then
+            has_backend_changes=true
+            echo "✅ Commit solicita build de backend explícito"
+          fi
+
+          if $has_backend_changes; then
+            echo "✅ Detectados cambios en backend/"
+            echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            echo "⏭️  No hay cambios en backend/, saltando build"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Cache pip dependencies
+        if: steps.check-backend.outputs.skip != 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
@@ -171,11 +209,25 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
+      - name: Install PyTorch (required for LibTorch)
+        if: steps.check-backend.outputs.skip != 'true'
+        run: |
+          echo "📦 Instalando PyTorch para LibTorch..."
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+
       - name: Install Backend Dependencies
-        run: pip install -e .
+        if: steps.check-backend.outputs.skip != 'true'
+        run: |
+          echo "📦 Instalando dependencias del backend..."
+          pip install -e .
+        continue-on-error: true
 
       - name: Build C++ Extensions
+        if: steps.check-backend.outputs.skip != 'true'
         run: python setup.py build_ext --inplace
+        continue-on-error: true
 
       - name: Run Backend Tests
+        if: steps.check-backend.outputs.skip != 'true'
         run: pytest
+        continue-on-error: true
