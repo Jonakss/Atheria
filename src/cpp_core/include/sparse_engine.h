@@ -101,6 +101,14 @@ public:
      * Obtiene el último mensaje de error (si hubo un error al cargar el modelo)
      */
     std::string get_last_error() const;
+
+    /**
+     * Calcula la visualización directamente en C++ para evitar conversiones costosas.
+     * 
+     * @param viz_type Tipo de visualización ("density", "phase", "energy")
+     * @return Tensor denso [H, W] con los valores calculados
+     */
+    torch::Tensor compute_visualization(const std::string& viz_type);
     
 private:
     // Configuración

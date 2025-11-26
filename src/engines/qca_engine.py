@@ -399,40 +399,31 @@ class Aetheria_Motor:
             psi_np = self.last_psi_input[0].cpu().numpy()  # (H, W, d_state) complejo
             delta_psi_np = self.last_delta_psi[0].cpu().numpy()  # (H, W, d_state) complejo
             
-            # Calcular métrica de física para cada célula
-            # Métrica: magnitud promedio de la relación delta_psi / psi
-            # Esto aproxima la "fuerza" de la interacción física local
-            for y in range(0, H, sample_rate):
-                for x in range(0, W, sample_rate):
-                    psi_cell = psi_np[y, x, :]  # (d_state,)
-                    delta_psi_cell = delta_psi_np[y, x, :]  # (d_state,)
-                    
-                    # Calcular magnitud de la relación delta_psi / psi
-                    # Evitar división por cero
-                    psi_magnitude = np.abs(psi_cell)
-                    delta_psi_magnitude = np.abs(delta_psi_cell)
-                    
-                    # Métrica: promedio de |delta_psi| / (|psi| + epsilon)
-                    # Esto mide la "fuerza" de la transformación física
-                    with np.errstate(divide='ignore', invalid='ignore'):
-                        ratio = np.where(psi_magnitude > 1e-10, 
-                                        delta_psi_magnitude / (psi_magnitude + 1e-10),
-                                        0.0)
-                    physics_map[y, x] = np.mean(ratio)
+            # Optimización Vectorizada: Calcular métrica para todo el grid a la vez
+            # Evita bucles Python lentos (H*W iteraciones)
             
-            # Interpolar valores para células no calculadas si sample_rate > 1
+            # Calcular magnitudes
+            psi_mag = np.abs(psi_np)
+            delta_mag = np.abs(delta_psi_np)
+            
+            # Calcular ratio de forma segura (evitando división por cero)
+            # ratio = |delta_psi| / (|psi| + epsilon)
+            # Usar np.divide con where para seguridad extra, aunque epsilon suele bastar
+            ratio = np.divide(delta_mag, psi_mag + 1e-10)
+            
+            # Si psi es muy pequeño (vacío), el ratio debería ser 0 (sin actividad física)
+            ratio = np.where(psi_mag > 1e-10, ratio, 0.0)
+            
+            # Promediar sobre canales (d_state) para tener un valor por célula
+            physics_map = np.mean(ratio, axis=-1)  # (H, W)
+            
+            # Aplicar subsampling si es necesario (para grids muy grandes)
             if sample_rate > 1:
-                # Interpolación simple usando numpy
-                # Repetir valores para llenar los huecos (interpolación nearest neighbor)
-                expanded_map = np.zeros((H, W), dtype=np.float32)
-                calc_h, calc_w = physics_map.shape[0], physics_map.shape[1]
-                for y in range(H):
-                    for x in range(W):
-                        src_y = min(int(y * calc_h / H), calc_h - 1)
-                        src_x = min(int(x * calc_w / W), calc_w - 1)
-                        expanded_map[y, x] = physics_map[src_y, src_x]
-                physics_map = expanded_map
-            
+                physics_map = physics_map[::sample_rate, ::sample_rate]
+                
+                # Si se necesita el tamaño original, interpolar (opcional, por ahora devolvemos subsampled)
+                # El frontend suele manejar texturas de diferente resolución bien
+                
             return physics_map
         except Exception as e:
             import logging

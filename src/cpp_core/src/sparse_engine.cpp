@@ -2,7 +2,7 @@
 #include "../include/sparse_engine.h"
 #include <algorithm>
 #include <stdexcept>
-// #include <omp.h> // OpenMP disabled to prevent deadlocks with LibTorch
+#include <omp.h> // OpenMP re-enabled
 
 namespace atheria {
 
@@ -98,170 +98,193 @@ int64_t Engine::step_native() {
     std::vector<Coord3D> processed_coords(active_region_.begin(), active_region_.end());
     
     // Agrupar coordenadas para procesamiento por batch
-    // NOTA: OpenMP deshabilitado porque causa deadlocks con LibTorch en algunos entornos
-    // El overhead de threads vs la paralelización interna de PyTorch no compensa el riesgo
-    
     const int64_t batch_size = 32; // Procesar en batches de 32
     
-    // Thread-local storage (ahora single thread)
-    std::vector<Coord3D> local_batch_coords;
-    std::vector<torch::Tensor> local_batch_states;
-    SparseMap local_next_matter_map;
-    std::unordered_set<Coord3D, Coord3DHash> local_next_active_region;
-    
-    for (size_t i = 0; i < processed_coords.size(); i++) {
-            const Coord3D& coord = processed_coords[i];
-            
-            // Obtener estado actual (materia o vacío)
-            // get_state_at es thread-safe porque solo lee de matter_map_ (que es const durante este paso)
-            // y vacuum_.get_fluctuation (que debe ser thread-safe o stateless)
-            torch::Tensor current_state = get_state_at(coord);
-            
-            // Calcular energía
-            float energy = torch::sum(torch::abs(current_state).pow(2)).item<float>();
-            
-            if (energy > 0.01f) { // Umbral de existencia
-                // Guardar para batch processing local
-                local_batch_coords.push_back(coord);
-                local_batch_states.push_back(current_state);
+    // Parallel region
+    #pragma omp parallel
+    {
+        // Evitar que LibTorch lance su propio pool de threads dentro de OpenMP
+        torch::set_num_threads(1);
+
+        // Thread-local storage
+        std::vector<Coord3D> local_batch_coords;
+        std::vector<torch::Tensor> local_batch_states;
+        SparseMap local_next_matter_map;
+        std::unordered_set<Coord3D, Coord3DHash> local_next_active_region;
+        
+        #pragma omp for schedule(dynamic)
+        for (size_t i = 0; i < processed_coords.size(); i++) {
+                const Coord3D& coord = processed_coords[i];
                 
-                // Si el batch local está lleno, procesar
-                if (local_batch_coords.size() >= static_cast<size_t>(batch_size)) {
+                // Obtener estado actual (materia o vacío)
+                // get_state_at es thread-safe porque solo lee de matter_map_ (que es const durante este paso)
+                // y vacuum_.get_fluctuation (que debe ser thread-safe o stateless)
+                torch::Tensor current_state = get_state_at(coord);
+                
+                // Calcular energía
+                float energy = torch::sum(torch::abs(current_state).pow(2)).item<float>();
+                
+                if (energy > 0.01f) { // Umbral de existencia
+                    // Guardar para batch processing local
+                    local_batch_coords.push_back(coord);
+                    local_batch_states.push_back(current_state);
                     
-                    // Construir entrada del batch
-                    torch::Tensor batch_input = build_batch_input(local_batch_coords);
-                    
-                    // Ejecutar inferencia con el modelo
-                    // IMPORTANTE: torch::jit::script::Module::forward es thread-safe para inferencia
-                    // pero debemos usar NoGradGuard localmente
-                    torch::NoGradGuard no_grad;
-                    std::vector<torch::jit::IValue> inputs;
-                    inputs.push_back(batch_input);
+                    // Si el batch local está lleno, procesar
+                    if (local_batch_coords.size() >= static_cast<size_t>(batch_size)) {
+                        try {
+                            // Construir entrada del batch
+                            torch::Tensor batch_input = build_batch_input(local_batch_coords);
+                            
+                            // Ejecutar inferencia con el modelo
+                            // IMPORTANTE: torch::jit::script::Module::forward es thread-safe para inferencia
+                            // pero debemos usar NoGradGuard localmente
+                            torch::NoGradGuard no_grad;
+                            std::vector<torch::jit::IValue> inputs;
+                            inputs.push_back(batch_input);
 
-                    torch::Tensor batch_output;
-                    auto output_ivalue = model_.forward(inputs);
+                            torch::Tensor batch_output;
+                            auto output_ivalue = model_.forward(inputs);
 
-                    if (output_ivalue.isTuple()) {
-                        auto output_tuple = output_ivalue.toTuple();
-                        if (output_tuple->elements().size() > 0) {
-                            batch_output = output_tuple->elements()[0].toTensor();
-                        } else {
-                            // En paralelo no podemos lanzar excepciones fácilmente, loggear o ignorar
-                            continue;
+                            if (output_ivalue.isTuple()) {
+                                auto output_tuple = output_ivalue.toTuple();
+                                if (output_tuple->elements().size() > 0) {
+                                    batch_output = output_tuple->elements()[0].toTensor();
+                                } else {
+                                    // En paralelo no podemos lanzar excepciones fácilmente, loggear o ignorar
+                                    local_batch_coords.clear();
+                                    local_batch_states.clear();
+                                    continue;
+                                }
+                            } else if (output_ivalue.isTensor()) {
+                                batch_output = output_ivalue.toTensor();
+                            } else {
+                                local_batch_coords.clear();
+                                local_batch_states.clear();
+                                continue;
+                            }
+
+                            // Procesar salida del modelo
+                            int64_t center_idx = grid_size_ / 2;
+
+                            for (size_t j = 0; j < local_batch_coords.size(); j++) {
+                                // Extraer salida del centro del patch
+                                torch::Tensor output_center = batch_output[j].select(2, center_idx).select(1, center_idx);
+
+                                // Dividir en real e imag
+                                torch::Tensor delta_real = output_center.slice(0, 0, d_state_);
+                                torch::Tensor delta_imag = output_center.slice(0, d_state_, 2 * d_state_);
+                                torch::Tensor delta_complex = torch::complex(delta_real, delta_imag);
+
+                                // Obtener estado actual
+                                torch::Tensor current_state_j = local_batch_states[j];
+                                if (!current_state_j.is_complex()) {
+                                    current_state_j = torch::complex(current_state_j, torch::zeros_like(current_state_j));
+                                }
+
+                                // Aplicar delta
+                                torch::Tensor new_state = current_state_j + delta_complex;
+
+                                // Normalizar
+                                torch::Tensor abs_squared = torch::abs(new_state).pow(2);
+                                float norm = torch::sum(abs_squared).item<float>();
+                                if (norm > 1e-6f) {
+                                    new_state = new_state / std::sqrt(norm);
+                                }
+
+                                // Filtrar estados con energía muy baja
+                                if (norm > 0.01f) {
+                                    local_next_matter_map.insert_tensor(local_batch_coords[j], new_state);
+                                    update_active_region({local_batch_coords[j]}, local_next_active_region);
+                                }
+                            }
+                        } catch (const c10::Error& e) {
+                             std::cerr << "LibTorch error in batch processing: " << e.msg() << std::endl;
+                        } catch (const std::exception& e) {
+                             std::cerr << "Standard exception in batch processing: " << e.what() << std::endl;
+                        } catch (...) {
+                             std::cerr << "Unknown error in batch processing." << std::endl;
                         }
-                    } else if (output_ivalue.isTensor()) {
-                        batch_output = output_ivalue.toTensor();
-                    } else {
-                        continue;
-                    }
 
-                    // Procesar salida del modelo
+                        // Limpiar batch local
+                        local_batch_coords.clear();
+                        local_batch_states.clear();
+                    }
+                }
+        } // Fin del loop for
+
+        // Procesar batch restante (si quedó algo)
+        if (!local_batch_coords.empty()) {
+             // Construir entrada del batch
+            torch::Tensor batch_input = build_batch_input(local_batch_coords);
+            
+            torch::NoGradGuard no_grad;
+            std::vector<torch::jit::IValue> inputs;
+            inputs.push_back(batch_input);
+            
+            torch::Tensor batch_output;
+            try {
+                auto output_ivalue = model_.forward(inputs);
+
+                if (output_ivalue.isTuple()) {
+                    auto output_tuple = output_ivalue.toTuple();
+                    if (output_tuple->elements().size() > 0) {
+                        batch_output = output_tuple->elements()[0].toTensor();
+                    }
+                } else if (output_ivalue.isTensor()) {
+                    batch_output = output_ivalue.toTensor();
+                }
+                
+                if (batch_output.defined()) {
                     int64_t center_idx = grid_size_ / 2;
 
                     for (size_t j = 0; j < local_batch_coords.size(); j++) {
-                        // Extraer salida del centro del patch
                         torch::Tensor output_center = batch_output[j].select(2, center_idx).select(1, center_idx);
-
-                        // Dividir en real e imag
                         torch::Tensor delta_real = output_center.slice(0, 0, d_state_);
                         torch::Tensor delta_imag = output_center.slice(0, d_state_, 2 * d_state_);
                         torch::Tensor delta_complex = torch::complex(delta_real, delta_imag);
-
-                        // Obtener estado actual
+                        
                         torch::Tensor current_state_j = local_batch_states[j];
                         if (!current_state_j.is_complex()) {
                             current_state_j = torch::complex(current_state_j, torch::zeros_like(current_state_j));
                         }
-
-                        // Aplicar delta
+                        
                         torch::Tensor new_state = current_state_j + delta_complex;
-
-                        // Normalizar
                         torch::Tensor abs_squared = torch::abs(new_state).pow(2);
                         float norm = torch::sum(abs_squared).item<float>();
                         if (norm > 1e-6f) {
                             new_state = new_state / std::sqrt(norm);
                         }
-
-                        // Filtrar estados con energía muy baja
+                        
                         if (norm > 0.01f) {
                             local_next_matter_map.insert_tensor(local_batch_coords[j], new_state);
                             update_active_region({local_batch_coords[j]}, local_next_active_region);
                         }
                     }
-
-                    // Limpiar batch local
-                    local_batch_coords.clear();
-                    local_batch_states.clear();
                 }
+            } catch (const c10::Error& e) {
+                std::cerr << "LibTorch error in final batch: " << e.msg() << std::endl;
+            } catch (const std::exception& e) {
+                std::cerr << "Standard exception in final batch: " << e.what() << std::endl;
+            } catch (...) {
+                std::cerr << "Unknown error in final batch." << std::endl;
             }
-    } // Fin del loop for
-
-    // Procesar batch restante (si quedó algo)
-    if (!local_batch_coords.empty()) {
-         // Construir entrada del batch
-        torch::Tensor batch_input = build_batch_input(local_batch_coords);
-        
-        torch::NoGradGuard no_grad;
-        std::vector<torch::jit::IValue> inputs;
-        inputs.push_back(batch_input);
-        
-        torch::Tensor batch_output;
-        try {
-            auto output_ivalue = model_.forward(inputs);
-
-            if (output_ivalue.isTuple()) {
-                auto output_tuple = output_ivalue.toTuple();
-                if (output_tuple->elements().size() > 0) {
-                    batch_output = output_tuple->elements()[0].toTensor();
-                }
-            } else if (output_ivalue.isTensor()) {
-                batch_output = output_ivalue.toTensor();
-            }
-            
-            if (batch_output.defined()) {
-                int64_t center_idx = grid_size_ / 2;
-
-                for (size_t j = 0; j < local_batch_coords.size(); j++) {
-                    torch::Tensor output_center = batch_output[j].select(2, center_idx).select(1, center_idx);
-                    torch::Tensor delta_real = output_center.slice(0, 0, d_state_);
-                    torch::Tensor delta_imag = output_center.slice(0, d_state_, 2 * d_state_);
-                    torch::Tensor delta_complex = torch::complex(delta_real, delta_imag);
-                    
-                    torch::Tensor current_state_j = local_batch_states[j];
-                    if (!current_state_j.is_complex()) {
-                        current_state_j = torch::complex(current_state_j, torch::zeros_like(current_state_j));
-                    }
-                    
-                    torch::Tensor new_state = current_state_j + delta_complex;
-                    torch::Tensor abs_squared = torch::abs(new_state).pow(2);
-                    float norm = torch::sum(abs_squared).item<float>();
-                    if (norm > 1e-6f) {
-                        new_state = new_state / std::sqrt(norm);
-                    }
-                    
-                    if (norm > 0.01f) {
-                        local_next_matter_map.insert_tensor(local_batch_coords[j], new_state);
-                        update_active_region({local_batch_coords[j]}, local_next_active_region);
-                    }
-                }
-            }
-        } catch (...) {
-            // Ignorar errores en batch final para no romper todo el step
         }
-    }
 
-    // Merge de resultados (ya no es necesario critical section porque es single thread)
-    // Merge matter map
-    auto local_coords = local_next_matter_map.coord_keys();
-    for (const auto& coord : local_coords) {
-        next_matter_map.insert_tensor(coord, local_next_matter_map.get_tensor(coord));
-    }
+        // Merge de resultados thread-safe
+        #pragma omp critical
+        {
+            // Merge matter map
+            auto local_coords = local_next_matter_map.coord_keys();
+            for (const auto& coord : local_coords) {
+                next_matter_map.insert_tensor(coord, local_next_matter_map.get_tensor(coord));
+            }
 
-    // Merge active region
-    for (const auto& coord : local_next_active_region) {
-        next_active_region.insert(coord);
-    }
+            // Merge active region
+            for (const auto& coord : local_next_active_region) {
+                next_active_region.insert(coord);
+            }
+        }
+    } // End parallel region
     
     // Actualizar estado
     matter_map_ = std::move(next_matter_map);
@@ -391,6 +414,72 @@ std::vector<Coord3D> Engine::get_active_coords() const {
 
 std::string Engine::get_last_error() const {
     return last_error_;
+}
+
+torch::Tensor Engine::compute_visualization(const std::string& viz_type) {
+    // Crear tensor de salida [H, W]
+    auto options = torch::TensorOptions()
+        .dtype(torch::kFloat32)
+        .device(device_);
+        
+    torch::Tensor viz_tensor = torch::zeros({grid_size_, grid_size_}, options);
+    
+    // Iterar sobre el mapa disperso
+    // Esto es mucho más eficiente que convertir todo a denso si la ocupación es baja
+    auto coord_keys = matter_map_.coord_keys();
+    
+    // Usar accessor para acceso rápido a CPU si el tensor está en CPU
+    // Si está en GPU, necesitamos otra estrategia o simplemente usar indexación de tensores
+    // Por simplicidad y compatibilidad inicial, usaremos indexación de tensores que funciona en ambos
+    
+    // TODO: Para máxima performance en GPU, esto debería ser un kernel CUDA custom
+    // o usar operaciones dispersas de PyTorch si matter_map_ fuera un tensor disperso.
+    // Por ahora, iteramos en C++ que es más rápido que Python.
+    
+    if (viz_type == "density") {
+        for (const auto& coord : coord_keys) {
+            // Verificar límites (solo visualizamos slice Z=0 por ahora)
+            if (coord.z != 0 || coord.x < 0 || coord.x >= grid_size_ || coord.y < 0 || coord.y >= grid_size_) {
+                continue;
+            }
+            
+            torch::Tensor state = matter_map_.get_tensor(coord);
+            // Densidad = sum(|psi|^2)
+            float density = torch::sum(torch::abs(state).pow(2)).item<float>();
+            
+            // Asignar al tensor de visualización
+            // Nota: viz_tensor[y][x]
+            viz_tensor[coord.y][coord.x] = density;
+        }
+    } else if (viz_type == "phase") {
+        for (const auto& coord : coord_keys) {
+            if (coord.z != 0 || coord.x < 0 || coord.x >= grid_size_ || coord.y < 0 || coord.y >= grid_size_) {
+                continue;
+            }
+            
+            torch::Tensor state = matter_map_.get_tensor(coord);
+            // Fase del primer componente (o promedio ponderado)
+            // Usamos el primer componente como referencia de fase global
+            float phase = torch::angle(state[0]).item<float>();
+            
+            // Normalizar fase a [0, 1] para visualización (opcional, el frontend suele esperar radianes o normalizado)
+            // Dejamos en radianes [-pi, pi]
+            viz_tensor[coord.y][coord.x] = phase;
+        }
+    } else if (viz_type == "energy") {
+        // Similar a densidad pero podría aplicar alguna transformación
+        for (const auto& coord : coord_keys) {
+            if (coord.z != 0 || coord.x < 0 || coord.x >= grid_size_ || coord.y < 0 || coord.y >= grid_size_) {
+                continue;
+            }
+            
+            torch::Tensor state = matter_map_.get_tensor(coord);
+            float energy = torch::sum(torch::abs(state).pow(2)).item<float>();
+            viz_tensor[coord.y][coord.x] = energy;
+        }
+    }
+    
+    return viz_tensor;
 }
 
 } // namespace atheria
