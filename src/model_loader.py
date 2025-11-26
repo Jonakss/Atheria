@@ -25,128 +25,74 @@ MODEL_MAP = {
     "UNET_UNITARY_RMSNORM": UNetUnitaryRMSNorm,
 }
 
-def create_new_model(exp_config: dict | SimpleNamespace):
+def load_checkpoint_data(checkpoint_path: str) -> dict | None:
     """
-    Crea un nuevo modelo sin cargar pesos entrenados.
-    Útil para entrenamiento desde cero.
+    Carga los datos de un checkpoint desde un archivo.
     
     Args:
-        exp_config: Configuración del experimento (dict o SimpleNamespace)
-    
+        checkpoint_path: Ruta al archivo de checkpoint.
+
     Returns:
-        Modelo instanciado (sin pesos entrenados)
+        Diccionario con los datos del checkpoint o None si falla.
     """
-    # Convertir dict a SimpleNamespace si es necesario
-    if isinstance(exp_config, dict):
-        exp_cfg = SimpleNamespace(**exp_config)
-        exp_cfg.MODEL_PARAMS = SimpleNamespace(**exp_config.get("MODEL_PARAMS", {}))
-    else:
-        exp_cfg = exp_config
-    
-    model_name = exp_cfg.MODEL_ARCHITECTURE
-    model_params = exp_cfg.MODEL_PARAMS
+    if not os.path.exists(checkpoint_path):
+        logging.error(f"El archivo de checkpoint no se encontró en: {checkpoint_path}")
+        return None
+    try:
+        checkpoint_data = torch.load(checkpoint_path, map_location=global_cfg.DEVICE)
+        return checkpoint_data
+    except Exception as e:
+        logging.error(f"Error al cargar el checkpoint '{checkpoint_path}': {e}", exc_info=True)
+        return None
+
+def instantiate_model(exp_config: SimpleNamespace) -> nn.Module:
+    """
+    Instancia un modelo a partir de la configuración del experimento.
+    """
+    model_name = exp_config.MODEL_ARCHITECTURE
+    model_params = exp_config.MODEL_PARAMS
     
     if model_name not in MODEL_MAP:
-        logging.error(f"Arquitectura de modelo desconocida: '{model_name}'")
         raise ValueError(f"Arquitectura de modelo desconocida: '{model_name}'")
 
-    # Instanciar la arquitectura del modelo
     model_class = MODEL_MAP[model_name]
     
-    # Convertir model_params a dict si es SimpleNamespace
     if isinstance(model_params, SimpleNamespace):
         params_dict = vars(model_params)
     else:
         params_dict = model_params
-    
+
     model = model_class(**params_dict)
     model.to(global_cfg.DEVICE)
-    model.train()  # Modo entrenamiento
-    
-    logging.info(f"Modelo '{model_name}' creado exitosamente para entrenamiento.")
+    logging.info(f"Modelo '{model_name}' instanciado exitosamente.")
     return model
 
-def load_model(exp_cfg: SimpleNamespace, checkpoint_path: str | None = None):
+def load_weights(model: nn.Module, checkpoint_data: dict):
     """
-    Carga la arquitectura de un modelo.
-    Si se proporciona un checkpoint_path, carga los pesos entrenados.
-    Devuelve (model, state_dict) o (model, None).
+    Carga los pesos desde un diccionario de checkpoint a un modelo.
+    Maneja el prefijo '_orig_mod.' de modelos compilados.
     """
-    model_name = exp_cfg.MODEL_ARCHITECTURE
-    model_params = exp_cfg.MODEL_PARAMS
-    
-    if model_name not in MODEL_MAP:
-        logging.error(f"Arquitectura de modelo desconocida: '{model_name}'")
-        raise ValueError(f"Arquitectura de modelo desconocida: '{model_name}'")
-
-    # 1. Instanciar la arquitectura del modelo
-    model_class = MODEL_MAP[model_name]
-    
-    # Convertir model_params a dict si es SimpleNamespace
-    if isinstance(model_params, SimpleNamespace):
-        params_dict = vars(model_params)
+    if 'model_state_dict' in checkpoint_data:
+        model_state_dict = checkpoint_data['model_state_dict']
+    elif 'state_dict' in checkpoint_data:
+        model_state_dict = checkpoint_data['state_dict']
     else:
-        params_dict = model_params
-    
-    model = model_class(**params_dict)
-    logging.info(f"Modelo '{model_name}' instanciado exitosamente.")
+        # Asumir que el diccionario completo es el state_dict
+        model_state_dict = checkpoint_data
 
-    # 2. Cargar los pesos si se proporciona un path
-    state_dict = None
-    if checkpoint_path and os.path.exists(checkpoint_path):
-        try:
-            state_dict = torch.load(checkpoint_path, map_location=global_cfg.DEVICE)
-            
-            # Manejar diferentes formatos de checkpoint
-            # Formato nuevo: {'model_state_dict': {...}, 'episode': ..., ...}
-            # Formato antiguo: directamente el state_dict
-            if isinstance(state_dict, dict):
-                if 'model_state_dict' in state_dict:
-                    model_state_dict = state_dict['model_state_dict']
-                elif 'state_dict' in state_dict:
-                    model_state_dict = state_dict['state_dict']
-                else:
-                    # Si no tiene las claves esperadas, asumir que el dict completo es el state_dict
-                    model_state_dict = state_dict
-            else:
-                # Si no es un dict, asumir que es directamente el state_dict
-                model_state_dict = state_dict
-                state_dict = {'model_state_dict': model_state_dict}
-            
-            # Manejar checkpoints de modelos compilados (torch.compile) que tienen prefijo "_orig_mod."
-            # Remover el prefijo si existe
-            if isinstance(model_state_dict, dict) and any(key.startswith('_orig_mod.') for key in model_state_dict.keys()):
-                logging.info("Checkpoint contiene modelo compilado, removiendo prefijo '_orig_mod.'")
-                cleaned_state_dict = {}
-                for key, value in model_state_dict.items():
-                    if key.startswith('_orig_mod.'):
-                        new_key = key.replace('_orig_mod.', '', 1)
-                        cleaned_state_dict[new_key] = value
-                    else:
-                        cleaned_state_dict[key] = value
-                model_state_dict = cleaned_state_dict
-            
-            # Cargar los pesos
-            if isinstance(model_state_dict, dict):
-                missing_keys, unexpected_keys = model.load_state_dict(model_state_dict, strict=False)
-                if missing_keys:
-                    logging.warning(f"Claves faltantes al cargar checkpoint: {missing_keys[:5]}... (mostrando primeras 5)")
-                if unexpected_keys:
-                    logging.warning(f"Claves inesperadas en checkpoint: {unexpected_keys[:5]}... (mostrando primeras 5)")
-            else:
-                logging.error(f"Formato de checkpoint inesperado. model_state_dict no es un dict: {type(model_state_dict)}")
-                return None, None
-            
-            model.to(global_cfg.DEVICE)
-            model.eval() # Poner el modelo en modo de evaluación
-            logging.info(f"Pesos del modelo cargados desde el checkpoint: {checkpoint_path}")
-        except Exception as e:
-            logging.error(f"Error al cargar el checkpoint '{checkpoint_path}': {e}. Se usará un modelo sin entrenar.", exc_info=True)
-            # Anular si la carga falla y devolver None para que el servidor lo detecte
-            state_dict = None
-            return None, None
-    else:
-        logging.warning(f"No se proporcionó un checkpoint o no se encontró. El modelo '{model_name}' se usará sin entrenar.")
-        model.to(global_cfg.DEVICE)
+    # Manejar prefijo de modelo compilado
+    if any(key.startswith('_orig_mod.') for key in model_state_dict.keys()):
+        logging.info("Removiendo prefijo '_orig_mod.' del checkpoint.")
+        model_state_dict = {
+            key.replace('_orig_mod.', '', 1): value
+            for key, value in model_state_dict.items()
+        }
+    
+    missing_keys, unexpected_keys = model.load_state_dict(model_state_dict, strict=False)
+    
+    if missing_keys:
+        logging.warning(f"Claves faltantes al cargar pesos: {missing_keys[:5]}...")
+    if unexpected_keys:
+        logging.warning(f"Claves inesperadas en los pesos: {unexpected_keys[:5]}...")
         
-    return model, state_dict
+    logging.info("Pesos del modelo cargados exitosamente.")
