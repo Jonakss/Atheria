@@ -385,7 +385,7 @@ async def handle_load_experiment(args):
                     if not exp_cfg:
                         raise ValueError(f"No se pudo cargar configuración de {exp_name}")
                     
-                    temp_model, _ = load_model(exp_cfg, checkpoint_path)
+                    temp_model = load_model(exp_cfg, checkpoint_path)
                     if temp_model is None:
                         raise ValueError(f"No se pudo cargar modelo de {exp_name}")
                     
@@ -437,7 +437,7 @@ async def handle_load_experiment(args):
                 
                 # CRÍTICO: Ejecutar inicialización en thread pool para no bloquear event loop
                 def create_python_motor():
-                    model, _ = load_model(exp_cfg, checkpoint_path)
+                    model = load_model(exp_cfg, checkpoint_path)
                     if model is None:
                         raise ValueError(f"No se pudo cargar modelo de {exp_name}")
                     
@@ -488,6 +488,20 @@ async def handle_load_experiment(args):
             g_state['simulation_step'] = 0
             g_state['current_epoch'] = 0
             g_state['epoch_metrics'] = {}
+            
+            # Mostrar información de grid scaling si aplica
+            try:
+                from ...utils import load_experiment_config
+                exp_cfg_loaded = load_experiment_config(exp_name)
+                if exp_cfg_loaded:
+                    training_grid_size = getattr(exp_cfg_loaded, 'GRID_SIZE_TRAINING', None)
+                    inference_grid_size = g_state.get('inference_grid_size', global_cfg.GRID_SIZE_INFERENCE)
+                    if training_grid_size and training_grid_size < inference_grid_size:
+                        scaling_msg = f"📐 Grid escalado: {training_grid_size}x{training_grid_size} (original) → {inference_grid_size}x{inference_grid_size} (inferencia)"
+                        logging.info(scaling_msg)
+                        if ws: await send_notification(ws, scaling_msg, "info")
+            except Exception as e:
+                logging.debug(f"No se pudo mostrar info de grid scaling: {e}")
             
             # Notificar éxito
             msg = f"✅ Experimento '{exp_name}' cargado exitosamente ({'Nativo' if use_native else 'Python'})."
