@@ -102,6 +102,12 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     const [activeExperiment, setActiveExperiment] = useState<string | null>(null);
     const [snapshotCount, setSnapshotCount] = useState<number>(0);
     const [trainingSnapshots, setTrainingSnapshots] = useState<TrainingSnapshot[]>([]);
+    interface InferenceSnapshot {
+        step: number;
+        timestamp: string;
+        filepath_pt: string;
+    }
+    const [inferenceSnapshots, setInferenceSnapshots] = useState<InferenceSnapshot[]>([]);
     const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'running' | 'completed' | 'cancelled' | 'error'>('idle');
     const [analysisType, setAnalysisType] = useState<'universe_atlas' | 'cell_chemistry' | null>(null);
     const [compileStatus, setCompileStatus] = useState<CompileStatus | null>(null);
@@ -583,6 +589,9 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         // Lista de checkpoints recibida
                         window.dispatchEvent(new CustomEvent('checkpoints_updated', { detail: payload.checkpoints }));
                         break;
+                    case 'snapshot_list':
+                        setInferenceSnapshots(payload.snapshots || []);
+                        break;
                 }
             } catch (error) {
                 console.error("Error procesando mensaje:", error);
@@ -657,6 +666,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         ws: ws.current, // Exponer WebSocket para mensajes personalizados
         snapshotCount,
         trainingSnapshots,
+        inferenceSnapshots,
         serverConfig,
         updateServerConfig,
         compileStatus, // Estado de compilación/motor (indica si es nativo)

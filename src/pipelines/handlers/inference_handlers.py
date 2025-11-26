@@ -17,7 +17,6 @@ from ... import config as global_cfg
 from ...engines.qca_engine import Aetheria_Motor, QuantumState
 from ...engines.harmonic_engine import SparseHarmonicEngine
 from ..viz import get_visualization_data
-from ...physics.analysis.EpochDetector import EpochDetector
 from ...utils import get_latest_checkpoint, get_latest_jit_model, load_experiment_config
 
 logger = logging.getLogger(__name__)
@@ -318,9 +317,6 @@ async def handle_load_experiment(args):
     try:
         logging.info(f"Intentando cargar el experimento '{exp_name}'...")
         if ws: await send_notification(ws, f"Cargando modelo '{exp_name}'...", "info")
-        
-        if 'epoch_detector' not in g_state:
-            g_state['epoch_detector'] = EpochDetector()
         
         # Pausar y limpiar motor anterior
         g_state['is_paused'] = True

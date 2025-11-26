@@ -4,6 +4,7 @@ from .inference_handlers import HANDLERS as INFERENCE_HANDLERS
 from .system_handlers import HANDLERS as SYSTEM_HANDLERS
 from .analysis_handlers import HANDLERS as ANALYSIS_HANDLERS
 from .history_handlers import HANDLERS as HISTORY_HANDLERS
+from .snapshot_handlers import HANDLERS as SNAPSHOT_HANDLERS
 
 # Agrupar todos los handlers por scope
 HANDLERS = {
@@ -12,7 +13,8 @@ HANDLERS = {
     "inference": INFERENCE_HANDLERS,
     "system": SYSTEM_HANDLERS,
     "analysis": ANALYSIS_HANDLERS,
-    "history": HISTORY_HANDLERS
+    "history": HISTORY_HANDLERS,
+    "snapshot": SNAPSHOT_HANDLERS,
 }
 
 __all__ = [
@@ -22,5 +24,6 @@ __all__ = [
     'INFERENCE_HANDLERS',
     'SYSTEM_HANDLERS',
     'ANALYSIS_HANDLERS',
-    'HISTORY_HANDLERS'
+    'HISTORY_HANDLERS',
+    'SNAPSHOT_HANDLERS',
 ]

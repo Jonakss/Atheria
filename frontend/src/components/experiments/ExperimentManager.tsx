@@ -1,6 +1,6 @@
 // frontend/src/components/ExperimentManager.tsx
-import { useState, useMemo } from 'react';
-import { Database, Info, Trash2, Check, Clock, ArrowRightLeft, X } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Database, Info, Trash2, Check, Clock, ArrowRightLeft, X, Save, UploadCloud } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
 
@@ -13,7 +13,7 @@ interface ExperimentNode {
 }
 
 export function ExperimentManager() {
-    const { experimentsData, activeExperiment, setActiveExperiment, sendCommand } = useWebSocket();
+    const { experimentsData, activeExperiment, setActiveExperiment, sendCommand, inferenceSnapshots } = useWebSocket();
     const [opened, setOpened] = useState(false);
     const [selectedExp, setSelectedExp] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'list' | 'tree'>('tree');
@@ -241,6 +241,19 @@ export function ExperimentManager() {
     const handleViewDetails = (expName: string) => {
         setSelectedExp(expName);
         open();
+    };
+
+    useEffect(() => {
+        if (opened && selectedExp) {
+            sendCommand('snapshot', 'list_snapshots', { experiment_name: selectedExp });
+        }
+    }, [opened, selectedExp, sendCommand]);
+
+    const handleLoadSnapshot = (filepath_pt: string) => {
+        if (confirm('¿Cargar este snapshot? La simulación actual se detendrá y su estado se reemplazará.')) {
+            sendCommand('snapshot', 'load_snapshot', { filepath_pt });
+            close();
+        }
     };
 
     const handleDeleteExperiment = (expName: string) => {
@@ -633,6 +646,35 @@ export function ExperimentManager() {
                                             </GlassPanel>
                                         );
                                     })()}
+
+                                    {/* Snapshots de Inferencia */}
+                                    <GlassPanel className="p-4">
+                                        <h3 className="text-xs font-bold text-gray-300 mb-3 uppercase tracking-wider flex items-center gap-2">
+                                            <Save size={12} />
+                                            Snapshots de Inferencia
+                                        </h3>
+                                        {inferenceSnapshots && inferenceSnapshots.length > 0 ? (
+                                            <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar pr-2">
+                                                {inferenceSnapshots.map((snapshot, index) => (
+                                                    <div key={index} className="flex items-center justify-between p-2 bg-white/5 rounded">
+                                                        <div>
+                                                            <div className="text-xs font-mono text-gray-300">Paso: {snapshot.step.toLocaleString()}</div>
+                                                            <div className="text-[10px] text-gray-500">{new Date(snapshot.timestamp).toLocaleString()}</div>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleLoadSnapshot(snapshot.filepath_pt)}
+                                                            className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 text-[10px] font-bold rounded transition-all"
+                                                        >
+                                                            <UploadCloud size={12} />
+                                                            Cargar
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-gray-500 italic">No hay snapshots para este experimento.</p>
+                                        )}
+                                    </GlassPanel>
                                     
                                     {/* Información del experimento */}
                                     <GlassPanel className="p-4">
