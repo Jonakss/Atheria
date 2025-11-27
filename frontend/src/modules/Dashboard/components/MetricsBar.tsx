@@ -1,92 +1,94 @@
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Terminal } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { HistoryControls } from '../../History/HistoryControls';
 
 export const MetricsBar: React.FC = () => {
   const { allLogs } = useWebSocket();
-  const [expanded, setExpanded] = useState(false);
+  const [viewMode, setViewMode] = useState<'controls' | 'logs'>('controls');
+
+  // Use a ref for logs to avoid unnecessary re-renders if logs are updated frequently
+  // but we only want to display the last few.
+  // Actually, for a "full log mode", we might want to show more than 2 lines.
+  // But let's start by respecting the current "recent logs" logic for the summary,
+  // and maybe show more in 'logs' mode if we had a full log viewer component.
+  // For now, I'll stick to the existing log logic but allow the container to expand.
   
-  // Filtrar logs recientes (últimos 2) - solo mensajes de texto
-  // Usar useRef para mantener una referencia estable y evitar re-renders infinitos
   const logsRef = useRef<string[]>([]);
   const logsLengthRef = useRef<number>(0);
   
   useEffect(() => {
     if (allLogs && allLogs.length !== logsLengthRef.current) {
       logsLengthRef.current = allLogs.length;
-      // Filtrar solo logs de texto (string)
+      // Filter only text logs
       const textLogs = allLogs.filter(log => typeof log === 'string' && log.trim().length > 0);
-      logsRef.current = textLogs.slice(-2);
+      // Keep a larger buffer for the expanded view, or just the recent ones?
+      // The user asked for "logs collapsible", implying they want to see logs.
+      // Let's show more logs in expanded mode (e.g., last 5-10) and fewer in compact.
+      logsRef.current = textLogs.slice(-10);
     }
   }, [allLogs]);
   
   const recentLogs = logsRef.current;
+  const displayLogs = viewMode === 'logs' ? recentLogs : recentLogs.slice(-2);
 
   return (
-    <div className={`mt-auto z-30 border-t border-white/10 bg-[#050505]/95 backdrop-blur-sm transition-all duration-300 ease-in-out relative ${
-      expanded ? 'p-4' : 'p-2'
-    }`}>
-      <div className="max-w-6xl mx-auto relative flex items-center justify-between gap-4">
+    <div className="mt-auto z-30 border-t border-white/10 bg-[#050505]/95 backdrop-blur-sm p-2 transition-all duration-300">
+      <div className="max-w-7xl mx-auto flex items-stretch gap-4">
         
-        {/* Controls Section (Replaces Metrics) */}
-        <div className="flex-1">
-            <HistoryControls />
+        {/* Controls Section */}
+        <div className={`transition-all duration-300 ease-in-out ${
+            viewMode === 'controls' ? 'flex-1' : 'w-auto'
+        }`}>
+            <HistoryControls mode={viewMode === 'controls' ? 'full' : 'compact'} />
+        </div>
+
+        {/* Separator / Toggle Button */}
+        <div className="flex items-center">
+            <button
+                onClick={() => setViewMode(prev => prev === 'controls' ? 'logs' : 'controls')}
+                className="p-1.5 rounded-full hover:bg-white/10 text-gray-500 hover:text-white transition-colors border border-transparent hover:border-white/10"
+                title={viewMode === 'controls' ? 'Show Logs' : 'Show Controls'}
+            >
+                {viewMode === 'controls' ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+            </button>
         </div>
 
         {/* Log Section */}
-        <div className={`w-1/3 pl-4 border-l border-white/5 flex flex-col justify-center transition-all duration-300 ${
-            expanded ? 'gap-1' : 'gap-2'
+        <div className={`transition-all duration-300 ease-in-out flex flex-col justify-center overflow-hidden relative ${
+            viewMode === 'logs' ? 'flex-1 opacity-100' : 'w-0 opacity-0'
         }`}>
-            {recentLogs.length > 0 ? (
-              recentLogs.map((log, idx) => {
-                const logStr = typeof log === 'string' ? log : JSON.stringify(log);
-                const isError = logStr.toLowerCase().includes('error');
-                const isInfo = logStr.toLowerCase().includes('nucleación') || logStr.toLowerCase().includes('optimiz');
-                
-                return (
-                  <div 
-                    key={idx} 
-                    className={`flex items-center gap-2 font-mono ${
-                      expanded ? 'text-[10px]' : 'text-xs'
-                    } ${
-                      isError ? 'text-red-500/80' : isInfo ? 'text-teal-500/80' : 'text-blue-500/80'
-                    }`}
-                  >
-                    <span className={`rounded-full shrink-0 ${
-                      expanded ? 'w-1 h-1' : 'w-1.5 h-1.5'
-                    } ${
-                      isError ? 'bg-red-500' : isInfo ? 'bg-teal-500' : 'bg-blue-500'
-                    }`} />
-                    <span className={expanded ? 'truncate' : ''}>
-                      {expanded 
-                        ? (logStr.length > 50 ? logStr.substring(0, 50) + '...' : logStr)
-                        : (logStr.length > 80 ? logStr.substring(0, 80) + '...' : logStr)
-                      }
-                    </span>
-                  </div>
-                );
-              })
-            ) : (
-              <div className={`flex items-center gap-2 font-mono text-gray-600 ${
-                expanded ? 'text-[10px]' : 'text-xs'
-              }`}>
-                <span className={`rounded-full bg-gray-600 shrink-0 ${
-                  expanded ? 'w-1 h-1' : 'w-1.5 h-1.5'
-                }`} />
-                <span>Esperando datos...</span>
-              </div>
-            )}
-        </div>
+             {/* Log Content */}
+             <div className="absolute inset-0 overflow-y-auto pr-2 custom-scrollbar flex flex-col justify-center">
+                {displayLogs.length > 0 ? (
+                displayLogs.map((log, idx) => {
+                    const logStr = typeof log === 'string' ? log : JSON.stringify(log);
+                    const isError = logStr.toLowerCase().includes('error');
+                    const isInfo = logStr.toLowerCase().includes('nucleación') || logStr.toLowerCase().includes('optimiz');
 
-        {/* Botón de expansión (Opcional, mantenido por si el usuario quiere expandir logs) */}
-        <div
-          onMouseEnter={() => setExpanded(true)}
-          onMouseLeave={() => setExpanded(false)}
-          className="absolute right-0 top-0 h-full w-4 bg-transparent cursor-pointer z-50 flex items-center justify-center opacity-50 hover:opacity-100"
-          title={expanded ? "Contraer" : "Expandir"}
-        >
-             {expanded ? <ChevronDown size={12} className="text-gray-500" /> : <ChevronUp size={12} className="text-gray-500" />}
+                    return (
+                    <div
+                        key={idx}
+                        className={`flex items-start gap-2 font-mono text-[10px] py-0.5 ${
+                        isError ? 'text-red-500/90' : isInfo ? 'text-teal-500/90' : 'text-blue-500/90'
+                        }`}
+                    >
+                        <span className={`mt-1 rounded-full shrink-0 w-1 h-1 ${
+                        isError ? 'bg-red-500' : isInfo ? 'bg-teal-500' : 'bg-blue-500'
+                        }`} />
+                        <span className="break-all leading-tight">
+                        {logStr}
+                        </span>
+                    </div>
+                    );
+                })
+                ) : (
+                <div className="flex items-center gap-2 font-mono text-gray-600 text-[10px]">
+                    <Terminal size={12} />
+                    <span>Esperando datos del sistema...</span>
+                </div>
+                )}
+             </div>
         </div>
       </div>
     </div>
