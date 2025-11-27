@@ -1,9 +1,10 @@
 // frontend/src/components/ExperimentManager.tsx
 import { useState, useMemo, useEffect } from 'react';
-import { Database, Info, Trash2, Check, Clock, ArrowRightLeft, X, Save, UploadCloud } from 'lucide-react';
+import { Database, Info, Trash2, Check, Clock, ArrowRightLeft, X, Save, UploadCloud, Download } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
 import { InferenceSnapshot } from '../../context/WebSocketContextDefinition';
+import { UploadExperimentModal } from './UploadExperimentModal';
 
 interface ExperimentNode {
     name: string;
@@ -19,6 +20,7 @@ export function ExperimentManager() {
     const [selectedExp, setSelectedExp] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'list' | 'tree'>('tree');
     const [sortBy, setSortBy] = useState<'created' | 'updated' | 'name' | 'training_time'>('created');
+    const [showUploadModal, setShowUploadModal] = useState(false);
 
     const open = () => setOpened(true);
     const close = () => setOpened(false);
@@ -279,6 +281,15 @@ export function ExperimentManager() {
         }
     };
 
+    const handleExportExperiment = (expName: string) => {
+        const link = document.createElement('a');
+        link.href = `/api/export_experiment?name=${encodeURIComponent(expName)}`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const selectedExperiment = selectedExp ? experimentTreeSorted[selectedExp] : null;
     const transferChain = selectedExp ? getTransferChain(selectedExp, experimentTree) : [];
 
@@ -315,6 +326,13 @@ export function ExperimentManager() {
                             <option value="list">Lista</option>
                             <option value="tree">Árbol</option>
                         </select>
+                        <button
+                            onClick={() => setShowUploadModal(true)}
+                            className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded transition-all"
+                            title="Importar Experimento/Modelo"
+                        >
+                            <UploadCloud size={14} />
+                        </button>
                         <button
                             onClick={() => sendCommand('system', 'refresh_experiments', {})}
                             className="p-1.5 text-gray-400 hover:text-gray-200 hover:bg-white/5 rounded transition-all"
@@ -396,6 +414,16 @@ export function ExperimentManager() {
                                                         title="Ver detalles"
                                                     >
                                                         <Info size={12} />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleExportExperiment(root);
+                                                        }}
+                                                        className="p-1 text-gray-400 hover:text-gray-200 hover:bg-white/5 rounded transition-all"
+                                                        title="Exportar (Descargar ZIP)"
+                                                    >
+                                                        <Download size={12} />
                                                     </button>
                                                     <button
                                                         onClick={(e) => {
@@ -520,6 +548,16 @@ export function ExperimentManager() {
                                                 </td>
                                                 <td className="py-2">
                                                     <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleExportExperiment(exp.name);
+                                                            }}
+                                                            className="p-1 text-gray-400 hover:text-gray-200 hover:bg-white/5 rounded transition-all"
+                                                            title="Exportar (Descargar ZIP)"
+                                                        >
+                                                            <Download size={12} />
+                                                        </button>
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
@@ -828,6 +866,13 @@ export function ExperimentManager() {
                         </div>
                     </GlassPanel>
                 </div>
+            )}
+
+            {showUploadModal && (
+                <UploadExperimentModal
+                    onClose={() => setShowUploadModal(false)}
+                    onUploadSuccess={() => sendCommand('system', 'refresh_experiments', {})}
+                />
             )}
         </>
     );
