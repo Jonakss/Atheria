@@ -21,17 +21,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.10"
-          cache: 'pip'
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: 'npm'
+          cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install Frontend Dependencies
@@ -195,6 +189,12 @@ jobs:
             echo "skip=true" >> $GITHUB_OUTPUT
           fi
 
+      - name: Set up Python
+        if: steps.check-backend.outputs.skip != 'true'
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+          cache: "pip"
 
       - name: Install PyTorch (required for LibTorch)
         if: steps.check-backend.outputs.skip != 'true'
