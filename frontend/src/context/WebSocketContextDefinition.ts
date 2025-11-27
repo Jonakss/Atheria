@@ -119,6 +119,7 @@ export interface WebSocketContextType {
   compileStatus: CompileStatus | null; // Estado de compilación/motor
   liveFeedEnabled: boolean; // Estado del live feed (sincronizado con backend)
   setLiveFeedEnabled: (enabled: boolean) => void; // Función para cambiar live feed
+  setStepsInterval: (interval: number) => void; // Función para cambiar el intervalo de pasos
 }
 
 export const WebSocketContext = createContext<WebSocketContextType | undefined>(

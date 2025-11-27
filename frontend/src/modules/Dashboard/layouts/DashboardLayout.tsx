@@ -188,7 +188,7 @@ export const DashboardLayout: React.FC = () => {
 
           {/* History Controls (Timeline Navigation) - Solo en vista Lab */}
           {activeTab === 'lab' && (
-            <div className="px-4 py-2 border-t border-white/5 bg-dark-980/80 backdrop-blur-sm">
+            <div className="mt-auto px-4 py-2 border-t border-white/5 bg-dark-980/80 backdrop-blur-sm relative z-10">
               <HistoryControls />
             </div>
           )}
