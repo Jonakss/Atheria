@@ -29,6 +29,12 @@ Formato de Escritura
 
 Usa Markdown limpio.
 
+**NUEVO ESTÁNDAR DE LOGS:**
+1. Crea un archivo nuevo en `docs/40_Experiments/logs/YYYY-MM-DD_Titulo_Descriptivo.md`.
+2. Escribe ahí el contenido detallado.
+3. Agrega un enlace en `docs/40_Experiments/AI_DEV_LOG.md` apuntando a tu nuevo archivo: `- [[logs/YYYY-MM-DD_Titulo...|YYYY-MM-DD - Tipo: Título]]`.
+4. **NO** escribas el contenido directamente en `AI_DEV_LOG.md`. Ese archivo es solo un índice.
+
 Usa enlaces estilo Obsidian [[Concepto]] para conectar ideas.
 
 Sé conciso. Preferimos listas con viñetas a párrafos largos.

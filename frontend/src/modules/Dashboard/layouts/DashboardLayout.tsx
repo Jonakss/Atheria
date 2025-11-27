@@ -12,7 +12,6 @@ import { MetricsBar } from '../components/MetricsBar';
 import { NavigationSidebar } from '../components/NavigationSidebar';
 import { PhysicsInspector } from '../components/PhysicsInspector';
 import { ScientificHeader } from '../components/ScientificHeader';
-import { Toolbar } from '../components/Toolbar';
 
 type TabType = 'lab' | 'analysis' | 'history' | 'logs';
 type LabSection = 'inference' | 'training' | 'analysis';
@@ -22,7 +21,6 @@ export const DashboardLayout: React.FC = () => {
   const [labPanelOpen, setLabPanelOpen] = useState(true);
   const [activeLabSection, setActiveLabSection] = useState<LabSection>('inference');
   const [physicsInspectorCollapsed, setPhysicsInspectorCollapsed] = useState(false);
-  const [timelineOpen, setTimelineOpen] = useState(false);
   const [selectedTimelineFrame, setSelectedTimelineFrame] = useState<{
     step: number;
     timestamp: string;
@@ -98,7 +96,7 @@ export const DashboardLayout: React.FC = () => {
                   <PanZoomCanvas historyFrame={selectedTimelineFrame} />
                   {/* Timeline Viewer - Panel flotante */}
                   {/* TEMPORALMENTE DESHABILITADO - Revisar performance issues */}
-                  {false && timelineOpen && (
+                  {false && (
                       <TimelineViewer
                         className="absolute bottom-0 left-0 right-0 z-30"
                         onFrameSelect={(frame) => {
@@ -185,9 +183,6 @@ export const DashboardLayout: React.FC = () => {
         {/* Design System: flex-1 (Ocupa todo el espacio restante), relative para overlays */}
         <main className="flex-1 relative bg-dark-990 flex flex-col overflow-hidden">
           
-          {/* Barra de Herramientas Superior (Flotante) */}
-          <Toolbar onToggleTimeline={() => setTimelineOpen(prev => !prev)} timelineOpen={timelineOpen} />
-
           {/* Viewport (Fondo) - Design System: bg-[#050505] a black según mockup */}
           {renderContentView()}
 
