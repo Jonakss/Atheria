@@ -36,8 +36,9 @@ class ExperimentLogger:
         self.docs_base_dir = docs_base_dir
         self.log_file = os.path.join(docs_base_dir, f"{experiment_name}.md")
         
-        # Asegurar que el directorio existe
-        os.makedirs(docs_base_dir, exist_ok=True)
+        # Asegurar que el directorio existe (incluyendo subdirectorios del experimento)
+        log_dir = os.path.dirname(self.log_file)
+        os.makedirs(log_dir, exist_ok=True)
         
         # Historial de resultados (se carga desde el archivo si existe)
         self.results_history: List[Dict[str, Any]] = []
