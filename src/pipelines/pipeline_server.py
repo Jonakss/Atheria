@@ -243,7 +243,9 @@ async def handle_upload_model(request):
             value = await part.text()
             form_fields[part.name] = value
 
-    if not file_data or not filename:
+    exp_name = request.query.get('name')
+    if not exp_name or '..' in exp_name or '/' in exp_name or '\\' in exp_name:
+        return web.json_response({'error': 'Nombre de experimento inválido'}, status=400)
         return web.json_response({'error': 'No se proporcionó ningún archivo'}, status=400)
 
     try:
