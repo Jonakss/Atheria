@@ -37,7 +37,8 @@ def verify_controls():
             # Check for Logs Mode
             # Timeline slider should be GONE (or hidden)
             # Logs area should be expanded
-            # Toggle button should now say 'Show Controls' (title)
+            # Wait for animation by waiting for the timeline to disappear
+            page.wait_for_selector("input[type='range']", state='hidden', timeout=5000)
 
             toggle_btn_back = page.get_by_title("Show Controls")
             if toggle_btn_back.is_visible():
