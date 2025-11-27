@@ -250,7 +250,38 @@ async def handle_upload_model(request):
 
     try:
         if filename.endswith('.zip'):
-            return await _process_zip_upload(filename, file_data)
+    try:
+        import io
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # Agregar config.json en la raíz
+            config_path = os.path.join(exp_dir, 'config.json')
+            if os.path.exists(config_path):
+                zipf.write(config_path, 'config.json')
+
+            # Agregar checkpoints en carpeta 'checkpoints'
+            if os.path.exists(checkpoints_dir):
+                for root, dirs, files in os.walk(checkpoints_dir):
+                    for file in files:
+                        if file.endswith('.pth') or file.endswith('.pt'):
+                            file_path = os.path.join(root, file)
+                            arcname = os.path.join('checkpoints', file)
+                            zipf.write(file_path, arcname)
+
+        # Servir el archivo desde el buffer de memoria
+        response = web.Response(
+            body=zip_buffer.getvalue(),
+            headers={
+                'Content-Type': 'application/zip',
+                'Content-Disposition': f'attachment; filename="experiment_{exp_name}.zip"'
+            }
+        )
+        return response
+
+    except Exception as e:
+        logging.error(f"Error exportando experimento: {e}", exc_info=True)
+        return web.json_response({'error': str(e)}, status=500)
         elif filename.endswith('.pth') or filename.endswith('.pt'):
             return await _process_pth_upload(filename, file_data, form_fields)
         else:
