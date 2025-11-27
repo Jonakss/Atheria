@@ -240,7 +240,11 @@ const HistoryTimeline: React.FC<{
 
 // --- Main Component ---
 
-export const HistoryControls: React.FC = () => {
+interface HistoryControlsProps {
+  mode?: 'full' | 'compact';
+}
+
+export const HistoryControls: React.FC<HistoryControlsProps> = ({ mode = 'full' }) => {
   const { sendCommand, ws, simData, inferenceStatus, connectionStatus, liveFeedEnabled, setLiveFeedEnabled, setStepsInterval } = useWebSocket();
   const [historyRange, setHistoryRange] = useState<HistoryRange>({
     available: false,
@@ -407,8 +411,8 @@ export const HistoryControls: React.FC = () => {
   const { min_step, max_step } = historyRange;
 
   return (
-    <div className="flex flex-col gap-2 p-3 bg-brand-dark/95 backdrop-blur-md rounded-lg border border-white/10 relative z-30">
-      <div className="flex items-center justify-between">
+    <div className={`flex flex-col gap-2 relative z-30 ${mode === 'compact' ? 'w-fit' : 'w-full'}`}>
+      <div className={`flex items-center ${mode === 'compact' ? 'gap-4' : 'justify-between'}`}>
         <SimulationControls
           isPlaying={isPlaying}
           controlsEnabled={controlsEnabled}
@@ -426,16 +430,18 @@ export const HistoryControls: React.FC = () => {
           currentStep={currentStep}
         />
       </div>
-      <HistoryTimeline
-        available={historyRange.available}
-        minStep={min_step}
-        maxStep={max_step}
-        selectedStep={selectedStep}
-        onStepBackward={handleStepBackward}
-        onStepForward={handleStepForward}
-        onSliderChange={handleSliderChange}
-        onSliderRelease={handleSliderRelease}
-      />
+      {mode === 'full' && (
+        <HistoryTimeline
+          available={historyRange.available}
+          minStep={min_step}
+          maxStep={max_step}
+          selectedStep={selectedStep}
+          onStepBackward={handleStepBackward}
+          onStepForward={handleStepForward}
+          onSliderChange={handleSliderChange}
+          onSliderRelease={handleSliderRelease}
+        />
+      )}
     </div>
   );
 };
