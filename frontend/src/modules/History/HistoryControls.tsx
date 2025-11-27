@@ -131,6 +131,8 @@ export const HistoryControls: React.FC = () => {
   // Determine if controls should be enabled
   const controlsEnabled = isConnected;
 
+  const { min_step, max_step } = historyRange;
+
   return (
     <div className="flex flex-col gap-2 p-3 bg-[#050505]/95 backdrop-blur-md rounded-lg border border-white/10 relative z-30">
 

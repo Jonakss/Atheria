@@ -12,7 +12,6 @@ import { MetricsBar } from '../components/MetricsBar';
 import { NavigationSidebar } from '../components/NavigationSidebar';
 import { PhysicsInspector } from '../components/PhysicsInspector';
 import { ScientificHeader } from '../components/ScientificHeader';
-import { Toolbar } from '../components/Toolbar';
 
 type TabType = 'lab' | 'analysis' | 'history' | 'logs';
 type LabSection = 'inference' | 'training' | 'analysis';
