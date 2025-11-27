@@ -5,6 +5,7 @@ import { TimelineViewer } from '../../../components/ui/TimelineViewer';
 import HolographicViewer from '../../../components/visualization/HolographicViewer';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { HistoryControls } from '../../../modules/History/HistoryControls';
+import { TrainingView } from '../components/TrainingView';
 import { AnalysisView } from '../components/AnalysisView';
 import { HistoryView } from '../components/HistoryView';
 import { LogsView } from '../components/LogsView';
@@ -65,6 +66,11 @@ export const DashboardLayout: React.FC = () => {
   const renderContentView = () => {
     switch (activeTab) {
       case 'lab':
+        // Si estamos en la sección de entrenamiento, mostrar la vista de entrenamiento
+        if (activeLabSection === 'training') {
+          return <TrainingView />;
+        }
+
         // Vista principal: 2D canvas o 3D holographic según selectedViz
         if (selectedViz === 'holographic' || selectedViz === '3d') {
           return (

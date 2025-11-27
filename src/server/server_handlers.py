@@ -107,28 +107,81 @@ async def create_experiment_handler(args):
                         logging.info(f"Entrenamiento stdout: {log_msg}")
                         
                         # Parsear mensajes de progreso del entrenamiento
+                        # Soporta formato V4 (Survival, Symmetry, etc.) y Legacy (Reward)
                         progress_match = re.search(
-                            r'Episodio\s+(\d+)/(\d+)\s+\|\s+Loss:\s+([\d.]+)(?:\s+\|\s+Reward:\s+([\d.-]+))?',
+                            r'Episodio\s+(?P<current>\d+)/(?P<total>\d+)\s+\|\s+'
+                            r'Loss:\s+(?P<loss>[\d.]+)'
+                            r'(?:\s+\|\s+Survival:\s+(?P<survival>[\d.]+))?'
+                            r'(?:\s+\|\s+Symmetry:\s+(?P<symmetry>[\d.]+))?'
+                            r'(?:\s+\|\s+Complexity:\s+(?P<complexity>[\d.]+))?'
+                            r'(?:\s+\|\s+Combined:\s+(?P<combined>[\d.]+))?'
+                            r'(?:\s+\|\s+Reward:\s+(?P<reward>[\d.-]+))?',
                             log_msg
                         )
                         if progress_match:
-                            current_episode = int(progress_match.group(1))
-                            total_episodes = int(progress_match.group(2))
-                            loss = float(progress_match.group(3))
-                            reward = float(progress_match.group(4)) if progress_match.group(4) else None
+                            groups = progress_match.groupdict()
+                            current_episode = int(groups['current'])
+                            total_episodes = int(groups['total'])
+                            loss = float(groups['loss'])
                             
-                            # Enviar progreso al frontend
+                            # Construir payload con todas las métricas disponibles
                             progress_payload = {
                                 "current_episode": current_episode,
                                 "total_episodes": total_episodes,
                                 "avg_loss": loss
                             }
-                            if reward is not None:
-                                progress_payload["avg_reward"] = reward
+
+                            # Agregar métricas opcionales si existen
+                            if groups.get('survival'):
+                                progress_payload["survival"] = float(groups['survival'])
+                            if groups.get('symmetry'):
+                                progress_payload["symmetry"] = float(groups['symmetry'])
+                            if groups.get('complexity'):
+                                progress_payload["complexity"] = float(groups['complexity'])
+                            if groups.get('combined'):
+                                progress_payload["combined"] = float(groups['combined'])
+                            if groups.get('reward'):
+                                progress_payload["avg_reward"] = float(groups['reward'])
                             
                             await broadcast({
                                 "type": "training_progress",
                                 "payload": progress_payload
+                            })
+
+                        # Parsear checkpoints guardados
+                        # Formato: ✅ Checkpoint guardado (MEJOR): Episodio 10 | Loss: ...
+                        checkpoint_match = re.search(
+                            r'Checkpoint guardado.*Episodio\s+(?P<episode>\d+)',
+                            log_msg
+                        )
+                        if checkpoint_match:
+                            episode = int(checkpoint_match.group('episode'))
+                            is_best = "MEJOR" in log_msg
+
+                            # Intentar extraer métricas del log del checkpoint si están presentes
+                            metrics = {}
+
+                            # Reusar patrones comunes para extraer valores flotantes
+                            loss_match = re.search(r'Loss:\s+(?P<val>[\d.]+)', log_msg)
+                            if loss_match: metrics['loss'] = float(loss_match.group('val'))
+
+                            surv_match = re.search(r'Survival:\s+(?P<val>[\d.]+)', log_msg)
+                            if surv_match: metrics['survival'] = float(surv_match.group('val'))
+
+                            sym_match = re.search(r'Symmetry:\s+(?P<val>[\d.]+)', log_msg)
+                            if sym_match: metrics['symmetry'] = float(sym_match.group('val'))
+
+                            comb_match = re.search(r'Combined:\s+(?P<val>[\d.]+)', log_msg)
+                            if comb_match: metrics['combined'] = float(comb_match.group('val'))
+
+                            await broadcast({
+                                "type": "training_checkpoint_event",
+                                "payload": {
+                                    "episode": episode,
+                                    "is_best": is_best,
+                                    "metrics": metrics,
+                                    "timestamp": asyncio.get_event_loop().time()
+                                }
                             })
             except Exception as e:
                 logging.error(f"Error leyendo stdout: {e}")
