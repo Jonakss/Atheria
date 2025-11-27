@@ -1,5 +1,6 @@
 import { BackwardIcon, ForwardIcon, PauseIcon, PlayIcon } from '@heroicons/react/24/solid';
-import React, { useCallback, useEffect, useState } from 'react';
+import { RefreshCw, Save, Eye, EyeOff } from 'lucide-react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 
 interface HistoryRange {
@@ -11,7 +12,7 @@ interface HistoryRange {
 }
 
 export const HistoryControls: React.FC = () => {
-  const { sendCommand, ws } = useWebSocket();
+  const { sendCommand, ws, simData, inferenceStatus, connectionStatus, liveFeedEnabled, setLiveFeedEnabled } = useWebSocket();
   const [historyRange, setHistoryRange] = useState<HistoryRange>({
     available: false,
     min_step: null,
@@ -21,6 +22,7 @@ export const HistoryControls: React.FC = () => {
   });
   const [selectedStep, setSelectedStep] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const isConnected = connectionStatus === 'connected';
 
   // Define callbacks before useEffect
   const requestHistoryRange = useCallback(() => {
@@ -54,11 +56,20 @@ export const HistoryControls: React.FC = () => {
   };
 
   const handlePlayPause = () => {
-    if (isPlaying) {
-      sendCommand('inference', 'pause', {});
-    } else {
-      sendCommand('inference', 'play', {});
-    }
+    const command = isPlaying ? 'pause' : 'play';
+    sendCommand('inference', command);
+  };
+
+  const handleReset = () => {
+    sendCommand('inference', 'reset');
+  };
+
+  const handleSaveSnapshot = () => {
+    sendCommand('snapshot', 'save_snapshot');
+  };
+
+  const handleToggleLiveFeed = () => {
+    setLiveFeedEnabled(!liveFeedEnabled);
   };
 
   // Solicitar rango de historia al iniciar
@@ -98,92 +109,146 @@ export const HistoryControls: React.FC = () => {
     return () => ws.removeEventListener('message', handleMessage);
   }, [ws]);
 
-  if (!historyRange.available) {
-    return (
-      <div className="flex items-center justify-center p-4 bg-gray-800/50 rounded-lg border border-gray-700">
-        <p className="text-gray-400 text-sm">
-          No hay historial disponible. Ejecuta la simulación para generar historial.
-        </p>
-      </div>
-    );
-  }
+  // Sync isPlaying state with hook
+  useEffect(() => {
+    setIsPlaying(inferenceStatus === 'running');
+  }, [inferenceStatus]);
 
-  const { min_step, max_step, total_frames, current_step } = historyRange;
+  const fps = simData?.simulation_info?.fps ?? 0;
+  const particleCount = useMemo(() => {
+    if (!simData?.map_data) return null;
+    let count = 0;
+    for (const row of simData.map_data) {
+      if (Array.isArray(row)) {
+        for (const val of row) {
+          if (typeof val === 'number' && !isNaN(val) && val > 0.01) count++;
+        }
+      }
+    }
+    return count > 1000 ? `${(count / 1000).toFixed(1)}K` : count.toString();
+  }, [simData?.map_data]);
+
+  // Determine if controls should be enabled
+  const controlsEnabled = isConnected;
 
   return (
-    <div className="flex flex-col gap-3 p-4 bg-gray-800/50 rounded-lg border border-gray-700 relative z-10">
-      {/* Header */}
+    <div className="flex flex-col gap-2 p-3 bg-[#050505]/95 backdrop-blur-md rounded-lg border border-white/10 relative z-30">
+
+      {/* Top Row: Simulation Controls & Status (Moved from Toolbar) */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-200">Timeline de Simulación</h3>
-        <div className="text-xs text-gray-400">
-          {total_frames} frames ({min_step} - {max_step})
+        <div className="flex items-center gap-2">
+          {/* Play/Pause */}
+          <button
+            onClick={handlePlayPause}
+            disabled={!controlsEnabled}
+            className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 transition-all border ${
+              !controlsEnabled
+                ? 'bg-white/5 text-gray-600 border-white/5 cursor-not-allowed opacity-50'
+                : isPlaying
+                  ? 'bg-pink-500/10 text-pink-500 border-pink-500/30 hover:bg-pink-500/20'
+                  : 'bg-teal-500/10 text-teal-400 border-teal-500/30 hover:bg-teal-500/20'
+            }`}
+          >
+            {isPlaying ? <PauseIcon className="w-3 h-3" /> : <PlayIcon className="w-3 h-3" />}
+            {isPlaying ? 'PAUSE' : 'RUN'}
+          </button>
+
+          {/* Reset */}
+          <button
+            onClick={handleReset}
+            disabled={!controlsEnabled}
+            className="p-1.5 rounded text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            title="Reset Simulation"
+          >
+            <RefreshCw size={14} />
+          </button>
+
+          {/* Snapshot */}
+          <button
+            onClick={handleSaveSnapshot}
+            disabled={!controlsEnabled}
+            className="p-1.5 rounded text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 transition-colors"
+            title="Save Snapshot"
+          >
+            <Save size={14} />
+          </button>
+        </div>
+
+        {/* Status Indicators (FPS, Particles, Live) */}
+        <div className="flex items-center gap-4 text-xs font-mono">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-gray-500">FPS</span>
+              <span className={fps > 0 ? 'text-teal-400' : 'text-gray-600'}>
+                {fps > 0 ? fps.toFixed(1) : '0.0'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-gray-500">PART.</span>
+              <span className={particleCount ? 'text-blue-400' : 'text-gray-600'}>
+                {particleCount ?? 'N/A'}
+              </span>
+            </div>
+             <button
+                onClick={handleToggleLiveFeed}
+                disabled={!controlsEnabled}
+                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold border transition-all ${
+                  liveFeedEnabled
+                    ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+                    : 'bg-gray-800 text-gray-500 border-gray-700'
+                }`}
+              >
+                {liveFeedEnabled ? <Eye size={10} /> : <EyeOff size={10} />}
+                <span>{liveFeedEnabled ? 'LIVE' : 'OFF'}</span>
+              </button>
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="flex items-center gap-3">
-        {/* Step Backward */}
-        <button
-          onClick={handleStepBackward}
-          disabled={selectedStep <= (min_step ?? 0)}
-          className="p-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-600 rounded-lg transition-colors"
-          title="Retroceder 10 steps"
-        >
-          <BackwardIcon className="w-4 h-4" />
-        </button>
+      {/* Bottom Row: History Timeline (If available) */}
+      {historyRange.available ? (
+        <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+            <button
+            onClick={handleStepBackward}
+            disabled={selectedStep <= (min_step ?? 0)}
+            className="p-1 text-gray-400 hover:text-white disabled:opacity-30"
+            >
+            <BackwardIcon className="w-3 h-3" />
+            </button>
 
-        {/* Play/Pause */}
-        <button
-          onClick={handlePlayPause}
-          className="p-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
-          title={isPlaying ? 'Pausar' : 'Reproducir'}
-        >
-          {isPlaying ? (
-            <PauseIcon className="w-4 h-4" />
-          ) : (
-            <PlayIcon className="w-4 h-4" />
-          )}
-        </button>
+            <div className="flex-1 flex items-center gap-2">
+            <input
+                type="range"
+                min={min_step ?? 0}
+                max={max_step ?? 0}
+                value={selectedStep}
+                onChange={handleSliderChange}
+                onMouseUp={handleSliderRelease}
+                onTouchEnd={handleSliderRelease}
+                className="flex-1 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb-sm"
+                style={{
+                backgroundImage: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${
+                    ((selectedStep - (min_step ?? 0)) / ((max_step ?? 1) - (min_step ?? 0))) * 100
+                }%, #4b5563 ${
+                    ((selectedStep - (min_step ?? 0)) / ((max_step ?? 1) - (min_step ?? 0))) * 100
+                }%, #4b5563 100%)`,
+                }}
+            />
+            </div>
 
-        {/* Step Forward */}
-        <button
-          onClick={handleStepForward}
-          disabled={selectedStep >= (max_step ?? 0)}
-          className="p-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-600 rounded-lg transition-colors"
-          title="Avanzar 10 steps"
-        >
-          <ForwardIcon className="w-4 h-4" />
-        </button>
+            <button
+            onClick={handleStepForward}
+            disabled={selectedStep >= (max_step ?? 0)}
+            className="p-1 text-gray-400 hover:text-white disabled:opacity-30"
+            >
+            <ForwardIcon className="w-3 h-3" />
+            </button>
 
-        {/* Slider */}
-        <div className="flex-1 flex items-center gap-2">
-          <span className="text-xs text-gray-400 min-w-[60px]">
-            Step: {selectedStep}
-          </span>
-          <input
-            type="range"
-            min={min_step ?? 0}
-            max={max_step ?? 0}
-            value={selectedStep}
-            onChange={handleSliderChange}
-            onMouseUp={handleSliderRelease}
-            onTouchEnd={handleSliderRelease}
-            className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb"
-            style={{
-              backgroundImage: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${
-                ((selectedStep - (min_step ?? 0)) / ((max_step ?? 1) - (min_step ?? 0))) * 100
-              }%, #4b5563 ${
-                ((selectedStep - (min_step ?? 0)) / ((max_step ?? 1) - (min_step ?? 0))) * 100
-              }%, #4b5563 100%)`,
-            }}
-          />
+            <div className="text-[10px] font-mono text-gray-400 min-w-[80px] text-right">
+                Step: <span className="text-white">{selectedStep.toLocaleString()}</span>
+            </div>
         </div>
-      </div>
-
-      {/* Current Step Indicator */}
-      {current_step !== selectedStep && (
-        <div className="text-xs text-amber-400">
-          ⚠️ Visualizando step {selectedStep} (actual: {current_step})
+      ) : (
+        <div className="text-[10px] text-gray-500 pt-2 text-center border-t border-white/5">
+             No history available. Run simulation to generate data.
         </div>
       )}
     </div>
