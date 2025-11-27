@@ -1,0 +1,15 @@
+[build-system]
+requires = [
+    "setuptools>=45",
+    "wheel",
+    "pybind11>=2.10.0",
+    "cmake>=3.15",
+    "torch",
+    "numpy"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atheria"
+dynamic = ["version", "description", "readme", "authors", "classifiers", "dependencies", "scripts"]
+requires-python = ">=3.8"
