@@ -5,6 +5,7 @@ import os
 import shutil
 import zipfile
 import json
+import io
 from datetime import datetime
 from aiohttp import web
 from pathlib import Path
@@ -69,10 +70,10 @@ async def on_cleanup(app):
     """Callback de cierre de aiohttp."""
     await service_manager.stop_all()
 
+# --- Handlers de Upload/Export ---
+
 async def _process_zip_upload(filename, file_data):
     """Procesa un archivo zip subido."""
-    import io
-
     # Crear un directorio temporal para extraer
     temp_dir = os.path.join(global_cfg.OUTPUT_DIR, "temp_upload_" + datetime.now().strftime("%Y%m%d%H%M%S"))
     os.makedirs(temp_dir, exist_ok=True)
@@ -161,6 +162,9 @@ async def _process_pth_upload(filename, file_data, form_fields):
         # Usar nombre del archivo
         exp_name = "Imported_" + os.path.splitext(filename)[0]
 
+    # Security check for experiment name
+    if '..' in exp_name or '/' in exp_name or '\\' in exp_name:
+        raise ValueError("Nombre de experimento inválido")
     # Validar si existe
     if os.path.exists(os.path.join(global_cfg.EXPERIMENTS_DIR, exp_name)):
         timestamp = datetime.now().strftime("_%Y%m%d_%H%M%S")
@@ -243,45 +247,12 @@ async def handle_upload_model(request):
             value = await part.text()
             form_fields[part.name] = value
 
-    exp_name = request.query.get('name')
-    if not exp_name or '..' in exp_name or '/' in exp_name or '\\' in exp_name:
-        return web.json_response({'error': 'Nombre de experimento inválido'}, status=400)
+    if not file_data or not filename:
         return web.json_response({'error': 'No se proporcionó ningún archivo'}, status=400)
 
     try:
         if filename.endswith('.zip'):
-    try:
-        import io
-
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            # Agregar config.json en la raíz
-            config_path = os.path.join(exp_dir, 'config.json')
-            if os.path.exists(config_path):
-                zipf.write(config_path, 'config.json')
-
-            # Agregar checkpoints en carpeta 'checkpoints'
-            if os.path.exists(checkpoints_dir):
-                for root, dirs, files in os.walk(checkpoints_dir):
-                    for file in files:
-                        if file.endswith('.pth') or file.endswith('.pt'):
-                            file_path = os.path.join(root, file)
-                            arcname = os.path.join('checkpoints', file)
-                            zipf.write(file_path, arcname)
-
-        # Servir el archivo desde el buffer de memoria
-        response = web.Response(
-            body=zip_buffer.getvalue(),
-            headers={
-                'Content-Type': 'application/zip',
-                'Content-Disposition': f'attachment; filename="experiment_{exp_name}.zip"'
-            }
-        )
-        return response
-
-    except Exception as e:
-        logging.error(f"Error exportando experimento: {e}", exc_info=True)
-        return web.json_response({'error': str(e)}, status=500)
+            return await _process_zip_upload(filename, file_data)
         elif filename.endswith('.pth') or filename.endswith('.pt'):
             return await _process_pth_upload(filename, file_data, form_fields)
         else:
@@ -299,6 +270,9 @@ async def handle_export_experiment(request):
     if not exp_name:
         return web.json_response({'error': 'Nombre de experimento requerido'}, status=400)
 
+    # Security check
+    if '..' in exp_name or '/' in exp_name or '\\' in exp_name:
+        return web.json_response({'error': 'Nombre de experimento inválido'}, status=400)
     exp_dir = os.path.join(global_cfg.EXPERIMENTS_DIR, exp_name)
     checkpoints_dir = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, exp_name)
 
@@ -306,8 +280,6 @@ async def handle_export_experiment(request):
         return web.json_response({'error': 'Experimento no encontrado'}, status=404)
 
     try:
-        import io
-
         # Usaremos archivo temporal para ser seguros con memoria
         temp_zip_path = os.path.join(global_cfg.OUTPUT_DIR, f"export_{exp_name}.zip")
 
