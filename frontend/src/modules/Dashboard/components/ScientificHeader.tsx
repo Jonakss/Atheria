@@ -279,18 +279,6 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = () => {
       </div>
 
       <div className="flex items-center gap-4">
-        {/* FPS y Velocidad */}
-        {connectionStatus === 'connected' && (
-          <div className="flex items-center gap-2 px-2 py-1 bg-white/5 rounded border border-white/5">
-            <Gauge size={12} className="text-gray-400" />
-            <span className={`text-[10px] font-mono ${fpsColor} font-semibold`}>
-              {fps > 0 ? `${fps.toFixed(1)} FPS` : 'N/A'}
-            </span>
-          </div>
-        )}
-        
-        <div className="h-4 w-px bg-white/10" />
-
         {/* Perfil / Config */}
         <button 
           onClick={() => setSettingsOpen(true)}
