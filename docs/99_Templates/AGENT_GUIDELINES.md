@@ -48,3 +48,12 @@ docs/30_Components/: Tu espacio de trabajo técnico. Documenta aquí tus clases 
 docs/40_Experiments/: Tu cuaderno de laboratorio. Anota aquí qué funcionó y qué falló.
 
 Instrucción Global: Antes de escribir código complejo, verifica docs/10_Core/ATHERIA_GLOSSARY.md para usar la terminología correcta.
+
+4. Seguridad en Scripts de Prueba
+
+**PROHIBIDO:** Nunca borres directorios compartidos (`docs/`, `src/`, `notebooks/`) en scripts de prueba o limpieza.
+
+**CORRECTO:**
+- Usa directorios temporales (`/tmp/`) o carpetas específicas de salida (`output/test_output/`).
+- Si necesitas limpiar, borra solo los archivos que tu script creó explícitamente.
+- Antes de `shutil.rmtree()`, verifica 3 veces que la ruta sea segura y contenida.
