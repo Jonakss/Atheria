@@ -805,7 +805,7 @@ async def handle_inject_energy(args):
             msg = "🔬 Semilla Simétrica inyectada"
         
         # Fix for RuntimeError: Inplace update to inference tensor outside InferenceMode is not allowed
-        with torch.no_grad():
+        with torch.inference_mode():
             if motor.state.psi.dim() == 4:
                 motor.state.psi[0].copy_(psi_new)
             else:
