@@ -50,8 +50,8 @@ const HolographicViewer: React.FC<HolographicViewerProps> = ({
         controls.dampingFactor = 0.05;
         controls.autoRotate = false;
         controls.enableRotate = false; // Bloquear rotación manual
-        controls.enableZoom = true;    // Permitir zoom (acercar/alejar)
-
+        controls.autoRotate = false;
+        controls.enableRotate = false; // Disable manual rotation
         // Referencias
         sceneRef.current = scene;
         cameraRef.current = camera;
