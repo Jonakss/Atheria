@@ -52,6 +52,12 @@ check_and_create_dir = _utils_py_module.check_and_create_dir
 
 # Importar desde el directorio utils
 from .experiment_logger import ExperimentLogger
+from .binary_loader import (
+    get_platform_info,
+    get_atheria_version,
+    download_prebuilt_binary,
+    try_load_native_engine,
+)
 
 # Exportar todo
 __all__ = [
@@ -64,4 +70,9 @@ __all__ = [
     'save_experiment_config',
     'sns_to_dict_recursive',
     'check_and_create_dir',
+    # Binary loader utilities
+    'get_platform_info',
+    'get_atheria_version',
+    'download_prebuilt_binary',
+    'try_load_native_engine',
 ]
