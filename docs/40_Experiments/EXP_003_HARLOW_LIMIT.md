@@ -34,7 +34,7 @@ Para medir esta paradoja, necesitamos instrumentación específica en `src/train
 
 1.  **Entrenamiento:** Entrenar una "Ley M" con una función de pérdida que *penalice* el cambio en la energía total pero *premie* la entropía local.
 2.  **Simulación:** Ejecutar el modelo entrenado por 10,000 pasos.
-3.  **Observación:**
+1.  **Entrenamiento:** Entrenar una "Ley M" (nuestro modelo de dinámica del universo, ver [[referencia a Ley M]]) con una función de pérdida que *penalice* el cambio en la energía total pero *premie* la entropía local.
     * Graficar la Fidelidad vs. Tiempo.
     * Graficar la Entropía Visual vs. Tiempo.
     * Si las gráficas divergen (Fidelidad alta, Entropía alta), habremos replicado el "Efecto Harlow".
