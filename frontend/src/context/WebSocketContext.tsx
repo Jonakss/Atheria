@@ -640,6 +640,11 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         sendCommand('simulation', 'set_live_feed', { enabled });
     }, [sendCommand]);
 
+    // Función para cambiar el intervalo de pasos
+    const setStepsInterval = useCallback((interval: number) => {
+        sendCommand('simulation', 'set_steps_interval', { interval });
+    }, [sendCommand]);
+
     const value = {
         sendCommand,
         connectionStatus,
@@ -668,6 +673,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         compileStatus, // Estado de compilación/motor (indica si es nativo)
         liveFeedEnabled, // Estado del live feed (sincronizado con backend)
         setLiveFeedEnabled, // Función para cambiar live feed
+        setStepsInterval, // Función para cambiar el intervalo de pasos
     };
 
     return (
