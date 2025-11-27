@@ -48,9 +48,10 @@ const HolographicViewer: React.FC<HolographicViewerProps> = ({
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
-        controls.autoRotate = true;
-        controls.autoRotateSpeed = 0.5;
-
+        controls.autoRotate = false;
+        controls.enableRotate = false; // Bloquear rotación manual
+        controls.autoRotate = false;
+        controls.enableRotate = false; // Disable manual rotation
         // Referencias
         sceneRef.current = scene;
         cameraRef.current = camera;

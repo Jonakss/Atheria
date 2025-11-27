@@ -23,6 +23,7 @@ export const vizOptions = [
     { value: 'entropy', label: 'Entropía (Complejidad)' },
     { value: 'coherence', label: 'Coherencia (Estructuras)' },
     { value: 'channel_activity', label: 'Actividad por Canal' },
+    { value: 'holographic', label: 'Holographic 3D' },
     { value: 'history_3d', label: 'Evolución Temporal 3D' },
     { value: 'complex_3d', label: 'Espacio Complejo 3D (Real vs Imag)' },
     { value: 'poincare', label: 'Gráfico de Poincaré' },
