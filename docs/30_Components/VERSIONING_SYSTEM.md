@@ -30,7 +30,7 @@ El proyecto Atheria 4 mantiene versiones en múltiples componentes:
 4. **Frontend React** (`frontend/package.json`)
    - Versión de la aplicación frontend
 
-**Todas las versiones se mantienen sincronizadas automáticamente.**
+**Todas las versiones se mantienen sincronizadas automáticamente cuando se solicita un bump explícito.**
 
 ---
 
@@ -143,7 +143,7 @@ O alternativas:
 **Proceso:**
 1. El workflow detecta el tag `[version:bump:*]` en el mensaje del commit
 2. Ejecuta el mismo proceso que en PRs
-3. Si NO hay tag de versión, el workflow se salta silenciosamente (no hace bump)
+3. Si NO hay tag de versión, el workflow se salta silenciosamente (no hace bump), **incluso si hay cambios en frontend**.
 
 **Ejemplo de uso:**
 ```bash
@@ -220,7 +220,7 @@ ENGINE_VERSION = "4.1.0"
 }
 ```
 
-**Nota:** Frontend puede tener versión diferente (independiente), pero se actualiza automáticamente cuando se hace bump.
+**Nota:** Frontend puede tener versión diferente (independiente), pero se actualiza automáticamente cuando se hace bump explícito.
 
 ---
 

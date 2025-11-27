@@ -103,11 +103,11 @@ jobs:
           if $is_docs_only; then
             echo "✅ La operación solo contiene cambios en 'docs/'. Saltando bump de versión."
             echo "skip=true" >> $GITHUB_OUTPUT
-          elif ! $has_frontend_changes && ! $has_version_tag; then
-            echo "⏭️  No hay cambios en frontend/ ni tag de versión. Saltando bump de versión."
+          elif ! $has_version_tag; then
+            echo "⏭️  No hay tag de versión explícito (ej: [version:bump:patch]). Saltando bump."
             echo "skip=true" >> $GITHUB_OUTPUT
           else
-            echo "📝 La operación contiene cambios de frontend o tag de versión. Procediendo con el bump."
+            echo "📝 Commit con tag de versión detectado. Procediendo con el bump."
             echo "has_frontend_changes=$has_frontend_changes" >> $GITHUB_OUTPUT
           fi
 
