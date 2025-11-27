@@ -886,22 +886,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 </Box>
             )}
 
-            {/* FPS Indicator - Top Left */}
-            {simData?.simulation_info?.fps !== undefined && (
-                <div className="absolute top-2.5 left-2.5 z-20 pointer-events-none">
-                    <GlassPanel className="px-2 py-1 bg-black/40 backdrop-blur-sm border-white/10">
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">FPS</span>
-                            <span className={`text-xs font-mono font-bold ${
-                                (simData.simulation_info.fps || 0) > 30 ? 'text-emerald-400' : 
-                                (simData.simulation_info.fps || 0) > 15 ? 'text-amber-400' : 'text-red-400'
-                            }`}>
-                                {(simData.simulation_info.fps || 0).toFixed(1)}
-                            </span>
-                        </div>
-                    </GlassPanel>
-                </div>
-            )}
+            {/* FPS Indicator - Top Left - REMOVED (Moved to Toolbar) */}
             
             {/* Controles de overlay */}
             <Box className="absolute top-2.5 right-2.5 z-20 flex flex-col gap-2">
