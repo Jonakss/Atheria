@@ -1129,7 +1129,8 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
             )}
             
             {/* Indicador de atajos de teclado - Vistas Rápidas (siempre visible) */}
-            <Box className="absolute bottom-2.5 left-2.5 z-20 opacity-70 hover:opacity-100 transition-opacity">
+            {/* Ajustado bottom para no solaparse con HistoryControls */}
+            <Box className="absolute bottom-32 left-2.5 z-20 opacity-70 hover:opacity-100 transition-opacity">
                 <GlassPanel className="p-2.5">
                     <div className="space-y-2">
                         <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
