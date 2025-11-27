@@ -32,6 +32,13 @@ class ExperimentLogger:
             experiment_name: Nombre del experimento (ej: "UNET_32ch_D5_LR2e-5")
             docs_base_dir: Directorio base para documentación (por defecto docs/40_Experiments)
         """
+        # Resolver ruta absoluta relativa al root del proyecto si es relativa
+        if not os.path.isabs(docs_base_dir):
+            # Asumiendo estructura: root/src/utils/experiment_logger.py
+            current_file = os.path.abspath(__file__)
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
+            docs_base_dir = os.path.join(project_root, docs_base_dir)
+
         self.experiment_name = experiment_name
         self.docs_base_dir = docs_base_dir
         self.log_file = os.path.join(docs_base_dir, f"{experiment_name}.md")
