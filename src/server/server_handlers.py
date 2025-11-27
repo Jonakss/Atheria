@@ -147,6 +147,42 @@ async def create_experiment_handler(args):
                                 "type": "training_progress",
                                 "payload": progress_payload
                             })
+
+                        # Parsear checkpoints guardados
+                        # Formato: ✅ Checkpoint guardado (MEJOR): Episodio 10 | Loss: ...
+                        checkpoint_match = re.search(
+                            r'Checkpoint guardado.*Episodio\s+(?P<episode>\d+)',
+                            log_msg
+                        )
+                        if checkpoint_match:
+                            episode = int(checkpoint_match.group('episode'))
+                            is_best = "MEJOR" in log_msg
+
+                            # Intentar extraer métricas del log del checkpoint si están presentes
+                            metrics = {}
+
+                            # Reusar patrones comunes para extraer valores flotantes
+                            loss_match = re.search(r'Loss:\s+(?P<val>[\d.]+)', log_msg)
+                            if loss_match: metrics['loss'] = float(loss_match.group('val'))
+
+                            surv_match = re.search(r'Survival:\s+(?P<val>[\d.]+)', log_msg)
+                            if surv_match: metrics['survival'] = float(surv_match.group('val'))
+
+                            sym_match = re.search(r'Symmetry:\s+(?P<val>[\d.]+)', log_msg)
+                            if sym_match: metrics['symmetry'] = float(sym_match.group('val'))
+
+                            comb_match = re.search(r'Combined:\s+(?P<val>[\d.]+)', log_msg)
+                            if comb_match: metrics['combined'] = float(comb_match.group('val'))
+
+                            await broadcast({
+                                "type": "training_checkpoint_event",
+                                "payload": {
+                                    "episode": episode,
+                                    "is_best": is_best,
+                                    "metrics": metrics,
+                                    "timestamp": asyncio.get_event_loop().time()
+                                }
+                            })
             except Exception as e:
                 logging.error(f"Error leyendo stdout: {e}")
         

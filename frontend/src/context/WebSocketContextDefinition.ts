@@ -70,6 +70,19 @@ export interface TrainingSnapshot {
   };
 }
 
+export interface TrainingCheckpoint {
+  episode: number;
+  is_best: boolean;
+  metrics: {
+    loss?: number;
+    survival?: number;
+    symmetry?: number;
+    combined?: number;
+    complexity?: number;
+  };
+  timestamp: number;
+}
+
 export interface InferenceSnapshot {
     step: number;
     timestamp: string;
@@ -117,6 +130,7 @@ export interface WebSocketContextType {
   ws: WebSocket | null; // Exponer WebSocket para escuchar mensajes personalizados
   snapshotCount: number; // Contador de snapshots capturados
   trainingSnapshots: TrainingSnapshot[]; // Snapshots de entrenamiento
+  trainingCheckpoints: TrainingCheckpoint[]; // Checkpoints de entrenamiento
   inferenceSnapshots: InferenceSnapshot[]; // Snapshots de inferencia
   serverConfig: ServerConfig; // Configuración del servidor
   updateServerConfig: (config: Partial<ServerConfig>) => void; // Actualizar configuración

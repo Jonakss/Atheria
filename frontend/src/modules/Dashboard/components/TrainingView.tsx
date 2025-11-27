@@ -15,7 +15,7 @@ interface TrainingDataPoint {
 }
 
 export const TrainingView: React.FC = () => {
-  const { trainingProgress, trainingStatus } = useWebSocket();
+  const { trainingProgress, trainingStatus, trainingCheckpoints } = useWebSocket();
   const [history, setHistory] = useState<TrainingDataPoint[]>([]);
 
   // Ref to track last processed episode to avoid duplicates
@@ -109,11 +109,28 @@ export const TrainingView: React.FC = () => {
                  <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                     <Shield size={16} /> Best Checkpoints
                 </h2>
-                <div className="text-xs text-gray-500 italic flex-1 overflow-y-auto">
-                    {/* Placeholder for future implementation of checkpoint list */}
-                    <div className="flex items-center justify-center h-full opacity-50">
-                        Waiting for checkpoint data...
-                    </div>
+                <div className="text-xs text-gray-500 italic flex-1 overflow-y-auto pr-1">
+                    {trainingCheckpoints.length === 0 ? (
+                        <div className="flex items-center justify-center h-full opacity-50">
+                            Waiting for checkpoint data...
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-2">
+                            {trainingCheckpoints.map((cp) => (
+                                <div key={cp.episode} className="flex items-center justify-between p-2 rounded bg-white/5 border border-white/5">
+                                    <div className="flex flex-col">
+                                        <span className="font-mono text-emerald-400 font-bold">Ep {cp.episode}</span>
+                                        <span className="text-[10px] text-gray-500">{new Date(cp.timestamp * 1000).toLocaleTimeString()}</span>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-1">
+                                        {cp.is_best && <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1 rounded border border-amber-500/30">BEST</span>}
+                                        <span className="font-mono text-[10px]">L: {cp.metrics?.loss?.toFixed(4) ?? 'N/A'}</span>
+                                        {cp.metrics?.combined && <span className="font-mono text-[10px] text-gray-400">C: {cp.metrics.combined.toFixed(4)}</span>}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </GlassPanel>
         </div>
