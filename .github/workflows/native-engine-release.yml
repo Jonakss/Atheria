@@ -1,0 +1,120 @@
+name: Build Native Engine Releases
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (e.g., 4.2.6)"
+        required: true
+        type: string
+
+jobs:
+  build-native-engine:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.10", "3.11"]
+
+    runs-on: ${{ matrix.os }}
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install PyTorch (for LibTorch)
+        run: |
+          echo "📦 Installing PyTorch for LibTorch..."
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install Build Dependencies
+        run: |
+          echo "📦 Installing build dependencies..."
+          pip install pybind11>=2.10.0 setuptools>=45 wheel cmake
+
+      - name: Build C++ Extension
+        run: |
+          echo "🔨 Building native engine extension..."
+          python setup.py build_ext --inplace
+        continue-on-error: false
+
+      - name: Identify Built Binary
+        id: identify-binary
+        shell: bash
+        run: |
+          echo "🔍 Searching for built binary..."
+
+          # Platform-specific extensions
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            EXT="so"
+            PLATFORM="linux-x86_64"
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+            EXT="so"
+            # Detect architecture (arm64 or x86_64)
+            ARCH=$(uname -m)
+            PLATFORM="macos-$ARCH"
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            EXT="pyd"
+            PLATFORM="windows-x64"
+          fi
+
+          # Find the binary
+          BINARY=$(find . -name "*atheria_core*.$EXT" -type f | head -1)
+
+          if [ -z "$BINARY" ]; then
+            echo "❌ Binary not found!"
+            exit 1
+          fi
+
+          echo "✅ Found binary: $BINARY"
+          echo "binary_path=$BINARY" >> $GITHUB_OUTPUT
+          echo "platform=$PLATFORM" >> $GITHUB_OUTPUT
+          echo "ext=$EXT" >> $GITHUB_OUTPUT
+
+      - name: Rename Binary
+        id: rename-binary
+        shell: bash
+        run: |
+          BINARY_PATH="${{ steps.identify-binary.outputs.binary_path }}"
+          PLATFORM="${{ steps.identify-binary.outputs.platform }}"
+          EXT="${{ steps.identify-binary.outputs.ext }}"
+          PYTHON_VER="${{ matrix.python-version }}"
+          PYTHON_VER_SHORT=$(echo $PYTHON_VER | tr -d '.')
+
+          # New name: atheria_core-{platform}-py{version}.{ext}
+          NEW_NAME="atheria_core-${PLATFORM}-py${PYTHON_VER_SHORT}.${EXT}"
+
+          echo "📝 Renaming $BINARY_PATH to $NEW_NAME"
+          cp "$BINARY_PATH" "$NEW_NAME"
+
+          echo "artifact_name=$NEW_NAME" >> $GITHUB_OUTPUT
+          echo "artifact_path=$NEW_NAME" >> $GITHUB_OUTPUT
+
+      - name: Upload Binary to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.release.tag_name || format('v{0}', github.event.inputs.version) }}
+          files: ${{ steps.rename-binary.outputs.artifact_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        shell: bash
+        run: |
+          echo "## ✅ Native Engine Built Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform:** ${{ steps.identify-binary.outputs.platform }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Python:** ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Binary:** ${{ steps.rename-binary.outputs.artifact_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Size:** $(ls -lh ${{ steps.rename-binary.outputs.artifact_path }} | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
