@@ -390,6 +390,24 @@ async def handle_load_experiment(args):
         logging.info(f"Intentando cargar el experimento '{exp_name}'...")
         if ws: await send_notification(ws, f"Cargando modelo '{exp_name}'...", "info")
         
+        # CRÍTICO: Actualizar grid_size de inferencia si se proporciona en args
+        # Esto asegura que el grid size seleccionado por el usuario se respete al cargar
+        grid_size_from_args = args.get('grid_size')
+        if grid_size_from_args is not None:
+            new_grid_size = int(grid_size_from_args)
+            logging.info(f"🔧 Actualizando grid size de inferencia: {new_grid_size}")
+            global_cfg.GRID_SIZE_INFERENCE = new_grid_size
+            g_state['inference_grid_size'] = new_grid_size
+            
+            # Actualizar ROI manager con nuevo grid size
+            roi_manager = g_state.get('roi_manager')
+            if roi_manager:
+                roi_manager.grid_size = new_grid_size
+                roi_manager.clear_roi()
+            else:
+                from ...managers.roi_manager import ROIManager
+                g_state['roi_manager'] = ROIManager(grid_size=new_grid_size)
+        
         # Pausar y limpiar motor anterior
         g_state['is_paused'] = True
         status_payload = build_inference_status_payload("paused")
@@ -408,6 +426,7 @@ async def handle_load_experiment(args):
             g_state['motor'] = None
             gc.collect()
             if torch.cuda.is_available(): torch.cuda.empty_cache()
+
         
         # Determinar motor a usar
         force_engine = args.get('force_engine')

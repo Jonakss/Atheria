@@ -311,7 +311,7 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
                                         type="number"
                                         value={gridSizeInference}
                                         onChange={(e) => {
-                                            const val = Math.max(64, Math.min(8192, Number(e.target.value) || 256));
+                                            const val = Math.max(64, Math.min(32768, Number(e.target.value) || 256));
                                             setGridSizeInference(val);
                                             localStorage.setItem('atheria_gridSizeInference', val.toString());
                                         }}
@@ -324,13 +324,18 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
                                             });
                                         }}
                                         min={64}
-                                        max={8192}
+                                        max={32768}
                                         step={64}
                                         disabled={!isConnected}
                                         className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50 font-mono"
                                     />
                                     <div className="text-[10px] text-gray-600 mt-1">
                                         Tamaño del grid para simulación (requiere recargar experimento)
+                                        {gridSizeInference > 4096 && (
+                                            <span className="block mt-0.5 text-amber-400">
+                                                ⚡ Grid muy grande ({gridSizeInference}x{gridSizeInference}) - Requiere GPU potente
+                                            </span>
+                                        )}
                                         {currentExperiment && currentExperiment.config?.GRID_SIZE_TRAINING && (
                                             currentExperiment.config.GRID_SIZE_TRAINING !== gridSizeInference ? (
                                                 <span className="block mt-0.5 text-pink-400">

@@ -148,15 +148,8 @@ cython_debug/
 
 # Atheria Project Specific
 /output/
-/notebooks/
-*.ipynb
-# Atheria Project Specific
-/output/
-/notebooks/
-*.ipynb
 .gemini/*
 !.gemini/GEMINI.md
-frontend/dist/
 frontend/dist/
 frontend/node_modules/
 
