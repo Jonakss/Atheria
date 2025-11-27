@@ -51,6 +51,55 @@
 
 ---
 
+## 2025-11-27 - Fix: Frontend Lint Errors (Unused Variables)
+
+### Contexto
+El CI/CD estaba fallando debido a errores de ESLint en el frontend por variables no utilizadas.
+
+### Problema
+Cinco errores de lint detectados:
+1. **`DashboardLayout.tsx`**: `setTimelineOpen` declarado pero nunca usado
+2. **`HistoryControls.tsx`**: 
+   - `calculateParticleCount` importado pero nunca usado
+   - `SimulationControls` componente definido pero no usado
+   - `StatusIndicators` componente definido pero no usado
+   - `HistoryTimeline` componente definido pero no usado
+
+### Causa Raíz
+- **Timeline state**: La funcionalidad de timeline fue temporalmente deshabilitada pero el estado `timelineOpen` no fue removido
+- **Componentes duplicados**: En `HistoryControls.tsx`, los componentes estaban definidos como sub-componentes pero el código los duplicaba inline en el render principal
+
+### Solución
+
+#### 1. DashboardLayout.tsx ✅
+- Removido estado `timelineOpen` y `setTimelineOpen` (línea 24)
+- Actualizada condición temporal de `false && timelineOpen &&` a solo `false &&` (línea 100)
+
+#### 2. HistoryControls.tsx ✅
+- Removido import no utilizado: `calculateParticleCount` (línea 5)
+- Removidos componentes duplicados: `SimulationControls`, `StatusIndicators`, `HistoryTimeline` (líneas 17-156)
+- La lógica ya estaba implementada inline en el componente principal
+
+### Resultado
+- ✅ **Lint check**: Pasa sin errores
+- ✅ **Build**: Completado exitosamente
+- ✅ **CI/CD**: Listo para merge sin fallos
+
+### Archivos Modificados
+- [`frontend/src/modules/Dashboard/layouts/DashboardLayout.tsx`](file:///home/jonathan.correa/Projects/Atheria/frontend/src/modules/Dashboard/layouts/DashboardLayout.tsx)
+- [`frontend/src/modules/History/HistoryControls.tsx`](file:///home/jonathan.correa/Projects/Atheria/frontend/src/modules/History/HistoryControls.tsx)
+
+### Commits
+- `9f7c834` - fix: remove unused variables in frontend components [version:bump:patch]
+
+### Verificación
+```bash
+cd frontend && npm run lint  # ✅ Passed
+cd frontend && npm run build # ✅ Built successfully
+```
+
+---
+
 ## 2025-11-26 - Feature: History Buffer System (Rewind/Replay)
 
 ### Contexto
