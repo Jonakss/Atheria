@@ -1,9 +1,28 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { Activity, Brain, Shield, Zap } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+    CartesianGrid as RechartsCartesianGrid,
+    Legend as RechartsLegend,
+    Line as RechartsLine,
+    LineChart as RechartsLineChart,
+    ResponsiveContainer as RechartsResponsiveContainer,
+    Tooltip as RechartsTooltip,
+    XAxis as RechartsXAxis,
+    YAxis as RechartsYAxis
+} from 'recharts';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { GlassPanel } from './GlassPanel';
 import { MetricItem } from './MetricItem';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Activity, Brain, Shield, Zap } from 'lucide-react';
+
+// Fix for TS2786: 'Component' cannot be used as a JSX component.
+const LineChart = RechartsLineChart as any;
+const Line = RechartsLine as any;
+const XAxis = RechartsXAxis as any;
+const YAxis = RechartsYAxis as any;
+const CartesianGrid = RechartsCartesianGrid as any;
+const Tooltip = RechartsTooltip as any;
+const Legend = RechartsLegend as any;
+const ResponsiveContainer = RechartsResponsiveContainer as any;
 
 interface TrainingDataPoint {
   episode: number;
@@ -150,7 +169,7 @@ export const TrainingView: React.FC = () => {
                                 dataKey="episode"
                                 stroke="#666"
                                 fontSize={10}
-                                tickFormatter={(value) => value.toString()}
+                                tickFormatter={(value: number) => value.toString()}
                             />
                             <YAxis stroke="#666" fontSize={10} domain={['auto', 'auto']} />
                             <Tooltip
