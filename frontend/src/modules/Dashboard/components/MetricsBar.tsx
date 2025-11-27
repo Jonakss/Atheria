@@ -59,7 +59,7 @@ export const MetricsBar: React.FC = () => {
             viewMode === 'logs' ? 'flex-1 opacity-100' : 'w-0 opacity-0'
         }`}>
              {/* Log Content */}
-             <div className="absolute inset-0 overflow-y-auto pr-2 custom-scrollbar flex flex-col justify-center">
+             <div className="max-h-32 overflow-y-auto pr-2 custom-scrollbar flex flex-col justify-center">
                 {displayLogs.length > 0 ? (
                 displayLogs.map((log, idx) => {
                     const logStr = typeof log === 'string' ? log : JSON.stringify(log);
