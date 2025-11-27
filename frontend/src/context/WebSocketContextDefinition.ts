@@ -51,6 +51,10 @@ export interface TrainingProgress {
   total_episodes: number;
   avg_loss: number;
   avg_reward?: number;
+  survival?: number;
+  symmetry?: number;
+  complexity?: number;
+  combined?: number;
 }
 
 export interface TrainingSnapshot {
