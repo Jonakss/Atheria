@@ -25,6 +25,7 @@
 - [[#2025-11-26 - Fix: Debugging Grid, Canvas, Versioning]]
 - [[#2025-11-26 - Feature: Native Engine Parallelism (OpenMP)]]
 - [[#2025-11-26 - Fix: Persistent Frame Sending (Duplicate Logic Removal)]]
+- [[logs/2025-11-26_native_optimization_and_fixes|2025-11-26 - Optimización Crítica Motor Nativo (<1ms) y Fix Live Feed]]
 - [[#2025-11-26 - Actualización Completa de Roadmaps (Fases 1-4)]]
 - [[#2025-11-26 - Fix: Saturación de WebSocket en Modo Full Speed]]
 - [[#2025-11-26 - Fix: Import Path de EpochDetector]]
