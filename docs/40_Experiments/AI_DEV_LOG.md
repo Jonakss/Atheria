@@ -16,6 +16,7 @@
 
 ## 📋 Índice de Entradas
 
+- [[logs/2025-11-27_Fixing_Notebook_and_Logger|2025-11-27 - Fix: Notebook Bugs, ExperimentLogger Paths & Agent Safety]]
 - [[logs/2025-11-27_Native_Engine_Releases|2025-11-27 - System: Multi-Platform Native Engine Releases]]
 - [[logs/2025-11-27_Notebook_Upgrade|2025-11-27 - Tool: Upgrade Notebook para Entrenamiento Progresivo Multi-Fase]]
 - [[logs/2025-11-27_Progressive_Training_Notebook_Creation|2025-11-27 - Tool: Progressive Training Notebook (Long-Running GPU Sessions)]]
