@@ -103,6 +103,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     const [activeExperiment, setActiveExperiment] = useState<string | null>(null);
     const [snapshotCount, setSnapshotCount] = useState<number>(0);
     const [trainingSnapshots, setTrainingSnapshots] = useState<TrainingSnapshot[]>([]);
+    const [trainingCheckpoints, setTrainingCheckpoints] = useState<any[]>([]);
     const [inferenceSnapshots, setInferenceSnapshots] = useState<InferenceSnapshot[]>([]);
     const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'running' | 'completed' | 'cancelled' | 'error'>('idle');
     const [analysisType, setAnalysisType] = useState<'universe_atlas' | 'cell_chemistry' | null>(null);
@@ -340,6 +341,15 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                                 return updated;
                             });
                         }
+                        break;
+                    case 'training_checkpoint_event':
+                        // Agregar nuevo checkpoint
+                        setTrainingCheckpoints(prev => {
+                            // Evitar duplicados por episodio
+                            if (prev.some(cp => cp.episode === payload.episode)) return prev;
+                            const newCheckpoint = payload;
+                            return [newCheckpoint, ...prev].slice(0, 50); // Mantener últimos 50, más recientes primero
+                        });
                         break;
                     case 'inference_status_update':
                         setInferenceStatus(payload.status);
@@ -667,6 +677,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         ws: ws.current, // Exponer WebSocket para mensajes personalizados
         snapshotCount,
         trainingSnapshots,
+        trainingCheckpoints,
         inferenceSnapshots,
         serverConfig,
         updateServerConfig,
