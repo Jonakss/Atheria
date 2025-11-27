@@ -12,7 +12,6 @@ import { MetricsBar } from '../components/MetricsBar';
 import { NavigationSidebar } from '../components/NavigationSidebar';
 import { PhysicsInspector } from '../components/PhysicsInspector';
 import { ScientificHeader } from '../components/ScientificHeader';
-import { Toolbar } from '../components/Toolbar';
 
 type TabType = 'lab' | 'analysis' | 'history' | 'logs';
 type LabSection = 'inference' | 'training' | 'analysis';
@@ -185,9 +184,6 @@ export const DashboardLayout: React.FC = () => {
         {/* Design System: flex-1 (Ocupa todo el espacio restante), relative para overlays */}
         <main className="flex-1 relative bg-dark-990 flex flex-col overflow-hidden">
           
-          {/* Barra de Herramientas Superior (Flotante) */}
-          <Toolbar onToggleTimeline={() => setTimelineOpen(prev => !prev)} timelineOpen={timelineOpen} />
-
           {/* Viewport (Fondo) - Design System: bg-[#050505] a black según mockup */}
           {renderContentView()}
 

@@ -53,6 +53,7 @@ export default {
           990: '#030406',  // Muy oscuro
           bg: '#040507',   // Fondo principal - Ligeramente más claro y azulado que #020202
         },
+        'brand-dark': '#050505', // Added for consistency per code review
       },
       // Efectos de brillo/glow
       boxShadow: {
