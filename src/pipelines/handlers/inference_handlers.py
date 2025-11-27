@@ -804,10 +804,12 @@ async def handle_inject_energy(args):
                         psi_new[:, center_y - dy, center_x - dx] = base_state
             msg = "🔬 Semilla Simétrica inyectada"
         
-        if motor.state.psi.dim() == 4:
-            motor.state.psi[0] = psi_new
-        else:
-            motor.state.psi = psi_new
+        # Fix for RuntimeError: Inplace update to inference tensor outside InferenceMode is not allowed
+        with torch.no_grad():
+            if motor.state.psi.dim() == 4:
+                motor.state.psi[0].copy_(psi_new)
+            else:
+                motor.state.psi.copy_(psi_new)
             
         logging.info(msg)
         if ws: await send_notification(ws, msg, "success")
@@ -828,5 +830,6 @@ HANDLERS = {
     "switch_engine": handle_switch_engine,
     "reset": handle_reset,
     "inject_energy": handle_inject_energy,
-    "set_inference_config": handle_set_inference_config
+    "set_inference_config": handle_set_inference_config,
+    "set_config": handle_set_inference_config
 }
