@@ -17,6 +17,7 @@
 ## 📋 Índice de Entradas
 
 - [[#2025-11-27 - System: Multi-Platform Native Engine Releases]]
+- [[logs/2025-11-27_Notebook_Upgrade|2025-11-27 - Tool: Upgrade Notebook para Entrenamiento Progresivo Multi-Fase]]
 - [[#2025-11-27 - Tool: Progressive Training Notebook (Long-Running GPU Sessions)]]
 - [[logs/2025-11-26_advanced_field_visualizations|2025-11-26 - Feature: Advanced Field Visualizations (Real/Imag/HSV Phase)]]
 - [[#2025-11-26 - Feature: History Buffer System (Rewind/Replay)]]
