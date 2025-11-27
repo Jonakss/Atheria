@@ -76,7 +76,7 @@ def export_model_to_jit(model: nn.Module, experiment_name: str, example_input_sh
     Returns:
         Ruta al archivo .pt exportado.
     """
-    from ... import config as global_cfg
+    from .. import config as global_cfg
     import os
 
     if output_dir is None:
