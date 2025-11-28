@@ -289,57 +289,115 @@ async def simulation_loop():
                             
                             # OPTIMIZACIÓN CRÍTICA: Usar lazy conversion para motor nativo
                             # Solo convertir estado denso cuando se necesita visualizar
+                            # OPTIMIZACIÓN CRÍTICA: Usar lazy conversion para motor nativo
+                            # Solo convertir estado denso cuando se necesita visualizar
                             motor = g_state['motor']
                             motor_is_native = g_state.get('motor_is_native', False)
                             
-                            # Para motor nativo: usar get_dense_state() con ROI y verificación de pausa
-                            if motor_is_native and hasattr(motor, 'get_dense_state'):
-                                # Obtener ROI si está habilitada
-                                roi = None
-                                roi_manager = g_state.get('roi_manager')
-                                if roi_manager and roi_manager.roi_enabled:
-                                    roi = (
-                                        roi_manager.roi_x,
-                                        roi_manager.roi_y,
-                                        roi_manager.roi_x + roi_manager.roi_width,
-                                        roi_manager.roi_y + roi_manager.roi_height
-                                    )
-                                
-                                # Callback para verificar pausa durante conversión
-                                def check_pause():
-                                    return g_state.get('is_paused', True)
-                                
-                                # CRÍTICO: Verificar pausa ANTES de conversión costosa
-                                if g_state.get('is_paused', True):
-                                    logging.info("⏸️ Pausa detectada antes de get_dense_state. Saltando frame.")
-                                    await asyncio.sleep(0.1)
-                                    continue
-                                
-                                # Obtener estado denso (solo convierte si es necesario)
-                                # Offload to thread pool
-                                psi = await asyncio.get_event_loop().run_in_executor(
-                                    None, 
-                                    lambda: motor.get_dense_state(roi=roi, check_pause_callback=check_pause)
-                                )
-                                # CRÍTICO: Yield al event loop después de conversión bloqueante (puede tardar en grids grandes)
-                                await asyncio.sleep(0)  # Permitir procesar comandos WebSocket
-                                
-                                # CRÍTICO: Verificar pausa DESPUÉS de conversión costosa
-                                if g_state.get('is_paused', True):
-                                    logging.info("⏸️ Pausa detectada después de get_dense_state. Saltando frame.")
-                                    await asyncio.sleep(0.1)
-                                    continue
-                            else:
-                                # Motor Python: acceder directamente (ya es denso)
-                                psi = motor.state.psi if hasattr(motor, 'state') and motor.state else None
+                            # Verificar si podemos usar visualización nativa rápida (C++)
+                            # Tipos soportados por C++: density, phase, energy
+                            native_viz_supported = viz_type in ['density', 'phase', 'energy']
                             
-                            # Verificar que psi no sea None
-                            if psi is None:
-                                logging.error("❌ Estado psi es None. Saltando frame.")
+                            # Determinar si necesitamos el estado denso (psi) obligatoriamente
+                            need_dense_state = False
+                            
+                            # 1. Epoch detector lo necesita cada 50 pasos
+                            if epoch_detector and updated_step % 50 == 0:
+                                need_dense_state = True
+                                
+                            # 2. Si el tipo de visualización NO es soportado nativamente, necesitamos psi
+                            if not native_viz_supported:
+                                need_dense_state = True
+                                
+                            # 3. Si queremos guardar historial completo (con psi) cada N pasos
+                            # Por ahora, priorizamos rendimiento y aceptamos historial "solo visual" en nativo
+                            
+                            psi = None
+                            viz_data = None
+                            
+                            # FAST PATH: Visualización Nativa (C++)
+                            # Evita la costosa conversión sparse->dense en Python
+                            if motor_is_native and hasattr(motor, 'get_visualization_data') and not need_dense_state:
+                                try:
+                                    # Llamada directa a C++ (retorna tensor [H, W])
+                                    viz_tensor = await asyncio.get_event_loop().run_in_executor(
+                                        None,
+                                        lambda: motor.get_visualization_data(viz_type)
+                                    )
+                                    
+                                    if viz_tensor is not None:
+                                        # Convertir a lista para JSON (rápido en CPU)
+                                        if viz_tensor.is_cuda:
+                                            viz_tensor = viz_tensor.cpu()
+                                        
+                                        map_data = viz_tensor.tolist()
+                                        
+                                        # Construir objeto viz_data mínimo
+                                        viz_data = {
+                                            "map_data": map_data,
+                                            "hist_data": {}, # Histograma no disponible en fast path
+                                            "poincare_coords": [],
+                                            "phase_attractor": None,
+                                            "flow_data": None
+                                        }
+                                        
+                                        # Si es 'phase', normalizar si es necesario (el frontend espera radianes o [0,1])
+                                        # C++ devuelve radianes [-pi, pi] o valor crudo
+                                except Exception as e:
+                                    logging.error(f"❌ Error en visualización nativa rápida: {e}. Cayendo a fallback.")
+                                    need_dense_state = True # Fallback a camino lento
+                            
+                            # SLOW PATH: Obtener estado denso y procesar en Python
+                            # Se ejecuta si no es nativo, o si necesitamos psi (epoch, viz avanzada, error en fast path)
+                            if psi is None and (not motor_is_native or need_dense_state):
+                                # Para motor nativo: usar get_dense_state() con ROI y verificación de pausa
+                                if motor_is_native and hasattr(motor, 'get_dense_state'):
+                                    # Obtener ROI si está habilitada
+                                    roi = None
+                                    roi_manager = g_state.get('roi_manager')
+                                    if roi_manager and roi_manager.roi_enabled:
+                                        roi = (
+                                            roi_manager.roi_x,
+                                            roi_manager.roi_y,
+                                            roi_manager.roi_x + roi_manager.roi_width,
+                                            roi_manager.roi_y + roi_manager.roi_height
+                                        )
+                                    
+                                    # Callback para verificar pausa durante conversión
+                                    def check_pause():
+                                        return g_state.get('is_paused', True)
+                                    
+                                    # CRÍTICO: Verificar pausa ANTES de conversión costosa
+                                    if g_state.get('is_paused', True):
+                                        logging.info("⏸️ Pausa detectada antes de get_dense_state. Saltando frame.")
+                                        await asyncio.sleep(0.1)
+                                        continue
+                                    
+                                    # Obtener estado denso (solo convierte si es necesario)
+                                    # Offload to thread pool
+                                    psi = await asyncio.get_event_loop().run_in_executor(
+                                        None, 
+                                        lambda: motor.get_dense_state(roi=roi, check_pause_callback=check_pause)
+                                    )
+                                    # CRÍTICO: Yield al event loop después de conversión bloqueante (puede tardar en grids grandes)
+                                    await asyncio.sleep(0)  # Permitir procesar comandos WebSocket
+                                    
+                                    # CRÍTICO: Verificar pausa DESPUÉS de conversión costosa
+                                    if g_state.get('is_paused', True):
+                                        logging.info("⏸️ Pausa detectada después de get_dense_state. Saltando frame.")
+                                        await asyncio.sleep(0.1)
+                                        continue
+                                else:
+                                    # Motor Python: acceder directamente (ya es denso)
+                                    psi = motor.state.psi if hasattr(motor, 'state') and motor.state else None
+                            
+                            # Verificar que tengamos datos para visualizar (psi o viz_data)
+                            if psi is None and viz_data is None:
+                                logging.error("❌ Estado psi y viz_data son None. Saltando frame.")
                                 continue
                             
-                            # DEBUG: Verificar que psi tenga datos válidos
-                            if isinstance(psi, torch.Tensor):
+                            # DEBUG: Verificar que psi tenga datos válidos (solo si existe)
+                            if psi is not None and isinstance(psi, torch.Tensor):
                                 if psi.numel() == 0:
                                     logging.error("❌ psi tiene 0 elementos. Saltando frame.")
                                     continue
@@ -350,6 +408,8 @@ async def simulation_loop():
                                     logging.warning(f"⚠️ CRÍTICO: psi tiene valores muy pequeños (max abs={psi_abs_max:.6e}, mean={psi_mean:.6e}). El motor está vacío o no inicializado correctamente.")
                                     # NOTA: No inyectamos partículas artificialmente. Deben emerger del vacío o ser sembradas inicialmente.
 
+                            # Calcular visualización si no la tenemos ya (Fast Path la provee)
+                            if viz_data is None:
                                 # OPTIMIZACIÓN PARA GRIDS GRANDES: Downsampling adaptativo y ROI automático
                                 inference_grid_size = g_state.get('inference_grid_size', 256)
                                 adaptive_downsample = calculate_adaptive_downsample(inference_grid_size)
