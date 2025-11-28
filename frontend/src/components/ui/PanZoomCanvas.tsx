@@ -913,13 +913,13 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
 
             {/* FPS Indicator - Top Left - REMOVED (Moved to Toolbar) */}
             
-            {/* Controles de overlay */}
-            <Box className="absolute top-2.5 right-2.5 z-20 flex flex-col gap-2">
-                <Group gap={1}>
-                    <Tooltip label="Resetear vista">
+            {/* Controles de Canvas */}
+            <Box className="absolute top-2.5 right-2.5 z-30">
+                <Group gap={2}>
+                    <Tooltip label="Resetear vista (R)">
                         <ActionIcon
-                            variant="filled"
-                            color="blue"
+                            variant="light"
+                            color="gray"
                             onClick={resetView}
                             size="sm"
                         >
@@ -973,11 +973,11 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                             onConfigChange={setOverlayConfig}
                         />
                                 <Box className="border-t border-white/10 pt-2 mt-1">
+                                    <Text size="xs" className="text-gray-500 mb-1">ROI Automático</Text>
                                     <Switch
-                                        label="ROI Automático"
-                                        description="Sincronizar ROI con la vista visible (solo procesar lo que ves)"
                                         checked={autoROIEnabled}
                                         onChange={(e) => setAutoROIEnabled(e.currentTarget.checked)}
+                                        label="Activar"
                                         size="sm"
                                     />
                                     {autoROIEnabled && (
@@ -990,6 +990,34 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                         </GlassPanel>
                     </Box>
                 )}
+            </Box>
+
+            {/* Selector de Visualización - Top Left */}
+            <Box className="absolute top-2.5 left-2.5 z-30">
+                <GlassPanel className="px-2.5 py-2">
+                    <select
+                        value={selectedViz || 'density'}
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            sendCommand('simulation', 'set_viz', { viz_type: value });
+                        }}
+                        className="bg-transparent border-none text-xs text-gray-300 focus:outline-none cursor-pointer font-medium uppercase tracking-wider pr-6"
+                        style={{ 
+                            appearance: 'none',
+                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 9L2 5h8z'/%3E%3C/svg%3E")`,
+                            backgroundRepeat: 'no-repeat',
+                            backgroundPosition: 'right 4px center'
+                        }}
+                    >
+                        <option value="density">🔵 Densidad</option>
+                        <option value="phase">🌈 Fase</option>
+                        <option value="flow">💨 Flujo</option>
+                        <option value="spectral">📊 Espectral</option>
+                        <option value="poincare">🎯 Poincaré</option>
+                        <option value="phase_hsv">🎨 Fase HSV</option>
+                        <option value="phase_attractor">🌀 Atractor</option>
+                    </select>
+                </GlassPanel>
             </Box>
             
             {/* Canvas principal - Usar ShaderCanvas (WebGL) cuando WebGL está disponible y la visualización es compatible */}
