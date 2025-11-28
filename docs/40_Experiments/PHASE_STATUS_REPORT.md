@@ -123,23 +123,24 @@
 
 #### Tareas Pendientes:
 - ⏳ **Sistema de Historial/Buffer Completo** - Navegación temporal, rewind/replay
-- ⏳ **Más Visualizaciones de Campos** - Real/Imaginario, Fase HSV avanzada
+-   ⏳ **Sistema de Historial/Buffer Completo** - Navegación temporal, rewind/replay
+-   ⏳ **Más Visualizaciones de Campos** - Real/Imaginario, Fase HSV avanzada
 
 #### Estado General: 🟢 **95% Completado**
 
 ---
 
-### ❓ Fase 4: No Documentada
+### 🚀 Fase 4: Holographic Lattice (AdS/CFT)
 
-**Roadmap:** Mencionado en `ROADMAP_PHASE_3.md` pero sin archivo de roadmap.
+**Roadmap:** `docs/10_core/ROADMAP_PHASE_4.md`
 
-**Inferido del Contexto:**
-- Probablemente incluye optimizaciones avanzadas
-- Sistema de análisis comparativo entre experimentos
-- Visualizaciones 3D mejoradas
-- Sistema de rewind/replay completo
+**Objetivo:** Implementar la correspondencia AdS/CFT y visualizaciones holográficas avanzadas.
 
-#### Estado General: ⚪ **No Iniciado**
+#### Tareas Completadas:
+-   ✅ **Disco de Poincaré** - Visualización hiperbólica implementada en `HolographicViewer`
+-   ✅ **Documentación Base** - Conceptos de AdS/CFT documentados
+
+#### Estado General: 🔵 **15% Completado**
 
 ---
 
@@ -183,23 +184,37 @@
    - ⏳ Más visualizaciones de campos
 
 4. **General:**
-   - ⏳ Documentar Fase 4
-   - ⏳ Integrar quadtree/octree en motor de simulación (opcional)
-   - ⏳ Exportación automática de modelos a TorchScript
+1.  **Fase 2:**
+    -   ⏳ OctreeIndex (índice espacial C++)
+    -   ⏳ Memory Pools
+    -   ⏳ Paralelismo (OpenMP)
+    -   ⏳ Benchmark completo Python vs C++
+
+2.  **Fase 1:**
+    -   ✅ Conectar EpochDetector al dashboard - **COMPLETADO**
+
+3.  **Fase 3:**
+    -   ⏳ Sistema de historial/buffer completo
+    -   ⏳ Más visualizaciones de campos
+
+4.  **General:**
+    -   ⏳ Documentar Fase 4
+    -   ⏳ Integrar quadtree/octree en motor de simulación (opcional)
+    -   ⏳ Exportación automática de modelos a TorchScript
 
 ### Tareas Pendientes (Baja Prioridad - Al Final de la Cola)
 
-5. **UX y Visualización:**
-   - ⏳ **Selector de visualización 2D/3D explícito** - Agregar control UI para cambiar entre `PanZoomCanvas` (2D) y `HolographicViewer` (3D)
-     - Actualmente: Cambio basado en `selectedViz === 'holographic' || selectedViz === '3d'`
-     - Propuesta: Botón/toggle en Toolbar o PhysicsInspector para alternar entre 2D/3D
-     - Estado actual: Lógica implementada pero sin control explícito de usuario
+5.  **UX y Visualización:**
+    -   ✅ **Selector de Motor (Engine Switching)** - Control UI en PhysicsInspector para cambiar entre Python y C++
+    -   ⏳ **Selector de visualización 2D/3D explícito** - Agregar control UI para cambiar entre `PanZoomCanvas` (2D) y `HolographicViewer` (3D)
+        -   Actualmente: Cambio basado en `selectedViz === 'holographic' || selectedViz === '3d'`
+        -   Propuesta: Botón/toggle en Toolbar o PhysicsInspector para alternar entre 2D/3D
+        -   Estado actual: Lógica implementada pero sin control explícito de usuario
 
 ---
 
 ## 🔗 Referencias
 
-- [[ROADMAP_PHASE_1]]: Fase 1 - El Despertar del Vacío
 - [[ROADMAP_PHASE_2]]: Fase 2 - Motor Nativo C++
 - [[ROADMAP_PHASE_3]]: Fase 3 - Optimización Visualización y UX
 - [[QUADTREE_BINARY]]: Documentación de Quadtree Binario
