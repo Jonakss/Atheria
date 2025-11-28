@@ -21,6 +21,10 @@ msgpack>=1.0.0  # Serialización binaria eficiente (más rápido que CBOR para a
 psutil>=5.9.0  # Monitoreo de sistema y memoria (usado en benchmarks)
 tensorboard>=2.10.0  # Para logging de métricas de entrenamiento
 
+# Caché distribuido (Dragonfly/Redis)
+redis>=5.0.0  # Cliente Redis compatible con Dragonfly
+zstandard>=0.21.0  # Compresión zstd para caché eficiente
+
 # Opcionales (fallback disponible si no están instalados)
 # matplotlib>=3.5.0  # Para visualizaciones de análisis (descomentar si se usa)
 # scipy>=1.8.0  # Para análisis científico (descomentar si se usa)

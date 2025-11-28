@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly
+    container_name: atheria_dragonfly
+    ports:
+      - "6379:6379"
+    command: |
+      dragonfly 
+      --maxmemory 2G 
+      --cache_mode true 
+      --snapshot_cron "0 */4 * * *"
+      --logtostderr
+    volumes:
+      - dragonfly_data:/data
+    restart: unless-stopped
+    networks:
+      - atheria_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+networks:
+  atheria_network:
+    driver: bridge
+
+volumes:
+  dragonfly_data:
+    driver: local

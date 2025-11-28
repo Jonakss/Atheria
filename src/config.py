@@ -323,3 +323,24 @@ QCA_STEPS_TRAINING = 16
 # - 'random': Estado aleatorio normalizado (más variado)
 # - 'zeros': Estado cero (requiere activación externa)
 INITIAL_STATE_MODE_INFERENCE = 'complex_noise'
+
+# ==============================================================================
+# --- DRAGONFLY CACHE CONFIGURATION ---
+# ==============================================================================
+
+# Habilitar caché distribuido (Dragonfly/Redis)
+# Si Dragonfly no está disponible, el sistema funciona normalmente sin caché
+CACHE_ENABLED = os.getenv('CACHE_ENABLED', 'true').lower() == 'true'
+
+# Host y puerto de Dragonfly
+CACHE_HOST = os.getenv('DRAGONFLY_HOST', 'localhost')
+CACHE_PORT = int(os.getenv('DRAGONFLY_PORT', '6379'))
+
+# Intervalo de caché de estados (cada N pasos se cachea el estado)
+# Un valor menor significa más caché pero más overhead
+# Un valor mayor significa menos caché pero mejor rendimiento
+CACHE_STATE_INTERVAL = int(os.getenv('CACHE_STATE_INTERVAL', '100'))
+
+# TTL (Time To Live) por defecto para estados cacheados en segundos
+# Estados más antiguos se eliminan automáticamente
+CACHE_TTL = int(os.getenv('CACHE_TTL', '7200'))  # 2 horas
