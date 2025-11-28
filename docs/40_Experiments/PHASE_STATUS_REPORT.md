@@ -162,7 +162,10 @@
 | **Fase 1** | Motor disperso y estructuras estables | 🟢 En progreso | ~80% |
 | **Fase 2** | Motor nativo C++ | 🟡 En progreso | ~70% |
 | **Fase 3** | Visualización y UX | 🟢 Casi completo | ~95% |
-| **Fase 4** | (No documentado) | ⚪ No iniciado | 0% |
+| **Fase 4** | Holographic Lattice (AdS/CFT) | 🔵 Planificación | 10% |
+| **Fase 5** | 3D Volumetric (Backlog) | ⚪ Backlog | 0% |
+| **Infraestructura** | DevOps & Tooling | 🟡 En progreso | ~60% |
+| **AI Research** | The Brain (Ley M) | ♾️ Continuo | N/A |
 
 ### Tareas Pendientes Críticas
 

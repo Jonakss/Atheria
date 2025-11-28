@@ -1,71 +1,75 @@
-# 🧊 Roadmap Fase 4: Universo Volumétrico (3D Core)
+# 🌌 Roadmap Fase 4: Holographic Lattice (AdS/CFT)
 
-**Objetivo:** Evolucionar la simulación de una superficie 2D a un volumen 3D completo ("El Tanque"), implementando tensores 5D y convoluciones volumétricas.
-
----
-
-## 1. Fundamentos Conceptuales
-
-**Referencia:** [[20_Concepts/3D_STATE_SPACE_CONCEPT|Conceptualización del Espacio de Estados en 3D]]
-
-La transición a 3D no es meramente visual, sino una expansión fundamental del espacio de fases de la simulación.
-- **2D:** Superficie $N \times N$ con estado `d_state`.
-- **3D:** Volumen $D \times H \times W$ con estado `d_state`.
-- **3D:** Volumen con $(X, Y, Z)$ dimensiones y estado `d_state`.
-## 2. Implementación del Motor
-
-### A. Migración de Tensores (PyTorch)
-Cambiar la estructura de datos base de 4D a 5D.
-
-- **Actual (4D):** `[Batch, Channels, Height, Width]`
-- **Nuevo (5D):** `[Batch, Channels, Depth, Height, Width]`
-
-### B. Adaptación de Redes Neuronales
-Migrar la arquitectura U-Net/SNN para operar en 3D.
-
-- Reemplazar `nn.Conv2d` por `nn.Conv3d`.
-- Reemplazar `nn.MaxPool2d` por `nn.MaxPool3d`.
-- Ajustar capas de normalización (`GroupNorm` soporta 3D, pero requiere verificación de dimensiones).
-- Recalcular campos receptivos.
-
-### C. Motor Nativo C++ (Sparse Octree)
-El motor nativo (Fase 2) ya contempla coordenadas 3D, pero necesita optimización para vecindades volumétricas.
-
-- **Octree:** Optimizar búsqueda de vecinos en eje Z (arriba/abajo).
-- **Hashing:** Verificar colisiones en hash map 3D con mayor densidad.
-
-## 3. Visualización Volumétrica
-
-### A. Proyección Holográfica (AdS/CFT)
-Implementar sistemas para visualizar el "Bulk" 3D en pantallas 2D.
-
-- **Slicing:** Ver cortes transversales del cubo (Plano XY a diferentes Z).
-- **Raymarching:** Renderizado volumétrico básico (densidad acumulada).
-- **Proyecciones:** Integrar valores a lo largo de un eje (ej. suma de energía en Z).
-
-### B. Interfaz de Usuario
-- Control de profundidad (Slider Z).
-- Rotación de cámara orbital.
-- Selección de volumen de interés (VOI) en lugar de ROI.
-
-## 4. Desafíos Computacionales
-
-### A. Explosión de Memoria
-Un cubo $128^3$ contiene 2 millones de celdas, comparado con 16k de un plano $128^2$.
-- **Solución:** Uso agresivo de Sparse Tensors y cuantización.
-- **Chunking:** Simular solo regiones activas del volumen.
-
-### B. Tiempo de Inferencia
-Las convoluciones 3D son significativamente más costosas.
-- **Solución:** Optimización CUDA y kernels personalizados.
+**Objetivo:** Implementar una simulación rigurosa de Lattice QFT en 2D que proyecte holográficamente un universo 3D (AdS), validando la correspondencia AdS/CFT como mecanismo generador de espacio-tiempo emergente.
 
 ---
 
-**Estado:** Planificación Futura
+## 1. Fundamentos Teóricos (The Boundary)
+
+**Referencia:** [[20_Concepts/AdS_CFT_Correspondence|AdS/CFT Correspondence]]
+
+### A. Lattice Gauge Theory (QFT en Retículo)
+Implementar un motor de física de partículas en retículo (Lattice) formal.
+- **Acción de Wilson:** Implementar la acción de Wilson para campos de gauge $SU(N)$ o $U(1)$.
+- **Fermiones:** Implementar fermiones en el retículo (Staggered o Wilson Fermions) para evitar el problema de duplicación.
+- **Observables:** Medir Plaquetas (energía magnética) y Links (energía eléctrica).
+
+### B. Entrelazamiento y Geometría
+La geometría del Bulk emerge del entrelazamiento en el Boundary.
+- **Entropía de Entrelazamiento:** Calcular la entropía de Von Neumann $S = -Tr(\rho \ln \rho)$ para subregiones.
+- **Información Mutua:** Medir correlaciones cuánticas entre regiones distantes.
+
+---
+
+## 2. El Diccionario Holográfico (The Bulk)
+
+**Referencia:** [[20_Concepts/The_Holographic_Viewer|The Holographic Viewer]]
+
+### A. Mapeo Escala-Radio (Scale-Radius Duality)
+Formalizar la relación matemática entre la escala de renormalización en 2D y la profundidad radial en 3D.
+- **Renormalización (RG Flow):** Implementar un algoritmo de "Coarse Graining" (MERA o Block Spin) en tiempo real.
+- **Tensor Network:** Visualizar el estado como una red tensorial (MERA) donde las capas representan la dimensión radial.
+
+### B. Fórmula de Ryu-Takayanagi
+Implementar la fórmula que conecta entropía con geometría:
+$$S_A = \frac{\text{Area}(\gamma_A)}{4G_N}$$
+- **Cálculo de Geodesicas:** Encontrar la superficie mínima $\gamma_A$ en el espacio hiperbólico que ancla la región $A$ en el borde.
+- **Métrica Emergente:** Reconstruir la métrica $g_{\mu\nu}$ del Bulk a partir de las entropías medidas.
+
+---
+
+## 3. Implementación Técnica
+
+### A. Motor de Simulación (Lattice Engine)
+- **Nuevo Kernel:** `LatticeEngine` optimizado para operaciones de grupo $SU(N)$.
+- **Monte Carlo:** Algoritmo Metropolis-Hastings o Heat Bath para termalización (opcional, si usamos enfoque estocástico).
+- **Evolución Unitaria:** Si usamos enfoque Hamiltoniano (tiempo real), mantener la evolución unitaria estricta $U(t) = e^{-iHt}$.
+
+### B. Visualizador Holográfico 2.0
+Mejorar el `HolographicViewer` actual para que sea un instrumento de medición física.
+- **Disco de Poincaré:** Visualización precisa de la geometría hiperbólica.
+- **Tensores de Curvatura:** Visualizar dónde se concentra la curvatura (energía) en el Bulk.
+- **Agujeros Negros:** Identificar horizontes de eventos en el Bulk (regiones de alta entropía/temperatura).
+
+---
+
+## 4. Experimentos Clave
+
+### A. Emergencia de Gravedad
+- ¿Surge una fuerza atractiva tipo gravedad entre excitaciones en el Bulk?
+- Verificar si la dinámica del Bulk obedece las ecuaciones de Einstein (aproximadamente).
+
+### B. Termodinámica de Agujeros Negros
+- Simular un estado térmico en el Boundary y observar si aparece un agujero negro en el Bulk.
+- Medir la temperatura de Hawking (correlaciones temporales).
+
+---
+
+**Estado:** Planificación
 **Prerrequisitos:**
-- [[ROADMAP_PHASE_2|Fase 2: Motor Nativo]] (Infraestructura C++ 3D)
-- [[ROADMAP_PHASE_3|Fase 3: Visualización]] (Sistema de renderizado flexible)
+- [[ROADMAP_PHASE_2|Fase 2: Motor Nativo]] (Rendimiento necesario para Lattice)
+- [[ROADMAP_PHASE_3|Fase 3: Visualización]] (Infraestructura de shaders)
 
 ---
 
-[[ROADMAP_PHASE_3|← Fase 3]] | **Fase 4 (Futuro)**
+[[ROADMAP_PHASE_3|← Fase 3]] | **Fase 4 (Actual)** | [[ROADMAP_PHASE_5_BACKLOG|Fase 5 (Backlog) →]]

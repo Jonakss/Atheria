@@ -42,6 +42,7 @@
 - [[logs/2025-11-28_fix_inference_persistence|2025-11-28 - Fix: Inference Persistence & Import Errors]]
 - [[logs/2025-11-28_harlow_limit_theory|2025-11-28 - Knowledge: Harlow Limit Theory Ingestion]]
 - [[logs/2025-11-28_ads_cft_correspondence|2025-11-28 - Knowledge: AdS/CFT Correspondence & Documentation Fixes]]
+- [[logs/2025-11-28_roadmap_restructuring_ads_cft|2025-11-28 - Strategy: Roadmap Restructuring (AdS/CFT, Infra, Research)]]
 - [[#2025-01-21 - Corrección Fundamental: Generación de Estado Inicial según Ley M]]
 - [[#2025-01-21 - Mejoras de Responsividad y Limpieza de Motor Nativo]]
 - [[#2025-01-XX - Refactorización Progresiva: Handlers y Visualizaciones]]

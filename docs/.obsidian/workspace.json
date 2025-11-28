@@ -164,11 +164,16 @@
   },
   "active": "8ec795a92d8b2ebe",
   "lastOpenFiles": [
-    "40_Experiments/logs/2025-11-28_ads_cft_correspondence.md",
-    "20_Concepts/AdS_CFT_Correspondence.md",
+    "40_Experiments/logs/2025-11-28_roadmap_restructuring_ads_cft.md",
+    "10_core/ROADMAP_AI_RESEARCH.md",
+    "10_core/ROADMAP_INFRASTRUCTURE.md",
+    "10_core/ROADMAP_PHASE_4.md",
+    "10_core/ROADMAP_PHASE_5_BACKLOG.md",
     "90_Troubleshooting/ENGINE_SWITCHING.md",
     "40_Experiments/logs/2025-11-28_holographic_viewer_and_engine_switching.md",
+    "40_Experiments/logs/2025-11-28_ads_cft_correspondence.md",
     "20_Concepts/The_Holographic_Viewer.md",
+    "20_Concepts/AdS_CFT_Correspondence.md",
     "20_Concepts/NATIVE_PARALLELISM.md",
     "40_Experiments/logs/2025-11-26_fix_live_feed_logic_and_imports.md",
     "logs/2025-01-XX_refactorización-progresiva-handlers-y-visualizaciones.md",
@@ -185,15 +190,6 @@
     "40_Experiments/BENCHMARK_TENSOR_STORAGE.md",
     "Atheria 4.md",
     "Ley M.md",
-    "30_Components/ARCHITECTURE_V3.md",
-    "README.md",
-    "30_Components/Models.md",
-    "OBSIDIAN_SETUP.md",
-    "30_Components/VOXEL_ENGINE_SUGGESTIONS.md",
-    "30_Components/FRONTEND_IMPROVEMENTS.md",
-    "40_Experiments/EXP_007_SPATIAL_INDEXING_VERIFICATION.md",
-    "30_Components/SPATIAL_INDEXING.md",
-    "00_RESPONSIBILITIES.md",
-    "40_Experiments/EXP_006_DATA_TRANSFER_OPTIMIZATION.md"
+    "30_Components/ARCHITECTURE_V3.md"
   ]
 }
