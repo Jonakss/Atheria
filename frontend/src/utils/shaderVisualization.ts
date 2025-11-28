@@ -416,6 +416,124 @@ export const FRAGMENT_SHADER_HSV = `
 `;
 
 /**
+ * Shader de fragment para visualización holográfica (Poincaré Disk)
+ * Mapea el grid 2D (Euclidiano) al Disco de Poincaré (Hiperbólico)
+ * Simula la correspondencia AdS/CFT donde el grid es el Boundary y el disco es el Bulk
+ */
+export const FRAGMENT_SHADER_POINCARE = `
+    precision mediump float;
+    
+    uniform sampler2D u_texture;
+    uniform vec2 u_resolution;
+    uniform float u_minValue;
+    uniform float u_maxValue;
+    uniform float u_gamma;
+    uniform int u_colormap;
+    
+    varying vec2 v_texCoord;
+    
+    // Constantes para el modelo de Poincaré
+    const float DISK_RADIUS = 0.95;
+    
+    // Colormap Viridis
+    vec3 viridis(float t) {
+        t = clamp(t, 0.0, 1.0);
+        vec3 c0 = vec3(0.267004, 0.004874, 0.329415);
+        vec3 c1 = vec3(0.127568, 0.566949, 0.550556);
+        vec3 c2 = vec3(0.369214, 0.788888, 0.382914);
+        vec3 c3 = vec3(0.993248, 0.906157, 0.143936);
+        
+        if (t < 0.33) {
+            return mix(c0, c1, t * 3.0);
+        } else if (t < 0.66) {
+            return mix(c1, c2, (t - 0.33) * 3.0);
+        } else {
+            return mix(c2, c3, (t - 0.66) * 3.0);
+        }
+    }
+    
+    // Colormap Plasma
+    vec3 plasma(float t) {
+        t = clamp(t, 0.0, 1.0);
+        vec3 c0 = vec3(0.050383, 0.029803, 0.527975);
+        vec3 c1 = vec3(0.546989, 0.127025, 0.513125);
+        vec3 c2 = vec3(0.998156, 0.401833, 0.255082);
+        vec3 c3 = vec3(0.988362, 0.998364, 0.644924);
+        
+        if (t < 0.33) {
+            return mix(c0, c1, t * 3.0);
+        } else if (t < 0.66) {
+            return mix(c1, c2, (t - 0.33) * 3.0);
+        } else {
+            return mix(c2, c3, (t - 0.66) * 3.0);
+        }
+    }
+    
+    void main() {
+        // Coordenadas normalizadas [-1, 1] centradas
+        // v_texCoord va de [0, 0] a [1, 1]
+        vec2 uv = v_texCoord * 2.0 - 1.0;
+        
+        // Distancia al centro
+        float r = length(uv);
+        
+        // Fondo negro fuera del disco
+        if (r > 1.0) {
+            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+            return;
+        }
+        
+        // Borde brillante del disco (Boundary)
+        if (r > DISK_RADIUS) {
+            float edgeIntensity = smoothstep(1.0, DISK_RADIUS, r);
+            gl_FragColor = vec4(0.2, 0.4, 1.0, 1.0) * edgeIntensity * 0.5;
+            return;
+        }
+        
+        // Mapeo holográfico: Disco -> Grid
+        // Transformamos la coordenada del disco (hiperbólico) a coordenada de textura (euclidiano)
+        
+        // Efecto de "Lente Gravitacional" / Proyección Estereográfica Inversa
+        // Distorsionamos las coordenadas UV basándonos en la distancia al centro
+        // para simular la curvatura del espacio AdS.
+        // r' = r^alpha (donde alpha < 1 expande el centro, alpha > 1 expande el borde)
+        float r_distorted = pow(r, 0.7); // Expandir ligeramente el centro
+        
+        float theta = atan(uv.y, uv.x);
+        vec2 texCoord = vec2(
+            0.5 + 0.5 * r_distorted * cos(theta),
+            0.5 + 0.5 * r_distorted * sin(theta)
+        );
+        
+        // Sampling de la textura (el estado del universo 2D)
+        vec4 texel = texture2D(u_texture, clamp(texCoord, 0.0, 1.0));
+        float normalized = texel.r;
+        
+        // Aplicar corrección gamma
+        normalized = pow(normalized, u_gamma);
+        
+        // Aplicar colormap
+        vec3 color;
+        if (u_colormap == 0) {
+            color = viridis(normalized);
+        } else if (u_colormap == 1) {
+            color = plasma(normalized);
+        } else {
+            color = vec3(normalized);
+        }
+        
+        // Efecto de "Atmósfera" o "Glow" basado en la intensidad
+        color += normalized * normalized * 0.2;
+        
+        // Viñeteado suave hacia el borde del disco para dar sensación de profundidad
+        float vignette = smoothstep(DISK_RADIUS, 0.0, r);
+        color *= (0.5 + 0.5 * vignette);
+        
+        gl_FragColor = vec4(color, 1.0);
+    }
+`;
+
+/**
  * Crea un programa de shader WebGL
  */
 export function createShaderProgram(

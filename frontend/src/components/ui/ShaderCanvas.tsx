@@ -14,6 +14,7 @@ import {
     FRAGMENT_SHADER_HSV,
     FRAGMENT_SHADER_IMAG,
     FRAGMENT_SHADER_PHASE,
+    FRAGMENT_SHADER_POINCARE,
     FRAGMENT_SHADER_REAL,
     isWebGLAvailable,
     renderWithShader,
@@ -78,6 +79,8 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
             fragmentShader = FRAGMENT_SHADER_IMAG;
         } else if (selectedViz === 'phase_hsv') {
             fragmentShader = FRAGMENT_SHADER_HSV;
+        } else if (selectedViz === 'poincare') {
+            fragmentShader = FRAGMENT_SHADER_POINCARE;
         } else {
             // Default: density
             fragmentShader = FRAGMENT_SHADER_DENSITY;
