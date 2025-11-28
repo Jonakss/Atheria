@@ -140,6 +140,7 @@ set(CPP_SOURCES
     src/cpp_core/src/sparse_map.cpp
     src/cpp_core/src/harmonic_vacuum.cpp
     src/cpp_core/src/sparse_engine.cpp
+    src/cpp_core/src/octree.cpp
     src/cpp_core/src/bindings.cpp
 )
 

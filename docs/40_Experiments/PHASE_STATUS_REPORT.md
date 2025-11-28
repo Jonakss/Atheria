@@ -90,12 +90,12 @@
 - ✅ **PyBind11 Bindings** - Módulo `atheria_core` compilado y disponible
 
 #### Componentes Pendientes:
-- ⏳ **OctreeIndex** - Índice espacial mencionado en roadmap pero no implementado
+- ✅ **OctreeIndex** - Implementado con Morton Codes (Linear Octree)
 - ⏳ **Memory Pools** - Optimización de memoria para evitar fragmentación
 - ✅ **Paralelismo** - OpenMP activado y configurable desde Python
 - ⏳ **Pruebas Completas** - Benchmark comparativo Python vs C++ pendiente
 
-#### Estado General: 🟢 **80% Completado**
+#### Estado General: 🟢 **90% Completado**
 
 **Nota:** El motor nativo está funcional pero requiere modelos TorchScript exportados para usarse automáticamente.
 

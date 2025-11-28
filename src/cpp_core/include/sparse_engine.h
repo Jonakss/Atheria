@@ -3,6 +3,7 @@
 #define ATHERIA_SPARSE_ENGINE_H
 
 #include "sparse_map.h"
+#include "octree.h"
 #include <torch/torch.h>
 #include <torch/script.h>
 #include <string>
@@ -121,6 +122,7 @@ private:
     // Almacenamiento
     SparseMap matter_map_;
     HarmonicVacuum vacuum_;
+    OctreeIndex octree_;
     
     // Estado de simulación
     std::unordered_set<Coord3D, Coord3DHash> active_region_;

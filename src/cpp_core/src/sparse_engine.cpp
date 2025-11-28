@@ -62,6 +62,9 @@ void Engine::add_particle(const Coord3D& coord, const torch::Tensor& state) {
     // Almacenar en el mapa
     matter_map_.insert_tensor(coord, state_on_device);
     
+    // Actualizar índice espacial
+    octree_.insert(coord);
+
     // Activar vecindario
     activate_neighborhood(coord);
 }
@@ -89,6 +92,9 @@ int64_t Engine::step_native() {
     }
     
     step_count_++;
+    
+    // Asegurar que el octree esté construido antes de usarlo (para futuras optimizaciones)
+    octree_.build();
     
     // Crear nuevo mapa para el siguiente estado
     SparseMap next_matter_map;
@@ -404,6 +410,7 @@ int64_t Engine::get_step_count() const {
 
 void Engine::clear() {
     matter_map_.clear();
+    octree_.clear();
     active_region_.clear();
     step_count_ = 0;
 }
