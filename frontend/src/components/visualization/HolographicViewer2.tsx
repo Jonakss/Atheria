@@ -110,7 +110,7 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
     useEffect(() => {
         if (!sceneRef.current || !data || data.length === 0) return;
 
-        // Si ya existen puntos, eliminarlos para recrearlos (o actualizarlos)
+        // Si ya existen puntos, eliminarlos para recrearlos
         if (pointsRef.current) {
             sceneRef.current.remove(pointsRef.current);
             pointsRef.current.geometry.dispose();
@@ -118,109 +118,139 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
         }
 
         const particleCount = width * height;
-        const positions: number[] = [];
-        const colors: number[] = [];
-        const sizes: number[] = [];
+        
+        // Atributos para el shader
+        const indices: number[] = [];
+        const magnitudes: number[] = [];
+        const phases: number[] = [];
 
-        const colorHelper = new THREE.Color();
-        const isPoincare = vizType === 'poincare' || vizType === 'poincare_3d';
-
-        // Recorrer el grid 2D y convertirlo a partículas 3D
+        // Llenar buffers
         for (let i = 0; i < particleCount; i++) {
             const magnitude = data[i];
-
-            // "Sparse Rendering": Solo dibujar si hay energía
+            
+            // Optimización: Skip puntos con muy poca energía
             if (magnitude > threshold) {
-                // Coordenadas normalizadas [-1, 1]
-                const u = ((i % width) / width) * 2 - 1;
-                const v = (Math.floor(i / width) / height) * 2 - 1;
-                
-                let x, y, z;
-
-                if (isPoincare) {
-                    // Mapeo Cuadrado -> Disco (Mapping Square to Disk)
-                    // x' = u * sqrt(1 - v^2/2)
-                    // y' = v * sqrt(1 - u^2/2)
-                    const diskX = u * Math.sqrt(1 - (v * v) / 2);
-                    const diskY = v * Math.sqrt(1 - (u * u) / 2);
-
-                    // Escalar al tamaño del mundo (ej: 100 unidades de radio)
-                    const R = 100;
-                    x = diskX * R;
-                    y = diskY * R;
-                    
-                    // Z sigue siendo la magnitud, pero quizás deformada
-                    // En Poincaré, el borde es infinito, así que reducimos Z cerca del borde?
-                    // Por ahora mantenemos Z = magnitud * 50
-                    z = magnitude * 50;
-                } else {
-                    // Cartesiano estándar
-                    x = u * (width / 2); // Escalar a dimensiones originales aprox
-                    y = v * (height / 2);
-                    z = magnitude * 50; 
-                }
-
-                positions.push(x, y, z);
-
-                // Color basado en la Fase (o azul cian por defecto)
-                if (phaseData) {
-                    // Mapear fase (-PI a PI) a HSL
-                    const hue = (phaseData[i] + Math.PI) / (2 * Math.PI);
-                    colorHelper.setHSL(hue, 1.0, 0.5);
-                } else {
-                    // Gradiente azul basado en altura
-                    colorHelper.setHSL(0.6, 1.0, Math.min(0.3 + magnitude, 1.0));
-                }
-                
-                colors.push(colorHelper.r, colorHelper.g, colorHelper.b);
-                
-                // Tamaño basado en magnitud
-                // Aumentamos el multiplicador para que sean visibles con el shader
-                sizes.push(Math.max(2.0, magnitude * 8.0)); 
+                indices.push(i);
+                magnitudes.push(magnitude);
+                phases.push(phaseData ? phaseData[i] : 0);
             }
         }
 
         const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-        geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+        // Usamos 'position' para pasar el índice (x) y magnitud (y) para ahorrar atributos? 
+        // Mejor usar atributos explícitos para claridad.
+        // Pasamos índice como atributo float para calcular UV en vertex shader
+        geometry.setAttribute('particleIndex', new THREE.Float32BufferAttribute(indices, 1));
+        geometry.setAttribute('magnitude', new THREE.Float32BufferAttribute(magnitudes, 1));
+        geometry.setAttribute('phase', new THREE.Float32BufferAttribute(phases, 1));
+        
+        // Dummy position attribute needed for Three.js to render count correctly?
+        // Actually, drawRange or explicit count in geometry is needed if no position.
+        // But Points usually expects position. Let's pass zeros and displace in shader.
+        const zeros = new Float32Array(indices.length * 3);
+        geometry.setAttribute('position', new THREE.BufferAttribute(zeros, 3));
 
-        // Shader para partículas circulares con tamaño variable
+        // Uniforms
+        const uniforms = {
+            uWidth: { value: width },
+            uHeight: { value: height },
+            uTime: { value: 0 },
+            uIsPoincare: { value: vizType === 'poincare' || vizType === 'poincare_3d' },
+            uScale: { value: 100.0 } // Radio del disco
+        };
+
+        // Vertex Shader: Proyección Hiperbólica
         const vertexShader = `
-            attribute float size;
+            attribute float particleIndex;
+            attribute float magnitude;
+            attribute float phase;
+            
+            uniform float uWidth;
+            uniform float uHeight;
+            uniform float uScale;
+            uniform bool uIsPoincare;
+            
             varying vec3 vColor;
+            varying float vAlpha;
+
+            // Función para convertir HSL a RGB
+            vec3 hsl2rgb(vec3 c) {
+                vec3 rgb = clamp(abs(mod(c.x*6.0+vec3(0.0,4.0,2.0),6.0)-3.0)-1.0, 0.0, 1.0);
+                return c.z + c.y * (rgb-0.5)*(1.0-abs(2.0*c.z-1.0));
+            }
+
             void main() {
-                vColor = color;
-                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-                // Size attenuation: escala el tamaño según la distancia a la cámara
-                gl_PointSize = size * (300.0 / -mvPosition.z);
+                // 1. Calcular coordenadas UV normalizadas [-1, 1]
+                float u = (mod(particleIndex, uWidth) / uWidth) * 2.0 - 1.0;
+                float v = (floor(particleIndex / uWidth) / uHeight) * 2.0 - 1.0;
+                
+                vec3 pos;
+                
+                if (uIsPoincare) {
+                    // 2. Mapeo Cuadrado -> Disco de Poincaré
+                    // x = u * sqrt(1 - v^2/2)
+                    // y = v * sqrt(1 - u^2/2)
+                    float diskX = u * sqrt(1.0 - (v * v) / 2.0);
+                    float diskY = v * sqrt(1.0 - (u * u) / 2.0);
+                    
+                    // 3. Scale-Radius Duality (Visualización)
+                    // En AdS/CFT, el radio r representa la escala de energía.
+                    // r -> 1 (Borde) es UV (Alta energía/Detalle)
+                    // r -> 0 (Centro) es IR (Baja energía/Bulk)
+                    
+                    // Aquí usamos la magnitud para desplazar en Z (hacia el usuario)
+                    // y expandir radialmente para enfatizar la estructura
+                    
+                    pos = vec3(diskX * uScale, diskY * uScale, magnitude * 50.0);
+                } else {
+                    // Cartesiano estándar
+                    pos = vec3(u * uWidth * 0.5, v * uHeight * 0.5, magnitude * 50.0);
+                }
+
+                vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
                 gl_Position = projectionMatrix * mvPosition;
+
+                // 4. Color basado en Fase (o Magnitud si no hay fase)
+                // HSL: Hue = Phase, Sat = 1.0, Light = 0.5 + Magnitude
+                float hue = (phase + 3.14159) / (2.0 * 3.14159);
+                vec3 color = hsl2rgb(vec3(hue, 1.0, 0.5 + magnitude * 0.5));
+                
+                // Si no hay fase (phase == 0 para todos), usar gradiente azul-cian
+                if (phase == 0.0) {
+                     color = hsl2rgb(vec3(0.6 - magnitude * 0.2, 1.0, min(0.3 + magnitude, 1.0)));
+                }
+                
+                vColor = color;
+                
+                // 5. Size Attenuation
+                gl_PointSize = max(2.0, magnitude * 10.0) * (300.0 / -mvPosition.z);
+                vAlpha = min(1.0, magnitude * 2.0);
             }
         `;
 
         const fragmentShader = `
             varying vec3 vColor;
+            varying float vAlpha;
+            
             void main() {
-                // Convertir punto cuadrado en círculo suave
+                // Círculo suave
                 vec2 coord = gl_PointCoord - vec2(0.5);
                 float dist = length(coord);
                 
                 if (dist > 0.5) discard;
                 
-                // Borde suave (antialiasing manual)
                 float alpha = 1.0 - smoothstep(0.4, 0.5, dist);
-                
-                gl_FragColor = vec4(vColor, alpha);
+                gl_FragColor = vec4(vColor, alpha * vAlpha);
             }
         `;
 
         const material = new THREE.ShaderMaterial({
-            uniforms: {},
+            uniforms,
             vertexShader,
             fragmentShader,
             transparent: true,
             blending: THREE.AdditiveBlending,
-            depthWrite: false // Importante para transparencia correcta en partículas
+            depthWrite: false
         });
 
         const points = new THREE.Points(geometry, material);

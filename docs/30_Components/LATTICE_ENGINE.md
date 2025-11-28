@@ -31,10 +31,5 @@ class LatticeEngine:
         # ...
 ```
 
--   **`grid_size`**: Tamaño del retículo.
--   **`d_state`**: Dimensión interna (usada para representar el grupo).
--   **`group`**: Grupo de simetría ('U1', 'SU2', 'SU3').
--   **`beta`**: Inverso de la constante de acoplamiento.
-
 ## Integración
 El Lattice Engine se integra en el pipeline de inferencia de Atheria como una opción de motor seleccionable (`force_engine="lattice"`).

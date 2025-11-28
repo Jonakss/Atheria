@@ -50,6 +50,9 @@
     - Implemented `HolographicViewer2` frontend component with visual indicator.
     - Added UI toggle in `PhysicsInspector` to switch between Viewer v1 and v2.
     - Updated `DashboardLayout` to handle viewer switching.
+    - **Backend:** Implemented SU(3) Wilson Action and Metropolis-Hastings update in `LatticeEngine`.
+    - **Frontend:** Implemented Scale-Radius Duality visualization using custom Vertex Shader in `HolographicViewer2`.
+    - Verified backend physics with `tests/test_lattice_engine.py`.
 - [[logs/2025-11-28_history_system_verification|2025-11-28 - Fix: History System Verification (Native Engine Support)]]
 - [2025-11-28: Visualizaciones Avanzadas de Campos (WebGL)](logs/2025-11-28_advanced_visualizations.md)
 - [2025-11-28: Implementación de OctreeIndex (Morton Codes)](logs/2025-11-28_octree_implementation.md)
