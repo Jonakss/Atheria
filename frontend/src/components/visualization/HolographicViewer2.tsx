@@ -211,13 +211,13 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
                 gl_Position = projectionMatrix * mvPosition;
 
                 // 4. Color basado en Fase (o Magnitud si no hay fase)
-                // HSL: Hue = Phase, Sat = 1.0, Light = 0.5 + Magnitude
+                // HSL: Hue = Phase, Sat = 1.0, Light = ajustado para evitar blanco
                 float hue = (phase + 3.14159) / (2.0 * 3.14159);
-                vec3 color = hsl2rgb(vec3(hue, 1.0, 0.5 + magnitude * 0.5));
+                vec3 color = hsl2rgb(vec3(hue, 1.0, 0.4 + magnitude * 0.3)); // Reducido de 0.5 + mag*0.5
                 
                 // Si no hay fase (phase == 0 para todos), usar gradiente azul-cian
                 if (phase == 0.0) {
-                     color = hsl2rgb(vec3(0.6 - magnitude * 0.2, 1.0, min(0.3 + magnitude, 1.0)));
+                     color = hsl2rgb(vec3(0.6 - magnitude * 0.2, 1.0, 0.25 + magnitude * 0.4)); // Reducido de 0.3 + mag
                 }
                 
                 vColor = color;
