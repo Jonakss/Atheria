@@ -2,7 +2,7 @@
 id: visor_holografico
 tipo: concepto_fisico
 tags: [ads-cft, holografia, poincare, visualizacion]
-relacionado: [[3D_State_Space], [The_Harlow_Limit_Theory]]
+relacionado: [[3D_State_Space], [The_Harlow_Limit_Theory], [AdS_CFT_Correspondence]]
 ---
 
 # The Holographic Viewer: Decodificando el Universo 2D

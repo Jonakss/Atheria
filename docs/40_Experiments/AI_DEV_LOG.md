@@ -41,6 +41,7 @@
 - [[logs/2025-11-28_dragonfly_cache_integration|2025-11-28 - Feature: Dragonfly Cache Integration (States & Checkpoints)]]
 - [[logs/2025-11-28_fix_inference_persistence|2025-11-28 - Fix: Inference Persistence & Import Errors]]
 - [[logs/2025-11-28_harlow_limit_theory|2025-11-28 - Knowledge: Harlow Limit Theory Ingestion]]
+- [[logs/2025-11-28_ads_cft_correspondence|2025-11-28 - Knowledge: AdS/CFT Correspondence & Documentation Fixes]]
 - [[#2025-01-21 - Corrección Fundamental: Generación de Estado Inicial según Ley M]]
 - [[#2025-01-21 - Mejoras de Responsividad y Limpieza de Motor Nativo]]
 - [[#2025-01-XX - Refactorización Progresiva: Handlers y Visualizaciones]]
