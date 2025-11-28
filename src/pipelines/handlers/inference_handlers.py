@@ -5,6 +5,7 @@ import logging
 import torch
 import numpy as np
 import time
+import os
 import importlib
 import sys
 import gc
@@ -111,6 +112,7 @@ async def handle_set_inference_config(args):
 
 from ...engines.qca_engine import Aetheria_Motor, QuantumState
 from ...engines.harmonic_engine import SparseHarmonicEngine
+from ...engines.lattice_engine import LatticeEngine
 from ..viz import get_visualization_data
 from ...utils import get_latest_checkpoint, get_latest_jit_model, load_experiment_config
 
@@ -614,8 +616,11 @@ async def handle_load_experiment(args):
                     grid_size = g_state.get(
                         "inference_grid_size", global_cfg.GRID_SIZE_INFERENCE
                     )
+                    # CRÍTICO: El modelo espera input real concatenado (Real + Imag), por lo que
+                    # los canales de entrada son 2 * d_state.
+                    # Si pasamos solo d_state, falla con RuntimeError de mismatch de canales.
                     jit_path = export_model_to_jit(
-                        temp_model, exp_name, (1, d_state, grid_size, grid_size)
+                        temp_model, exp_name, (1, 2 * d_state, grid_size, grid_size)
                     )
                     del temp_model
                     gc.collect()
@@ -665,12 +670,16 @@ async def handle_load_experiment(args):
                 if not exp_cfg:
                     raise ValueError(f"No se pudo cargar configuración de {exp_name}")
 
-                if ws:
-                    await send_notification(
-                        ws,
-                        f"Inicializando motor {'Harmónico' if force_engine == 'harmonic' else 'Python'}...",
-                        "info",
-                    )
+                    if ws:
+                        engine_type = "Python"
+                        if force_engine == "harmonic": engine_type = "Harmónico"
+                        elif force_engine == "lattice": engine_type = "Lattice (AdS/CFT)"
+                        
+                        await send_notification(
+                            ws,
+                            f"Inicializando motor {engine_type}...",
+                            "info",
+                        )
 
                 checkpoint_path = get_latest_checkpoint(exp_name)
 
@@ -696,6 +705,16 @@ async def handle_load_experiment(args):
                             exp_cfg.MODEL_PARAMS.d_state, device=device
                         )
                         motor.add_matter(0, 0, 0, initial_state)
+                    elif force_engine == "lattice":
+                        # Usar LatticeEngine (Phase 4)
+                        motor = LatticeEngine(
+                            grid_size=g_state.get(
+                                "inference_grid_size", global_cfg.GRID_SIZE_INFERENCE
+                            ),
+                            d_state=exp_cfg.MODEL_PARAMS.d_state,
+                            device=device,
+                            group="SU3" # Default por ahora
+                        )
                     else:
                         # Usar Aetheria_Motor estándar
                         motor = Aetheria_Motor(
@@ -729,7 +748,7 @@ async def handle_load_experiment(args):
 
                 g_state["motor_is_native"] = False
                 g_state["motor_type"] = (
-                    "harmonic" if force_engine == "harmonic" else "python"
+                    force_engine if force_engine in ["harmonic", "lattice"] else "python"
                 )
 
             # Extraer paso inicial del nombre del archivo
