@@ -30,6 +30,7 @@ related: [[10_core/00_CORE_MOC]], [[40_Experiments/00_EXPERIMENTS_MOC]]
 - [[NATIVE_ENGINE_COMMUNICATION]] - Comunicación del motor nativo
 - [[HISTORY_SYSTEM]] - Gestión de historia de simulación
 - [[GPU_OPTIMIZATION]] - Optimizaciones de GPU
+- [[DRAGONFLY_CACHE]] - Caché distribuido (Dragonfly/Redis)
 - [[REFACTORING_PLAN]] - Plan de refactorización (archivos atómicos) - Estado actual
 
 ---

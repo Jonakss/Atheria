@@ -20,6 +20,7 @@ from ..engines.qca_engine import Aetheria_Motor
 from ..physics.noise import QuantumNoiseInjector
 from .. import config as global_cfg
 from ..utils.experiment_logger import ExperimentLogger
+from src.cache import cache
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -62,9 +63,13 @@ class QC_Trainer_v4:
         # 1. Motor de Física (Ley M)
         # Si se proporciona un modelo ya instanciado, usarlo; sino, crear uno nuevo
         if model is not None:
-            # Usar modelo ya instanciado (para checkpoints/transfer learning)
-            d_state = model_params.get('d_state', 2) if isinstance(model_params, dict) else getattr(model_params, 'd_state', 2)
-            self.motor = Aetheria_Motor(model, grid_size, d_state, device)
+            # Si ya es un motor, usarlo directamente
+            if isinstance(model, Aetheria_Motor):
+                self.motor = model
+            else:
+                # Usar modelo ya instanciado (para checkpoints/transfer learning)
+                d_state = model_params.get('d_state', 2) if isinstance(model_params, dict) else getattr(model_params, 'd_state', 2)
+                self.motor = Aetheria_Motor(model, grid_size, d_state, device)
         elif model_class is not None and model_params is not None:
             # Crear nuevo modelo
             if isinstance(model_params, dict):
@@ -381,3 +386,43 @@ class QC_Trainer_v4:
                 shutil.copy2(path, last_checkpoint_path)
             except Exception as e:
                 logging.warning(f"Error al copiar último checkpoint: {e}")
+
+        # NUEVO: Cachear en Dragonfly para acceso rápido (Latest Checkpoint)
+        if cache.enabled:
+            try:
+                # Usar una clave consistente para el último checkpoint de este experimento
+                cache_key = f"checkpoint:{self.experiment_name}:latest"
+                
+                # Preparar datos para caché (asegurar que están en CPU)
+                # No cacheamos todo el dict para ahorrar memoria/ancho de banda si no es necesario
+                # Pero para resumir entrenamiento, necesitamos state_dicts
+                
+                # Convertir tensores a CPU para evitar problemas de pickle con CUDA
+                cpu_checkpoint_data = {
+                    'episode': episode,
+                    'loss': current_loss,
+                    'metrics': current_metrics,
+                    'combined_metric': combined_metric,
+                    # Convertir state_dicts a CPU recursivamente es costoso, 
+                    # pero necesario si queremos independencia del device al cargar
+                    # Por ahora confiamos en que torch.save/load manejan esto, 
+                    # pero para pickle directo necesitamos cuidado.
+                    # DragonflyCache usa pickle.
+                }
+                
+                # Opción A: Solo cachear metadatos (rápido)
+                # Opción B: Cachear modelo completo (lento pero permite fast-resume)
+                
+                # Vamos con Opción B pero optimizada: solo state_dict del modelo
+                # (optimizador y scheduler pueden cargarse de disco si es necesario)
+                
+                # Mover state_dict a CPU
+                model_state_cpu = {k: v.cpu() for k, v in self.motor.operator.state_dict().items()}
+                cpu_checkpoint_data['model_state_dict'] = model_state_cpu
+                
+                # Guardar con TTL de 24 horas
+                cache.set(cache_key, cpu_checkpoint_data, ttl=86400)
+                logging.debug(f"💾 Checkpoint (modelo) cacheado en Dragonfly: {cache_key}")
+                
+            except Exception as e:
+                logging.warning(f"⚠️ Error cacheando checkpoint en Dragonfly: {e}")

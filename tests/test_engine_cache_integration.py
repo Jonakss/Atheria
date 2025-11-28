@@ -81,3 +81,38 @@ def test_engine_restores_state(mock_motor):
     
     # Clean up
     cache.delete(key)
+
+def test_checkpoint_caching(mock_motor):
+    if not cache.enabled:
+        pytest.skip("Dragonfly cache not available")
+        
+    from src.trainers.qc_trainer_v4 import QC_Trainer_v4
+    
+    # Mock trainer
+    trainer = QC_Trainer_v4(
+        experiment_name="test_integration",
+        model=mock_motor, # Pass the mock motor directly
+        device=mock_motor.device
+    )
+    
+    # Save checkpoint
+    metrics = {"survival": 0.9, "symmetry": 0.8, "complexity": 0.5}
+    trainer.save_checkpoint(episode=1, current_metrics=metrics, current_loss=0.1)
+    
+    # Verify it's in cache
+    key = "checkpoint:test_integration:latest"
+    assert cache.exists(key)
+    
+    # Retrieve and verify
+    cached_data = cache.get(key)
+    assert cached_data is not None
+    assert cached_data['episode'] == 1
+    assert cached_data['metrics'] == metrics
+    assert 'model_state_dict' in cached_data
+    
+    # Clean up
+    cache.delete(key)
+    # Clean up created directory
+    import shutil
+    if os.path.exists(trainer.checkpoint_dir):
+        shutil.rmtree(trainer.checkpoint_dir)

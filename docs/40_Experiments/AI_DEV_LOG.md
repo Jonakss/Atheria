@@ -37,6 +37,7 @@
 - [[logs/2025-11-23_critical_live_feed_optimizations|2025-11-23 - Optimizaciones Críticas de Live Feed y Rendimiento]]
 - [[logs/2025-11-23_refactor_architecture_decoupled_services|2025-11-23 - Refactorización de Arquitectura: Servicios Desacoplados]]
 - [[logs/2025-11-28_fix_dragonfly_and_apr_docs|2025-11-28 - Fix: Dragonfly Startup & APR Documentation]]
+- [[logs/2025-11-28_dragonfly_cache_integration|2025-11-28 - Feature: Dragonfly Cache Integration (States & Checkpoints)]]
 - [[#2025-01-21 - Corrección Fundamental: Generación de Estado Inicial según Ley M]]
 - [[#2025-01-21 - Mejoras de Responsividad y Limpieza de Motor Nativo]]
 - [[#2025-01-XX - Refactorización Progresiva: Handlers y Visualizaciones]]
