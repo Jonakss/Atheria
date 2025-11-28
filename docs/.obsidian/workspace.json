@@ -164,8 +164,12 @@
   },
   "active": "8ec795a92d8b2ebe",
   "lastOpenFiles": [
-    "20_Concepts/NATIVE_PARALLELISM.md",
+    "40_Experiments/logs/2025-11-28_ads_cft_correspondence.md",
+    "20_Concepts/AdS_CFT_Correspondence.md",
+    "90_Troubleshooting/ENGINE_SWITCHING.md",
     "40_Experiments/logs/2025-11-28_holographic_viewer_and_engine_switching.md",
+    "20_Concepts/The_Holographic_Viewer.md",
+    "20_Concepts/NATIVE_PARALLELISM.md",
     "40_Experiments/logs/2025-11-26_fix_live_feed_logic_and_imports.md",
     "logs/2025-01-XX_refactorización-progresiva-handlers-y-visualizaciones.md",
     "logs/2025-01-21_corrección-fundamental-generación-de-estado-inicial-según-ley-m.md",
