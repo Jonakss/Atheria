@@ -122,7 +122,8 @@ class WebSocketService(BaseService):
             "experiments": get_experiment_list(), # Cargar lista real de experimentos
             "training_status": g_state.get('training_status', 'idle'),
             "inference_status": "paused" if g_state.get('is_paused', True) else "running",
-            "compile_status": g_state.get('compile_status', {'is_compiled': False})
+            "compile_status": g_state.get('compile_status', {'is_compiled': False}),
+            "active_experiment": g_state.get('active_experiment')
         }
         await ws.send_json({"type": "initial_state", "payload": initial_payload})
 

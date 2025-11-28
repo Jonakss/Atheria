@@ -511,8 +511,8 @@ async def handle_load_experiment(args):
         if ws: await send_notification(ws, f"Cargando modelo '{exp_name}'...", "info")
         
         from ..utils import load_experiment_config, get_latest_checkpoint
-        from . import config as global_cfg
-        from .model_loader import load_model
+        from .. import config as global_cfg
+        from ..model_loader import load_model
         from ..engines.qca_engine import Aetheria_Motor
         from ..managers.roi_manager import ROIManager
         
@@ -620,13 +620,18 @@ async def handle_load_experiment(args):
         }
         
         if ws: await send_notification(ws, f"✅ Modelo '{exp_name}' cargado.", "success")
+        
+        # Actualizar experimento activo en estado global
+        g_state['active_experiment'] = exp_name
+        
         await broadcast({
             "type": "inference_status_update", 
             "payload": {
                 "status": "paused",
                 "model_loaded": True,
                 "experiment_name": exp_name,
-                "compile_status": compile_status
+                "compile_status": compile_status,
+                "active_experiment": exp_name # Enviar también aquí por redundancia
             }
         })
 

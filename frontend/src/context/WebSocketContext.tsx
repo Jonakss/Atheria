@@ -313,6 +313,8 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         if (payload.compile_status) {
                             setCompileStatus(payload.compile_status as CompileStatus);
                         }
+                        // Restaurar o limpiar experimento activo
+                        setActiveExperiment(payload.active_experiment || null);
                         break;
                     case 'experiments_updated': {
                         // Actualizar lista de experimentos cuando se crea/elimina un experimento
@@ -379,6 +381,11 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                             if (process.env.NODE_ENV === 'development') {
                                 console.warn('⚠️ WebSocketContext - inference_status_update sin compile_status. Payload completo:', payload);
                             }
+                        }
+                        
+                        // Actualizar experimento activo si viene en el payload
+                        if (payload.active_experiment) {
+                            setActiveExperiment(payload.active_experiment);
                         }
                         break;
                     case 'simulation_frame':
