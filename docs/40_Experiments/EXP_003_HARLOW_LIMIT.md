@@ -3,7 +3,7 @@
 ## 🎯 Objetivo Científico
 Validar la hipótesis de que un sistema cuántico fundamentalmente simple (con un espacio de estados casi trivial) puede generar una complejidad visual y dinámica indistinguible del caos para un "observador interno".
 
-Este experimento se basa en la teoría reciente de gravedad cuántica (Harlow et al., MIT) que sugiere que si el universo es cerrado, su espacio de Hilbert podría ser unidimensional (un solo estado estático), y la complejidad que percibimos es producto del *coarse-graining* (baja resolución) del observador.
+Este experimento se basa en la teoría reciente de gravedad cuántica (Harlow et al., MIT) que sugiere que si el universo es cerrado, su espacio de Hilbert podría ser unidimensional (un solo estado estático), y la complejidad que percibimos es producto del *coarse-graining* (baja resolución) del observador. Ver [[The_Harlow_Limit_Theory]] para más detalles teóricos.
 
 ## 🧪 Hipótesis en Aetheria
 Si configuramos nuestro Motor QCA para que sea **perfectamente unitario** y **cerrado** (sin decaimiento, sin ruido externo), el estado matemático global del sistema debería permanecer constante o cíclico. Sin embargo, si observamos solo una proyección (visualización 2D de fase/densidad), deberíamos ver patrones complejos emerger.

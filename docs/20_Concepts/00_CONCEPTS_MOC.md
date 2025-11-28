@@ -8,6 +8,7 @@
 
 - **[Vacío Armónico](../20_Concepts/HARMONIC_VACUUM_CONCEPT.md)** - Concepto fundamental del vacío cuántico armónico
 - **[Espacio de Estados 3D](../20_Concepts/3D_STATE_SPACE_CONCEPT.md)** - Conceptualización de la transición de superficie 2D a volumen 3D
+- **[Teoría del Límite de Harlow](../20_Concepts/The_Harlow_Limit_Theory.md)** - Complejidad emergente de un estado cuántico simple y su relación con la unitariedad
 
 ## 🔧 Arquitecturas y Sistemas
 
