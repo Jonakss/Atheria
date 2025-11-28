@@ -614,16 +614,29 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 return;
             }
             
-            const gridHeight = mapData.length;
-            const gridWidth = mapData[0].length;
-
-            if (canvas.width !== gridWidth || canvas.height !== gridHeight) {
-                if (gridWidth > 0 && gridHeight > 0) {
-                canvas.width = gridWidth;
-                canvas.height = gridHeight;
+            // IMPORTANTE: Detectar si hay ROI activo
+            // Si hay ROI, mapData es solo una porción (ej. 256x256) del grid completo (ej. 2048x2048)
+            // Necesitamos dibujar este pedazo en la posición correcta dentro de un canvas virtual del tamaño completo
+            const roiInfo = simData?.roi_info;
+            const hasROI = roiInfo?.enabled && roiInfo.x !== undefined && roiInfo.y !== undefined;
+            
+            // Tamaño de los datos recibidos (puede ser ROI o grid completo)
+            const dataHeight = mapData.length;
+            const dataWidth = mapData[0].length;
+            
+            // Tamaño del grid virtual completo (usar inference_grid_size si está disponible)
+            const virtualGridWidth = gridWidth || dataWidth;
+            const virtualGridHeight = gridHeight || dataHeight;
+            
+            // Ajustar tamaño del canvas al grid virtual completo
+            if (canvas.width !== virtualGridWidth || canvas.height !== virtualGridHeight) {
+                if (virtualGridWidth > 0 && virtualGridHeight > 0) {
+                canvas.width = virtualGridWidth;
+                canvas.height = virtualGridHeight;
             }
             }
 
+            // Limpiar todo el canvas virtual
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             // Si no hay datos de mapa (por ejemplo, live feed desactivado), terminar aquí
@@ -651,9 +664,13 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 
                 const sampleStep = Math.max(1, Math.floor(1 / renderQuality));
                 
+                // Calcular offsets para ROI (si está activo) - igual que en visualización normal
+                const roiOffsetX = hasROI ? (roiInfo.x || 0) : 0;
+                const roiOffsetY = hasROI ? (roiInfo.y || 0) : 0;
+                
                 // Renderizar con muestreo adaptativo
-                for (let y = 0; y < gridHeight; y += sampleStep) {
-                    for (let x = 0; x < gridWidth; x += sampleStep) {
+                for (let y = 0; y < dataHeight; y += sampleStep) {
+                    for (let x = 0; x < dataWidth; x += sampleStep) {
                         if (!hue[y] || typeof hue[y][x] === 'undefined') continue;
                         const h = hue[y][x] * 360; // Convertir a grados [0, 360]
                         const s = saturation[y]?.[x] ?? 1.0;
@@ -673,8 +690,8 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                         else { r = c; g = 0; b = x_h; }
                         
                         ctx.fillStyle = `rgb(${Math.round((r + m) * 255)}, ${Math.round((g + m) * 255)}, ${Math.round((b + m) * 255)})`;
-                        // Dibujar bloque de píxeles (más grande cuando hay downsampling)
-                        ctx.fillRect(x, y, sampleStep, sampleStep);
+                        // Dibujar en la posición correcta del canvas virtual (aplicar offset ROI)
+                        ctx.fillRect(x + roiOffsetX, y + roiOffsetY, sampleStep, sampleStep);
                     }
                 }
             } else {
@@ -760,9 +777,17 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 // renderQuality = 0.25 => sampleStep = 4 (1 de cada 4 píxeles)
                 const sampleStep = Math.max(1, Math.floor(1 / renderQuality));
                 
+                // Calcular offsets para ROI (si está activo)
+                // Si tenemos ROI, los datos están en mapData pero representan solo una porción del grid
+                // Necesitamos dibujarlos en la posición correcta del canvas virtual
+                const roiOffsetX = hasROI ? (roiInfo.x || 0) : 0;
+                const roiOffsetY = hasROI ? (roiInfo.y || 0) : 0;
+                
                 // Renderizar con muestreo adaptativo
-                for (let y = 0; y < gridHeight; y += sampleStep) {
-                    for (let x = 0; x < gridWidth; x += sampleStep) {
+                // Iteramos sobre los datos recibidos (dataHeight x dataWidth)
+                // Pero los dibujamos en la posición correcta del canvas virtual (con offset ROI)
+                for (let y = 0; y < dataHeight; y += sampleStep) {
+                    for (let x = 0; x < dataWidth; x += sampleStep) {
                         // Validar que mapData[y] existe y tiene el elemento x
                         if (!mapData[y] || typeof mapData[y][x] === 'undefined') {
                             continue;
@@ -778,8 +803,8 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                         normalizedValue = Math.max(0, Math.min(1, normalizedValue));
                         ctx.fillStyle = getColor(normalizedValue);
                         
-                        // Dibujar bloque de píxeles (más grande cuando hay downsampling)
-                        ctx.fillRect(x, y, sampleStep, sampleStep);
+                        // Dibujar en la posición correcta del canvas virtual (aplicar offset ROI)
+                        ctx.fillRect(x + roiOffsetX, y + roiOffsetY, sampleStep, sampleStep);
                     }
                 }
             }
@@ -1001,8 +1026,6 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                             width: gridWidth,
                             height: gridHeight,
                             pointerEvents: 'none',
-                            left: simData?.roi_info?.enabled ? simData.roi_info.x : 0,
-                            top: simData?.roi_info?.enabled ? simData.roi_info.y : 0,
                         }}>
                             <ShaderCanvas
                                 mapData={mapData || []}
@@ -1031,8 +1054,6 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                             zIndex: 2,
                             pointerEvents: 'none',
                             position: 'absolute',
-                            left: simData?.roi_info?.enabled ? simData.roi_info.x : 0,
-                            top: simData?.roi_info?.enabled ? simData.roi_info.y : 0,
                         }}
                     />
                     
