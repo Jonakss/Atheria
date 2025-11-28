@@ -8,6 +8,7 @@ from .base_service import BaseService
 from ..server.server_state import g_state
 from ..server.data_compression import optimize_frame_payload
 from ..pipelines.visualization_pipeline import VisualizationPipeline
+from ..analysis.epoch_detector import EpochDetector
 
 class DataProcessingService(BaseService):
     """
@@ -20,6 +21,7 @@ class DataProcessingService(BaseService):
         self.state_queue = state_queue
         self.broadcast_queue = broadcast_queue
         self.viz_pipeline = VisualizationPipeline()
+        self.epoch_detector = EpochDetector()
         
     async def _start_impl(self):
         """Inicia el bucle de procesamiento."""
@@ -80,6 +82,19 @@ class DataProcessingService(BaseService):
                 if psi is None:
                     self.state_queue.task_done()
                     continue
+
+                # --- ANÁLISIS DE ÉPOCA ---
+                # Ejecutar análisis en thread pool para no bloquear
+                epoch_metrics = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    self.epoch_detector.analyze_state,
+                    psi
+                )
+                current_epoch = self.epoch_detector.determine_epoch(epoch_metrics)
+                
+                # Actualizar estado global
+                g_state['current_epoch'] = current_epoch
+                g_state['epoch_metrics'] = epoch_metrics
                 
                 # 4. Generar visualización (Heavy Operation)
                 # Offload to thread pool
@@ -108,7 +123,8 @@ class DataProcessingService(BaseService):
                     'is_paused': g_state.get('is_paused', False),
                     'live_feed_enabled': True,
                     'fps': g_state.get('current_fps', 0.0),
-                    'epoch': g_state.get('current_epoch', 0)
+                    'epoch': current_epoch,
+                    'epoch_metrics': epoch_metrics
                 }
                 
                 # 6. Enviar a cola de broadcast

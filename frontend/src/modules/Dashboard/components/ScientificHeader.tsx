@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { Settings, Aperture, Power, Plug, ChevronDown, Cpu, Gauge } from 'lucide-react';
-import { SettingsPanel } from './SettingsPanel';
+import { Aperture, ChevronDown, Cpu, Plug, Power, Settings } from 'lucide-react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { getFormattedVersion } from '../../../utils/version';
+import { EpochBadge } from './EpochBadge';
+import { SettingsPanel } from './SettingsPanel';
 
 interface ScientificHeaderProps {
   // No props are currently used, but the interface is kept for future reference.
@@ -309,6 +310,17 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = () => {
         </button>
       </div>
       
+      {/* Epoch Indicator (Centered) */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden md:flex items-center gap-3">
+         {/* Show previous, current, and next if possible, or just current with context */}
+         {/* For now, just the current active epoch to save space */}
+         <div className="flex items-center gap-2 px-3 py-1.5 bg-black/20 rounded-full border border-white/5 backdrop-blur-sm">
+            <span className="text-[9px] text-gray-500 font-mono uppercase tracking-widest">COSMIC ERA</span>
+            <div className="h-3 w-px bg-white/10" />
+            <EpochBadge era={simData?.simulation_info?.epoch ?? 0} current={simData?.simulation_info?.epoch ?? 0} />
+         </div>
+      </div>
+
       {/* Panel de Configuración */}
       <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
       
