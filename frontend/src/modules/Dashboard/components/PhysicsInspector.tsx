@@ -1,5 +1,5 @@
+import { AlertCircle, ChevronLeft, ChevronRight, Microscope, Zap } from 'lucide-react';
 import React, { useState } from 'react';
-import { Zap, ChevronRight, AlertCircle, Microscope, ChevronLeft } from 'lucide-react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 
 interface PhysicsInspectorProps {
@@ -101,6 +101,30 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
                 background: `linear-gradient(to right, rgb(217, 119, 6) 0%, rgb(217, 119, 6) ${(thermalNoise / 0.01) * 100}%, rgb(31, 41, 55) ${(thermalNoise / 0.01) * 100}%, rgb(31, 41, 55) 100%)`
               }}
             />
+          </div>
+        </div>
+
+        {/* Sección: Motor de Simulación */}
+        <div className="space-y-3 pt-4 border-t border-white/5">
+          <div className="flex items-center gap-2 text-gray-200 text-xs font-bold uppercase tracking-wider mb-2">
+            <Zap size={12} className="text-green-500" /> Motor de Simulación
+          </div>
+          
+          <div className="grid grid-cols-2 gap-2">
+            <button 
+              className="flex flex-col items-center justify-center p-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded text-xs text-gray-300 transition-all group"
+              onClick={() => sendCommand('inference', 'switch_engine', { engine: 'python' })}
+            >
+              <span className="font-bold text-blue-400">Python</span>
+              <span className="text-[9px] text-gray-500">Flexible</span>
+            </button>
+            <button 
+              className="flex flex-col items-center justify-center p-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded text-xs text-gray-300 transition-all group"
+              onClick={() => sendCommand('inference', 'switch_engine', { engine: 'native' })}
+            >
+              <span className="font-bold text-orange-400">Nativo (C++)</span>
+              <span className="text-[9px] text-gray-500">Alto Rendimiento</span>
+            </button>
           </div>
         </div>
 
