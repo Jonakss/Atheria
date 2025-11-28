@@ -18,6 +18,7 @@ related: [[10_core/00_CORE_MOC]], [[40_Experiments/00_EXPERIMENTS_MOC]]
 ## 🤖 Modelos y Arquitecturas
 
 - [[Models]] - Arquitecturas de modelos disponibles
+- [[APR_MODELS]] - Application Performance Repository (APR) para modelos
 - [[UNET]] - Documentación específica de UNet
 - [[ARCHITECTURE_V3]] - Sistema V3 completo
 
