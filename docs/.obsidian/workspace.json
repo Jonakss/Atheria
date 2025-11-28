@@ -190,6 +190,10 @@
     "30_Components/Models.md",
     "OBSIDIAN_SETUP.md",
     "30_Components/VOXEL_ENGINE_SUGGESTIONS.md",
-    "30_Components/FRONTEND_IMPROVEMENTS.md"
+    "30_Components/FRONTEND_IMPROVEMENTS.md",
+    "40_Experiments/EXP_007_SPATIAL_INDEXING_VERIFICATION.md",
+    "30_Components/SPATIAL_INDEXING.md",
+    "00_RESPONSIBILITIES.md",
+    "40_Experiments/EXP_006_DATA_TRANSFER_OPTIMIZATION.md"
   ]
 }
