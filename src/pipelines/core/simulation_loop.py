@@ -374,11 +374,26 @@ async def simulation_loop():
                                         continue
                                     
                                     # Obtener estado denso (solo convierte si es necesario)
-                                    # Offload to thread pool
-                                    psi = await asyncio.get_event_loop().run_in_executor(
-                                        None, 
-                                        lambda: motor.get_dense_state(roi=roi, check_pause_callback=check_pause)
-                                    )
+                                    # CRÍTICO: Usar timeout para evitar bloqueo indefinido en grids grandes
+                                    try:
+                                        psi = await asyncio.wait_for(
+                                            asyncio.get_event_loop().run_in_executor(
+                                                None, 
+                                                lambda: motor.get_dense_state(roi=roi, check_pause_callback=check_pause)
+                                            ),
+                                            timeout=10.0  # Timeout de 10s para grids grandes
+                                        )
+                                    except asyncio.TimeoutError:
+                                        logging.error(f"❌ Timeout crítico en get_dense_state (10s) para grid {g_state.get('inference_grid_size')}. Saltando frame.")
+                                        g_state['is_paused'] = True
+                                        await broadcast({"type": "error", "payload": {"message": "get_dense_state bloqueado (timeout 10s). Pausando simulación. Intenta reducir grid size o usar ROI."}})
+                                        await asyncio.sleep(0.1)
+                                        continue
+                                    except Exception as e:
+                                        logging.error(f"❌ Error en get_dense_state: {e}")
+                                        await asyncio.sleep(0.1)
+                                        continue
+                                        
                                     # CRÍTICO: Yield al event loop después de conversión bloqueante (puede tardar en grids grandes)
                                     await asyncio.sleep(0)  # Permitir procesar comandos WebSocket
                                     
