@@ -3,6 +3,7 @@ import { LabSider } from '../../../components/ui/LabSider';
 import { PanZoomCanvas } from '../../../components/ui/PanZoomCanvas';
 import { TimelineViewer } from '../../../components/ui/TimelineViewer';
 import HolographicViewer from '../../../components/visualization/HolographicViewer';
+import HolographicViewer2 from '../../../components/visualization/HolographicViewer2';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { AnalysisView } from '../components/AnalysisView';
 import { HistoryView } from '../components/HistoryView';
@@ -21,6 +22,7 @@ export const DashboardLayout: React.FC = () => {
   const [labPanelOpen, setLabPanelOpen] = useState(true);
   const [activeLabSection, setActiveLabSection] = useState<LabSection>('inference');
   const [physicsInspectorCollapsed, setPhysicsInspectorCollapsed] = useState(false);
+  const [viewerVersion, setViewerVersion] = useState<'v1' | 'v2'>('v1');
   const [selectedTimelineFrame, setSelectedTimelineFrame] = useState<{
     step: number;
     timestamp: string;
@@ -75,12 +77,21 @@ export const DashboardLayout: React.FC = () => {
           return (
             <div className="absolute inset-0 z-0 bg-gradient-deep-space overflow-hidden">
               {flatMapData.length > 0 && gridWidth > 0 && gridHeight > 0 ? (
-                <HolographicViewer 
-                  data={flatMapData}
-                  width={gridWidth}
-                  height={gridHeight}
-                  vizType={selectedViz}
-                />
+                viewerVersion === 'v1' ? (
+                  <HolographicViewer 
+                    data={flatMapData}
+                    width={gridWidth}
+                    height={gridHeight}
+                    vizType={selectedViz}
+                  />
+                ) : (
+                  <HolographicViewer2 
+                    data={flatMapData}
+                    width={gridWidth}
+                    height={gridHeight}
+                    vizType={selectedViz}
+                  />
+                )
               ) : (
                 <div className="flex items-center justify-center h-full text-dark-300 text-sm">
                   Esperando datos de simulación...
@@ -201,6 +212,8 @@ export const DashboardLayout: React.FC = () => {
         <PhysicsInspector 
           isCollapsed={physicsInspectorCollapsed}
           onToggleCollapse={() => setPhysicsInspectorCollapsed(!physicsInspectorCollapsed)}
+          viewerVersion={viewerVersion}
+          onViewerVersionChange={setViewerVersion}
         />
       </div>
     </div>

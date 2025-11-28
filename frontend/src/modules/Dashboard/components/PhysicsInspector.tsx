@@ -5,11 +5,15 @@ import { useWebSocket } from '../../../hooks/useWebSocket';
 interface PhysicsInspectorProps {
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  viewerVersion?: 'v1' | 'v2';
+  onViewerVersionChange?: (version: 'v1' | 'v2') => void;
 }
 
 export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({ 
   isCollapsed = false, 
-  onToggleCollapse 
+  onToggleCollapse,
+  viewerVersion = 'v1',
+  onViewerVersionChange
 }) => {
   const { sendCommand, allLogs } = useWebSocket();
   const [gammaDecay, setGammaDecay] = useState(0.015);
@@ -128,6 +132,36 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
           </div>
         </div>
 
+
+        {/* Sección: Versión del Visor (Holographic) */}
+        <div className="space-y-3 pt-4 border-t border-white/5">
+          <div className="flex items-center gap-2 text-gray-200 text-xs font-bold uppercase tracking-wider mb-2">
+            <Microscope size={12} className="text-purple-500" /> Versión Holográfica
+          </div>
+          
+          <div className="flex bg-black/20 p-1 rounded border border-white/5">
+            <button 
+              className={`flex-1 py-1.5 text-[10px] font-medium rounded transition-all ${
+                viewerVersion === 'v1' 
+                  ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' 
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+              onClick={() => onViewerVersionChange?.('v1')}
+            >
+              v1.0 (Poincaré)
+            </button>
+            <button 
+              className={`flex-1 py-1.5 text-[10px] font-medium rounded transition-all ${
+                viewerVersion === 'v2' 
+                  ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' 
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+              onClick={() => onViewerVersionChange?.('v2')}
+            >
+              v2.0 (AdS/CFT)
+            </button>
+          </div>
+        </div>
         {/* Sección: Inyección (Génesis) */}
         <div className="space-y-3 pt-4 border-t border-white/5">
           <div className="flex items-center gap-2 text-gray-200 text-xs font-bold uppercase tracking-wider mb-2">

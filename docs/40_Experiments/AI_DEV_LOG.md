@@ -47,6 +47,9 @@
     - Integrated `LatticeEngine` into `inference_handlers.py`.
     - Created documentation `docs/30_Components/LATTICE_ENGINE.md`.
     - Planned `HolographicViewer2` for AdS/CFT visualization.
+    - Implemented `HolographicViewer2` frontend component with visual indicator.
+    - Added UI toggle in `PhysicsInspector` to switch between Viewer v1 and v2.
+    - Updated `DashboardLayout` to handle viewer switching.
 - [[logs/2025-11-28_history_system_verification|2025-11-28 - Fix: History System Verification (Native Engine Support)]]
 - [2025-11-28: Visualizaciones Avanzadas de Campos (WebGL)](logs/2025-11-28_advanced_visualizations.md)
 - [2025-11-28: Implementación de OctreeIndex (Morton Codes)](logs/2025-11-28_octree_implementation.md)
