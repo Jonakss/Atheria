@@ -148,7 +148,7 @@ class TestDragonflyCache:
         assert deleted == 5
         
         # Verificar que ya no existen
-       for i in range(5):
+        for i in range(5):
             assert not cache.exists(f"test:pattern:item_{i}")
     
     def test_stats(self, cache):

@@ -531,7 +531,7 @@ class NativeEngineWrapper:
                 logging.error(f"❌ Error al cargar modelo TorchScript: {model_path} (error desconocido)")
         return success
     
-    def evolve_internal_state(self):
+    def evolve_internal_state(self, step=None):
         """Evoluciona el estado interno usando el motor nativo."""
         if not self.model_loaded:
             logging.warning("Modelo no cargado. No se puede evolucionar el estado.")

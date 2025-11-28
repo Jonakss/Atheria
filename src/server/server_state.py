@@ -7,11 +7,14 @@ from .data_compression import optimize_frame_payload, get_payload_size
 from ..managers.roi_manager import ROIManager, apply_roi_to_payload
 from .data_serialization import serialize_frame_binary, should_use_binary
 
+from src.cache import cache
+
 # Estado global de la aplicación
 g_state = {
     "websockets": {},  # {ws_id: ws_object}
     "training_process": None,
     "motor": None,
+    "cache": cache,  # Caché distribuido (Dragonfly)
     "is_paused": True,
     "simulation_step": 0,
     "viz_type": "density",

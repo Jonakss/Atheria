@@ -134,8 +134,10 @@ async def simulation_loop():
                                 # Offload evolution to thread pool to avoid blocking event loop
                                 try:
                                     # Timeout de 5s para evitar bloqueos infinitos en motor nativo
+                                    # Pasamos el paso objetivo (current + idx + 1) para caching correcto
+                                    target_step = current_step + step_idx + 1
                                     await asyncio.wait_for(
-                                        asyncio.get_event_loop().run_in_executor(None, motor.evolve_internal_state),
+                                        asyncio.get_event_loop().run_in_executor(None, lambda: motor.evolve_internal_state(step=target_step)),
                                         timeout=5.0
                                     )
                                 except asyncio.TimeoutError:

@@ -5,6 +5,7 @@ import numpy as np
 import os
 import logging
 from .. import config as cfg
+from src.cache import cache
 
 # Versión del motor Python
 try:
@@ -192,16 +193,47 @@ class Aetheria_Motor:
         if self.has_memory:
             logging.info(f"Motor con memoria temporal (ConvLSTM) inicializado. d_memory={d_memory}")
 
-    def evolve_internal_state(self):
+    def evolve_internal_state(self, step=None):
         if self.state.psi is None: return
+        
+        # 1. Intentar recuperar de caché si tenemos el paso actual
+        if step is not None and cache.enabled:
+            cache_interval = getattr(self.cfg, 'CACHE_STATE_INTERVAL', 100) if self.cfg else 100
+            
+            if step % cache_interval == 0:
+                exp_name = getattr(self.cfg, 'EXPERIMENT_NAME', 'default') if self.cfg else 'default'
+                cache_key = f"state:{exp_name}:{step}"
+                
+                cached_state = cache.get(cache_key)
+                if cached_state is not None:
+                    try:
+                        self.state.psi = torch.from_numpy(cached_state).to(self.device)
+                        logging.debug(f"⚡ Cache HIT: Estado restaurado desde Dragonfly para paso {step}")
+                        return
+                    except Exception as e:
+                        logging.warning(f"⚠️ Error restaurando estado de caché: {e}")
         
         # Usar inference_mode en lugar de no_grad para mejor rendimiento
         from ..optimization.gpu_optimizer import GPUOptimizer
         with GPUOptimizer.enable_inference_mode():
-            # Limpiar cache de GPU periódicamente
             self.optimizer.empty_cache_if_needed()
-            
             self.state.psi = self._evolve_logic(self.state.psi)
+            
+        # 2. Guardar en caché si es intervalo
+        if step is not None and cache.enabled:
+            cache_interval = getattr(self.cfg, 'CACHE_STATE_INTERVAL', 100) if self.cfg else 100
+            
+            if step % cache_interval == 0:
+                exp_name = getattr(self.cfg, 'EXPERIMENT_NAME', 'default') if self.cfg else 'default'
+                cache_key = f"state:{exp_name}:{step}"
+                
+                try:
+                    state_np = self.state.psi.cpu().numpy()
+                    ttl = getattr(self.cfg, 'CACHE_TTL', 7200) if self.cfg else 7200
+                    cache.set(cache_key, state_np, ttl=ttl)
+                    logging.debug(f"💾 Estado guardado en Dragonfly para paso {step}")
+                except Exception as e:
+                    logging.warning(f"⚠️ Error guardando estado en caché: {e}")
 
     def evolve_step(self, current_psi):
         with torch.set_grad_enabled(True):
