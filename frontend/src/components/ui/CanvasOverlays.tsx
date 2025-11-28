@@ -258,6 +258,14 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config, roiInfo 
                 const visibleMaxX = Math.ceil(Math.min(gridWidth, bottomRight.x));
                 const visibleMaxY = Math.ceil(Math.min(gridHeight, bottomRight.y));
 
+                // Si hay ROI activa, solo procesar la región visible
+                const roiBounds = roiInfo?.enabled ? {
+                    minX: roiInfo.x,
+                    minY: roiInfo.y,
+                    maxX: roiInfo.x + roiInfo.width,
+                    maxY: roiInfo.y + roiInfo.height
+                } : null;
+
                 // Solo dibujar si hay algo visible
                 if (visibleMaxX > visibleMinX && visibleMaxY > visibleMinY) {
                     
