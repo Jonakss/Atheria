@@ -4,8 +4,6 @@ import { PanZoomCanvas } from '../../../components/ui/PanZoomCanvas';
 import { TimelineViewer } from '../../../components/ui/TimelineViewer';
 import HolographicViewer from '../../../components/visualization/HolographicViewer';
 import { useWebSocket } from '../../../hooks/useWebSocket';
-import { HistoryControls } from '../../../modules/History/HistoryControls';
-import { TrainingView } from '../components/TrainingView';
 import { AnalysisView } from '../components/AnalysisView';
 import { HistoryView } from '../components/HistoryView';
 import { LogsView } from '../components/LogsView';
@@ -13,6 +11,7 @@ import { MetricsBar } from '../components/MetricsBar';
 import { NavigationSidebar } from '../components/NavigationSidebar';
 import { PhysicsInspector } from '../components/PhysicsInspector';
 import { ScientificHeader } from '../components/ScientificHeader';
+import { TrainingView } from '../components/TrainingView';
 
 type TabType = 'lab' | 'analysis' | 'history' | 'logs';
 type LabSection = 'inference' | 'training' | 'analysis';
@@ -80,6 +79,7 @@ export const DashboardLayout: React.FC = () => {
                   data={flatMapData}
                   width={gridWidth}
                   height={gridHeight}
+                  vizType={selectedViz}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-dark-300 text-sm">

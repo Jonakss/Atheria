@@ -47,7 +47,7 @@ $$S_A = \frac{\text{Area}(\gamma_A)}{4G_N}$$
 
 ### B. Visualizador Holográfico 2.0
 Mejorar el `HolographicViewer` actual para que sea un instrumento de medición física.
-- **Disco de Poincaré:** Visualización precisa de la geometría hiperbólica.
+- **Disco de Poincaré:** ✅ Implementado (Mapeo Cuadrado -> Disco en `HolographicViewer`).
 - **Tensores de Curvatura:** Visualizar dónde se concentra la curvatura (energía) en el Bulk.
 - **Agujeros Negros:** Identificar horizontes de eventos en el Bulk (regiones de alta entropía/temperatura).
 

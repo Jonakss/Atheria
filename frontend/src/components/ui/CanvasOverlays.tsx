@@ -232,105 +232,98 @@ export function CanvasOverlays({ canvasRef, mapData, pan, zoom, config, roiInfo 
                 const regionSizeMultiplier = 1 / Math.max(0.5, zoomFactor); // Inversamente proporcional al zoom
                 const minRegionSize = Math.max(1, Math.floor(baseMinRegionSize * regionSizeMultiplier));
 
-                // Si hay ROI activa, solo procesar la región visible
-                const roiBounds = roiInfo?.enabled ? {
-                    minX: roiInfo.x,
-                    minY: roiInfo.y,
-                    maxX: roiInfo.x + roiInfo.width,
-                    maxY: roiInfo.y + roiInfo.height
-                } : null;
+                // CALCULAR VIEWPORT BOUNDS PARA CULLING (OPTIMIZACIÓN CRÍTICA)
+                // Transformación inversa para encontrar qué parte del grid es visible
+                // Sx = ((gx * baseScale + offsetX + pan.x) * zoom) + centerX
+                // (Sx - centerX) / zoom - pan.x - offsetX = gx * baseScale
+                // gx = ((Sx - centerX) / zoom - pan.x - offsetX) / baseScale
 
-                const drawQuadtree = (minX: number, minY: number, maxX: number, maxY: number, depth: number) => {
-                    if (depth > maxDepth) return; // Limitar profundidad
+                const centerX = overlayCanvas.width / 2;
+                const centerY = overlayCanvas.height / 2;
+                const offsetX = -scaledGridWidth / 2;
+                const offsetY = -scaledGridHeight / 2;
 
-                    // Si hay ROI activa, solo procesar regiones que intersecten con la ROI
-                    if (roiBounds) {
-                        // Verificar si la región intersecta con la ROI
-                        if (maxX < roiBounds.minX || minX > roiBounds.maxX ||
-                            maxY < roiBounds.minY || minY > roiBounds.maxY) {
-                            return; // Región fuera de la ROI, ignorar
-                        }
-                        // Clamp a la ROI
-                        minX = Math.max(minX, roiBounds.minX);
-                        minY = Math.max(minY, roiBounds.minY);
-                        maxX = Math.min(maxX, roiBounds.maxX);
-                        maxY = Math.min(maxY, roiBounds.maxY);
-                    }
-
-                    const width = maxX - minX;
-                    const height = maxY - minY;
-
-                    // Si la región es muy pequeña según el LOD actual, no subdividir más
-                    // El tamaño mínimo se ajusta según el zoom (más zoom = regiones más pequeñas visibles)
-                    const currentMinSize = minRegionSize / zoom; // Ajustar según zoom actual
-                    if (width < currentMinSize || height < currentMinSize) {
-                        // Verificar si tiene datos significativos en esta región pequeña
-                        let hasData = false;
-                        for (let y = Math.floor(minY); y < Math.ceil(maxY) && y < gridHeight; y++) {
-                            for (let x = Math.floor(minX); x < Math.ceil(maxX) && x < gridWidth; x++) {
-                                const value = Math.abs(mapData[y]?.[x] || 0);
-                                if (value > threshold) {
-                                    hasData = true;
-                                    break;
-                                }
-                            }
-                            if (hasData) break;
-                        }
-
-                        if (hasData) {
-                            // Dibujar borde de región pequeña
-                            ctx.strokeRect(minX, minY, width, height);
-                        }
-                        return;
-                    }
-
-                    // Para regiones más grandes, usar muestreo inteligente
-                    let hasData = false;
-                    let maxValue = 0;
-                    let sampleCount = 0;
-                    const maxSamples = Math.min(64, Math.floor(width * height / 4)); // Muestrear hasta 64 puntos
-
-                    // Calcular paso de muestreo para cubrir la región eficientemente
-                    const sampleStepX = Math.max(1, Math.floor(width / Math.sqrt(maxSamples)));
-                    const sampleStepY = Math.max(1, Math.floor(height / Math.sqrt(maxSamples)));
-
-                    for (let y = Math.floor(minY); y < Math.ceil(maxY) && y < gridHeight && sampleCount < maxSamples; y += sampleStepY) {
-                        for (let x = Math.floor(minX); x < Math.ceil(maxX) && x < gridWidth && sampleCount < maxSamples; x += sampleStepX) {
-                            const value = Math.abs(mapData[y]?.[x] || 0);
-                            if (value > threshold) {
-                                hasData = true;
-                                maxValue = Math.max(maxValue, value);
-                            }
-                            sampleCount++;
-                        }
-                    }
-
-                    if (hasData) {
-                        // Dibujar borde de región
-                        ctx.strokeRect(minX, minY, width, height);
-
-                        // Subdividir si la región es suficientemente grande y no hemos alcanzado la profundidad máxima
-                        // Subdividir si la región es suficientemente grande y no hemos alcanzado la profundidad máxima
-                        // El tamaño mínimo para subdividir se ajusta según el zoom (más zoom = subdivisiones más pequeñas)
-                        const subdivisionThreshold = currentMinSize * 2; // Usar el tamaño mínimo ajustado al zoom
-                        if (width > subdivisionThreshold && height > subdivisionThreshold && depth < maxDepth) {
-                            const midX = (minX + maxX) / 2;
-                            const midY = (minY + maxY) / 2;
-
-                            // Subdividir recursivamente en 4 cuadrantes
-                            drawQuadtree(minX, minY, midX, midY, depth + 1);
-                            drawQuadtree(midX, minY, maxX, midY, depth + 1);
-                            drawQuadtree(minX, midY, midX, maxY, depth + 1);
-                            drawQuadtree(midX, midY, maxX, maxY, depth + 1);
-                        }
-                    }
+                const getGridCoord = (screenX: number, screenY: number) => {
+                    const x = ((screenX - centerX) / zoom - pan.x - offsetX) / baseScale;
+                    const y = ((screenY - centerY) / zoom - pan.y - offsetY) / baseScale;
+                    return { x, y };
                 };
 
-                // Iniciar quadtree desde el grid completo o desde la ROI si está activa
-                if (roiBounds) {
-                    drawQuadtree(roiBounds.minX, roiBounds.minY, roiBounds.maxX, roiBounds.maxY, 0);
-                } else {
-                drawQuadtree(0, 0, gridWidth, gridHeight, 0);
+                const topLeft = getGridCoord(0, 0);
+                const bottomRight = getGridCoord(overlayCanvas.width, overlayCanvas.height);
+
+                // Bounds visibles en coordenadas del grid
+                const visibleMinX = Math.floor(Math.max(0, topLeft.x));
+                const visibleMinY = Math.floor(Math.max(0, topLeft.y));
+                const visibleMaxX = Math.ceil(Math.min(gridWidth, bottomRight.x));
+                const visibleMaxY = Math.ceil(Math.min(gridHeight, bottomRight.y));
+
+                // Solo dibujar si hay algo visible
+                if (visibleMaxX > visibleMinX && visibleMaxY > visibleMinY) {
+                    
+                    const drawQuadtree = (minX: number, minY: number, maxX: number, maxY: number, depth: number) => {
+                        if (depth > maxDepth) return; 
+
+                        // CULLING: Verificar intersección con el viewport visible
+                        if (maxX < visibleMinX || minX > visibleMaxX ||
+                            maxY < visibleMinY || minY > visibleMaxY) {
+                            return; // Fuera de la pantalla
+                        }
+
+                        // Si hay ROI activa, también verificar intersección con ROI
+                        if (roiBounds) {
+                            if (maxX < roiBounds.minX || minX > roiBounds.maxX ||
+                                maxY < roiBounds.minY || minY > roiBounds.maxY) {
+                                return; // Fuera de la ROI
+                            }
+                        }
+
+                        const width = maxX - minX;
+                        const height = maxY - minY;
+
+                        // Si la región es muy pequeña según el LOD actual, no subdividir más
+                        const currentMinSize = minRegionSize / zoom; 
+                        if (width < currentMinSize || height < currentMinSize) {
+                            // Verificar datos (optimizado: solo chequear si está en viewport)
+                            let hasData = false;
+                            
+                            // Optimización: Sampling adaptativo
+                            // Si la región es grande, no recorrer todo, usar sampling
+                            // Si es pequeña, recorrer todo
+                            const useSampling = width * height > 100;
+                            const stepX = useSampling ? Math.ceil(width / 10) : 1;
+                            const stepY = useSampling ? Math.ceil(height / 10) : 1;
+
+                            for (let y = Math.floor(minY); y < Math.ceil(maxY) && y < gridHeight; y += stepY) {
+                                for (let x = Math.floor(minX); x < Math.ceil(maxX) && x < gridWidth; x += stepX) {
+                                    const value = Math.abs(mapData[y]?.[x] || 0);
+                                    if (value > threshold) {
+                                        hasData = true;
+                                        break;
+                                    }
+                                }
+                                if (hasData) break;
+                            }
+
+                            if (hasData) {
+                                ctx.strokeRect(minX, minY, width, height);
+                            }
+                            return;
+                        }
+
+                        // Subdividir
+                        const midX = (minX + maxX) / 2;
+                        const midY = (minY + maxY) / 2;
+
+                        drawQuadtree(minX, minY, midX, midY, depth + 1);
+                        drawQuadtree(midX, minY, maxX, midY, depth + 1);
+                        drawQuadtree(minX, midY, midX, maxY, depth + 1);
+                        drawQuadtree(midX, midY, maxX, maxY, depth + 1);
+                    };
+
+                    // Iniciar recursión desde el nodo raíz (0,0 a W,H)
+                    // El culling se encargará de podar las ramas no visibles rápidamente
+                    drawQuadtree(0, 0, gridWidth, gridHeight, 0);
                 }
             }
         }

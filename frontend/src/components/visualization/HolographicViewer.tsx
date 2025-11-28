@@ -8,6 +8,7 @@ interface HolographicViewerProps {
     width: number;
     height: number;
     threshold?: number; // Umbral para no renderizar vacío
+    vizType?: string; // Tipo de visualización (ej: 'poincare')
 }
 
 const HolographicViewer: React.FC<HolographicViewerProps> = ({ 
@@ -15,7 +16,8 @@ const HolographicViewer: React.FC<HolographicViewerProps> = ({
     phaseData, 
     width, 
     height,
-    threshold = 0.05 
+    threshold = 0.05,
+    vizType = 'holographic'
 }) => {
     const mountRef = useRef<HTMLDivElement>(null);
     const sceneRef = useRef<THREE.Scene | null>(null);
@@ -49,9 +51,8 @@ const HolographicViewer: React.FC<HolographicViewerProps> = ({
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
         controls.autoRotate = false;
-        controls.enableRotate = false; // Bloquear rotación manual
-        controls.autoRotate = false;
-        controls.enableRotate = false; // Disable manual rotation
+        controls.enableRotate = true; // Permitir rotación manual
+
         // Referencias
         sceneRef.current = scene;
         cameraRef.current = camera;
@@ -122,6 +123,7 @@ const HolographicViewer: React.FC<HolographicViewerProps> = ({
         const sizes: number[] = [];
 
         const colorHelper = new THREE.Color();
+        const isPoincare = vizType === 'poincare' || vizType === 'poincare_3d';
 
         // Recorrer el grid 2D y convertirlo a partículas 3D
         for (let i = 0; i < particleCount; i++) {
@@ -129,12 +131,34 @@ const HolographicViewer: React.FC<HolographicViewerProps> = ({
 
             // "Sparse Rendering": Solo dibujar si hay energía
             if (magnitude > threshold) {
-                const x = (i % width) - width / 2;
-                const y = Math.floor(i / width) - height / 2;
+                // Coordenadas normalizadas [-1, 1]
+                let u = ((i % width) / width) * 2 - 1;
+                let v = (Math.floor(i / width) / height) * 2 - 1;
                 
-                // Z es la magnitud (Heightmap)
-                // Multiplicamos por 50 para exagerar la altura y que se vea 3D
-                const z = magnitude * 50; 
+                let x, y, z;
+
+                if (isPoincare) {
+                    // Mapeo Cuadrado -> Disco (Mapping Square to Disk)
+                    // x' = u * sqrt(1 - v^2/2)
+                    // y' = v * sqrt(1 - u^2/2)
+                    const diskX = u * Math.sqrt(1 - (v * v) / 2);
+                    const diskY = v * Math.sqrt(1 - (u * u) / 2);
+
+                    // Escalar al tamaño del mundo (ej: 100 unidades de radio)
+                    const R = 100;
+                    x = diskX * R;
+                    y = diskY * R;
+                    
+                    // Z sigue siendo la magnitud, pero quizás deformada
+                    // En Poincaré, el borde es infinito, así que reducimos Z cerca del borde?
+                    // Por ahora mantenemos Z = magnitud * 50
+                    z = magnitude * 50;
+                } else {
+                    // Cartesiano estándar
+                    x = u * (width / 2); // Escalar a dimensiones originales aprox
+                    y = v * (height / 2);
+                    z = magnitude * 50; 
+                }
 
                 positions.push(x, y, z);
 
@@ -203,7 +227,7 @@ const HolographicViewer: React.FC<HolographicViewerProps> = ({
         sceneRef.current.add(points);
         pointsRef.current = points;
 
-    }, [data, phaseData, width, height, threshold]);
+    }, [data, phaseData, width, height, threshold, vizType]);
 
     return <div ref={mountRef} style={{ width: '100%', height: '100%', minHeight: '400px' }} />;
 };
