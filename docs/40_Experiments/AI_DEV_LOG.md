@@ -36,7 +36,7 @@
 - [[logs/2025-11-24_crash_loop_backend_fix|2025-11-24 - CRÍTICO: Solución Crash Loop Backend por Conversión Bloqueante]]
 - [[logs/2025-11-23_critical_live_feed_optimizations|2025-11-23 - Optimizaciones Críticas de Live Feed y Rendimiento]]
 - [[logs/2025-11-23_refactor_architecture_decoupled_services|2025-11-23 - Refactorización de Arquitectura: Servicios Desacoplados]]
-- [[#2025-11-28 - Fix: Dragonfly Startup & APR Documentation]]
+- [[logs/2025-11-28_fix_dragonfly_and_apr_docs|2025-11-28 - Fix: Dragonfly Startup & APR Documentation]]
 - [[#2025-01-21 - Corrección Fundamental: Generación de Estado Inicial según Ley M]]
 - [[#2025-01-21 - Mejoras de Responsividad y Limpieza de Motor Nativo]]
 - [[#2025-01-XX - Refactorización Progresiva: Handlers y Visualizaciones]]
@@ -56,20 +56,3 @@
 - [[#2024-12-XX - Fase 3 Completada: Migración de Componentes UI]]
 - [[#2024-12-XX - Fase 2 Iniciada: Setup Motor Nativo C++]]
 - [[#2024-12-XX - Optimización de Logs y Reducción de Verbosidad]]
-
-
-### 2025-11-28 - Fix: Dragonfly Startup & APR Documentation
-
-**Contexto:**
-- `docker-compose` fallaba debido a problemas con el entorno de Python del sistema (`http+docker` scheme not supported).
-- Necesidad de documentar el sistema APR (Application Performance Repository) para modelos.
-
-**Cambios:**
-- **Dragonfly Fix:** Se optó por ejecutar Dragonfly directamente con `docker run` en lugar de `docker-compose` para evitar conflictos de dependencias de Python.
-  - Comando: `docker run -d -p 6379:6379 --name atheria_dragonfly ...`
-- **APR Documentation:** Se creó `docs/30_Components/APR_MODELS.md` definiendo métricas, benchmarks y protocolos para el análisis de modelos.
-- **Tests:** Se verificó la conectividad con Dragonfly usando `tests/test_dragonfly_cache.py`.
-
-**Archivos Relacionados:**
-- [[APR_MODELS]]
-- `tests/test_dragonfly_cache.py`
