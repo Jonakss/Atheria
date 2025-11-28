@@ -5,7 +5,7 @@ import logging
 import os
 
 from .. import config as global_cfg
-from ..model_loader import create_new_model, load_model
+from ..model_loader import instantiate_model, load_model
 from ..engines.qca_engine import Aetheria_Motor
 from ..trainers import QC_Trainer_v3, QC_Trainer_v4
 from ..utils import get_latest_checkpoint, load_experiment_config
@@ -42,7 +42,7 @@ def run_training_pipeline(exp_cfg: SimpleNamespace, checkpoint_path: str | None 
     elif hasattr(exp_cfg, 'LOAD_FROM_EXPERIMENT') and exp_cfg.LOAD_FROM_EXPERIMENT:
         # Transfer Learning: crear nuevo modelo y cargar pesos de otro experimento
         try:
-            ley_M = create_new_model(exp_cfg)
+            ley_M = instantiate_model(exp_cfg)
             logging.info(f"Nuevo modelo creado. Cargando pesos desde '{exp_cfg.LOAD_FROM_EXPERIMENT}' para transfer learning...")
             
             # Cargar checkpoint del experimento base
@@ -79,7 +79,7 @@ def run_training_pipeline(exp_cfg: SimpleNamespace, checkpoint_path: str | None 
         # Para V3, siempre necesitamos crear el modelo (aunque sea desde cero)
         # V4 puede crear su propio modelo, así que solo lo creamos aquí para V3
         try:
-            ley_M = create_new_model(exp_cfg)
+            ley_M = instantiate_model(exp_cfg)
             logging.info("Nuevo modelo creado para entrenamiento desde cero (V3).")
             ley_M.train()
         except Exception as e:
