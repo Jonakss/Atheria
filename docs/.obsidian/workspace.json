@@ -11,10 +11,10 @@
             "id": "8ec795a92d8b2ebe",
             "type": "leaf",
             "state": {
-              "type": "empty",
+              "type": "graph",
               "state": {},
-              "icon": "lucide-file",
-              "title": "New tab"
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
             }
           }
         ]
@@ -164,6 +164,8 @@
   },
   "active": "8ec795a92d8b2ebe",
   "lastOpenFiles": [
+    "20_Concepts/NATIVE_PARALLELISM.md",
+    "40_Experiments/logs/2025-11-28_holographic_viewer_and_engine_switching.md",
     "40_Experiments/logs/2025-11-26_fix_live_feed_logic_and_imports.md",
     "logs/2025-01-XX_refactorización-progresiva-handlers-y-visualizaciones.md",
     "logs/2025-01-21_corrección-fundamental-generación-de-estado-inicial-según-ley-m.md",
@@ -188,8 +190,6 @@
     "40_Experiments/EXP_007_SPATIAL_INDEXING_VERIFICATION.md",
     "30_Components/SPATIAL_INDEXING.md",
     "00_RESPONSIBILITIES.md",
-    "40_Experiments/EXP_006_DATA_TRANSFER_OPTIMIZATION.md",
-    "20_Concepts/00_CONCEPTS_MOC.md",
-    "40_Experiments/00_EXPERIMENTS_MOC.md"
+    "40_Experiments/EXP_006_DATA_TRANSFER_OPTIMIZATION.md"
   ]
 }
