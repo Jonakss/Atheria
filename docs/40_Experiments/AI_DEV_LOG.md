@@ -16,6 +16,7 @@
 
 ## 📋 Índice de Entradas
 
+- **2025-11-28 - Fix: Docker Compose Compatibility & CUDA Optimization Backlog**
 - [[logs/2025-11-28_holographic_viewer_and_engine_switching|2025-11-28 - Feature: Holographic Viewer & Engine Switching Docs]]
 - [[logs/2025-11-27_fix_import_error_and_conflicts|2025-11-27 - Fix: Import Error in Native Engine Wrapper & Git Conflicts]]
 - [[logs/2025-11-27_fix_ci_pip_cache_and_versioning|2025-11-27 - Fix: CI Pip Cache & Frontend Versioning Strategy]]

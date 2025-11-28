@@ -61,6 +61,21 @@ Las convoluciones 3D son significativamente más costosas.
 
 ---
 
+## 5. Backlog - Tareas Pendientes
+
+### A. Optimización de Memoria para GPUs Pequeñas
+**Referencia:** [[50_Backlog/CUDA_MEMORY_OPTIMIZATION|Optimización de Memoria CUDA]]
+
+Implementar estrategias para entrenar en GPUs <4 GiB:
+- Mixed Precision Training (FP16)
+- Gradient Checkpointing
+- Perfiles de configuración optimizados
+- Auto-detección de capacidad de GPU
+
+**Prioridad:** Media | **Complejidad:** Alta
+
+---
+
 **Estado:** Planificación Futura
 **Prerrequisitos:**
 - [[ROADMAP_PHASE_2|Fase 2: Motor Nativo]] (Infraestructura C++ 3D)
