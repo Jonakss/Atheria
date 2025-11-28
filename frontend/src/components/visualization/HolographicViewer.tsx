@@ -132,8 +132,8 @@ const HolographicViewer: React.FC<HolographicViewerProps> = ({
             // "Sparse Rendering": Solo dibujar si hay energía
             if (magnitude > threshold) {
                 // Coordenadas normalizadas [-1, 1]
-                let u = ((i % width) / width) * 2 - 1;
-                let v = (Math.floor(i / width) / height) * 2 - 1;
+                const u = ((i % width) / width) * 2 - 1;
+                const v = (Math.floor(i / width) / height) * 2 - 1;
                 
                 let x, y, z;
 

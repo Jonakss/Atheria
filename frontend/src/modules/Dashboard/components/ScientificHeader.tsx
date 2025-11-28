@@ -135,16 +135,9 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = () => {
     }
   }, [compileStatus, connectionStatus]);
 
-  const fps = simData?.simulation_info?.fps ?? 0;
+
   
-  // Determinar color del FPS según velocidad
-  const fpsColor = useMemo(() => {
-    if (fps === 0) return 'text-gray-500';
-    if (fps < 5) return 'text-red-400';
-    if (fps < 15) return 'text-pink-400';
-    if (fps < 30) return 'text-pink-300';
-    return 'text-teal-400';
-  }, [fps]);
+
 
   // Función para cambiar de motor
   const handleSwitchEngine = useCallback((targetEngine: 'native' | 'python') => {
