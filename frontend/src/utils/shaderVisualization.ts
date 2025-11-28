@@ -6,12 +6,211 @@
  */
 
 export interface ShaderConfig {
-  type: "density" | "phase" | "energy" | "complex" | "real" | "imag";
+  type:
+    | "density"
+    | "phase"
+    | "energy"
+    | "complex"
+    | "real"
+    | "imag"
+    | "entropy"
+    | "gradient"
+    | "flow";
   colormap?: "viridis" | "plasma" | "inferno" | "magma" | "turbo";
   minValue?: number;
   maxValue?: number;
   gamma?: number; // Corrección gamma para colormap
 }
+
+// ... (existing code) ...
+
+/**
+ * Shader de fragment para visualización de Entropía Local (Shannon)
+ * Calcula la entropía en una ventana de 3x3 alrededor de cada píxel
+ */
+export const FRAGMENT_SHADER_ENTROPY = `
+    precision mediump float;
+    
+    uniform sampler2D u_texture;
+    uniform vec2 u_resolution;
+    uniform float u_gamma;
+    uniform int u_colormap;
+    
+    varying vec2 v_texCoord;
+    
+    // Colormap Plasma
+    vec3 plasma(float t) {
+        t = clamp(t, 0.0, 1.0);
+        vec3 c0 = vec3(0.050383, 0.029803, 0.527975);
+        vec3 c1 = vec3(0.546989, 0.127025, 0.513125);
+        vec3 c2 = vec3(0.998156, 0.401833, 0.255082);
+        vec3 c3 = vec3(0.988362, 0.998364, 0.644924);
+        
+        if (t < 0.33) {
+            return mix(c0, c1, t * 3.0);
+        } else if (t < 0.66) {
+            return mix(c1, c2, (t - 0.33) * 3.0);
+        } else {
+            return mix(c2, c3, (t - 0.66) * 3.0);
+        }
+    }
+
+    void main() {
+        vec2 onePixel = vec2(1.0, 1.0) / u_resolution;
+        
+        // Calcular histograma local en ventana 3x3
+        // Simplificación: Usamos la varianza local como proxy de entropía para rendimiento
+        // La entropía real requiere binning que es costoso en fragment shader
+        
+        float mean = 0.0;
+        float values[9];
+        
+        int idx = 0;
+        for(int i = -1; i <= 1; i++) {
+            for(int j = -1; j <= 1; j++) {
+                float val = texture2D(u_texture, v_texCoord + vec2(float(i), float(j)) * onePixel).r;
+                values[idx] = val;
+                mean += val;
+                idx++;
+            }
+        }
+        mean /= 9.0;
+        
+        float variance = 0.0;
+        for(int i = 0; i < 9; i++) {
+            float diff = values[i] - mean;
+            variance += diff * diff;
+        }
+        variance /= 9.0;
+        
+        // Visualizar desviación estándar normalizada
+        float stdDev = sqrt(variance);
+        
+        // Amplificar para visibilidad (la entropía local suele ser baja en campos suaves)
+        float entropyProxy = clamp(stdDev * 10.0, 0.0, 1.0);
+        
+        vec3 color = plasma(entropyProxy);
+        gl_FragColor = vec4(color, 1.0);
+    }
+`;
+
+/**
+ * Shader de fragment para visualización de Gradiente (|∇ρ|)
+ */
+export const FRAGMENT_SHADER_GRADIENT = `
+    precision mediump float;
+    
+    uniform sampler2D u_texture;
+    uniform vec2 u_resolution;
+    uniform float u_gamma;
+    
+    varying vec2 v_texCoord;
+    
+    // Colormap Inferno (bueno para intensidad)
+    vec3 inferno(float t) {
+        t = clamp(t, 0.0, 1.0);
+        return vec3(t, t*0.5, t*0.2); // Simplificado para demo, idealmente usar tabla completa
+    }
+
+    void main() {
+        vec2 onePixel = vec2(1.0, 1.0) / u_resolution;
+        
+        // Operador Sobel para gradiente
+        float gx = 0.0;
+        float gy = 0.0;
+        
+        // Kernel X
+        // -1 0 1
+        // -2 0 2
+        // -1 0 1
+        gx += -1.0 * texture2D(u_texture, v_texCoord + vec2(-1.0, -1.0) * onePixel).r;
+        gx += -2.0 * texture2D(u_texture, v_texCoord + vec2(-1.0,  0.0) * onePixel).r;
+        gx += -1.0 * texture2D(u_texture, v_texCoord + vec2(-1.0,  1.0) * onePixel).r;
+        gx +=  1.0 * texture2D(u_texture, v_texCoord + vec2( 1.0, -1.0) * onePixel).r;
+        gx +=  2.0 * texture2D(u_texture, v_texCoord + vec2( 1.0,  0.0) * onePixel).r;
+        gx +=  1.0 * texture2D(u_texture, v_texCoord + vec2( 1.0,  1.0) * onePixel).r;
+        
+        // Kernel Y
+        // -1 -2 -1
+        //  0  0  0
+        //  1  2  1
+        gy += -1.0 * texture2D(u_texture, v_texCoord + vec2(-1.0, -1.0) * onePixel).r;
+        gy += -2.0 * texture2D(u_texture, v_texCoord + vec2( 0.0, -1.0) * onePixel).r;
+        gy += -1.0 * texture2D(u_texture, v_texCoord + vec2( 1.0, -1.0) * onePixel).r;
+        gy +=  1.0 * texture2D(u_texture, v_texCoord + vec2(-1.0,  1.0) * onePixel).r;
+        gy +=  2.0 * texture2D(u_texture, v_texCoord + vec2( 0.0,  1.0) * onePixel).r;
+        gy +=  1.0 * texture2D(u_texture, v_texCoord + vec2( 1.0,  1.0) * onePixel).r;
+        
+        float gradientMag = sqrt(gx*gx + gy*gy);
+        
+        // Amplificar para visibilidad
+        float normalized = clamp(gradientMag * 2.0, 0.0, 1.0);
+        
+        // Color fuego/inferno
+        vec3 color = vec3(normalized, pow(normalized, 3.0), pow(normalized, 10.0));
+        
+        gl_FragColor = vec4(color, 1.0);
+    }
+`;
+
+/**
+ * Shader de fragment para visualización de Flujo Denso
+ * Mapea la dirección del gradiente a Hue y la magnitud a Value
+ */
+export const FRAGMENT_SHADER_FLOW = `
+    precision mediump float;
+    
+    uniform sampler2D u_texture;
+    uniform vec2 u_resolution;
+    
+    varying vec2 v_texCoord;
+    
+    vec3 hsvToRgb(float h, float s, float v) {
+        h = mod(h, 1.0) * 6.0;
+        float c = v * s;
+        float x = c * (1.0 - abs(mod(h, 2.0) - 1.0));
+        float m = v - c;
+        
+        vec3 rgb;
+        if (h < 1.0) rgb = vec3(c, x, 0.0);
+        else if (h < 2.0) rgb = vec3(x, c, 0.0);
+        else if (h < 3.0) rgb = vec3(0.0, c, x);
+        else if (h < 4.0) rgb = vec3(0.0, x, c);
+        else if (h < 5.0) rgb = vec3(x, 0.0, c);
+        else rgb = vec3(c, 0.0, x);
+        
+        return rgb + m;
+    }
+
+    void main() {
+        vec2 onePixel = vec2(1.0, 1.0) / u_resolution;
+        
+        // Calcular gradiente (dirección del flujo)
+        float center = texture2D(u_texture, v_texCoord).r;
+        float left = texture2D(u_texture, v_texCoord + vec2(-1.0, 0.0) * onePixel).r;
+        float right = texture2D(u_texture, v_texCoord + vec2(1.0, 0.0) * onePixel).r;
+        float up = texture2D(u_texture, v_texCoord + vec2(0.0, -1.0) * onePixel).r;
+        float down = texture2D(u_texture, v_texCoord + vec2(0.0, 1.0) * onePixel).r;
+        
+        float dx = right - left;
+        float dy = down - up; // Y invertido en texturas a veces, ajustar según coord system
+        
+        float angle = atan(dy, dx);
+        float magnitude = sqrt(dx*dx + dy*dy);
+        
+        // Normalizar ángulo a Hue [0, 1]
+        float hue = (angle + 3.14159) / (2.0 * 3.14159);
+        
+        // Magnitud a Value (amplificada)
+        float value = clamp(magnitude * 5.0, 0.0, 1.0);
+        
+        // Saturación constante para colores vivos
+        float saturation = 1.0;
+        
+        vec3 color = hsvToRgb(hue, saturation, value);
+        gl_FragColor = vec4(color, 1.0);
+    }
+`;
 
 /**
  * Detecta si WebGL está disponible en el navegador

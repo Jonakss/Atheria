@@ -11,6 +11,9 @@ import {
     createTextureFromData,
     FRAGMENT_SHADER_DENSITY,
     FRAGMENT_SHADER_ENERGY,
+    FRAGMENT_SHADER_ENTROPY,
+    FRAGMENT_SHADER_FLOW,
+    FRAGMENT_SHADER_GRADIENT,
     FRAGMENT_SHADER_HSV,
     FRAGMENT_SHADER_IMAG,
     FRAGMENT_SHADER_PHASE,
@@ -81,6 +84,12 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
             fragmentShader = FRAGMENT_SHADER_HSV;
         } else if (selectedViz === 'poincare') {
             fragmentShader = FRAGMENT_SHADER_POINCARE;
+        } else if (selectedViz === 'entropy') {
+            fragmentShader = FRAGMENT_SHADER_ENTROPY;
+        } else if (selectedViz === 'gradient') {
+            fragmentShader = FRAGMENT_SHADER_GRADIENT;
+        } else if (selectedViz === 'flow') {
+            fragmentShader = FRAGMENT_SHADER_FLOW;
         } else {
             // Default: density
             fragmentShader = FRAGMENT_SHADER_DENSITY;
