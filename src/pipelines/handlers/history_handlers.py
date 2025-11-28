@@ -225,91 +225,87 @@ async def handle_restore_history_step(args):
                 await send_notification(ws, "⚠️ No hay modelo cargado.", "warning")
             return
         
-        # Restaurar estado cuántico si está disponible
-        if 'psi' in target_frame and target_frame['psi'] is not None:
+        # Restaurar estado cuántico si está disponible Y soportado (Python engine)
+        motor_is_native = g_state.get('motor_is_native', False)
+        can_restore_state = 'psi' in target_frame and target_frame['psi'] is not None and not motor_is_native
+        
+        if can_restore_state:
             import torch
             from ...engines.qca_engine import QuantumState
             
-            # Verificar si el motor es nativo o Python
-            motor_is_native = g_state.get('motor_is_native', False)
+            # Motor Python: restaurar psi directamente
+            psi = target_frame['psi']
             
-            if motor_is_native:
-                # Motor nativo: necesitamos convertir psi denso a sparse y cargarlo
-                if ws:
-                    await send_notification(ws, "⚠️ Restauración de historia no soportada aún en motor nativo.", "warning")
-                logging.warning("Restauración de historia no implementada para motor nativo")
-                return
-            else:
-                # Motor Python: restaurar psi directamente
-                psi = target_frame['psi']
+            # Asegurar que psi esté en el dispositivo correcto
+            if isinstance(psi, torch.Tensor):
+                psi = psi.to(motor.device)
                 
-                # Asegurar que psi esté en el dispositivo correcto
-                if isinstance(psi, torch.Tensor):
-                    psi = psi.to(motor.device)
-                    
-                    # Restaurar estado
-                    if hasattr(motor, 'state') and motor.state is not None:
-                        motor.state.psi = psi
-                    else:
-                        # Crear nuevo estado con psi restaurado
-                        motor.state = QuantumState(
-                            motor.grid_size,
-                            motor.d_state,
-                            motor.device,
-                            initial_mode='zeros'  # No importa, lo sobrescribiremos
-                        )
-                        motor.state.psi = psi
-                    
-                    # Actualizar step global
-                    g_state['simulation_step'] = target_frame.get('step', 0)
-                    
-                    # Enviar frame al frontend para visualización
-                    if ws:
-                        from ..viz import get_visualization_data
-                        
-                        viz_type = g_state.get('viz_type', 'density')
-                        delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
-                        
-                        viz_data = get_visualization_data(psi, viz_type, delta_psi=delta_psi, motor=motor)
-                        
-                        if viz_data and isinstance(viz_data, dict):
-                            import asyncio
-                            frame_payload = {
-                                "step": target_frame.get('step', 0),
-                                "timestamp": asyncio.get_event_loop().time(),
-                                "map_data": viz_data.get("map_data", []),
-                                "hist_data": viz_data.get("hist_data", {}),
-                                "poincare_coords": viz_data.get("poincare_coords", []),
-                                "phase_attractor": viz_data.get("phase_attractor"),
-                                "flow_data": viz_data.get("flow_data"),
-                                "phase_hsv_data": viz_data.get("phase_hsv_data"),
-                                "complex_3d_data": viz_data.get("complex_3d_data"),
-                                "simulation_info": {
-                                    "step": target_frame.get('step', 0),
-                                    "is_paused": True,
-                                    "from_history": True
-                                }
-                            }
-                            
-                            await broadcast({"type": "simulation_frame", "payload": frame_payload})
-                            await send_notification(ws, f"✅ Estado restaurado a step {target_frame.get('step', 0)}", "success")
-                            
-                            # Actualizar estado de inferencia
-                            await broadcast({
-                                "type": "inference_status_update",
-                                "payload": {
-                                    "status": "paused",
-                                    "step": target_frame.get('step', 0),
-                                    "from_history": True
-                                }
-                            })
+                # Restaurar estado
+                if hasattr(motor, 'state') and motor.state is not None:
+                    motor.state.psi = psi
                 else:
-                    if ws:
-                        await send_notification(ws, "⚠️ Estado psi no es un tensor válido.", "warning")
+                    # Crear nuevo estado con psi restaurado
+                    motor.state = QuantumState(
+                        motor.grid_size,
+                        motor.d_state,
+                        motor.device,
+                        initial_mode='zeros'  # No importa, lo sobrescribiremos
+                    )
+                    motor.state.psi = psi
+                
+                # Actualizar step global
+                g_state['simulation_step'] = target_frame.get('step', 0)
+                
+                # Enviar frame al frontend para visualización
+                if ws:
+                    from ..viz import get_visualization_data
+                    
+                    viz_type = g_state.get('viz_type', 'density')
+                    delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
+                    
+                    viz_data = get_visualization_data(psi, viz_type, delta_psi=delta_psi, motor=motor)
+                    
+                    if viz_data and isinstance(viz_data, dict):
+                        import asyncio
+                        frame_payload = {
+                            "step": target_frame.get('step', 0),
+                            "timestamp": asyncio.get_event_loop().time(),
+                            "map_data": viz_data.get("map_data", []),
+                            "hist_data": viz_data.get("hist_data", {}),
+                            "poincare_coords": viz_data.get("poincare_coords", []),
+                            "phase_attractor": viz_data.get("phase_attractor"),
+                            "flow_data": viz_data.get("flow_data"),
+                            "phase_hsv_data": viz_data.get("phase_hsv_data"),
+                            "complex_3d_data": viz_data.get("complex_3d_data"),
+                            "simulation_info": {
+                                "step": target_frame.get('step', 0),
+                                "is_paused": True,
+                                "from_history": True
+                            }
+                        }
+                        
+                        await broadcast({"type": "simulation_frame", "payload": frame_payload})
+                        await send_notification(ws, f"✅ Estado restaurado a step {target_frame.get('step', 0)}", "success")
+                        
+                        # Actualizar estado de inferencia
+                        await broadcast({
+                            "type": "inference_status_update",
+                            "payload": {
+                                "status": "paused",
+                                "step": target_frame.get('step', 0),
+                                "from_history": True
+                            }
+                        })
+            else:
+                if ws:
+                    await send_notification(ws, "⚠️ Estado psi no es un tensor válido.", "warning")
         else:
-            # No hay psi guardado, solo podemos mostrar la visualización anterior
+            # Solo visualización (Native Engine o sin psi)
+            msg_type = "info" if motor_is_native else "warning"
+            msg_text = "ℹ️ Visualizando historial (Native Engine)." if motor_is_native else "⚠️ Frame sin estado completo. Solo visualización."
+            
             if ws:
-                await send_notification(ws, "⚠️ Frame no tiene estado psi guardado. Solo mostrando visualización.", "warning")
+                await send_notification(ws, msg_text, msg_type)
             
             # Enviar frame guardado (solo visualización, sin restaurar estado real)
             import asyncio
@@ -327,6 +323,16 @@ async def handle_restore_history_step(args):
             }
             
             await broadcast({"type": "simulation_frame", "payload": frame_payload})
+            
+            # También actualizar el estado de inferencia para que el frontend sepa que estamos en ese step
+            await broadcast({
+                "type": "inference_status_update",
+                "payload": {
+                    "status": "paused",
+                    "step": target_frame.get('step', 0),
+                    "from_history": True
+                }
+            })
         
     except Exception as e:
         logging.error(f"Error restaurando step de historia: {e}", exc_info=True)
