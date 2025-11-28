@@ -77,6 +77,30 @@ except Exception as e:
         "El motor nativo no estará disponible, usando motor Python como fallback."
     )
 
+
+def set_num_threads(num_threads: int) -> None:
+    """Establece el número de hilos para OpenMP en el motor nativo."""
+    if NATIVE_AVAILABLE:
+        try:
+            atheria_core.set_num_threads(num_threads)
+            logging.info(f"OpenMP threads set to {num_threads}")
+        except AttributeError:
+            logging.warning("atheria_core.set_num_threads not available")
+    else:
+        logging.warning("Native engine not available, cannot set OpenMP threads")
+
+
+def get_max_threads() -> int:
+    """Obtiene el número máximo de hilos disponibles para OpenMP."""
+    if NATIVE_AVAILABLE:
+        try:
+            return atheria_core.get_max_threads()
+        except AttributeError:
+            logging.warning("atheria_core.get_max_threads not available")
+            return 1
+    return 1
+
+
 from ..engines.qca_engine import QuantumState
 
 

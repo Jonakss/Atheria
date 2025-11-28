@@ -11,6 +11,7 @@
 #include "../include/sparse_map.h"
 #include "../include/sparse_engine.h"
 #include "../include/version.h"
+#include <omp.h>
 
 namespace py = pybind11;
 using namespace atheria;
@@ -46,6 +47,15 @@ PYBIND11_MODULE(atheria_core, m) {
           "Verifica si el soporte para tensores PyTorch está disponible");
 #endif
     
+    // Control de OpenMP
+    m.def("set_num_threads", [](int num_threads) {
+        omp_set_num_threads(num_threads);
+    }, "Establece el número de hilos para OpenMP", py::arg("num_threads"));
+
+    m.def("get_max_threads", []() {
+        return omp_get_max_threads();
+    }, "Obtiene el número máximo de hilos disponibles para OpenMP");
+
     // Binding para Coord3D
     py::class_<Coord3D>(m, "Coord3D")
         .def(py::init<>())

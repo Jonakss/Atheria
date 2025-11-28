@@ -92,10 +92,10 @@
 #### Componentes Pendientes:
 - ⏳ **OctreeIndex** - Índice espacial mencionado en roadmap pero no implementado
 - ⏳ **Memory Pools** - Optimización de memoria para evitar fragmentación
-- ⏳ **Paralelismo** - OpenMP/std::thread para bucle de física
+- ✅ **Paralelismo** - OpenMP activado y configurable desde Python
 - ⏳ **Pruebas Completas** - Benchmark comparativo Python vs C++ pendiente
 
-#### Estado General: 🟡 **70% Completado**
+#### Estado General: 🟢 **80% Completado**
 
 **Nota:** El motor nativo está funcional pero requiere modelos TorchScript exportados para usarse automáticamente.
 

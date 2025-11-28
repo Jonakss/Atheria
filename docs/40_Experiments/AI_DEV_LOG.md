@@ -41,7 +41,8 @@
 - [[logs/2025-11-28_dragonfly_cache_integration|2025-11-28 - Feature: Dragonfly Cache Integration (States & Checkpoints)]]
 - [[logs/2025-11-28_fix_inference_persistence|2025-11-28 - Fix: Inference Persistence & Import Errors]]
 - [[logs/2025-11-28_harlow_limit_theory|2025-11-28 - Knowledge: Harlow Limit Theory Ingestion]]
-- [2025-11-28 - Poincaré Projection & Quadtree Optimization](logs/2025-11-28_poincare_quadtree.md)
+- [2025-11-28: Optimización de Motor Nativo con OpenMP](logs/2025-11-28_openmp_optimization.md)
+- [2025-11-28: Implementación de Proyección de Poincaré y Optimización de Quadtree](logs/2025-11-28_poincare_quadtree.md)
 - [2025-11-28 - AdS/CFT Correspondence Documentation](logs/2025-11-28_ads_cft_correspondence.md)
 - [[logs/2025-11-28_ads_cft_correspondence|2025-11-28 - Knowledge: AdS/CFT Correspondence & Documentation Fixes]]
 - [2025-11-28: Integración de EpochDetector y Finalización de Fase 1](logs/2025-11-28_epoch_detector_integration.md)
