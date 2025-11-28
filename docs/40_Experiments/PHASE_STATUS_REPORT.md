@@ -170,18 +170,7 @@
 
 ### Tareas Pendientes Críticas
 
-1. **Fase 2:**
-   - ⏳ OctreeIndex (índice espacial C++)
-   - ⏳ Memory Pools
-   - ⏳ Paralelismo (OpenMP)
-   - ⏳ Benchmark completo Python vs C++
 
-2. **Fase 1:**
-   - ✅ Conectar EpochDetector al dashboard - **COMPLETADO**
-
-3. **Fase 3:**
-   - ⏳ Sistema de historial/buffer completo
-   - ⏳ Más visualizaciones de campos
 
 4. **General:**
 1.  **Fase 2:**
@@ -194,8 +183,8 @@
     -   ✅ Conectar EpochDetector al dashboard - **COMPLETADO**
 
 3.  **Fase 3:**
-    -   ⏳ Sistema de historial/buffer completo
-    -   ⏳ Más visualizaciones de campos
+    -   ✅ Sistema de historial/buffer completo (Rewind/Replay verificado) - **COMPLETADO**
+    -   ✅ Más visualizaciones de campos (Entropía, Gradiente, Flujo GPU) - **COMPLETADO**
 
 4.  **General:**
     -   ⏳ Documentar Fase 4
