@@ -1,0 +1,31 @@
+# Experimento low-memory para GPU de 3.68 GiB
+# Basado en MLP-d11-h32-g32-lr1e-4 pero optimizado para memoria limitada
+
+# Configuración del modelo
+MODEL_ARCHITECTURE: "MLP"
+
+MODEL_PARAMS:
+  d_state: 10 # Reducido de 11 para ahorrar memoria
+  hidden_channels: 32 # Mantener 32 (ya es bajo)
+  activation: "SiLU"
+
+# Configuración de entrenamiento
+GRID_SIZE_TRAINING: 32
+QCA_STEPS_TRAINING: 200 # Reducido de default para menor uso de memoria
+LR_RATE_M: 0.0001
+
+# Física
+GAMMA_DECAY: 0.01
+
+# Memoria y optimizaciones
+USE_MIXED_PRECISION: true # Habilitar FP16 (reduce memoria ~50%)
+USE_GRADIENT_CHECKPOINTING: false # Deshabilitado por defecto (trade compute for memory)
+EMPTY_CACHE_INTERVAL: 5 # Vaciar caché CUDA más frecuentemente
+
+# Entrenamiento
+TOTAL_EPISODES: 5000
+NOISE_LEVEL: 0.05
+
+# Logging
+LOG_INTERVAL: 10
+CHECKPOINT_INTERVAL: 100

@@ -2,7 +2,12 @@
 import argparse
 import json
 import logging
+import os
 from types import SimpleNamespace
+
+# CRÍTICO: Configurar variables de entorno CUDA ANTES de importar torch
+# Esto mejora el manejo de memoria en GPUs pequeñas
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
 from . import config as global_cfg
 from .utils import check_and_create_dir, load_experiment_config, get_latest_checkpoint
@@ -10,6 +15,26 @@ from .pipelines.pipeline_train import run_training_pipeline
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Detectar memoria GPU y advertir si es limitada
+try:
+    import torch
+    if torch.cuda.is_available():
+        gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        logging.info(f"🔍 GPU detectada: {gpu_memory_gb:.2f} GiB de memoria")
+        
+        if gpu_memory_gb < 4.0:
+            logging.warning("=" * 70)
+            logging.warning("⚠️  GPU CON MEMORIA LIMITADA DETECTADA (<4 GiB)")
+            logging.warning("Recomendación: Usar configuración 'low_memory' para evitar OOM")
+            logging.warning("Considera reducir:")
+            logging.warning("  - hidden_channels: 128 → 64")
+            logging.warning("  - d_state: 14 → 10")
+            logging.warning("  - qca_steps: 500 → 200")
+            logging.warning("=" * 70)
+except ImportError:
+    pass  # Torch no disponible aún
+
 
 def sns_to_dict(obj):
     """

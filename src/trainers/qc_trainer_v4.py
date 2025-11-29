@@ -88,6 +88,18 @@ class QC_Trainer_v4:
         self.optimizer = optim.AdamW(self.motor.operator.parameters(), lr=lr, weight_decay=1e-5)
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', patience=100, factor=0.5)
         
+        # 4. Mixed Precision Training (AMP) - reduce memoria ~50%
+        self.use_amp = (str(device).startswith('cuda'))
+        self.scaler = None
+        if self.use_amp:
+            try:
+                from torch.cuda.amp import GradScaler
+                self.scaler = GradScaler()
+                logging.info("🚀 Mixed Precision Training (FP16) habilitado - reduce uso de memoria ~50%")
+            except ImportError:
+                logging.warning("⚠️ torch.cuda.amp no disponible. Entrenando en FP32.")
+                self.use_amp = False
+        
         # Directorios
         self.checkpoint_dir = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, experiment_name)
         os.makedirs(self.checkpoint_dir, exist_ok=True)
@@ -176,35 +188,39 @@ class QC_Trainer_v4:
         max_noise = self.max_noise
         current_noise = min(max_noise, max_noise * (episode_num / 2000))
         
+        # Mixed Precision Training: autocast context para forward pass
+        autocast_context = torch.cuda.amp.autocast() if self.use_amp else torch.cuda.amp.autocast(enabled=False)
+        
         # Simulación temporal
-        for t in range(self.qca_steps):
-            # 1. Ley M (Física)
-            psi = self.motor.evolve_step(psi)
+        with autocast_context:
+            for t in range(self.qca_steps):
+                # 1. Ley M (Física)
+                psi = self.motor.evolve_step(psi)
+                
+                # 2. Entorno Hostil (Ruido)
+                if current_noise > 0.001:
+                    # 80% Ruido de Fase (Z), 20% Ruido de Bit (X)
+                    psi = self.noise_injector.apply_phase_flip(psi, rate=current_noise)
+                    if np.random.random() < 0.2:
+                        psi = self.noise_injector.apply_bit_flip(psi, rate=current_noise * 0.1)
+                
+                # Gradient Checkpointing para ahorrar VRAM en simulaciones largas
+                # (Opcional, activo si pasos > 50)
+                # if self.qca_steps > 50 and t % 10 == 0:
+                #     psi = torch.utils.checkpoint.checkpoint(self.motor.operator, psi)
+                
+                # OPTIMIZACIÓN DE MEMORIA: Solo guardar estados necesarios para la pérdida
+                # Solo guardamos: estado inicial, estados intermedios (cada N pasos), y estado final
+                save_interval = max(1, self.qca_steps // 10)  # Guardar ~10 estados máximo
+                if t == 0 or t == self.qca_steps - 1 or t % save_interval == 0:
+                    psi_history.append(psi)
             
-            # 2. Entorno Hostil (Ruido)
-            if current_noise > 0.001:
-                # 80% Ruido de Fase (Z), 20% Ruido de Bit (X)
-                psi = self.noise_injector.apply_phase_flip(psi, rate=current_noise)
-                if np.random.random() < 0.2:
-                    psi = self.noise_injector.apply_bit_flip(psi, rate=current_noise * 0.1)
-            
-            # Gradient Checkpointing para ahorrar VRAM en simulaciones largas
-            # (Opcional, activo si pasos > 50)
-            # if self.qca_steps > 50 and t % 10 == 0:
-            #     psi = torch.utils.checkpoint.checkpoint(self.motor.operator, psi)
-            
-            # OPTIMIZACIÓN DE MEMORIA: Solo guardar estados necesarios para la pérdida
-            # Solo guardamos: estado inicial, estados intermedios (cada N pasos), y estado final
-            save_interval = max(1, self.qca_steps // 10)  # Guardar ~10 estados máximo
-            if t == 0 or t == self.qca_steps - 1 or t % save_interval == 0:
+            # Asegurar que tenemos al menos el estado inicial y final
+            if len(psi_history) == 0 or not torch.equal(psi_history[-1], psi):
                 psi_history.append(psi)
-        
-        # Asegurar que tenemos al menos el estado inicial y final
-        if len(psi_history) == 0 or not torch.equal(psi_history[-1], psi):
-            psi_history.append(psi)
-        
-        # Calcular pérdida evolutiva
-        loss, metrics = self.loss_function_evolutionary(psi_history, psi_initial)
+            
+            # Calcular pérdida evolutiva (dentro de autocast)
+            loss, metrics = self.loss_function_evolutionary(psi_history, psi_initial)
         
         # OPTIMIZACIÓN DE MEMORIA: Limpiar psi_history después de calcular pérdida
         # Los tensores ya no se necesitan y pueden ocupar mucha memoria
@@ -212,11 +228,20 @@ class QC_Trainer_v4:
         import gc
         gc.collect()  # Forzar garbage collection para liberar memoria inmediatamente
         
-        # Retropropagación con manejo de memoria CUDA
+        # Retropropagación con Mixed Precision (AMP) y manejo de memoria CUDA
         try:
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.motor.operator.parameters(), 1.0) # Evitar explosión de gradientes
-            self.optimizer.step()
+            if self.use_amp and self.scaler:
+                # Backward pass con gradient scaling (AMP)
+                self.scaler.scale(loss).backward()
+                self.scaler.unscale_(self.optimizer)
+                torch.nn.utils.clip_grad_norm_(self.motor.operator.parameters(), 1.0)
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+            else:
+                # Backward pass estándar (FP32)
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.motor.operator.parameters(), 1.0)
+                self.optimizer.step()
         except torch.cuda.OutOfMemoryError as e:
             # Si hay error de memoria CUDA, limpiar caché y reintentar una vez
             logging.warning(f"⚠️ CUDA Out of Memory durante entrenamiento episodio {episode_num}. Limpiando caché...")
@@ -224,9 +249,16 @@ class QC_Trainer_v4:
             gc.collect()
             # Reintentar una vez después de limpiar
             try:
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.motor.operator.parameters(), 1.0)
-                self.optimizer.step()
+                if self.use_amp and self.scaler:
+                    self.scaler.scale(loss).backward()
+                    self.scaler.unscale_(self.optimizer)
+                    torch.nn.utils.clip_grad_norm_(self.motor.operator.parameters(), 1.0)
+                    self.scaler.step(self.optimizer)
+                    self.scaler.update()
+                else:
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(self.motor.operator.parameters(), 1.0)
+                    self.optimizer.step()
                 logging.info("✅ Recuperado después de limpiar caché CUDA")
             except torch.cuda.OutOfMemoryError:
                 logging.error(f"❌ CUDA Out of Memory persistente en episodio {episode_num}. Deteniendo entrenamiento.")
