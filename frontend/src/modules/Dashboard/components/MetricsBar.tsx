@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, Terminal } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { HistoryControls } from '../../History/HistoryControls';
+import { ScientificMetrics } from './ScientificMetrics';
 
 export const MetricsBar: React.FC = () => {
   const { allLogs } = useWebSocket();
@@ -37,11 +38,17 @@ export const MetricsBar: React.FC = () => {
       <div className="max-w-7xl mx-auto flex items-stretch gap-4">
         
         {/* Controls Section */}
-        <div className={`transition-all duration-300 ease-in-out ${
-            viewMode === 'controls' ? 'flex-1' : 'w-auto'
+        <div className={`transition-all duration-300 ease-in-out ${ viewMode === 'controls' ? 'flex-1' : 'w-auto'
         }`}>
             <HistoryControls mode={viewMode === 'controls' ? 'full' : 'compact'} />
         </div>
+
+        {/* Scientific Metrics - Compact Display */}
+        {viewMode === 'controls' && (
+          <div className="flex items-center px-4 border-l border-white/5">
+            <ScientificMetrics compact={true} />
+          </div>
+        )}
 
         {/* Separator / Toggle Button */}
         <div className="flex items-center">
