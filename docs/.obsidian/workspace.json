@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "40_Experiments/AI_DEV_LOG.md",
+                "file": "40_Experiments/EXP_003_HARLOW_LIMIT.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "AI_DEV_LOG"
+              "title": "EXP_003_HARLOW_LIMIT"
             }
           }
         ]
@@ -168,6 +168,8 @@
   },
   "active": "8ec795a92d8b2ebe",
   "lastOpenFiles": [
+    "40_Experiments/MultiPhase_Experiment_v1/Fase1_Vacuum_Stability.md",
+    "40_Experiments/AI_DEV_LOG.md",
     "40_Experiments/configs/low_memory_mlp.yaml",
     "40_Experiments/configs",
     "40_Experiments/LOW_MEMORY_TRAINING_GUIDE.md",
@@ -194,7 +196,6 @@
     "40_Experiments/SNN_UNET-d12-h128-g64-lr1e-4.md",
     "30_Components/UNIVERSE_ATLAS_ANALYSIS.md",
     "40_Experiments/VISUALIZATION_FIX_ROADMAP.md",
-    "00_KNOWLEDGE_BASE_GAPS_ANALYSIS.md",
-    "00_KNOWLEDGE_BASE.md"
+    "00_KNOWLEDGE_BASE_GAPS_ANALYSIS.md"
   ]
 }

@@ -7,25 +7,45 @@ interface PhysicsInspectorProps {
   onToggleCollapse?: () => void;
   viewerVersion?: 'v1' | 'v2';
   onViewerVersionChange?: (version: 'v1' | 'v2') => void;
+  selectedLayer?: number;
+  onLayerChange?: (layer: number) => void;
 }
 
 export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({ 
   isCollapsed = false, 
   onToggleCollapse,
   viewerVersion = 'v1',
-  onViewerVersionChange
+  onViewerVersionChange,
+  selectedLayer = 0,
+  onLayerChange
 }) => {
   const { sendCommand, allLogs } = useWebSocket();
   const [gammaDecay, setGammaDecay] = useState(0.015);
   const [thermalNoise, setThermalNoise] = useState(0.002);
-  const [selectedLayer, setSelectedLayer] = useState(0);
+  // Internal state fallback if prop not provided
+  const [internalLayer, setInternalLayer] = useState(0);
+  
+  const activeLayer = onLayerChange ? selectedLayer : internalLayer;
+  const handleLayerChange = (layer: number) => {
+    if (onLayerChange) {
+      onLayerChange(layer);
+    } else {
+      setInternalLayer(layer);
+    }
+  };
+
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   
   // Usar prop externo si está disponible, sino usar estado interno
   const collapsed = onToggleCollapse !== undefined ? isCollapsed : internalCollapsed;
   const handleToggle = onToggleCollapse || (() => setInternalCollapsed(!internalCollapsed));
 
-  const layers = ['Densidad (Scalar)', 'Fase (Complex)', 'Flujo (Vector)', 'Chunks (Meta)'];
+  const VIZ_MODES = [
+    { id: 0, label: 'Densidad', desc: 'Amplitud |ψ|', icon: '📊', color: 'text-blue-400', border: 'border-blue-500/50' },
+    { id: 1, label: 'Fase', desc: 'Argumento φ', icon: '🌈', color: 'text-purple-400', border: 'border-purple-500/50' },
+    { id: 2, label: 'Energía', desc: 'Hamiltoniano', icon: '⚡', color: 'text-yellow-400', border: 'border-yellow-500/50' },
+    { id: 3, label: 'Flujo', desc: 'Corriente J', icon: '🌊', color: 'text-cyan-400', border: 'border-cyan-500/50' }
+  ];
 
   const handleGammaChange = (value: number) => {
     setGammaDecay(value);
@@ -62,8 +82,36 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
       {!collapsed && (
       <div className="flex-1 overflow-y-auto p-4 space-y-6" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
         
+        {/* Sección: Selector de Visualización (Prominente) */}
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            {VIZ_MODES.map((mode) => (
+              <button
+                key={mode.id}
+                onClick={() => handleLayerChange(mode.id)}
+                className={`flex flex-col p-2 rounded-lg border transition-all duration-200 ${
+                  activeLayer === mode.id
+                    ? `bg-white/10 ${mode.border} shadow-lg`
+                    : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-lg">{mode.icon}</span>
+                  {activeLayer === mode.id && <div className={`w-1.5 h-1.5 rounded-full ${mode.color.replace('text-', 'bg-')} shadow-[0_0_5px_currentColor]`} />}
+                </div>
+                <span className={`text-xs font-bold ${activeLayer === mode.id ? mode.color : 'text-gray-300'}`}>
+                  {mode.label}
+                </span>
+                <span className="text-[9px] text-gray-500 font-mono leading-tight">
+                  {mode.desc}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Sección: Parámetros Globales */}
-        <div className="space-y-4">
+        <div className="space-y-4 pt-2 border-t border-white/5">
           
           {/* Control Slider Refinado - Gamma */}
           <div className="space-y-1.5">
@@ -193,30 +241,7 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
           </div>
         </div>
 
-        {/* Sección: Debug de Campos */}
-        <div className="space-y-3 pt-4 border-t border-white/5">
-          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Visualización de Campos</span>
-          <div className="space-y-1">
-            {layers.map((layer, i) => (
-              <label 
-                key={layer} 
-                className="flex items-center gap-2 cursor-pointer p-1.5 rounded hover:bg-white/5 transition-colors"
-                onClick={() => setSelectedLayer(i)}
-              >
-                <div className={`w-3 h-3 rounded-sm border ${
-                  i === selectedLayer 
-                    ? 'bg-blue-500 border-blue-500' 
-                    : 'border-gray-600 bg-transparent'
-                } flex items-center justify-center`}>
-                  {i === selectedLayer && <div className="w-1.5 h-1.5 bg-white rounded-[1px]" />}
-                </div>
-                <span className={`text-xs ${i === selectedLayer ? 'text-gray-200 font-medium' : 'text-gray-500'}`}>
-                  {layer}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
+        {/* Sección: Debug de Campos (Legacy - Removido por Selector Prominente) */}
         
         {/* Mensaje de Alerta (Contextual) - Si hay logs de error */}
         {recentLogs.some(log => typeof log === 'string' && log.toLowerCase().includes('error')) && (

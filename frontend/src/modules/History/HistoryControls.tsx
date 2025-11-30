@@ -1,5 +1,5 @@
 import { BackwardIcon, ForwardIcon, PauseIcon, PlayIcon } from '@heroicons/react/24/solid';
-import { Eye, EyeOff, RefreshCw, Save, Clock } from 'lucide-react';
+import { Clock, Eye, EyeOff, RefreshCw, Save } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { calculateParticleCount } from '../../utils/simulationUtils';
@@ -25,16 +25,21 @@ const SimulationControls: React.FC<{
     <button
       onClick={onPlayPause}
       disabled={!controlsEnabled}
-      className={`px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 transition-all border ${
+      className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-2 transition-all border ${
         !controlsEnabled
           ? 'bg-white/5 text-gray-600 border-white/5 cursor-not-allowed opacity-50'
           : isPlaying
-            ? 'bg-pink-500/10 text-pink-500 border-pink-500/30 hover:bg-pink-500/20'
-            : 'bg-teal-500/10 text-teal-400 border-teal-500/30 hover:bg-teal-500/20'
+            ? 'bg-green-500/10 text-green-400 border-green-500/30 hover:bg-green-500/20'
+            : 'bg-gray-500/20 text-gray-400 border-gray-500/30 hover:bg-gray-500/30 hover:text-gray-300'
       }`}
+      title={isPlaying ? 'Pause simulation' : 'Start simulation'}
     >
+      {/* Status indicator dot */}
+      <span className={`w-2 h-2 rounded-full ${
+        isPlaying ? 'bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.5)]' : 'bg-gray-500'
+      }`} />
       {isPlaying ? <PauseIcon className="w-3 h-3" /> : <PlayIcon className="w-3 h-3" />}
-      {isPlaying ? 'PAUSE' : 'RUN'}
+      <span className="font-mono tracking-wide">{isPlaying ? 'RUNNING' : 'PAUSED'}</span>
     </button>
 
     <button

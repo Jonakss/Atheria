@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { ColorScaleLegend } from '../../../components/ui/ColorScaleLegend';
 import { LabSider } from '../../../components/ui/LabSider';
 import { PanZoomCanvas } from '../../../components/ui/PanZoomCanvas';
 import { TimelineViewer } from '../../../components/ui/TimelineViewer';
@@ -17,12 +18,24 @@ import { TrainingView } from '../components/TrainingView';
 type TabType = 'lab' | 'analysis' | 'history' | 'logs';
 type LabSection = 'inference' | 'training' | 'analysis';
 
+// Helper to get legend props based on layer
+const getLegendProps = (layer: number) => {
+  switch (layer) {
+    case 0: return { mode: 'DENSITY', min: 0, max: 1.0, gradient: 'linear-gradient(to top, #000, #00f, #0ff, #fff)' };
+    case 1: return { mode: 'PHASE', min: -3.14, max: 3.14, gradient: 'linear-gradient(to top, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)' };
+    case 2: return { mode: 'ENERGY', min: 0, max: 1.0, gradient: 'linear-gradient(to top, #000, #f00, #ff0, #fff)' };
+    case 3: return { mode: 'FLOW', min: 0, max: 1.0, gradient: 'linear-gradient(to top, #000, #0ff, #fff)' };
+    default: return { mode: 'UNKNOWN', min: 0, max: 1, gradient: 'linear-gradient(to top, #000, #fff)' };
+  }
+};
+
 export const DashboardLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('lab');
   const [labPanelOpen, setLabPanelOpen] = useState(true);
   const [activeLabSection, setActiveLabSection] = useState<LabSection>('inference');
   const [physicsInspectorCollapsed, setPhysicsInspectorCollapsed] = useState(false);
   const [viewerVersion, setViewerVersion] = useState<'v1' | 'v2'>('v1');
+  const [selectedLayer, setSelectedLayer] = useState(0); // 0: Density, 1: Phase, 2: Energy, 3: Flow
   const [selectedTimelineFrame, setSelectedTimelineFrame] = useState<{
     step: number;
     timestamp: string;
@@ -200,8 +213,22 @@ export const DashboardLayout: React.FC = () => {
         {/* Design System: flex-1 (Ocupa todo el espacio restante), relative para overlays */}
         <main className="flex-1 relative bg-dark-990 flex flex-col overflow-hidden">
           
+
+
+// ... inside component ...
+
           {/* Viewport (Fondo) - Design System: bg-[#050505] a black según mockup */}
           {renderContentView()}
+          
+          {/* Color Scale Legend - Only visible in holographic/3d modes */}
+          {(selectedViz === 'holographic' || selectedViz === '3d') && (
+            <ColorScaleLegend 
+              mode={getLegendProps(selectedLayer).mode}
+              minValue={getLegendProps(selectedLayer).min}
+              maxValue={getLegendProps(selectedLayer).max}
+              gradient={getLegendProps(selectedLayer).gradient}
+            />
+          )}
 
           {/* Panel Inferior (Controles + Logs) - Design System: bg-[#050505]/95 backdrop-blur-sm */}
           <MetricsBar />
@@ -209,11 +236,15 @@ export const DashboardLayout: React.FC = () => {
 
         {/* Panel Lateral Derecho (Inspector y Controles) - Colapsible */}
         {/* Design System: w-72 (288px) o w-80 (320px) - usando w-72 según mockup */}
+        {/* Panel Lateral Derecho (Inspector y Controles) - Colapsible */}
+        {/* Design System: w-72 (288px) o w-80 (320px) - usando w-72 según mockup */}
         <PhysicsInspector 
           isCollapsed={physicsInspectorCollapsed}
           onToggleCollapse={() => setPhysicsInspectorCollapsed(!physicsInspectorCollapsed)}
           viewerVersion={viewerVersion}
           onViewerVersionChange={setViewerVersion}
+          selectedLayer={selectedLayer}
+          onLayerChange={setSelectedLayer}
         />
       </div>
     </div>
