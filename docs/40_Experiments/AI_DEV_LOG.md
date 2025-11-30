@@ -16,6 +16,7 @@
 
 ## 📋 Índice de Entradas
 
+- [[UI_DASHBOARD_IMPROVEMENTS_2025_11_29|2025-11-29 - Feature: Scientific Metrics Display & UI Investigation]]
 - **2025-11-28 - Fix: Docker Compose Compatibility & CUDA Optimization Backlog**
 - [[logs/2025-11-28_holographic_viewer_and_engine_switching|2025-11-28 - Feature: Holographic Viewer & Engine Switching Docs]]
 - [[logs/2025-11-27_fix_import_error_and_conflicts|2025-11-27 - Fix: Import Error in Native Engine Wrapper & Git Conflicts]]
