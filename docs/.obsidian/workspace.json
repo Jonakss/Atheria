@@ -168,6 +168,12 @@
   },
   "active": "8ec795a92d8b2ebe",
   "lastOpenFiles": [
+    "40_Experiments/configs/low_memory_mlp.yaml",
+    "40_Experiments/configs",
+    "40_Experiments/LOW_MEMORY_TRAINING_GUIDE.md",
+    "40_Experiments/UI_DASHBOARD_IMPROVEMENTS_2025_11_29.md",
+    "40_Experiments/TRAINING_EMERGE_TEST_2240.md",
+    "40_Experiments/UI_IMPROVEMENTS_2025_11_29.md",
     "40_Experiments/EMERGE_TEST_2243.md",
     "40_Experiments/logs/2025-11-28_roadmap_restructuring_ads_cft.md",
     "10_core/ROADMAP_AI_RESEARCH.md",
@@ -189,11 +195,6 @@
     "30_Components/UNIVERSE_ATLAS_ANALYSIS.md",
     "40_Experiments/VISUALIZATION_FIX_ROADMAP.md",
     "00_KNOWLEDGE_BASE_GAPS_ANALYSIS.md",
-    "00_KNOWLEDGE_BASE.md",
-    "30_Components/DESIGN_SYSTEM.md",
-    "40_Experiments/AI_DEV_LOG_ENTRY_TEMP.md",
-    "40_Experiments/BENCHMARK_TENSOR_STORAGE.md",
-    "Atheria 4.md",
-    "Ley M.md"
+    "00_KNOWLEDGE_BASE.md"
   ]
 }

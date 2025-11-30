@@ -18,6 +18,7 @@
 - **[UI Dashboard Improvements](../40_Experiments/UI_DASHBOARD_IMPROVEMENTS_2025_11_29.md)** - Scientific Metrics \u0026 UI Investigation (2025-11-29)
 - **[UI Review Full](../40_Experiments/UI_IMPROVEMENTS_2025_11_29.md)** - Complete UI analysis with 10 suggestions
 - **[Training Guide: EMERGE_TEST](../40_Experiments/TRAINING_EMERGE_TEST_2240.md)** - Experiment guide for emergence testing
+- **[Low-Memory Training Guide](../40_Experiments/LOW_MEMORY_TRAINING_GUIDE.md)** - Optimization for GPUs with \u003c4 GiB VRAM
 
 ---
 
