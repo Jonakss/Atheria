@@ -90,8 +90,17 @@ export const HistoryView: React.FC = () => {
         }
     }
   };
-
-  const handleDeleteClick = (expName: string) => {
+    } catch (error) {
+        let errorMessage = 'Error al conectar con el servidor.';
+        if (error instanceof Error) {
+            errorMessage = error.message;
+        } else if (typeof error === 'string') {
+            errorMessage = error;
+        }
+        setUploadStatus({
+            type: 'error',
+            message: errorMessage,
+        });
       if (confirm(`¿Estás seguro de que deseas eliminar el experimento '${expName}'? Esta acción no se puede deshacer.`)) {
           sendCommand('experiment', 'delete', { EXPERIMENT_NAME: expName });
       }
