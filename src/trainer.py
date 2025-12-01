@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 # CRÍTICO: Configurar variables de entorno CUDA ANTES de importar torch
 # Esto mejora el manejo de memoria en GPUs pequeñas
-os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+os.environ['PYTORCH_ALLOC_CONF'] = 'expandable_segments:True'
 
 from . import config as global_cfg
 from .utils import check_and_create_dir, load_experiment_config, get_latest_checkpoint
@@ -68,7 +68,7 @@ def main():
     parser.add_argument("--model_params", type=str, required=True, help='JSON string of model parameters')
     parser.add_argument("--continue_training", action="store_true")
     parser.add_argument("--noise_level", type=float, default=0.05, help="Maximum noise level for training")
-    parser.add_argument("--engine_type", type=str, default="PYTHON", choices=["PYTHON", "NATIVE", "LATTICE", "HARMONIC"], help="Physics engine type")
+    parser.add_argument("--engine_type", type=str, default="PYTHON", choices=["PYTHON", "NATIVE", "LATTICE", "HARMONIC", "POLAR"], help="Physics engine type")
     parser.add_argument("--backend_type", type=str, default="LOCAL", choices=["LOCAL", "QUANTUM_MOCK", "QUANTUM_IONQ", "QUANTUM_IBM"], help="Compute backend type")
     
     args = parser.parse_args()

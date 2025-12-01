@@ -35,7 +35,7 @@ class QC_Trainer_v4:
     """
     def __init__(self, experiment_name, model_class=None, model_params=None, device=None, 
                  lr=1e-4, grid_size=64, qca_steps=100, gamma_decay=0.01, model=None,
-                 max_checkpoints_to_keep=5, max_noise=0.05):
+                 max_checkpoints_to_keep=5, max_noise=0.05, engine_type=None):
         """
         Inicializa QC_Trainer_v4.
         
@@ -51,6 +51,7 @@ class QC_Trainer_v4:
             model: Modelo ya instanciado (opcional, para checkpoints/transfer learning)
             max_checkpoints_to_keep: Número máximo de mejores checkpoints a retener (por defecto 5)
             max_noise: Nivel máximo de ruido a inyectar (default 0.05)
+            engine_type: Tipo de motor de física (opcional, por defecto usa global_cfg)
         """
         self.experiment_name = experiment_name
         self.device = device
@@ -71,7 +72,7 @@ class QC_Trainer_v4:
             GRID_SIZE_TRAINING=grid_size,
             MODEL_PARAMS=model_params if not isinstance(model_params, dict) else SimpleNamespace(**model_params),
             GAMMA_DECAY=gamma_decay,
-            ENGINE_TYPE=global_cfg.ENGINE_TYPE # Usar global o permitir inyección
+            ENGINE_TYPE=engine_type if engine_type else global_cfg.ENGINE_TYPE # Usar inyectado o global
         )
         
         if model is not None:

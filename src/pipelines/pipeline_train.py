@@ -111,7 +111,8 @@ def run_training_pipeline(exp_cfg: SimpleNamespace, checkpoint_path: str | None 
             'grid_size': exp_cfg.GRID_SIZE_TRAINING,
             'qca_steps': exp_cfg.QCA_STEPS_TRAINING,
             'gamma_decay': getattr(exp_cfg, 'GAMMA_DECAY', getattr(global_cfg, 'GAMMA_DECAY', 0.01)),
-            'max_noise': getattr(exp_cfg, 'NOISE_LEVEL', 0.05)
+            'max_noise': getattr(exp_cfg, 'NOISE_LEVEL', 0.05),
+            'engine_type': getattr(exp_cfg, 'ENGINE_TYPE', None)
         }
         
         # Si ya creamos el modelo (checkpoint o transfer), pasarlo

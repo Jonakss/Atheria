@@ -4,7 +4,7 @@ from .engines.qca_engine import Aetheria_Motor
 from .engines.qca_engine_polar import PolarEngine
 from .engines.compute_backend import LocalBackend, MockQuantumBackend, ComputeBackend
 
-def get_motor(config, model: nn.Module, device):
+def get_motor(config, device, model: nn.Module = None):
     """
     Factory function to create the appropriate physics engine based on configuration.
     

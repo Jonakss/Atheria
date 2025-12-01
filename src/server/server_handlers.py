@@ -566,7 +566,7 @@ async def handle_load_experiment(args):
              logging.info(f"Escalando grid de entrenamiento ({training_grid_size}) a inferencia ({inference_grid_size})")
         
         # Inicializar motor usando la fábrica
-        g_state['motor'] = get_motor(config, model, global_cfg.DEVICE)
+        g_state['motor'] = get_motor(config, global_cfg.DEVICE, model=model)
         g_state['simulation_step'] = 0
         
         # Compilación opcional

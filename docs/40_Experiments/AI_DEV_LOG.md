@@ -17,6 +17,7 @@
 ## 📋 Índice de Entradas
 
 - **[[PHASE_STATUS_REPORT]]**: 2025-12-01 (17:28) - Actualización comprehensiva del estado del proyecto. Progreso de Fase 2 (benchmarking Python vs C++, bloqueo en Native Engine), Fase 3 100% completado (frontend linting, Phase Space Viz, Field Theory UI), y Compute Backend 100% completado. Tareas críticas actualizadas con prioridades.
+- [[logs/2025-12-01_fix_trainer_engine_and_motor_factory|2025-12-01 - Fix: Trainer Engine Type Support & Motor Factory Signature]]
 - [[logs/2025-12-01_obsidian_kb_optimization|2025-12-01 - Optimization: Knowledge Base Obsidian Links (docs/20_Concepts/)]]
 - [[logs/2025-12-01_frontend_lint_fixes|2025-12-01 - Fix: Frontend Lint and Build Errors]]
 - [2025-12-01: UI Consolidation and Holographic Viewer Improvements](logs/2025-12-01_ui_consolidation.md)
