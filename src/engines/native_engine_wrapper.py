@@ -459,9 +459,20 @@ class NativeEngineWrapper:
 
         # Función interna para agregar partículas
         def add_particles_with_threshold(thresh):
+            import time
+            start_time = time.time()
             count = 0
             verified_count = 0
+            
+            # Log initial progress
+            logging.info(f"⚡ Iniciando transferencia de partículas al motor nativo (Grid: {grid_size}x{grid_size}, Thresh: {thresh:.2e})")
+            
             for y in range(0, grid_size, sample_step):
+                # Yield GIL every row to allow main thread (asyncio) to process heartbeats
+                # This prevents "freezes" during heavy loops in threads
+                if y % 10 == 0:
+                    time.sleep(0)
+                    
                 for x in range(0, grid_size, sample_step):
                     # Obtener estado en esta posición
                     cell_state = dense_psi[0, y, x, :]  # [d_state]
@@ -493,6 +504,9 @@ class NativeEngineWrapper:
                                 f"⚠️ Error agregando partícula en ({x}, {y}): {e}"
                             )
 
+            elapsed = time.time() - start_time
+            logging.info(f"⚡ Transferencia completada: {count} partículas en {elapsed:.2f}s")
+            
             if count > 0 and verified_count == 0 and count < 5:
                 logging.warning(
                     f"⚠️ Se intentaron agregar {count} partículas pero la verificación inmediata falló."

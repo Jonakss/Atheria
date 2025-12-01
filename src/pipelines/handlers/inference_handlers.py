@@ -597,35 +597,54 @@ async def handle_load_experiment(args):
                         await send_notification(
                             ws, "Exportando modelo a JIT para motor nativo...", "info"
                         )
-                    # Cargar temporalmente en Python para exportar
-                    from ...utils import load_experiment_config
+                    # Definir función para exportar en thread
+                    def export_jit_task():
+                        logging.info("🧵 Iniciando exportación JIT en thread separado...")
+                        # Cargar temporalmente en Python para exportar
+                        from ...utils import load_experiment_config
+                        
+                        # Re-importar dentro del thread para evitar problemas de contexto
+                        import torch
+                        import gc
 
-                    exp_cfg = load_experiment_config(exp_name)
-                    if not exp_cfg:
-                        raise ValueError(
-                            f"No se pudo cargar configuración de {exp_name}"
+                        exp_cfg_thread = load_experiment_config(exp_name)
+                        if not exp_cfg_thread:
+                            raise ValueError(
+                                f"No se pudo cargar configuración de {exp_name}"
+                            )
+
+                        temp_model = load_model(exp_cfg_thread, checkpoint_path)
+                        if temp_model is None:
+                            raise ValueError(f"No se pudo cargar modelo de {exp_name}")
+
+                        from ...engines.native_engine_wrapper import export_model_to_jit
+
+                        d_state = exp_cfg_thread.MODEL_PARAMS.d_state
+                        # Usar grid size de inferencia actual
+                        grid_size_export = g_state.get(
+                            "inference_grid_size", global_cfg.GRID_SIZE_INFERENCE
                         )
+                        
+                        logging.info(f"📐 Exportando con grid_size={grid_size_export}, d_state={d_state}")
+                        
+                        # CRÍTICO: El modelo espera input real concatenado (Real + Imag)
+                        jit_p = export_model_to_jit(
+                            temp_model, exp_name, (1, 2 * d_state, grid_size_export, grid_size_export)
+                        )
+                        
+                        # Limpieza explícita
+                        del temp_model
+                        gc.collect()
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                            
+                        return jit_p
 
-                    temp_model = load_model(exp_cfg, checkpoint_path)
-                    if temp_model is None:
-                        raise ValueError(f"No se pudo cargar modelo de {exp_name}")
-
-                    from ...engines.native_engine_wrapper import export_model_to_jit
-
-                    d_state = exp_cfg.MODEL_PARAMS.d_state
-                    grid_size = g_state.get(
-                        "inference_grid_size", global_cfg.GRID_SIZE_INFERENCE
-                    )
-                    # CRÍTICO: El modelo espera input real concatenado (Real + Imag), por lo que
-                    # los canales de entrada son 2 * d_state.
-                    # Si pasamos solo d_state, falla con RuntimeError de mismatch de canales.
-                    jit_path = export_model_to_jit(
-                        temp_model, exp_name, (1, 2 * d_state, grid_size, grid_size)
-                    )
-                    del temp_model
-                    gc.collect()
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
+                    # Ejecutar exportación en thread pool
+                    logging.info("⏳ Ejecutando exportación JIT en background (esto puede tomar tiempo)...")
+                    loop = asyncio.get_event_loop()
+                    jit_path = await loop.run_in_executor(None, export_jit_task)
+                    logging.info(f"✅ Exportación JIT completada: {jit_path}")
 
                 from ...engines.native_engine_wrapper import NativeEngineWrapper
                 from ...utils import load_experiment_config
