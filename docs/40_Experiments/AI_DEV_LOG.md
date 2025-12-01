@@ -115,4 +115,3 @@
 - [[logs/2025-12-01_compute_backend|2025-12-01 - Feature: Compute Backend Abstraction]]
 - [[logs/2025-12-01_memory_pools|2025-12-01 - Feature: Memory Pools & Concurrency Fixes]]
 - [[logs/2025-12-01_native_performance|2025-12-01 - Performance: Native Engine Patch Size Optimization]]
-```
