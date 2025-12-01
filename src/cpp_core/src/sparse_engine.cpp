@@ -189,7 +189,8 @@ int64_t Engine::step_native() {
                             }
 
                             // Procesar salida del modelo
-                            int64_t center_idx = grid_size_ / 2;
+                            int64_t patch_size = 3; // Debe coincidir con build_batch_input
+                            int64_t center_idx = patch_size / 2;
 
                             for (size_t j = 0; j < local_batch_coords.size(); j++) {
                                 // Extraer salida del centro del patch
@@ -270,7 +271,8 @@ int64_t Engine::step_native() {
                 }
                 
                 if (batch_output.defined()) {
-                    int64_t center_idx = grid_size_ / 2;
+                    int64_t patch_size = 3; // Debe coincidir con build_batch_input
+                    int64_t center_idx = patch_size / 2;
 
                     for (size_t j = 0; j < local_batch_coords.size(); j++) {
                         torch::Tensor output_center = batch_output[j].select(2, center_idx).select(1, center_idx);
@@ -381,8 +383,8 @@ torch::Tensor Engine::build_batch_input(const std::vector<Coord3D>& coords) {
 
     int64_t batch_size = static_cast<int64_t>(coords.size());
 
-    // Usar el tamaño del grid con el que fue entrenado el modelo
-    int64_t patch_size = grid_size_;  // Tamaño del patch (debe coincidir con el tamaño de entrenamiento)
+    // Usar un tamaño de patch pequeño para inferencia local eficiente
+    int64_t patch_size = 3;  // Tamaño del patch (3x3 es suficiente para reglas locales)
     int64_t patch_radius = patch_size / 2;  // Radio del patch (para centrar)
 
     int64_t height = patch_size;
