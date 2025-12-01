@@ -220,13 +220,18 @@ async def handle_play(args):
                 await send_notification(ws, msg, "error")
             return
     else:
-        # Motor Python: verificar estado tradicional
-        if not motor.state or motor.state.psi is None:
+        # Motor Python: verificar estado tradicional (solo si tiene state)
+        if hasattr(motor, 'state') and (not motor.state or motor.state.psi is None):
             msg = "⚠️ El modelo cargado no tiene un estado válido. Intenta reiniciar la simulación."
             logging.warning(msg)
             if ws:
                 await send_notification(ws, msg, "warning")
             return
+        elif not hasattr(motor, 'state'):
+            # Engines como HarmonicEngine/LatticeEngine que manejan su propio estado
+            # No necesitan verificación de state.psi
+            logging.info(f"Motor {type(motor).__name__} no tiene atributo 'state', manejando estado internamente")
+
 
     # Asegurar que la simulación no esté pausada
     g_state["is_paused"] = False
@@ -961,10 +966,11 @@ async def handle_inject_energy(args):
             )
         return
 
-    if not motor.state or motor.state.psi is None:
+    if not hasattr(motor, 'state') or not motor.state or (hasattr(motor.state, 'psi') and motor.state.psi is None):
         if ws:
-            await send_notification(ws, "⚠️ Estado no válido.", "warning")
+            await send_notification(ws, "⚠️ Estado no válido o engine no soporta inyección de energía.", "warning")
         return
+
 
     energy_type = args.get("type", "primordial_soup")
 
