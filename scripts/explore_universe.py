@@ -149,8 +149,15 @@ def main():
 
         # 3. Update Archive
         added = archive.add(genotype, phenotype)
+    # Ensure output dir exists
+    os.makedirs("output", exist_ok=True)
+    output_path = "output/universe_atlas.json"
 
-        if added:
+    archive.save(output_path)
+
+    elapsed = time.time() - start_time
+    logger.info(f"Exploration Complete. {len(archive.grid)} niches filled out of {archive.resolution**2} possible.")
+    logger.info(f"Atlas saved to {output_path}")
             logger.info(f"Gen {i}: New Elite found! Ent={phenotype.entropy:.2f}, Stab={phenotype.stability:.2f}, Fit={phenotype.fitness:.2f}")
 
     # Save Results
