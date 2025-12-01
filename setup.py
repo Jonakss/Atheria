@@ -200,6 +200,8 @@ setup(
         "torch",
         "numpy",
         "pybind11>=2.10.0",
+        "redis>=4.0.0",
+        "zstandard>=0.19.0",
     ],
     setup_requires=[
         "pybind11>=2.10.0",
