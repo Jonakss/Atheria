@@ -80,7 +80,17 @@ Cuando cargas un experimento desde el frontend:
 - `src/pipelines/pipeline_server.py`: Función `handle_load_experiment()` (línea ~1015)
 - `src/engines/native_engine_wrapper.py`: Wrapper del motor nativo
 
-## Troubleshooting
+## Enlaces Relacionados
+
+- [[NATIVE_ENGINE_DEVICE_CONFIG]] - Configuración de device (CPU/CUDA) para el motor nativo
+- [[SPARSE_ARCHITECTURE_V4]] - Arquitectura sparse del motor C++
+- [[NATIVE_PARALLELISM]] - Paralelismo OpenMP en el motor nativo
+- [[CUDA_CONFIGURATION]] - Configuración de CUDA
+
+## Tags
+
+#native-engine #migration #torchscript #cpp #performance
+
 
 ### Problemas Comunes
 

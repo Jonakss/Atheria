@@ -44,7 +44,20 @@ In Experiment 04 ("Quantum Optimization"), we use this loop to find stable "Laws
 *   **Cost Function:** The simulated entropy of the Aetheria grid after $N$ steps.
 *   **Result:** The quantum circuit learns to output parameters that stabilize the universe.
 
+This approach allows us to leverage quantum hardware for hyperparameter tuning, potentially discovering physics configurations unreachable by classical optimization.
+
 ## 5. Key References
 *   *Peruzzo et al., "A variational eigenvalue solver on a photonic quantum processor", Nature Comm, 2014.*
 *   *McClean et al., "The theory of variational hybrid quantum-classical algorithms", New J. Phys, 2016.*
 *   *Cerezo et al., "Variational Quantum Algorithms", Nature Reviews Physics, 2021.*
+
+## Enlaces Relacionados
+
+- [[QUANTUM_COMPUTE_SERVICES]] - Servicios de computación cuántica (IonQ, Braket, IBM)
+- [[QUANTUM_NATIVE_ARCHITECTURE_V1]] - Arquitectura nativa cuántica
+- [[NEURAL_CELLULAR_AUTOMATA_THEORY]] - Teoría NCA que se optimiza
+- [[QUALITY_DIVERSITY_MAP_ELITES]] - Alternativa clásica de optimización
+
+## Tags
+
+#quantum #vqe #optimization #variational #qiskit

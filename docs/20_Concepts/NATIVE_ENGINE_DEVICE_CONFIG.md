@@ -104,3 +104,13 @@ wrapper = NativeEngineWrapper(
 - `src/config.py::get_native_device()`
 - `src/engines/native_engine_wrapper.py::__init__()`
 
+## Enlaces Relacionados
+
+- [[CUDA_CONFIGURATION]] - Configuración detallada de CUDA
+- [[NATIVE_PARALLELISM]] - Paralelismo en el motor nativo
+- [[PYTHON_TO_NATIVE_MIGRATION]] - Guía de migración de experimentos
+- [[SPARSE_ARCHITECTURE_V4]] - Arquitectura del motor nativo
+
+## Tags
+
+#native-engine #device #cuda #cpu #configuration

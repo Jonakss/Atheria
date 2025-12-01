@@ -16,6 +16,7 @@
 
 ## 📋 Índice de Entradas
 
+- [[logs/2025-12-01_obsidian_kb_optimization|2025-12-01 - Optimization: Knowledge Base Obsidian Links (docs/20_Concepts/)]]
 - [[logs/2025-12-01_frontend_lint_fixes|2025-12-01 - Fix: Frontend Lint and Build Errors]]
 - [2025-12-01: UI Consolidation and Holographic Viewer Improvements](logs/2025-12-01_ui_consolidation.md)
 - [[logs/2025-12-01_compute_backend_implementation|2025-12-01 - Feature: Compute Backend Abstraction (Local/Quantum/Mock)]]

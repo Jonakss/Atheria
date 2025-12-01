@@ -31,4 +31,11 @@ La implementación se encuentra en `src/pipelines/viz/phase_space.py` y utiliza:
 *   **Caché:** Evita recalcular la proyección si el estado cuántico no ha cambiado significativamente.
 
 ---
-**Tags:** #concept #visualization #physics #pca #clustering
+
+## Enlaces Relacionados
+
+- [[QUALITY_DIVERSITY_MAP_ELITES]] - Algoritmo MAP-Elites que explora el espacio de fases
+- [[NEURAL_CELLULAR_AUTOMATA_THEORY]] - Teoría NCA y análisis de estado
+- [[3D_STATE_SPACE_CONCEPT]] - Conceptualización del espacio de estados
+
+**Tags:** #concept #visualization #physics #pca #clustering #phase-space

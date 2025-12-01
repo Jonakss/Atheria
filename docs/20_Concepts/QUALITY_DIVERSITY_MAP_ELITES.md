@@ -45,3 +45,24 @@ Convergent evolution often gets stuck in local optima (boring stable states). QD
 *   *Mouret & Clune, "Illuminating search spaces by mapping elites", arXiv, 2015.*
 *   *Pugh et al., "Quality Diversity: A New Frontier for Evolutionary Computation", Frontiers in Robotics and AI, 2016.*
 *   *Cully et al., "Robots that can adapt like animals", Nature, 2015.*
+
+## 5. Application in Atheria
+
+En Atheria, MAP-Elites se utiliza para entrenar "Ley M" encontrando múltiples configuraciones de física que generen comportamientos diversos. Los Behavioral Descriptors incluyen:
+
+- **Entropía**: Nivel de desorden en el universo
+- **Estabilidad**: Variación temporal del estado
+- **Masa Activa**: Proporción de celdas activas
+- **Complejidad Emergente**: Detectada mediante análisis topológico
+
+Esto permite descubrir "regiones interesantes" del espacio de física, como el "Edge of Chaos" donde emerge la complejidad.
+
+## Enlaces Relacionados
+
+- [[NEURAL_CELLULAR_AUTOMATA_THEORY]] - Teoría NCA que se entrena con MAP-Elites
+- [[PHASE_SPACE_VISUALIZATION]] - Visualización del espacio de fases descubierto
+- [[QUANTUM_OPTIMIZATION_VQE]] - Otra técnica de optimización cuántica
+
+## Tags
+
+#quality-diversity #map-elites #optimization #evolution #training

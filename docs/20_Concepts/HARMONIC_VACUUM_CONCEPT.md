@@ -38,6 +38,16 @@ Cero Memoria: No se guarda en arrays; se computa "on-the-fly" (al vuelo).
 
 Relación con Otros Sistemas
 
-Es utilizado por el [[SparseQuantumEngine]] para rellenar los huecos entre la materia.
+Es utilizado por el motor Sparse (ver [[SPARSE_ARCHITECTURE_V4]]) para rellenar los huecos entre la materia.
 
-Interactúa con la [[Ley M]] durante la inferencia.
+Interactúa con la Ley M (modelo neuronal, ver [[NEURAL_CELLULAR_AUTOMATA_THEORY]]) durante la inferencia.
+
+## Enlaces Relacionados
+
+- [[HARMONIC_ENGINE]] - Motor que implementa este concepto
+- [[SPARSE_ARCHITECTURE_V4]] - Arquitectura sparse que lo utiliza
+- [[NEURAL_CELLULAR_AUTOMATA_THEORY]] - Teoría NCA y Ley M
+
+## Tags
+
+#vacuum #harmonic #qft #procedural #infinite-universe

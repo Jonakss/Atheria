@@ -76,3 +76,14 @@ La transición a este espacio de estados 3D conlleva un aumento cúbico en la co
 
 * **Explosión de Memoria:** Un grid $128 \times 128$ tiene ~16k celdas. Un grid $128 \times 128 \times 128$ tiene ~2 millones. Esto impacta drásticamente la VRAM requerida.
 * **Arquitectura Distribuida:** Debido a este coste, el modelo 3D justifica la transición hacia una arquitectura de **Ejecución Remota**, donde el cálculo del tensor 5D ocurre en GPUs dedicadas (Workers) y la visualización (proyección 2D/Holograma) se transmite al cliente local.
+
+## Enlaces Relacionados
+
+- [[AdS_CFT_Correspondence]] - Correspondencia AdS/CFT para visualización holográfica
+- [[The_Holographic_Viewer]] - Viewer que implementa la proyección 2D del bulk 3D
+- [[NEURAL_CELLULAR_AUTOMATA_THEORY]] - Teoría NCA que opera en espacios de alta dimensión
+- [[CUDA_CONFIGURATION]] - Configuración de CUDA para manejar tensores 5D
+
+## Tags
+
+#3d #state-space #tensors #topology #ads-cft #holography

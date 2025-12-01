@@ -109,8 +109,16 @@ Por ahora, seguimos con la implementación actual que ya incluye:
 
 ## Referencias
 
-- [[NATIVE_ENGINE_WRAPPER]]: Wrapper Python para el motor C++
-- [[TECHNICAL_ARCHITECTURE_V4]]: Arquitectura general del sistema
 - `src/cpp_core/src/sparse_engine.cpp`: Implementación C++
 - `src/cpp_core/include/sparse_engine.h`: Interfaz C++
 
+## Enlaces Relacionados
+
+- [[SPARSE_ARCHITECTURE_V4]] - Arquitectura sparse general
+- [[NATIVE_PARALLELISM]] - Paralelismo en el motor nativo
+- [[HARMONIC_VACUUM_CONCEPT]] - Vacío cuántico armónico
+- [[NATIVE_ENGINE_DEVICE_CONFIG]] - Configuración de device
+
+## Tags
+
+#sparse-engine #active-neighbors #vacuum #qft #cpp

@@ -31,3 +31,14 @@ La visualización RGB estándar es una proyección limitada. Para analizar la si
 - **Interferencia Total:** La superposición de todos los campos (la "música" completa).
 
 Esta interpretación justifica la búsqueda de patrones de onda e interferencia en lugar de estructuras rígidas de bloques.
+
+## Enlaces Relacionados
+
+- [[FIELD_VISUALIZATIONS]] - Visualizaciones avanzadas de campos
+- [[NEURAL_CELLULAR_AUTOMATA_THEORY]] - Teoría NCA y Ley M
+- [[HARMONIC_VACUUM_CONCEPT]] - Vacío cuántico armónico
+- [[WEBGL_SHADERS]] - Shaders para visualización de campos
+
+## Tags
+
+#field-theory #qft #visualization #interference #superposition

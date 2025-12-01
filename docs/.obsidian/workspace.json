@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "2589372034465b57",
+        "id": "b0575859ea934540",
         "type": "tabs",
         "children": [
           {
-            "id": "8ec795a92d8b2ebe",
+            "id": "81ede3e987ac16e9",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -162,8 +162,19 @@
       "bases:Create new base": false
     }
   },
-  "active": "8ec795a92d8b2ebe",
+  "active": "81ede3e987ac16e9",
   "lastOpenFiles": [
+    "40_Experiments/logs/2025-12-01_obsidian_kb_optimization.md",
+    "Untitled.canvas",
+    "00_KNOWLEDGE_BASE.md",
+    "00_KNOWLEDGE_BASE_GAPS_ANALYSIS.md",
+    "00_RESPONSIBILITIES.md",
+    "OBSIDIAN_SETUP.md",
+    "README.md",
+    "referencia a Ley M.md",
+    "40_Experiments/logs/2025-12-01_benchmarking.md",
+    "20_Concepts/NEURAL_CELLULAR_AUTOMATA_THEORY.md",
+    "40_Experiments/logs/2025-12-01_frontend_lint_fixes.md",
     "40_Experiments/assets/verification_training_section.png",
     "40_Experiments/assets/verification_settings_modal.png",
     "40_Experiments/assets/verification_lab_menu.png",
@@ -174,29 +185,19 @@
     "40_Experiments/logs/2025-12-01_compute_backend.md",
     "40_Experiments/logs/2025-12-01_octree_integration.md",
     "40_Experiments/logs/2025-12-01_modular_physics_engine.md",
-    "Untitled.canvas",
     "20_Concepts/QUANTUM_NATIVE_ARCHITECTURE_V1.md",
     "20_Concepts/POLAR_ARCHITECTURE_V3.md",
     "20_Concepts/QUANTUM_OPTIMIZATION_VQE.md",
     "20_Concepts/QUALITY_DIVERSITY_MAP_ELITES.md",
-    "20_Concepts/NEURAL_CELLULAR_AUTOMATA_THEORY.md",
     "30_Components/NATIVE_ENGINE_TESTS.md",
     "40_Experiments/HARLOW_LIMIT_TEST.md",
     "40_Experiments/HOW_TO_RUN.md",
-    "referencia a Ley M.md",
     "40_Experiments/EXP_003_HARLOW_LIMIT.md",
     "40_Experiments/configs/harlow_limit.yaml",
     "40_Experiments/MultiPhase_Experiment_v1/Fase1_Vacuum_Stability.md",
     "40_Experiments/AI_DEV_LOG.md",
     "40_Experiments/configs/low_memory_mlp.yaml",
     "40_Experiments/configs",
-    "40_Experiments/LOW_MEMORY_TRAINING_GUIDE.md",
-    "40_Experiments/UI_DASHBOARD_IMPROVEMENTS_2025_11_29.md",
-    "40_Experiments/TRAINING_EMERGE_TEST_2240.md",
-    "40_Experiments/UI_IMPROVEMENTS_2025_11_29.md",
-    "40_Experiments/EMERGE_TEST_2243.md",
-    "40_Experiments/logs/2025-11-28_roadmap_restructuring_ads_cft.md",
-    "10_core/ROADMAP_AI_RESEARCH.md",
     "logs"
   ]
 }

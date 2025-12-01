@@ -56,3 +56,23 @@ To ensure the "Physics" are robust, we often employ:
 *   *Mordvintsev et al., "Growing Neural Cellular Automata", Distill, 2020.*
 *   *Randazzo et al., "Self-classifying MNIST Digits", Distill, 2020.*
 *   *Gilpin, W. "Cellular automata as convolutional neural networks", Phys. Rev. E, 2019.*
+
+## 5. Application in Atheria
+
+En Atheria, utilizamos NCA como base para "Ley M", el modelo neuronal que gobierna la evolución del universo simulado. La arquitectura combina:
+
+- **Perception**: Convoluciones para detectar patrones locales en el campo cuántico
+- **Update Rule**: Red neuronal que aprende las leyes de física óptimas
+- **Stochasticity**: Dropout para robustez y prevención de patrones frágiles
+- **Training**: Optimización mediante [[QUALITY_DIVERSITY_MAP_ELITES]] para encontrar física compleja
+
+## Enlaces Relacionados
+
+- [[QUALITY_DIVERSITY_MAP_ELITES]] - Algoritmo de entrenamiento para explorar espacio de física
+- [[HARMONIC_VACUUM_CONCEPT]] - Concepto del vacío cuántico en Atheria
+- [[QUANTUM_OPTIMIZATION_VQE]] - Optimización cuántica variacional
+- [[INFERENCE_OPTIMIZATION_STRATEGIES]] - Estrategias para optimizar inferencia del modelo
+
+## Tags
+
+#nca #theory #differentiable-physics #ai #machine-learning

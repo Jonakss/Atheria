@@ -53,5 +53,11 @@ Existe un riesgo conocido de **deadlocks** al combinar OpenMP con LibTorch (PyTo
 
 ## 🔗 Referencias
 
-- [[Native_Engine_Core]]
-- [[ROADMAP_PHASE_2]]
+- [[SPARSE_ENGINE_ACTIVE_NEIGHBORS]] - Cómo funcionan los vecinos activos
+- [[SPARSE_ARCHITECTURE_V4]] - Arquitectura sparse general
+- [[NATIVE_ENGINE_DEVICE_CONFIG]] - Configuración de device
+- [[CUDA_CONFIGURATION]] - Configuración de CUDA
+
+## Tags
+
+#native-engine #parallelism #openmp #performance #cpp

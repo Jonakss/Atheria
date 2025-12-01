@@ -41,3 +41,13 @@ El espacio Anti-de Sitter tiene una geometría hiperbólica (curvatura negativa 
 
 ---
 **Nota:** Comprender esta correspondencia es vital para interpretar correctamente los resultados del `HolographicViewer`. Lo que parece "ruido" en el 2D puede ser un "agujero negro" formándose en el 3D.
+
+## Enlaces Relacionados
+
+- [[The_Holographic_Viewer]] - Implementación visual de la dualidad AdS/CFT
+- [[3D_STATE_SPACE_CONCEPT]] - Conceptualización del espacio de estados en 3D
+- [[The_Harlow_Limit_Theory]] - Límites de complejidad emergente
+
+## Tags
+
+#ads-cft #holography #string-theory #bulk-boundary #emergent-gravity

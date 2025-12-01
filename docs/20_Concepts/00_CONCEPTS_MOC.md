@@ -15,13 +15,22 @@
 ## 🔧 Arquitecturas y Sistemas
 
 - **[Arquitectura Sparse en V4](../20_Concepts/SPARSE_ARCHITECTURE_V4.md)** - Sparse como arquitectura base del motor nativo C++
+- **[Sparse Engine: Vecinos Activos](../20_Concepts/SPARSE_ENGINE_ACTIVE_NEIGHBORS.md)** - Cómo el motor sparse procesa celdas activas y sus vecinos
 - **[Configuración de CUDA](../20_Concepts/CUDA_CONFIGURATION.md)** - Configuración y troubleshooting de CUDA para PyTorch y motor nativo
+- **[Configuración de Device del Motor Nativo](../20_Concepts/NATIVE_ENGINE_DEVICE_CONFIG.md)** - Cómo seleccionar CPU o CUDA para el motor nativo
 - **[Paralelismo Nativo (OpenMP)](../20_Concepts/NATIVE_PARALLELISM.md)** - Documentación sobre la implementación de paralelismo en el motor C++
+- **[Migración Python → Nativo](../20_Concepts/PYTHON_TO_NATIVE_MIGRATION.md)** - Guía para migrar experimentos del motor Python al motor C++ nativo
 - **[History Buffer Architecture](../20_Concepts/HISTORY_BUFFER_ARCHITECTURE.md)** - Sistema de buffer circular para navegación temporal (rewind/replay)
+
+## 🧠 Teoría de IA y Aprendizaje
+
+- **[Neural Cellular Automata Theory](../20_Concepts/NEURAL_CELLULAR_AUTOMATA_THEORY.md)** - Fundamentos de NCA y física diferenciable
+- **[Quality Diversity & MAP-Elites](../20_Concepts/QUALITY_DIVERSITY_MAP_ELITES.md)** - Algoritmo para exploración del espacio de búsqueda
 
 ## ⚡ Optimización e Inferencia
 
 - **[Inference Optimization Strategies](../20_Concepts/INFERENCE_OPTIMIZATION_STRATEGIES.md)** - Estrategias para optimizar el servicio del modelo Ley M (LitServe, cuantización, compilación)
+- **[Quantum Optimization & VQE](../20_Concepts/QUANTUM_OPTIMIZATION_VQE.md)** - Variational Quantum Eigensolver para optimización cuántica
 
 ## 🎨 Visualización y Rendering
 
