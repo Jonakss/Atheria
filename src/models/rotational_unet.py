@@ -79,4 +79,7 @@ class RotationalUNet(nn.Module):
         # Use Tanh to constrain predictions
         # Channel 0: Delta Mag (Additive/Log-space) -> Tanh allows +/- changes
         # Channel 1: Delta Phase (Rotational) -> Tanh * PI allows full rotation range (well, PI/1 scale)
-        return torch.tanh(logits)
+        # Channel 1: Delta Phase (Rotational) -> Tanh * PI allows full rotation range
+        output = torch.tanh(logits)
+        output[:, 1:2, :, :] *= np.pi
+        return output
