@@ -32,10 +32,13 @@ class QC_Trainer_v3:
         # Configurar optimizador
         # Usar get_model_for_params() para acceder a parámetros correctamente
         model_for_params = self.motor.get_model_for_params()
-        self.optimizer = optim.Adam(
-            model_for_params.parameters(),
-            lr=self.lr_rate
-        )
+        if model_for_params:
+            self.optimizer = optim.Adam(
+                model_for_params.parameters(),
+                lr=self.lr_rate
+            )
+        else:
+            self.optimizer = None
         
         # Parámetros de entrenamiento desde exp_cfg
         self.total_episodes = exp_cfg.TOTAL_EPISODES
@@ -127,8 +130,11 @@ class QC_Trainer_v3:
         """
         # Usar get_model_for_params() para acceder al modelo correctamente
         model_for_params = self.motor.get_model_for_params()
-        model_for_params.train()
-        self.optimizer.zero_grad()
+        if model_for_params:
+            model_for_params.train()
+        
+        if self.optimizer:
+            self.optimizer.zero_grad()
         
         # Inicializar estados del batch
         psi_initial = self.motor.get_initial_state(self.batch_size)
@@ -144,10 +150,11 @@ class QC_Trainer_v3:
         
         # IMPORTANTE: Resetear estados de memoria después de cada episodio de entrenamiento
         # para evitar problemas con backward a través de múltiples episodios
-        if hasattr(self.motor.state, 'h_state') and self.motor.state.h_state is not None:
-            self.motor.state.h_state = None
-        if hasattr(self.motor.state, 'c_state') and self.motor.state.c_state is not None:
-            self.motor.state.c_state = None
+        if hasattr(self.motor, 'state'):
+            if hasattr(self.motor.state, 'h_state') and self.motor.state.h_state is not None:
+                self.motor.state.h_state = None
+            if hasattr(self.motor.state, 'c_state') and self.motor.state.c_state is not None:
+                self.motor.state.c_state = None
         
         # Calcular recompensa
         total_reward, reward_quietud, reward_complejidad = self.compute_reward(
@@ -164,12 +171,14 @@ class QC_Trainer_v3:
         if self.gradient_clip > 0:
             # Usar get_model_for_params() para acceder a parámetros correctamente
             model_for_params = self.motor.get_model_for_params()
-            torch.nn.utils.clip_grad_norm_(
-                model_for_params.parameters(),
-                self.gradient_clip
-            )
+            if model_for_params:
+                torch.nn.utils.clip_grad_norm_(
+                    model_for_params.parameters(),
+                    self.gradient_clip
+                )
         
-        self.optimizer.step()
+        if self.optimizer:
+            self.optimizer.step()
         
         # Guardar valores antes de liberar memoria
         loss_val = loss.item()
@@ -213,13 +222,14 @@ class QC_Trainer_v3:
                     return str(obj)
         
         # Obtener el state_dict del modelo, manejando modelos compilados
+        # Obtener el state_dict del modelo, manejando modelos compilados
         # Usar get_model_for_params() para acceder al modelo correctamente
         model_for_params = self.motor.get_model_for_params()
-        model_state_dict = model_for_params.state_dict()
+        model_state_dict = model_for_params.state_dict() if model_for_params else None
         
         # Si el modelo está compilado, las claves tienen prefijo "_orig_mod."
         # Remover el prefijo para guardar el modelo sin compilar
-        if any(key.startswith('_orig_mod.') for key in model_state_dict.keys()):
+        if model_state_dict and any(key.startswith('_orig_mod.') for key in model_state_dict.keys()):
             logging.info("Modelo compilado detectado, removiendo prefijo '_orig_mod.' al guardar checkpoint")
             cleaned_state_dict = {}
             for key, value in model_state_dict.items():
@@ -233,7 +243,7 @@ class QC_Trainer_v3:
         checkpoint = {
             'episode': episode,
             'model_state_dict': model_state_dict,
-            'optimizer_state_dict': self.optimizer.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict() if self.optimizer else None,
             'loss': loss,
             'reward': reward,
             'config': sns_to_dict(self.exp_cfg)
