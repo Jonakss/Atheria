@@ -230,18 +230,17 @@ Before deploying optimizations:
 
 ---
 
-## References
+## Referencias
 
-- LitServe Documentation: [[LITSERVE_INTEGRATION]]
-- PyTorch Compilation: [[TORCH_COMPILE_GUIDE]]
-- Quantization Techniques: [[MODEL_QUANTIZATION]]
-- Hardware Benchmarks: [[GPU_SELECTION_GUIDE]]
+Ver roadmap completo en [[ROADMAP_INFERENCE_OPTIMIZATION]]
 
----
+## Enlaces Relacionados
 
-## Related Concepts
+- [[NEURAL_CELLULAR_AUTOMATA_THEORY]] - Modelo Ley M a optimizar
+- [[CUDA_CONFIGURATION]] - Configuración de CUDA para GPUs
+- [[NATIVE_ENGINE_DEVICE_CONFIG]] - Configuración de device
+- [[PYTHON_TO_NATIVE_MIGRATION]] - Migración para mejor rendimiento
 
-- [[REAL_TIME_INFERENCE]]
-- [[MODEL_SERVING_ARCHITECTURE]]
-- [[GPU_OPTIMIZATION]]
-- [[TRAINING_OPTIMIZATION]]
+## Tags
+
+#inference #optimization #litserve #quantization #torch-compile #performance

@@ -22,5 +22,15 @@ The engine is implemented in `src/engines/harmonic_engine.py` and consists of tw
 The Harmonic Engine is selected by setting `ENGINE_TYPE = 'HARMONIC'` in the experiment configuration or by forcing the engine type during load.
 
 ## Related Concepts
--   [[HARMONIC_VACUUM_CONCEPT]]
--   [[SPARSE_ARCHITECTURE_V4]]
+-   [[HARMONIC_VACUUM_CONCEPT]] - Concepto del vacío armónico
+-   [[SPARSE_ARCHITECTURE_V4]] - Arquitectura sparse base
+
+## Enlaces Relacionados
+
+- [[NEURAL_CELLULAR_AUTOMATA_THEORY]] - Teoría NCA y Ley M
+- [[NATIVE_PARALLELISM]] - Paralelismo en motor nativo
+- [[PYTHON_TO_NATIVE_MIGRATION]] - Migración de motores
+
+## Tags
+
+#harmonic-engine #sparse #vacuum #qft #procedural

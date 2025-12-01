@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "b0575859ea934540",
+        "id": "6094c073885c1725",
         "type": "tabs",
         "children": [
           {
-            "id": "81ede3e987ac16e9",
+            "id": "5692398a7a86fa0e",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -162,8 +162,9 @@
       "bases:Create new base": false
     }
   },
-  "active": "81ede3e987ac16e9",
+  "active": "5692398a7a86fa0e",
   "lastOpenFiles": [
+    "99_Templates/AGENT_GUIDELINES.md",
     "40_Experiments/logs/2025-12-01_obsidian_kb_optimization.md",
     "Untitled.canvas",
     "00_KNOWLEDGE_BASE.md",
@@ -195,7 +196,6 @@
     "40_Experiments/EXP_003_HARLOW_LIMIT.md",
     "40_Experiments/configs/harlow_limit.yaml",
     "40_Experiments/MultiPhase_Experiment_v1/Fase1_Vacuum_Stability.md",
-    "40_Experiments/AI_DEV_LOG.md",
     "40_Experiments/configs/low_memory_mlp.yaml",
     "40_Experiments/configs",
     "logs"

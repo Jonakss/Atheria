@@ -101,7 +101,18 @@ def _update_dense_state_from_sparse(self):
 - `src/cpp_core/include/sparse_map.h`: Estructura de datos SparseMap
 - `src/engines/native_engine_wrapper.py`: Wrapper con conversión automática
 - `src/engines/qca_engine.py`: Motor Python denso (entrenamiento)
-- [[TECHNICAL_ARCHITECTURE_V4]]: Arquitectura técnica general
+
+## Enlaces Relacionados
+
+- [[SPARSE_ENGINE_ACTIVE_NEIGHBORS]] - Cómo se procesan vecinos activos
+- [[HARMONIC_VACUUM_CONCEPT]] - Vacío armónico on-demand
+- [[NATIVE_ENGINE_DEVICE_CONFIG]] - Configuración de device
+- [[PYTHON_TO_NATIVE_MIGRATION]] - Migración de experimentos
+- [[NATIVE_PARALLELISM]] - Paralelismo en el motor
+
+## Tags
+
+#sparse #architecture #native-engine #memory-optimization #cpp
 
 ---
 
