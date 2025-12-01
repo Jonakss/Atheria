@@ -149,7 +149,8 @@ PYBIND11_MODULE(atheria_core, m) {
              py::arg("coord"))
         .def("step_native", &Engine::step_native,
              "Ejecuta un paso completo de simulación en C++ (todo el trabajo pesado)",
-             "Retorna el número de partículas activas")
+             "Retorna el número de partículas activas",
+             py::call_guard<py::gil_scoped_release>())
         .def("get_matter_count", &Engine::get_matter_count,
              "Retorna el número de partículas de materia")
         .def("get_step_count", &Engine::get_step_count,
@@ -165,6 +166,7 @@ PYBIND11_MODULE(atheria_core, m) {
              "Obtiene el último mensaje de error (si hubo un error al cargar el modelo)")
         .def("compute_visualization", &Engine::compute_visualization,
              "Calcula la visualización directamente en C++",
-             py::arg("viz_type"));
+             py::arg("viz_type"),
+             py::call_guard<py::gil_scoped_release>());
 #endif
 }
