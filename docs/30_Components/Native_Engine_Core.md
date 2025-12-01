@@ -95,6 +95,22 @@ return torch::complex(real, imag);
 8. Filtrar estados con energía baja (< 0.01)
 9. Actualizar mapa disperso
 
+9. Actualizar mapa disperso
+
+### 4. TensorPool
+
+**Ubicación:** `src/cpp_core/include/tensor_pool.h`
+
+**Funcionalidad:**
+- Sistema de reciclaje de memoria para `torch::Tensor`
+- Evita la fragmentación de memoria por asignaciones/liberaciones frecuentes
+- Mantiene un pool de tensores pre-asignados
+
+**Uso en `step_native()`:**
+- `pool_.acquire()`: Obtiene un tensor reutilizable para el nuevo estado
+- `pool_.release()`: Devuelve los tensores del estado anterior al pool
+- Reduce significativamente el overhead del asignador de memoria del sistema
+
 ---
 
 ## 📥 Inputs / 📤 Outputs

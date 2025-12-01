@@ -4,6 +4,7 @@
 
 #include "sparse_map.h"
 #include "octree.h"
+#include "tensor_pool.h" // Added
 #include <torch/torch.h>
 #include <torch/script.h>
 #include <string>
@@ -127,6 +128,7 @@ private:
     // Almacenamiento
     SparseMap matter_map_;
     HarmonicVacuum vacuum_;
+    TensorPool pool_; // Memory pool for tensors
     OctreeIndex octree_;
     
     // Estado de simulación
