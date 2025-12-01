@@ -25,7 +25,7 @@ def main():
     try:
         logging.info("Importando módulos del proyecto...")
         from src.utils import load_experiment_config
-        from src.pipeline_train import run_training_pipeline
+        from src.pipelines.pipeline_train import run_training_pipeline
         logging.info("Módulos importados exitosamente.")
         
         logging.info(f"Cargando configuración para el experimento: {experiment_name}")

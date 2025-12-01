@@ -248,8 +248,12 @@ async def simulation_loop():
                             g_state['steps_interval_counter'] = 0
                             
                             # Detectar época periódicamente (cada 50 pasos para no saturar)
+                            # Detectar época y calcular métricas periódicamente (cada 50 pasos)
                             epoch_detector = g_state.get('epoch_detector')
-                            if epoch_detector and updated_step % 50 == 0:
+                            # Calcular métricas si hay detector O si estamos en inferencia (para Harlow Limit)
+                            should_calculate_metrics = (updated_step % 50 == 0)
+                            
+                            if should_calculate_metrics:
                                 try:
                                     # OPTIMIZACIÓN: Para motor nativo, usar get_dense_state() si está disponible
                                     motor = g_state['motor']
@@ -258,18 +262,38 @@ async def simulation_loop():
                                         psi_tensor = motor.get_dense_state(check_pause_callback=lambda: g_state.get('is_paused', True))
                                     else:
                                         psi_tensor = motor.state.psi if hasattr(motor, 'state') and motor.state else None
+                                    
                                     if psi_tensor is not None:
-                                        # Analizar estado y determinar época
-                                        metrics = epoch_detector.analyze_state(psi_tensor)
-                                        epoch = epoch_detector.determine_epoch(metrics)
-                                        g_state['current_epoch'] = epoch
-                                        g_state['epoch_metrics'] = {
-                                            'energy': float(metrics.get('energy', 0)),
-                                            'clustering': float(metrics.get('clustering', 0)),
-                                            'symmetry': float(metrics.get('symmetry', 0))
+                                        metrics = {}
+                                        if epoch_detector:
+                                            # Analizar estado y determinar época
+                                            metrics = epoch_detector.analyze_state(psi_tensor)
+                                            epoch = epoch_detector.determine_epoch(metrics)
+                                            g_state['current_epoch'] = epoch
+                                        
+                                        # Calcular métricas adicionales para Harlow Limit (siempre)
+                                        from ...physics.metrics import calculate_fidelity, calculate_entanglement_entropy
+                                        
+                                        # Necesitamos estado inicial para fidelidad
+                                        # Si no tenemos estado inicial guardado, usar el actual como referencia (F=1)
+                                        if 'initial_state_ref' not in g_state:
+                                            g_state['initial_state_ref'] = psi_tensor.clone().detach()
+                                            
+                                        fidelity = calculate_fidelity(g_state['initial_state_ref'], psi_tensor)
+                                        entropy = calculate_entanglement_entropy(psi_tensor)
+                                        
+                                        # Actualizar epoch_metrics (merge con existentes o defaults)
+                                        current_metrics = g_state.get('epoch_metrics', {})
+                                        new_metrics = {
+                                            'energy': float(metrics.get('energy', current_metrics.get('energy', 0))),
+                                            'clustering': float(metrics.get('clustering', current_metrics.get('clustering', 0))),
+                                            'symmetry': float(metrics.get('symmetry', current_metrics.get('symmetry', 0))),
+                                            'fidelity': float(fidelity),
+                                            'entropy': float(entropy)
                                         }
+                                        g_state['epoch_metrics'] = new_metrics
                                 except Exception as e:
-                                    logging.debug(f"Error detectando época: {e}")
+                                    logging.warning(f"Error calculando métricas/época: {e}")
                             
                             # Calcular visualización para este frame
                             # OPTIMIZACIÓN: Solo calcular Poincaré cada N frames si está activo

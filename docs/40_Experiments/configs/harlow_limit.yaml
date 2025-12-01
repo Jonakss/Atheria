@@ -1,0 +1,33 @@
+# Experimento 03: El Límite de Harlow
+# Objetivo: Validar complejidad emergente en sistema unitario cerrado
+# Ver: docs/40_Experiments/EXP_003_HARLOW_LIMIT.md
+
+EXPERIMENT_NAME: "HARLOW_LIMIT_TEST"
+MODEL_ARCHITECTURE: "UNetUnitary"
+
+# Parámetros Físicos (Sistema Cerrado)
+GAMMA_DECAY: 0.0 # Sin disipación de energía
+NOISE_LEVEL: 0.001 # Perturbación mínima inicial
+POTENTIAL_TYPE: "harmonic" # Potencial confinante suave
+
+# Entrenamiento
+LEARNING_RATE: 0.0001
+BATCH_SIZE: 8
+QCA_STEPS_TRAINING: 100 # Pasos por episodio de entrenamiento
+TOTAL_EPISODES: 1000
+
+# Dimensiones
+GRID_SIZE_TRAINING: 64 # Entrenar en grid pequeño
+GRID_SIZE_INFERENCE: 256 # Simular en grid grande
+
+# Estado Inicial
+INITIAL_STATE_MODE_TRAINING: "complex_noise"
+INITIAL_STATE_MODE_INFERENCE: "complex_noise"
+
+# Configuración del Modelo
+MODEL_PARAMS:
+  d_state: 4 # Dimensión del estado cuántico
+  d_hidden: 32 # Canales ocultos
+  n_layers: 4 # Profundidad de la U-Net
+  kernel_size: 3
+  activation: "gelu"
