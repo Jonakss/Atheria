@@ -27,8 +27,9 @@ related: [[10_core/00_CORE_MOC]], [[40_Experiments/00_EXPERIMENTS_MOC]]
 ## ⚙️ Motores y Sistemas
 
 - [[Native_Engine_Core]] - Motor Nativo C++ (arquitectura y optimizaciones)
-- [[NATIVE_ENGINE_COMMUNICATION]] - Comunicación del motor nativo
-- [[HISTORY_SYSTEM]] - Gestión de historia de simulación
+- [[NATIVE_ENGINE_CORE]]: Núcleo del motor nativo en C++.
+- [[MOTOR_FACTORY_ARCHITECTURE]]: Arquitectura de selección dinámica de motores físicos.
+- [[LATTICE_ENGINE]]: Motor de física de retícula (Lattice Gauge Theory). simulación
 - [[GPU_OPTIMIZATION]] - Optimizaciones de GPU
 - [[DRAGONFLY_CACHE]] - Caché distribuido (Dragonfly/Redis)
 - [[REFACTORING_PLAN]] - Plan de refactorización (archivos atómicos) - Estado actual

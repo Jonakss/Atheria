@@ -50,6 +50,7 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
     const [transferWizardOpened, setTransferWizardOpened] = useState(false);
 
     const [selectedEngine, setSelectedEngine] = useState<string>('auto');
+    const [creationEngineType, setCreationEngineType] = useState<string>('CARTESIAN');
 
     // Encontrar el experimento activo
     const currentExperiment = activeExperiment 
@@ -99,7 +100,8 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
             TOTAL_EPISODES: episodesToAdd,
             MODEL_PARAMS: { d_state: dState, hidden_channels: hiddenChannels, alpha: 0.9, beta: 0.85 },
             GAMMA_DECAY: gammaDecay,
-            INITIAL_STATE_MODE_INFERENCE: initialStateMode
+            INITIAL_STATE_MODE_INFERENCE: initialStateMode,
+            ENGINE_TYPE: creationEngineType
         };
         
         if (transferFromExperiment) {
@@ -467,6 +469,24 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
                                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Nuevo Experimento</div>
                                 
                                 <div className="space-y-3">
+                                    {/* Selector de Motor Físico (Primer Paso) */}
+                                    <div>
+                                        <label className="block text-[10px] text-gray-400 mb-1 uppercase">Motor Físico</label>
+                                        <select
+                                            value={creationEngineType}
+                                            onChange={(e) => setCreationEngineType(e.target.value)}
+                                            disabled={!isConnected}
+                                            className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                                        >
+                                            <option value="CARTESIAN">🌊 Estándar (Cartesiano)</option>
+                                            <option value="POLAR">🌀 Rotacional (Polar)</option>
+                                            <option value="QUANTUM">⚛️ Quantum (Híbrido)</option>
+                                        </select>
+                                        <div className="text-[10px] text-gray-600 mt-1">
+                                            Define la topología y física base del universo.
+                                        </div>
+                                    </div>
+
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
                                             <label className="block text-[10px] text-gray-400 uppercase">
