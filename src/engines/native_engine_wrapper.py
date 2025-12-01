@@ -181,6 +181,9 @@ class NativeEngineWrapper:
             device: Dispositivo ('cpu', 'cuda', o None para auto-detección)
             cfg: Configuración del experimento (opcional)
         """
+        import threading
+        self._lock = threading.RLock()  # Reentrant lock para permitir llamadas anidadas
+
         # Si device es None, usar auto-detección desde config
         if device is None:
             from src import config as global_cfg
@@ -640,18 +643,22 @@ class NativeEngineWrapper:
 
     def evolve_internal_state(self, step=None):
         """Evoluciona el estado interno usando el motor nativo."""
-        if not self.model_loaded:
-            logging.warning("Modelo no cargado. No se puede evolucionar el estado.")
-            return
+        with self._lock:
+            if not self.model_loaded:
+                logging.warning("Modelo no cargado. No se puede evolucionar el estado.")
+                return
 
-        # Ejecutar paso nativo (todo en C++)
-        particle_count = self.native_engine.step_native()
-        self.step_count += 1
+            # Ejecutar paso nativo (todo en C++)
+            if self.native_engine is not None:
+                particle_count = self.native_engine.step_native()
+                self.step_count += 1
 
-        # OPTIMIZACIÓN CRÍTICA: NO convertir aquí - solo marcar como "stale"
-        # La conversión se hará solo cuando se necesite (lazy conversion)
-        # Esto evita convertir 65,536 coordenadas en cada paso
-        self._dense_state_stale = True
+                # OPTIMIZACIÓN CRÍTICA: NO convertir aquí - solo marcar como "stale"
+                # La conversión se hará solo cuando se necesite (lazy conversion)
+                # Esto evita convertir 65,536 coordenadas en cada paso
+                self._dense_state_stale = True
+            else:
+                logging.warning("Intento de evolve_internal_state con native_engine=None")
 
     def get_dense_state(self, roi=None, check_pause_callback=None):
         """
@@ -666,20 +673,21 @@ class NativeEngineWrapper:
         Returns:
             Tensor complejo con el estado denso [1, H, W, d_state]
         """
-        # Convertir solo si el estado está desactualizado o no existe
-        # O si la ROI cambió (necesitamos convertir más/menos del grid)
-        roi_changed = (roi is not None and roi != self._last_conversion_roi) or (
-            roi is None and self._last_conversion_roi is not None
-        )
-
-        if self._dense_state_stale or self.state.psi is None or roi_changed:
-            self._update_dense_state_from_sparse(
-                roi=roi, check_pause_callback=check_pause_callback
+        with self._lock:
+            # Convertir solo si el estado está desactualizado o no existe
+            # O si la ROI cambió (necesitamos convertir más/menos del grid)
+            roi_changed = (roi is not None and roi != self._last_conversion_roi) or (
+                roi is None and self._last_conversion_roi is not None
             )
-            self._dense_state_stale = False
-            self._last_conversion_roi = roi
 
-        return self.state.psi
+            if self._dense_state_stale or self.state.psi is None or roi_changed:
+                self._update_dense_state_from_sparse(
+                    roi=roi, check_pause_callback=check_pause_callback
+                )
+                self._dense_state_stale = False
+                self._last_conversion_roi = roi
+
+            return self.state.psi
 
     def _update_dense_state_from_sparse(self, roi=None, check_pause_callback=None):
         """
@@ -1123,15 +1131,26 @@ class NativeEngineWrapper:
             # Limpiar referencias al motor nativo
             # El destructor de C++ se llamará automáticamente cuando no haya más referencias
             try:
-                if hasattr(self, "native_engine") and self.native_engine is not None:
-                    # Liberar referencias explícitamente
-                    # CRÍTICO: Capturar cualquier error durante la liberación del motor C++
-                    try:
-                        self.native_engine = None
-                    except Exception as native_cleanup_error:
-                        logging.warning(
-                            f"Error liberando native_engine: {native_cleanup_error}"
-                        )
+                # Intentar adquirir lock para asegurar que nadie lo está usando
+                # Usar timeout para evitar deadlock si el motor está colgado
+                acquired = self._lock.acquire(timeout=2.0)
+                if not acquired:
+                    logging.warning("⚠️ No se pudo adquirir lock para cleanup (motor ocupado/colgado). Forzando limpieza...")
+                
+                try:
+                    if hasattr(self, "native_engine") and self.native_engine is not None:
+                        # Liberar referencias explícitamente
+                        # CRÍTICO: Capturar cualquier error durante la liberación del motor C++
+                        try:
+                            self.native_engine = None
+                        except Exception as native_cleanup_error:
+                            logging.warning(
+                                f"Error liberando native_engine: {native_cleanup_error}"
+                            )
+                finally:
+                    if acquired:
+                        self._lock.release()
+                        
             except Exception as native_error:
                 logging.warning(
                     f"Error durante limpieza de native_engine: {native_error}"
