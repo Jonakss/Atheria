@@ -16,6 +16,7 @@
 
 ## 📋 Índice de Entradas
 
+- [2025-12-01: UI Consolidation and Holographic Viewer Improvements](logs/2025-12-01_ui_consolidation.md)
 - [[logs/2025-12-01_viz_ui_refactor_and_native_fixes|2025-12-01 - Refactor: Visualization UI & Native Engine Fixes]]
 - [[logs/2025-12-01_engine_selection_training|2025-12-01 - Feature: Engine Selection for Training]]
 - **2025-12-01 - Fix: Syntax Error in TransferLearningWizard (Extra Tag)**

@@ -1,6 +1,6 @@
 // frontend/src/components/ui/LabSider.tsx
 import { ArrowRightLeft, Play, RotateCcw, Upload, X } from 'lucide-react';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
 import { modelOptions } from '../../utils/vizOptions';
@@ -20,7 +20,7 @@ interface LabSiderProps {
 export function LabSider({ activeSection, onClose }: LabSiderProps) {
     const { 
         sendCommand, experimentsData, trainingStatus, trainingProgress,
-        inferenceStatus, connectionStatus, selectedViz, setSelectedViz,
+        inferenceStatus, connectionStatus,
         activeExperiment, setActiveExperiment, compileStatus
     } = useWebSocket();
     
@@ -173,13 +173,7 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
         sendCommand('inference', 'reset');
     };
 
-    const handleVizChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const value = e.target.value;
-        if (value && isConnected) {
-            setSelectedViz(value);
-            sendCommand('simulation', 'set_viz', { viz_type: value });
-        }
-    };
+
 
     const progressPercent = trainingProgress ? (trainingProgress.current_episode / trainingProgress.total_episodes) * 100 : 0;
 

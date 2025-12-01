@@ -107,7 +107,9 @@ class LatticeMotorWrapper:
         self.engine = engine
         self.device = engine.device
         # Dummy state object for compatibility if accessed directly, though get_dense_state is preferred
-        self.state = SimpleNamespace(psi=None) 
+        self.state = SimpleNamespace(psi=None)
+        # Initialize state.psi to pass validation in handle_play
+        self.state.psi = self.get_dense_state()
 
     def evolve_internal_state(self):
         """Avanza la simulación un paso."""
@@ -130,6 +132,9 @@ class LatticeMotorWrapper:
             real = energy.unsqueeze(0).unsqueeze(-1)
             imag = torch.zeros_like(real)
             psi = torch.complex(real, imag)
+            # Update internal state for validation
+            if self.state:
+                self.state.psi = psi
             return psi
         return None
         
@@ -144,6 +149,8 @@ class HarmonicMotorWrapper:
         self.engine = engine
         self.device = engine.device
         self.state = SimpleNamespace(psi=None)
+        # Initialize state.psi to pass validation in handle_play
+        self.state.psi = self.get_dense_state()
 
     def evolve_internal_state(self):
         self.engine.step()
@@ -161,6 +168,9 @@ class HarmonicMotorWrapper:
             real = state
             imag = torch.zeros_like(real)
             psi = torch.complex(real, imag)
+            # Update internal state for validation
+            if self.state:
+                self.state.psi = psi
             return psi
         return None
 
