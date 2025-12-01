@@ -9,15 +9,63 @@ Este documento detalla las capacidades, soporte de física y características de
 | **Python (Standard)** | PyTorch (GPU/CPU) | Medio/Bajo | Prototipado, Física Lattice, Experimentos Flexibles |
 | **Nativo (C++)** | C++ / OpenMP / TorchScript | Alto (CPU Bound) | Entrenamiento a gran escala, Inferencia rápida, Grids grandes |
 
-## Soporte de Física
+## Engine Implementations Status
 
-| Característica | Motor Python | Motor Nativo (C++) | Notas |
-|----------------|--------------|--------------------|-------|
-| **QCA Standard** | ✅ Completo | ✅ Completo | Misma lógica matemática (verificada). |
-| **Lattice (SU3)** | ✅ Completo | ❌ No Soportado | Requiere motor Python para simulaciones de Gauge Theory. |
-| **Harmonic (Ondas)** | ✅ Completo | ⚠️ Parcial | Python usa interferencia de ondas real. Nativo usa ruido determinista optimizado. |
-| **Polar (Magnitud/Fase)** | ⚠️ En Desarrollo | ⚠️ Parcial | Soporte básico en ambos. |
-| **Inyección de Física** | ✅ Completo | ✅ Completo | Soporta inyección de partículas y modificaciones de estado. |
+### Native Engine (C++)
+- **Status**: Production-ready
+- **Physics**: Standard QCA (Quantum Cellular Automata)
+- **Performance**: 10-100x faster than Python
+- **Limitations**: 
+  - Advanced visualizations fallback to Python (Flow, Poincaré, Phase HSV)
+  - Only supports standard Cartesian QCA physics
+
+### Python Engines
+
+#### Standard (CARTESIAN)
+- **Status**: Production-ready
+- **Physics**: Standard QCA
+- **Backend**: Both Python and C++ (via Native Engine)
+- **Use case**: Default for training and inference
+
+#### Harmonic (HARMONIC)
+- **Status**: Experimental (Python-only)
+- **Physics**: Spectral methods, wave interference, FFT
+- **Backend**: Python only (C++ implementation planned)
+- **Use case**: Wave-based simulations, spectral analysis
+
+#### Lattice (LATTICE)
+- **Status**: Experimental (Python-only)
+- **Physics**: SU(3) gauge theory, Wilson Action, AdS/CFT
+- **Backend**: Python only (C++ implementation planned)
+- **Use case**: Gauge theory simulations, holographic duality
+
+#### Polar (POLAR)
+- **Status**: Experimental (Python-only)
+- **Physics**: Rotational coordinates, angular momentum
+- **Backend**: Python only (C++ implementation planned)
+- **Use case**: Rotational dynamics, vortex simulations
+
+#### Quantum (QUANTUM)
+- **Status**: Prototype (Python-only)
+- **Physics**: Hybrid quantum-classical
+- **Backend**: Python only
+- **Use case**: Quantum algorithm research
+
+### Roadmap: C++ Implementations
+
+The following engines are planned for C++ implementation to achieve Native Engine performance:
+
+1. **Harmonic Engine (C++)** - Priority: Medium
+   - Port FFT and spectral methods to C++
+   - Est. performance improvement: 50-100x
+
+2. **Lattice Engine (C++)** - Priority: Low
+   - Port SU(3) gauge field logic to C++
+   - Est. performance improvement: 30-50x
+
+3. **Polar Engine (C++)** - Priority: Medium
+   - Port polar coordinate transform to C++
+   - Est. performance improvement: 40-80x
 
 ## Soporte de Visualización
 
