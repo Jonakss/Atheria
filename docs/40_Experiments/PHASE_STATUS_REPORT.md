@@ -1,6 +1,6 @@
 # 📊 Informe de Estado: Fases de Atheria 4
 
-**Fecha:** 2025-12-01 (Actualizado 17:28)
+**Fecha:** 2025-12-01 (Actualizado 17:47)
 **Objetivo:** Revisar el estado actual de todas las fases documentadas y componentes implementados.
 **Última Actualización:** Benchmarking Motor Nativo, Phase Space Visualization, Compute Backend, Frontend Optimization
 
@@ -195,11 +195,17 @@
     -   ✅ Integración real de Octree para consultas espaciales en C++
     -   ✅ Memory Pools implementados
     -   ✅ Tuning de Paralelismo (OpenMP configurado)
-    -   ⚠️ **CRITICAL:** Debugging de bloqueo en Native Engine durante warmup
-        - Investigar lock contention en `_lock` (threading.RLock)
-        - Optimizar conversión sparse→dense (lazy conversion)
-        - Revisar `step_native()` en C++ para deadlocks
-    -   ⏳ Benchmark completo Python vs C++ (bloqueado hasta resolver freeze)
+    -   🔴 **BLOCKER CRÍTICO:** Native Engine se cuelga durante inicialización
+        - ✅ Implementado GIL release en bindings C++ (`py::gil_scoped_release`)
+        - ✅ Agregados yields periódicos en benchmark
+        - ❌ **Problema persiste** - hang ocurre antes de primer output (probablemente en init/JIT export)
+        - 📝 Documentado en `logs/2025-12-01_native_freeze_debugging.md`
+        - **Próximos pasos sugeridos:**
+          - Agregar logging verbose en `NativeEngineWrapper.__init__`
+          - Probar con grid pequeño (32x32)
+          - Testear C++ directamente sin wrapper Python
+    -   ⏸️ Benchmark completo Python vs C++ (bloqueado hasta resolver freeze)
+        - **Baseline documentado:** Python Engine ~60 FPS (CPU, 128x128 grid)
 
 2.  **Inferencia (Optimización) - MEDIA PRIORIDAD:**
     -   ⏳ Implementar LitServe para inferencia asíncrona
