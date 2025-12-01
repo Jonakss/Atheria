@@ -1,7 +1,7 @@
 # Quantum Optimization & The Variational Principle
 
 ## 1. Introduction: Physics as an Optimization Problem
-In Atheria, we often treat physical evolution as an energy minimization problem. Nature is lazy; it seeks the path of least action (Lagrangian mechanics) or the state of lowest energy (Hamiltonian mechanics).
+In Aetheria, we often treat physical evolution as an energy minimization problem. Nature is lazy; it seeks the path of least action (Lagrangian mechanics) or the state of lowest energy (Hamiltonian mechanics).
 
 Quantum Computers are uniquely suited for this because they operate on the same principles of unitary evolution and superposition. However, current Noisy Intermediate-Scale Quantum (NISQ) devices cannot run deep, error-corrected algorithms.
 
