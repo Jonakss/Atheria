@@ -42,3 +42,7 @@ class QuantumStatePolar:
         real = self.magnitude * torch.cos(self.phase)
         imag = self.magnitude * torch.sin(self.phase)
         return real, imag
+        
+    @property
+    def shape(self):
+        return self.magnitude.shape
