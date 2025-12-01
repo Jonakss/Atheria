@@ -168,8 +168,8 @@ const HolographicViewer: React.FC<HolographicViewerProps> = ({
                     const hue = (phaseData[i] + Math.PI) / (2 * Math.PI);
                     colorHelper.setHSL(hue, 1.0, 0.5);
                 } else {
-                    // Gradiente azul basado en altura
-                    colorHelper.setHSL(0.6, 1.0, Math.min(0.3 + magnitude, 1.0));
+                    // Gradiente azul basado en altura - Luminosidad reducida para evitar blanco
+                    colorHelper.setHSL(0.6, 1.0, Math.min(0.2 + magnitude * 0.3, 0.6));
                 }
                 
                 colors.push(colorHelper.r, colorHelper.g, colorHelper.b);

@@ -90,7 +90,7 @@ export const DashboardLayout: React.FC = () => {
         }
 
         // Vista principal: 2D canvas o 3D holographic según selectedViz
-        if (selectedViz === 'holographic' || selectedViz === '3d') {
+        if (selectedViz === 'holographic' || selectedViz === '3d' || selectedViz === 'poincare_3d') {
           return (
             <div className="absolute inset-0 z-0 bg-gradient-deep-space overflow-hidden">
               {flatMapData.length > 0 && gridWidth > 0 && gridHeight > 0 ? (
@@ -100,6 +100,7 @@ export const DashboardLayout: React.FC = () => {
                     width={gridWidth}
                     height={gridHeight}
                     vizType={selectedViz}
+                    threshold={0.01}
                   />
                 ) : (
                   <HolographicViewer2 
@@ -107,6 +108,7 @@ export const DashboardLayout: React.FC = () => {
                     width={gridWidth}
                     height={gridHeight}
                     vizType={selectedViz}
+                    threshold={0.01}
                   />
                 )
               ) : (

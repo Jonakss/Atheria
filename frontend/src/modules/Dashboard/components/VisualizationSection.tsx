@@ -1,4 +1,4 @@
-import { Activity, Microscope, Zap } from 'lucide-react';
+import { Activity, Box, Eye, Microscope, Zap } from 'lucide-react';
 import React, { useState } from 'react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 
@@ -15,9 +15,12 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
   selectedLayer = 0,
   onLayerChange
 }) => {
-  const { sendCommand } = useWebSocket();
+  const { sendCommand, selectedViz } = useWebSocket();
   const [gammaDecay, setGammaDecay] = useState(0.015);
   const [thermalNoise, setThermalNoise] = useState(0.002);
+  const [pointSize, setPointSize] = useState(1.0);
+  const [threshold, setThreshold] = useState(0.01); // Umbral más bajo para ver más estructura
+  const [renderMode, setRenderMode] = useState<'points' | 'wireframe' | 'mesh'>('points');
   
   const [internalLayer, setInternalLayer] = useState(0);
   const activeLayer = onLayerChange ? selectedLayer : internalLayer;
@@ -181,6 +184,115 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Visualization Type Selector */}
+      <div className="space-y-3 pt-4 border-t border-white/5">
+        <div className="flex items-center gap-2 text-gray-200 text-xs font-bold uppercase tracking-wider mb-2">
+          <Eye size={12} className="text-cyan-500" /> Tipo de Visualización
+        </div>
+        
+        <select
+          value={selectedViz || 'density'}
+          onChange={(e) => sendCommand('inference', 'set_viz', { viz_type: e.target.value })}
+          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-cyan-500/50"
+        >
+          <option value="density">Densidad |ψ|²</option>
+          <option value="phase">Fase φ</option>
+          <option value="flow">Flujo (Quiver)</option>
+          <option value="spectral">Espectral (FFT)</option>
+          <option value="poincare">Poincaré 2D</option>
+          <option value="fields">Campos (Teoría de Campos)</option>
+          <option value="phase_hsv">Fase HSV</option>
+          <option value="holographic">Holographic 3D</option>
+          <option value="poincare_3d">Poincaré 3D</option>
+        </select>
+      </div>
+
+      {/* Holographic Viewer Controls (solo visible si está en modo 3D) */}
+      {(selectedViz === 'holographic' || selectedViz === 'poincare_3d' || selectedViz === '3d') && (
+        <div className="space-y-3 pt-4 border-t border-white/5">
+          <div className="flex items-center gap-2 text-gray-200 text-xs font-bold uppercase tracking-wider mb-2">
+            <Box size={12} className="text-pink-500" /> Renderizado 3D
+          </div>
+          
+          {/* Render Mode */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] text-gray-400 uppercase">Modo de Renderizado</label>
+            <div className="grid grid-cols-3 gap-1 bg-black/20 p-1 rounded border border-white/5">
+              <button 
+                className={`py-1 text-[9px] font-medium rounded transition-all ${
+                  renderMode === 'points' 
+                    ? 'bg-pink-500/20 text-pink-200 border border-pink-500/30' 
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+                onClick={() => setRenderMode('points')}
+              >
+                Puntos
+              </button>
+              <button 
+                className={`py-1 text-[9px] font-medium rounded transition-all ${
+                  renderMode === 'wireframe' 
+                    ? 'bg-pink-500/20 text-pink-200 border border-pink-500/30' 
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+                onClick={() => setRenderMode('wireframe')}
+              >
+                Wireframe
+              </button>
+              <button 
+                className={`py-1 text-[9px] font-medium rounded transition-all ${
+                  renderMode === 'mesh' 
+                    ? 'bg-pink-500/20 text-pink-200 border border-pink-500/30' 
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+                onClick={() => setRenderMode('mesh')}
+              >
+                Mesh
+              </button>
+            </div>
+          </div>
+
+          {/* Point Size */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-[10px]">
+              <span className="text-gray-400">Tamaño de Punto</span>
+              <span className="font-mono text-gray-200 bg-white/5 px-1.5 rounded">{pointSize.toFixed(1)}x</span>
+            </div>
+            <input
+              type="range"
+              min="0.5"
+              max="5.0"
+              step="0.1"
+              value={pointSize}
+              onChange={(e) => setPointSize(parseFloat(e.target.value))}
+              className="w-full h-1 bg-gray-800 rounded-full appearance-none cursor-pointer slider-thumb"
+              style={{
+                background: `linear-gradient(to right, rgb(236, 72, 153) 0%, rgb(236, 72, 153) ${((pointSize - 0.5) / 4.5) * 100}%, rgb(31, 41, 55) ${((pointSize - 0.5) / 4.5) * 100}%, rgb(31, 41, 55) 100%)`
+              }}
+            />
+          </div>
+
+          {/* Threshold */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-[10px]">
+              <span className="text-gray-400">Umbral de Densidad</span>
+              <span className="font-mono text-gray-200 bg-white/5 px-1.5 rounded">{threshold.toFixed(3)}</span>
+            </div>
+            <input
+              type="range"
+              min="0.001"
+              max="0.5"
+              step="0.001"
+              value={threshold}
+              onChange={(e) => setThreshold(parseFloat(e.target.value))}
+              className="w-full h-1 bg-gray-800 rounded-full appearance-none cursor-pointer slider-thumb"
+              style={{
+                background: `linear-gradient(to right, rgb(14, 165, 233) 0%, rgb(14, 165, 233) ${(threshold / 0.5) * 100}%, rgb(31, 41, 55) ${(threshold / 0.5) * 100}%, rgb(31, 41, 55) 100%)`
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

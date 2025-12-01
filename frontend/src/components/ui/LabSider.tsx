@@ -3,7 +3,7 @@ import { ArrowRightLeft, Play, RotateCcw, Upload, X } from 'lucide-react';
 import React, { useState } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
-import { modelOptions, vizOptions } from '../../utils/vizOptions';
+import { modelOptions } from '../../utils/vizOptions';
 import { ExperimentInfo } from '../experiments/ExperimentInfo';
 import { ExperimentManager } from '../experiments/ExperimentManager';
 import { TransferLearningWizard } from '../experiments/TransferLearningWizard';
@@ -406,27 +406,6 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
                                     />
                                     <div className="text-[10px] text-gray-600 mt-1">
                                         Término Lindbladian (0.0 = cerrado, &gt;0 = abierto)
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Configuración de Visualización */}
-                            <div className="space-y-3 pt-3 border-t border-white/5">
-                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">VISUALIZACIÓN</div>
-                                <div>
-                                    <label className="block text-[10px] text-gray-400 mb-1 uppercase">Tipo de Visualización</label>
-                                    <select
-                                        value={selectedViz || 'density'}
-                                        onChange={handleVizChange}
-                                        disabled={!isConnected}
-                                        className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
-                                    >
-                                        {vizOptions.map(opt => (
-                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                        ))}
-                                    </select>
-                                    <div className="text-[10px] text-gray-600 mt-1">
-                                        Usa el botón flotante <span className="text-blue-400">EJECUTAR</span> en la esquina superior izquierda para controlar la simulación
                                     </div>
                                 </div>
                             </div>
