@@ -173,3 +173,38 @@ class LatticeEngine:
             
         return None
 
+    def compile_model(self):
+        """
+        Compila el modelo para optimización (no-op para LatticeEngine).
+        """
+        pass
+
+    def get_model_for_params(self):
+        """
+        Retorna el modelo para contar parámetros (None para LatticeEngine).
+        """
+        return None
+
+    def get_initial_state(self, batch_size=1):
+        """
+        Retorna el estado inicial (dummy para LatticeEngine).
+        """
+        # LatticeEngine maneja su propio estado interno (self.links)
+        # Retornamos un tensor dummy para satisfacer la API del trainer
+        return torch.zeros(batch_size, 1, self.grid_size, self.grid_size, device=self.device)
+
+    def evolve_step(self, current_psi):
+        """
+        Evoluciona el estado un paso (Metropolis-Hastings para Lattice).
+        """
+        # LatticeEngine evoluciona self.links internamente
+        self.step()
+        # Retornamos el mismo dummy state
+        return current_psi
+
+    def evolve_internal_state(self, step=None):
+        """
+        Alias para step() para compatibilidad.
+        """
+        self.step()
+

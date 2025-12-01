@@ -225,3 +225,30 @@ class SparseHarmonicEngine:
         self.active_coords = next_active_coords
         
         return len(self.matter)
+
+    def compile_model(self):
+        """
+        Compila el modelo para optimización (no-op para HarmonicEngine).
+        """
+        pass
+
+    def get_model_for_params(self):
+        """
+        Retorna el modelo para contar parámetros.
+        """
+        return self.model
+
+    def get_initial_state(self, batch_size=1):
+        """
+        Retorna el estado inicial (dummy para HarmonicEngine).
+        """
+        # HarmonicEngine maneja su propio estado interno (self.matter)
+        # Retornamos un tensor dummy para satisfacer la API del trainer
+        return torch.zeros(batch_size, self.d_state, self.grid_size, self.grid_size, device=self.device)
+
+    def evolve_step(self, current_psi):
+        """
+        Evoluciona el estado un paso.
+        """
+        self.step()
+        return current_psi
