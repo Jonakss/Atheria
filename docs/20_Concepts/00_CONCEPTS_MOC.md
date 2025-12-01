@@ -19,6 +19,10 @@
 - **[Paralelismo Nativo (OpenMP)](../20_Concepts/NATIVE_PARALLELISM.md)** - Documentación sobre la implementación de paralelismo en el motor C++
 - **[History Buffer Architecture](../20_Concepts/HISTORY_BUFFER_ARCHITECTURE.md)** - Sistema de buffer circular para navegación temporal (rewind/replay)
 
+## ⚡ Optimización e Inferencia
+
+- **[Inference Optimization Strategies](../20_Concepts/INFERENCE_OPTIMIZATION_STRATEGIES.md)** - Estrategias para optimizar el servicio del modelo Ley M (LitServe, cuantización, compilación)
+
 ## 🎨 Visualización y Rendering
 
 - **[WebGL Shaders](../20_Concepts/WEBGL_SHADERS.md)** - Guía completa para trabajar con shaders WebGL GPU-accelerated
