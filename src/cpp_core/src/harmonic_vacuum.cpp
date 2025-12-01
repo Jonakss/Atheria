@@ -17,34 +17,27 @@ torch::Tensor HarmonicVacuum::get_fluctuation(const Coord3D& coord, int64_t step
                   (hasher(coord.z) << 2) ^ (hasher(step_count) << 3);
     
     // Usar la semilla para generar ruido determinista
-    // Establecer semilla global temporalmente
-    // Nota: Esto afecta todas las operaciones aleatorias, pero es la forma más simple
-    // TODO: Mejorar para usar generador específico si LibTorch lo permite
+    // Crear generador local para evitar modificar estado global (thread-safe)
+    auto gen = torch::make_generator<torch::CPUGeneratorImpl>(seed);
+    
     auto options = torch::TensorOptions()
         .dtype(torch::kFloat32)
         .device(device_)
         .requires_grad(false);
     
-    // Guardar semilla anterior
-    auto prev_seed = torch::globalContext().defaultGenerator(device_).current_seed();
-    
-    // Establecer nueva semilla determinista
-    torch::manual_seed(static_cast<int64_t>(seed));
-    
     // Generar ruido complejo (similar a Python: complex_noise mode)
     // Python usa: noise = randn * strength; real = cos(noise); imag = sin(noise)
     const float complex_noise_strength = 0.1f;
-    torch::Tensor noise = torch::randn({d_state_}, options) * complex_noise_strength;
+    torch::Tensor noise = torch::randn({d_state_}, gen, options) * complex_noise_strength;
     
     // Convertir a complejo usando cos y sin (como en Python)
     torch::Tensor real = torch::cos(noise);
     torch::Tensor imag = torch::sin(noise);
     torch::Tensor complex_state = torch::complex(real, imag);
     
-    // Restaurar semilla anterior
-    torch::manual_seed(prev_seed);
-    
     return complex_state;
+    
+
 }
 
 } // namespace atheria

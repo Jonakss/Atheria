@@ -17,6 +17,7 @@
 ## 📋 Índice de Entradas
 
 - [2025-12-01: UI Consolidation and Holographic Viewer Improvements](logs/2025-12-01_ui_consolidation.md)
+- [[logs/2025-12-01_compute_backend_implementation|2025-12-01 - Feature: Compute Backend Abstraction (Local/Quantum/Mock)]]
 - [[logs/2025-12-01_viz_ui_refactor_and_native_fixes|2025-12-01 - Refactor: Visualization UI & Native Engine Fixes]]
 - [[logs/2025-12-01_engine_selection_training|2025-12-01 - Feature: Engine Selection for Training]]
 - **2025-12-01 - Fix: Syntax Error in TransferLearningWizard (Extra Tag)**
@@ -158,3 +159,49 @@ Integrated `OctreeIndex` into the C++ Native Engine (`atheria_core`) to enable e
 - **Range Queries**: `query_box` allows for efficient retrieval of particles within a bounding box, which is essential for "Moore neighborhood" operations and future optimizations like view frustum culling.
 
 
+### 2025-12-01 - Compute Backend Abstraction
+**Status**: Completed
+**Component**: Core Architecture
+
+Implemented a modular "Compute Backend" system to abstract the execution hardware (Local CPU/GPU, Cloud Simulator, Real QPU).
+
+**Changes:**
+1.  **ComputeBackend Interface**: Defined abstract base class in `src/engines/compute_backend.py`.
+2.  **Implementations**:
+    - `LocalBackend`: Wraps PyTorch device (CPU/CUDA).
+    - `MockQuantumBackend`: Simulates QPU connection for testing/UI.
+3.  **ConnectionManager**: Service to manage backend registration and selection (`src/services/connection_manager.py`).
+4.  **MotorFactory Refactor**: Updated `src/motor_factory.py` to use `ComputeBackend` and accept `BACKEND_TYPE` from config.
+5.  **Trainer Integration**: Added `--backend_type` argument to `trainer.py`.
+
+**Impact:**
+- Decouples physics engine logic from specific hardware execution.
+- Enables future integration of IonQ/IBM Quantum services without rewriting core engine logic.
+- Allows "One-Click" switching between Local and Cloud backends (Lightning AI style).
+
+**See also:**
+- [[QUANTUM_COMPUTE_SERVICES]] - Research and integration strategy.
+
+
+### 2025-12-01 - Memory Pools & Concurrency Fixes
+**Status**: Completed
+**Component**: Native Engine (C++)
+
+Implementación de sistema de reciclaje de tensores y corrección de errores de concurrencia crítica.
+
+**Cambios:**
+1.  **TensorPool**: Implementada clase `TensorPool` para reutilizar memoria de tensores `torch::Tensor` entre pasos de simulación.
+    - Reduce overhead de `malloc/free` en cada frame.
+    - Integrado en `step_native` con lógica `acquire/release`.
+2.  **HarmonicVacuum Fix**:
+    - **Problema**: `step_native` se congelaba aleatoriamente en ejecución paralela.
+    - **Diagnóstico**: `torch::manual_seed` modifica estado global y no es thread-safe dentro de bloques OpenMP.
+    - **Solución**: Reemplazado por `torch::make_generator<torch::CPUGeneratorImpl>(seed)` local para generación de ruido determinista thread-safe.
+
+**Impacto:**
+- Eliminación de deadlocks en simulación nativa.
+- Base sólida para escalar a millones de partículas sin fragmentación excesiva.
+
+**Ver también:**
+- [[NATIVE_ENGINE_TESTS]] - Guía de pruebas y troubleshooting.
+- [[Native_Engine_Core]] - Documentación actualizada del motor.

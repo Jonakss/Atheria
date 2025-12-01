@@ -37,7 +37,7 @@ The quantum computer prepares $|\psi(\theta)\rangle$ and measures the expectatio
 A classical computer (CPU) reads the measured energy $E(\theta)$ and updates the parameters $\theta$ using an optimizer (SPSA, COBYLA, Adam) to descend the energy landscape.
 $$ \theta_{t+1} = \theta_t - \eta \nabla E(\theta) $$
 
-## 4. Application in Aetheria (Experiment 04)
+## 4. Application in Atheria (Experiment 04)
 In Experiment 04 ("Quantum Optimization"), we use this loop to find stable "Laws of Physics".
 *   **Problem:** Minimize the "Chaos" of the universe (or maximize Symmetry).
 *   **Ansatz:** A circuit representing the "Hyperparameters" (e.g., $\gamma$ decay, noise levels).

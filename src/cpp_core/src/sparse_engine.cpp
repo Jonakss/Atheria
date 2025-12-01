@@ -22,6 +22,7 @@ Engine::Engine(int64_t d_state, const std::string& device_str, int64_t grid_size
     , device_(determine_device(device_str))
     , model_loaded_(false)
     , vacuum_(d_state_, device_)
+    , pool_(d_state_, determine_device(device_str))
     , step_count_(0)
     , last_error_("") {
     // Device ya está determinado y vacuum inicializado correctamente
@@ -103,13 +104,11 @@ int64_t Engine::step_native() {
     
     // Procesar todas las coordenadas activas
     std::vector<Coord3D> processed_coords(active_region_.begin(), active_region_.end());
-
+    
     // OPTIMIZATION: Sort by Morton code for spatial locality
-    // This ensures that particles close in space are processed together,
-    // improving cache locality and reducing memory jumps.
     const int64_t OFFSET = 1048576; 
     std::sort(processed_coords.begin(), processed_coords.end(), [OFFSET](const Coord3D& a, const Coord3D& b) {
-        // Clamp to valid range for Morton encoding
+        // ... (sorting logic)
         int64_t ax = std::max(int64_t(0), std::min(a.x + OFFSET, int64_t(2097151)));
         int64_t ay = std::max(int64_t(0), std::min(a.y + OFFSET, int64_t(2097151)));
         int64_t az = std::max(int64_t(0), std::min(a.z + OFFSET, int64_t(2097151)));
@@ -167,7 +166,9 @@ int64_t Engine::step_native() {
                             inputs.push_back(batch_input);
 
                             torch::Tensor batch_output;
+                            // std::cout << "DEBUG: Running model forward for batch of size " << local_batch_coords.size() << std::endl;
                             auto output_ivalue = model_.forward(inputs);
+                            // std::cout << "DEBUG: Model forward done." << std::endl;
 
                             if (output_ivalue.isTuple()) {
                                 auto output_tuple = output_ivalue.toTuple();
@@ -217,7 +218,17 @@ int64_t Engine::step_native() {
 
                                 // Filtrar estados con energía muy baja
                                 if (norm > 0.01f) {
-                                    local_next_matter_map.insert_tensor(local_batch_coords[j], new_state);
+                                    // Use pool to acquire tensor
+                                    // std::cout << "DEBUG: Acquiring tensor from pool" << std::endl;
+                                    torch::Tensor pooled_state = pool_.acquire();
+                                    // std::cout << "DEBUG: Acquired tensor" << std::endl;
+                                    
+                                    // Copy data to pooled tensor
+                                    // new_state might be a view or a new tensor, we need to copy its content
+                                    // to the pooled storage.
+                                    pooled_state.copy_(new_state);
+                                    
+                                    local_next_matter_map.insert_tensor(local_batch_coords[j], pooled_state);
                                     update_active_region({local_batch_coords[j]}, local_next_active_region);
                                 }
                             }
@@ -280,7 +291,11 @@ int64_t Engine::step_native() {
                         }
                         
                         if (norm > 0.01f) {
-                            local_next_matter_map.insert_tensor(local_batch_coords[j], new_state);
+                            // Use pool
+                            torch::Tensor pooled_state = pool_.acquire();
+                            pooled_state.copy_(new_state);
+                            
+                            local_next_matter_map.insert_tensor(local_batch_coords[j], pooled_state);
                             update_active_region({local_batch_coords[j]}, local_next_active_region);
                         }
                     }
@@ -309,6 +324,20 @@ int64_t Engine::step_native() {
             }
         }
     } // End parallel region
+    
+    // Recycle old tensors
+    // Before overwriting matter_map_, we should return its tensors to the pool.
+    // Note: We need to be careful about thread safety if we did this in parallel,
+    // but here we are in the main thread (after parallel region).
+    
+    // However, matter_map_ holds tensors. We can iterate and release them.
+    // BUT: SparseMap doesn't expose iterators to tensors directly easily without copy.
+    // We added coord_keys(). Let's use that or add a method to SparseMap to "drain" tensors?
+    // For now, let's iterate keys.
+    auto old_coords = matter_map_.coord_keys();
+    for (const auto& coord : old_coords) {
+        pool_.release(matter_map_.get_tensor(coord));
+    }
     
     // Actualizar estado
     matter_map_ = std::move(next_matter_map);

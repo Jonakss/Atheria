@@ -5,7 +5,7 @@ Neural Cellular Automata (NCA) represent a paradigm shift in how we model comple
 
 In biology, a single cell does not know the shape of the liver or the heart. It only knows its immediate chemical neighborhood and its own internal genetic code. Yet, these local interactions give rise to robust, self-repairing global structures.
 
-**Aetheria** utilizes NCA to simulate a universe where "Physics" is not a fixed equation, but a **learned behavior** encoded in the weights of a neural network.
+**Atheria** utilizes NCA to simulate a universe where "Physics" is not a fixed equation, but a **learned behavior** encoded in the weights of a neural network.
 
 ## 2. The Mathematical Model
 
@@ -29,7 +29,7 @@ Crucially, **$F_\theta$ is shared by every cell**. It is effectively the "DNA" o
 $$ \Delta s_{i,j} = F_\theta(P_{i,j}) $$
 $$ s_{t+1} = s_t + \Delta s_t \cdot \text{StochasticMask} $$
 
-In Aetheria, this is typically implemented as a $1 \times 1$ Convolution (equivalent to a Dense layer applied per-pixel).
+In Atheria, this is typically implemented as a $1 \times 1$ Convolution (equivalent to a Dense layer applied per-pixel).
 
 ### 2.4 Stochasticity & Asynchrony
 Real biological systems do not have a global clock tick. To prevent "perfect" but brittle structures (like Game of Life gliders that break with slight timing errors), NCA updates are **stochastic**.

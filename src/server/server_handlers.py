@@ -76,7 +76,8 @@ async def create_experiment_handler(args):
             "--total_episodes", str(args.get("TOTAL_EPISODES")),
             # Serializamos el diccionario MODEL_PARAMS a un string JSON
             "--model_params", json.dumps(args.get("MODEL_PARAMS", {})),
-            "--engine_type", args.get("ENGINE_TYPE", "CARTESIAN")
+            "--engine_type", args.get("ENGINE_TYPE", "CARTESIAN"),
+            "--backend_type", args.get("BACKEND_TYPE", "LOCAL")
         ]
         
         if args.get('CONTINUE_TRAINING', False):
