@@ -26,6 +26,7 @@
 ## 🎨 Visualización y Rendering
 
 - **[WebGL Shaders](../20_Concepts/WEBGL_SHADERS.md)** - Guía completa para trabajar con shaders WebGL GPU-accelerated
+- **[Visualización del Espacio de Fases](../20_Concepts/PHASE_SPACE_VISUALIZATION.md)** - Análisis topológico del estado cuántico usando PCA y Clustering
 
 ---
 
