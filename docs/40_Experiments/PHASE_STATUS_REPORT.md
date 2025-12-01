@@ -91,7 +91,7 @@
 - ✅ **OctreeIndex** - Implementado con Morton Codes (Linear Octree) en `src/cpp_core/src/octree.cpp`
 
 #### Componentes Pendientes:
-- ⏳ **Integración Octree en Engine** - Usar el Octree para consultas de vecindad eficientes en `step_native`
+- ✅ **Integración Octree en Engine** - Usar el Octree para consultas de vecindad eficientes en `step_native`
 - ⏳ **Memory Pools** - Optimización de memoria para evitar fragmentación
 - ⏳ **Paralelismo** - OpenMP activado pero requiere tuning y verificación de thread-safety
 - ⏳ **Pruebas Completas** - Benchmark comparativo Python vs C++ pendiente
@@ -172,7 +172,7 @@
 ### Tareas Pendientes Críticas
 
 1.  **Fase 2 (Motor Nativo):**
-    -   ⏳ Integración real de Octree para consultas espaciales en C++
+    -   ✅ Integración real de Octree para consultas espaciales en C++
     -   ⏳ Memory Pools
     -   ⏳ Tuning de Paralelismo (OpenMP)
     -   ⏳ Benchmark completo Python vs C++
