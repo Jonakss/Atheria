@@ -1026,7 +1026,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                     handleCanvasMouseMove(e);
                 }}
                 onMouseUp={handleMouseUp}
-                onMouseLeave={(e) => {
+                onMouseLeave={() => {
                     handleMouseUp();
                     handleCanvasMouseLeave();
                 }}

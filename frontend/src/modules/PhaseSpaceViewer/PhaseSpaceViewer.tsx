@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unknown-property */
 import { OrbitControls } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 /// <reference types="@react-three/fiber" />
@@ -99,7 +100,7 @@ const PhaseSpaceViewer: React.FC = () => {
                         <ambientLight intensity={0.5} />
                         <pointLight position={[10, 10, 10]} />
                         <PointsCloud data={analysisData.points} />
-                        {/* @ts-ignore */}
+                        {/* @ts-expect-error TS2322: Type 'typeof OrbitControls' is not assignable to type 'FunctionComponent<Partial<Omit<OrbitControlsProps, "ref"> & RefAttributes<OrbitControlsImpl>>>'. */}
                         <OrbitControls />
                         <gridHelper args={[20, 20, 0x444444, 0x222222]} />
                         <axesHelper args={[5]} />
@@ -108,7 +109,7 @@ const PhaseSpaceViewer: React.FC = () => {
                     <div className="absolute inset-0 flex items-center justify-center text-slate-400">
                         <div className="text-center">
                             <p className="mb-2 text-lg">No analysis data available</p>
-                            <p className="text-sm opacity-70">Click "Deep Analyze" to map the current quantum state topology</p>
+                            <p className="text-sm opacity-70">Click &quot;Deep Analyze&quot; to map the current quantum state topology</p>
                         </div>
                     </div>
                 )}

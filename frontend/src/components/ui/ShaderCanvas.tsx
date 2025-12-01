@@ -147,7 +147,7 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
             
             for (let y = 0; y < Math.min(10, mapDataHeight); y++) {
                 for (let x = 0; x < Math.min(10, mapDataWidth); x++) {
-                    // @ts-ignore
+                    // @ts-expect-error - mapData type union makes TS unsure about array access
                     const val = is3D ? mapData[y]?.[x]?.[0] : mapData[y]?.[x];
                     if (typeof val === 'number' && !isNaN(val)) {
                         validCount++;
@@ -175,7 +175,7 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
 
             for (let y = 0; y < mapData.length; y++) {
                 for (let x = 0; x < mapData[y]?.length || 0; x += step) {
-                    // @ts-ignore
+
                     const val = mapData[y]?.[x];
                     if (typeof val === 'number' && !isNaN(val) && isFinite(val)) {
                         values.push(val);
@@ -206,7 +206,7 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
             
             for (let y = 0; y < mapData.length; y++) {
                 for (let x = 0; x < mapData[y]?.length || 0; x += step) {
-                    // @ts-ignore
+
                     const val = mapData[y]?.[x];
                     if (typeof val === 'number' && !isNaN(val) && isFinite(val)) {
                         values.push(val);
@@ -235,7 +235,7 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
           textureRef.current = null;
         }
         // Crear/actualizar textura
-        // @ts-ignore - createTextureFromData now handles any[][]
+        // createTextureFromData now handles any[][]
         const texture = createTextureFromData(gl, mapData, width, height, dataMin, dataMax);
         if (!texture) {
           console.error('❌ ShaderCanvas: Error creando textura WebGL');
@@ -275,7 +275,7 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
         } catch (error) {
             console.error('❌ ShaderCanvas: Error durante renderizado:', error);
         }
-    }, [webglAvailable, mapData, width, height, selectedViz, minValue, maxValue]);
+    }, [webglAvailable, mapData, width, height, selectedViz, minValue, maxValue, channelMode]);
     
     // Si WebGL no está disponible, renderizar canvas vacío (el componente padre usará Canvas2D)
     if (!webglAvailable) {
