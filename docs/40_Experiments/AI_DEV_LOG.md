@@ -16,7 +16,16 @@
 
 ## 📋 Índice de Entradas
 
-- **[[PHASE_STATUS_REPORT]]**: 2025-12-01 (17:28) - Actualización comprehensiva del estado del proyecto. Progreso de Fase 2 (benchmarking Python vs C++, bloqueo en Native Engine), Fase 3 100% completado (frontend linting, Phase Space Viz, Field Theory UI), y Compute Backend 100% completado. Tareas críticas actualizadas con prioridades.
+- **[[PHASE_STATUS_REPORT]]**: 2025-12-01 (17:28) - Actualización comprehensiva del estado del proyecto. Progreso de Fase 2 (benchmarking Python vs C++, bloqueo en Native Engine), Fase 3 100% completado (frontend linting, Phase Space Viz, Field Theory UI), y Compute Backend 100% completado. Tareas críticas actualizadas.
+- **Fixing Engine Compatibility**:
+  - **Native Engine Crash**: Mitigated by forcing `CARTESIAN` engine (Python backend) in `config.json` and `trainer.py` arguments.
+  - **Lattice Engine**: Implemented missing methods (`compile_model`, `get_model_for_params`, `get_initial_state`, `evolve_step` aliased to `step`) to satisfy `QC_Trainer_v3` interface.
+  - **Harmonic Engine**: Implemented missing methods (`compile_model`, `get_model_for_params`, `get_initial_state`, `evolve_step` aliased to `step`) to satisfy `QC_Trainer_v4` interface.
+  - **Trainer Updates**:
+    - Updated `QC_Trainer_v3` to handle engines without trainable models (skipping optimizer/scheduler init, gradient steps, and state dict saving).
+    - Updated `QC_Trainer_v4` to handle engines without `state.psi` attribute (using `get_initial_state` fallback).
+    - Added `CARTESIAN` to allowed `engine_type` choices in `trainer.py`.
+  - **Verification**: Successfully verified training loop for `LATTICE`, `HARMONIC`, and `CARTESIAN` engines.
 - **2025-12-01**: Fixed `motor_factory.py` to support `LATTICE` and `HARMONIC` engines. Added `shape` property to `QuantumStatePolar`. Investigated Native Engine crash (`terminate called recursively`) but could not resolve it without C++ debugging access; suspected tensor interface mismatch. [Log](logs/2025-12-01_fix_engine_support_and_native_crash.md)
 - [[logs/2025-12-01_fix_trainer_engine_and_motor_factory|2025-12-01 - Fix: Trainer Engine Type Support & Motor Factory Signature]]
 - [[logs/2025-12-01_obsidian_kb_optimization|2025-12-01 - Optimization: Knowledge Base Obsidian Links (docs/20_Concepts/)]]
