@@ -4,7 +4,7 @@ import logging
 import time
 import os
 from dataclasses import dataclass, asdict
-from dataclasses import dataclass, asdict
+from typing import Dict, List, Tuple
 from qiskit import QuantumCircuit
 from qiskit.circuit.library import EfficientSU2
 from qiskit.primitives import StatevectorEstimator
