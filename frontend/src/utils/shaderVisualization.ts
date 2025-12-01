@@ -20,6 +20,7 @@ export interface ShaderConfig {
   minValue?: number;
   maxValue?: number;
   gamma?: number; // Corrección gamma para colormap
+  channelMode?: number; // 0=Composite, 1=Ch0, 2=Ch1, 3=Ch2
 }
 
 // ... (existing code) ...
@@ -733,6 +734,52 @@ export const FRAGMENT_SHADER_POINCARE = `
 `;
 
 /**
+ * Shader de fragment para visualización de Campos (Field Theory)
+ * Mapea los canales RGB a campos físicos:
+ * R: Campo Electromagnético (Energía)
+ * G: Campo Gravitatorio (Fase/Curvatura)
+ * B: Campo de Higgs (Masa)
+ */
+export const FRAGMENT_SHADER_FIELDS = `
+    precision mediump float;
+    
+    uniform sampler2D u_texture;
+    uniform vec2 u_resolution;
+    uniform int u_channel_mode; // 0=Composite, 1=Ch0(R), 2=Ch1(G), 3=Ch2(B)
+    uniform float u_gamma;
+    
+    varying vec2 v_texCoord;
+    
+    void main() {
+        vec4 texel = texture2D(u_texture, v_texCoord);
+        vec3 color = vec3(0.0);
+        
+        if (u_channel_mode == 0) {
+            // Composite: Mostrar RGB tal cual
+            color = texel.rgb;
+            
+            // Aplicar gamma a cada canal
+            color = pow(color, vec3(u_gamma));
+        } else if (u_channel_mode == 1) {
+            // Channel 0 (Red) - Mostrar en Rojo o Blanco?
+            // Mejor mostrar en su color correspondiente (Rojo)
+            float val = pow(texel.r, u_gamma);
+            color = vec3(val, 0.0, 0.0);
+        } else if (u_channel_mode == 2) {
+            // Channel 1 (Green)
+            float val = pow(texel.g, u_gamma);
+            color = vec3(0.0, val, 0.0);
+        } else if (u_channel_mode == 3) {
+            // Channel 2 (Blue)
+            float val = pow(texel.b, u_gamma);
+            color = vec3(0.0, 0.0, val);
+        }
+        
+        gl_FragColor = vec4(color, 1.0);
+    }
+`;
+
+/**
  * Crea un programa de shader WebGL
  */
 export function createShaderProgram(
@@ -802,7 +849,7 @@ function compileShader(
  */
 export function createTextureFromData(
   gl: WebGLRenderingContext,
-  data: number[][],
+  data: any[][], // number[][] or number[][][]
   width: number,
   height: number,
   minValue?: number,
@@ -813,11 +860,25 @@ export function createTextureFromData(
 
   gl.bindTexture(gl.TEXTURE_2D, texture);
 
-  // Flatten 2D array
-  const flatData = new Float32Array(width * height);
+  // Detect 3D data (RGB)
+  const is3D = data.length > 0 && Array.isArray(data[0][0]);
+
+  // Flatten array
+  // If 3D, we need 3 channels. If 2D, 1 channel.
+  const channels = is3D ? 3 : 1;
+  const flatData = new Float32Array(width * height * channels);
+
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      flatData[y * width + x] = data[y]?.[x] ?? 0;
+      if (is3D) {
+        const pixel = (data[y]?.[x] as unknown as number[]) || [0, 0, 0];
+        const idx = (y * width + x) * 3;
+        flatData[idx] = pixel[0] || 0;
+        flatData[idx + 1] = pixel[1] || 0;
+        flatData[idx + 2] = pixel[2] || 0;
+      } else {
+        flatData[y * width + x] = (data[y]?.[x] as number) ?? 0;
+      }
     }
   }
 
@@ -849,27 +910,49 @@ export function createTextureFromData(
     (dataMin === 0 && dataMax === 1) ||
     (Math.abs(dataMin) < 0.01 && Math.abs(dataMax - 1) < 0.01);
 
-  // Build RGBA Uint8Array (R = normalized value, G/B = 0, A = 255)
+  // Build RGBA Uint8Array
   const rgbaData = new Uint8Array(width * height * 4);
-  for (let i = 0; i < flatData.length; i++) {
-    const val = flatData[i];
-    let normalized: number;
-    if (isFinite(val)) {
-      if (isNormalized || isPreNormalized) {
-        normalized = Math.max(0, Math.min(1, val));
-      } else {
-        normalized = (val - dataMin) / dataRange;
-        normalized = Math.max(0, Math.min(1, normalized));
-      }
-    } else {
-      normalized = 0;
+
+  if (is3D) {
+    // Handle 3D RGB data
+    // Assuming data is already normalized [0, 1] from backend for 'fields' viz
+    for (let i = 0; i < width * height; i++) {
+      const srcIdx = i * 3;
+      const dstIdx = i * 4;
+
+      rgbaData[dstIdx] = Math.round(
+        Math.max(0, Math.min(1, flatData[srcIdx])) * 255
+      ); // R
+      rgbaData[dstIdx + 1] = Math.round(
+        Math.max(0, Math.min(1, flatData[srcIdx + 1])) * 255
+      ); // G
+      rgbaData[dstIdx + 2] = Math.round(
+        Math.max(0, Math.min(1, flatData[srcIdx + 2])) * 255
+      ); // B
+      rgbaData[dstIdx + 3] = 255; // A
     }
-    const byte = Math.round(normalized * 255);
-    const idx = i * 4;
-    rgbaData[idx] = byte; // R
-    rgbaData[idx + 1] = 0; // G
-    rgbaData[idx + 2] = 0; // B
-    rgbaData[idx + 3] = 255; // A
+  } else {
+    // Handle 2D Grayscale data
+    for (let i = 0; i < flatData.length; i++) {
+      const val = flatData[i];
+      let normalized: number;
+      if (isFinite(val)) {
+        if (isNormalized || isPreNormalized) {
+          normalized = Math.max(0, Math.min(1, val));
+        } else {
+          normalized = (val - dataMin) / dataRange;
+          normalized = Math.max(0, Math.min(1, normalized));
+        }
+      } else {
+        normalized = 0;
+      }
+      const byte = Math.round(normalized * 255);
+      const idx = i * 4;
+      rgbaData[idx] = byte; // R
+      rgbaData[idx + 1] = 0; // G
+      rgbaData[idx + 2] = 0; // B
+      rgbaData[idx + 3] = 255; // A
+    }
   }
 
   // Upload texture as RGBA
@@ -923,6 +1006,7 @@ export function renderWithShader(
   const maxValueLocation = gl.getUniformLocation(program, "u_maxValue");
   const gammaLocation = gl.getUniformLocation(program, "u_gamma");
   const colormapLocation = gl.getUniformLocation(program, "u_colormap");
+  const channelModeLocation = gl.getUniformLocation(program, "u_channel_mode");
 
   if (resolutionLocation) {
     gl.uniform2f(resolutionLocation, canvasWidth, canvasHeight);
@@ -945,6 +1029,9 @@ export function renderWithShader(
   if (colormapLocation) {
     const colormapIndex = config.colormap === "plasma" ? 1 : 0;
     gl.uniform1i(colormapLocation, colormapIndex);
+  }
+  if (channelModeLocation) {
+    gl.uniform1i(channelModeLocation, config.channelMode || 0);
   }
 
   // Renderizar cuadrilátero completo

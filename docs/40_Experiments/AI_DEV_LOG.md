@@ -16,6 +16,8 @@
 
 ## 📋 Índice de Entradas
 
+- [[logs/2025-12-01_field_theory_ui|2025-12-01 - Feature: Field Theory UI Implementation (Field Selector)]]
+- [[logs/2025-12-01_fix_fps_display|2025-12-01 - Fix: FPS Display in SimulationService]]
 - [[docs/10_core/ROADMAP_INFERENCE_OPTIMIZATION|2025-12-01 - Strategy: Inference Optimization Roadmap (LitServe, Quantization, Compile)]]
 - [[logs/2025-12-01_fix_native_freeze|2025-12-01 - Fix: Native Engine JIT Export Freeze]]
 - [[logs/2025-12-01_phase_space_viz|2025-12-01 - Feature: Phase Space Visualization (PCA + Clustering)]]

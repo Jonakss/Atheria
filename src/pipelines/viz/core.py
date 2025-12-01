@@ -373,6 +373,23 @@ def select_map_data(viz_type: str, density: np.ndarray, phase: np.ndarray,
     elif viz_type == 'channel_activity':
         # Actividad por canal: muestra qué canales están más activos
         return calculate_channel_activity_map(psi)
+    elif viz_type == 'fields':
+        # Field Theory Visualization: Return first 3 channels as RGB
+        # Channel 0: EM (Red), Channel 1: Gravity (Green), Channel 2: Higgs (Blue)
+        if psi.shape[-1] >= 3:
+            # Extract first 3 channels magnitude
+            fields = psi.abs()[..., :3]  # (H, W, 3)
+            return tensor_to_numpy(fields, "fields_map")
+        elif psi.shape[-1] >= 1:
+            # Fallback if less than 3 channels: Pad with zeros
+            h, w = psi.shape[0], psi.shape[1]
+            fields = torch.zeros((h, w, 3), device=psi.device, dtype=psi.dtype)
+            # Copy available channels
+            available = min(psi.shape[-1], 3)
+            fields[..., :available] = psi.abs()[..., :available]
+            return tensor_to_numpy(fields, "fields_map")
+        else:
+            return density
     else:
         return density
 

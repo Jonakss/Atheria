@@ -6,11 +6,9 @@ import { useWebSocket } from '../../hooks/useWebSocket';
 import { ActionIcon } from '../../modules/Dashboard/components/ActionIcon';
 import { Box } from '../../modules/Dashboard/components/Box';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
-import { Group } from '../../modules/Dashboard/components/Group';
 import { Stack } from '../../modules/Dashboard/components/Stack';
 import { Switch } from '../../modules/Dashboard/components/Switch';
 import { Text } from '../../modules/Dashboard/components/Text';
-import { Tooltip } from '../../modules/Dashboard/components/Tooltip';
 import { isWebGLAvailable } from '../../utils/shaderVisualization';
 import { CanvasOverlays, OverlayConfig, OverlayControls } from './CanvasOverlays';
 import { ShaderCanvas } from './ShaderCanvas';
@@ -849,12 +847,11 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
         return () => window.removeEventListener('keydown', handleKeyPress);
     }, [sendCommand, resetView]);
 
+    // Estado para el modo de canal (Field Theory)
+    const [channelMode, setChannelMode] = useState<number>(0); // 0=Composite, 1=Ch0, 2=Ch1, 3=Ch2
+
     return (
-        <Box 
-            className="relative w-full h-full"
-            onMouseMove={handleCanvasMouseMove}
-            onMouseLeave={handleCanvasMouseLeave}
-        >
+        <div className="relative w-full h-full overflow-hidden bg-[#0A0A0A] select-none group">
             {/* Overlay de zoom centrado en el mouse */}
             {isZooming && zoomCenter && (
                 <div
@@ -898,6 +895,7 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                     </div>
                 </div>
             )}
+
             {(!dataToRender?.map_data && !simData?.map_data) && (
                 <Box className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center text-gray-500 z-10 pointer-events-none">
                     <Text size="lg" className="block mb-2">Esperando datos de simulación...</Text>
@@ -918,323 +916,214 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 </Box>
             )}
 
-            {/* FPS Indicator - Top Left - REMOVED (Moved to Toolbar) */}
-            
-            {/* Controles de Canvas */}
-            <Box className="absolute top-2.5 right-2.5 z-30">
-                <Group gap={2}>
-                    <Tooltip label="Resetear vista (R)">
-                        <ActionIcon
-                            variant="light"
-                            color="gray"
-                            onClick={resetView}
-                            size="sm"
-                        >
-                            <ZoomOut size={16} />
-                        </ActionIcon>
-                    </Tooltip>
-                    {/* Toggle WebGL (Shaders) vs Canvas2D */}
-                    {shaderShouldBeAvailable && (
-                        <Tooltip label={useShaderRendering ? "Cambiar a Canvas2D (CPU)" : "Cambiar a WebGL (GPU)"}>
-                            <ActionIcon
-                                variant={useShaderRendering ? "filled" : "light"}
-                                color={useShaderRendering ? "green" : "amber"}
-                                onClick={() => setUseShaderRendering(!useShaderRendering)}
-                                size="sm"
-                            >
-                                {useShaderRendering ? (
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <rect x="4" y="4" width="16" height="16" rx="2" />
-                                        <path d="M9 9h6v6" />
-                                        <path d="m9 15 6-6" />
-                                    </svg>
-                                ) : (
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                                        <path d="M7 7h10" />
-                                        <path d="M7 12h10" />
-                                        <path d="M7 17h10" />
-                                    </svg>
-                                )}
-                            </ActionIcon>
-                        </Tooltip>
-                    )}
-                    <Tooltip label="Configurar overlays">
-                        <ActionIcon
-                            variant={showOverlayControls ? "filled" : "light"}
-                            color="gray"
-                            onClick={() => setShowOverlayControls(!showOverlayControls)}
-                            size="sm"
-                        >
-                            <Settings size={16} />
-                        </ActionIcon>
-                    </Tooltip>
-                </Group>
-                
-                {showOverlayControls && (
-                    <Box className="absolute top-10 right-0 z-30">
-                        <GlassPanel className="p-3">
-                            <Stack gap={2}>
-                        <OverlayControls
-                            config={overlayConfig}
-                            onConfigChange={setOverlayConfig}
-                        />
-                                <Box className="border-t border-white/10 pt-2 mt-1">
-                                    <Text size="xs" className="text-gray-500 mb-1">ROI Automático</Text>
-                                    <Switch
-                                        checked={autoROIEnabled}
-                                        onChange={(e) => setAutoROIEnabled(e.currentTarget.checked)}
-                                        label="Activar"
-                                        size="sm"
-                                    />
-                                    {autoROIEnabled && (
-                                        <Text size="xs" color="dimmed" className="mt-1 block">
-                                            El ROI se actualiza automáticamente según el zoom y pan. Solo se procesa la región visible.
-                                        </Text>
-                                    )}
-                                </Box>
-                            </Stack>
-                        </GlassPanel>
-                    </Box>
-                )}
-            </Box>
-
-            {/* Selector de Visualización - Top Left */}
-            <Box className="absolute top-2.5 left-2.5 z-30">
-                <GlassPanel className="px-2.5 py-2">
-                    <select
-                        value={selectedViz || 'density'}
-                        onChange={(e) => {
-                            const value = e.target.value;
-                            sendCommand('simulation', 'set_viz', { viz_type: value });
-                        }}
-                        className="bg-transparent border-none text-xs text-gray-300 focus:outline-none cursor-pointer font-medium uppercase tracking-wider pr-6"
-                        style={{ 
-                            appearance: 'none',
-                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 9L2 5h8z'/%3E%3C/svg%3E")`,
-                            backgroundRepeat: 'no-repeat',
-                            backgroundPosition: 'right 4px center'
-                        }}
-                    >
-                        <option value="density">🔵 Densidad</option>
-                        <option value="phase">🌈 Fase</option>
-                        <option value="flow">💨 Flujo</option>
-                        <option value="spectral">📊 Espectral</option>
-                        <option value="poincare">🎯 Poincaré</option>
-                        <option value="phase_hsv">🎨 Fase HSV</option>
-                        <option value="phase_attractor">🌀 Atractor</option>
-                    </select>
-                </GlassPanel>
-            </Box>
-            
-            {/* Canvas principal - Usar ShaderCanvas (WebGL) cuando WebGL está disponible y la visualización es compatible */}
-            {/* Canvas principal - Usar ShaderCanvas (WebGL) cuando WebGL está disponible y la visualización es compatible */}
-            <div
+            {/* Contenedor para ShaderCanvas (WebGL) */}
+            <div 
                 ref={containerRefShader}
-                className="absolute inset-0 overflow-hidden select-none"
-                style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
+                className="absolute inset-0 w-full h-full"
+                style={{ 
+                    cursor: isPanning ? 'grabbing' : 'grab',
+                    touchAction: 'none',
+                    visibility: useShaderRendering ? 'visible' : 'hidden',
+                    zIndex: 1
+                }}
                 onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
+                onMouseMove={(e) => {
+                    handleMouseMove(e);
+                    handleCanvasMouseMove(e);
+                }}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={() => {
                     handleMouseUp();
                     handleCanvasMouseLeave();
                 }}
             >
-                <div
+                <ShaderCanvas 
+                    mapData={mapData || []}
+                    width={gridWidth}
+                    height={gridHeight}
+                    selectedViz={selectedViz}
+                    minValue={0} // Fields viz is normalized
+                    maxValue={1} // Fields viz is normalized
+                    channelMode={channelMode}
                     style={{
-                        transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
+                        transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                         transformOrigin: 'center center',
                         width: '100%',
                         height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        willChange: 'transform'
+                        imageRendering: zoom > 2 ? 'pixelated' : 'auto'
                     }}
-                >
-                    {/* Capa de Shaders (GPU) - Fondo */}
-                    {useShaderRendering && (
-                        <div style={{ 
-                            position: 'absolute', 
-                            zIndex: 1,
-                            width: gridWidth,
-                            height: gridHeight,
-                            pointerEvents: 'none',
-                        }}>
-                            <ShaderCanvas
-                                mapData={mapData || []}
-                                width={gridWidth}
-                                height={gridHeight}
-                                selectedViz={selectedViz}
-                                minValue={0}
-                                maxValue={1}
-                                style={{ 
-                                    width: '100%', 
-                                    height: '100%',
-                                    imageRendering: 'pixelated' 
-                                }}
-                            />
-                        </div>
-                    )}
-
-                    {/* Capa de Canvas 2D (CPU) - Frente/Fallback/Overlays */}
-                    <canvas
-                        ref={canvasRef}
-                        className="pixelated"
-                        width={gridWidth}
-                        height={gridHeight}
-                        style={{
-                            opacity: useShaderRendering ? 0 : 1, 
-                            zIndex: 2,
-                            pointerEvents: 'none',
-                            position: 'absolute',
-                        }}
-                    />
-                    
-                    {/* Overlay de bordes toroidales */}
-                    {overlayConfig.showToroidalBorders && (
-                        <div style={{
-                            position: 'absolute',
-                            top: -(gridHeight/2),
-                            left: -(gridWidth/2),
-                            width: gridWidth * 3,
-                            height: gridHeight * 3,
-                            border: '1px dashed rgba(255, 255, 255, 0.2)',
-                            zIndex: 3,
-                            pointerEvents: 'none',
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr 1fr',
-                            gridTemplateRows: '1fr 1fr 1fr'
-                        }}>
-                            {[...Array(9)].map((_, i) => (
-                                <div key={i} style={{
-                                    border: '1px dashed rgba(255, 255, 255, 0.1)',
-                                    boxSizing: 'border-box'
-                                }} />
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-            
-            {/* Overlays */}
-            {(overlayConfig.showGrid || overlayConfig.showCoordinates || overlayConfig.showQuadtree || overlayConfig.showStats || overlayConfig.showToroidalBorders) && (
-                <CanvasOverlays
-                    canvasRef={canvasRef}
-                    mapData={mapData}
-                    pan={pan}
-                    zoom={zoom}
-                    config={overlayConfig}
-                    roiInfo={simData?.roi_info || null}
                 />
-            )}
+            </div>
 
-            {/* Tooltip de información del punto (tipo Google Maps) */}
-            {tooltipData && tooltipData.visible && (
-                <div
-                    className="fixed z-[100] pointer-events-none"
+            {/* Contenedor para Canvas 2D (Fallback/Default) */}
+            <div 
+                ref={containerRefCanvas}
+                className="absolute inset-0 w-full h-full"
+                style={{ 
+                    cursor: isPanning ? 'grabbing' : 'grab',
+                    touchAction: 'none',
+                    visibility: !useShaderRendering ? 'visible' : 'hidden',
+                    zIndex: 1
+                }}
+                onMouseDown={handleMouseDown}
+                onMouseMove={(e) => {
+                    handleMouseMove(e);
+                    handleCanvasMouseMove(e);
+                }}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={(e) => {
+                    handleMouseUp();
+                    handleCanvasMouseLeave();
+                }}
+            >
+                <canvas
+                    ref={canvasRef}
                     style={{
-                        left: `${Math.min(tooltipData.x + 10, window.innerWidth - 200)}px`,
-                        top: `${Math.max(tooltipData.y - 120, 10)}px`
+                        transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                        transformOrigin: 'center center',
+                        width: '100%',
+                        height: '100%',
+                        imageRendering: zoom > 2 ? 'pixelated' : 'auto'
                     }}
-                >
-                    <GlassPanel className="p-2.5 shadow-xl border border-white/20 min-w-[160px]">
-                        <div className="text-[10px] space-y-1.5">
-                            <div className="flex items-center justify-between gap-3">
-                                <span className="text-gray-400 font-mono uppercase text-[9px] tracking-wider">Posición</span>
-                                <span className="text-gray-200 font-mono font-bold">
-                                    ({tooltipData.gridX}, {tooltipData.gridY})
-                                </span>
+                />
+            </div>
+
+            {/* Overlays (Grid, Coords, etc) */}
+            <CanvasOverlays 
+                canvasRef={useShaderRendering ? (containerRefShader.current?.querySelector('canvas') as any) : canvasRef}
+                mapData={mapData}
+                pan={pan}
+                zoom={zoom}
+                config={overlayConfig}
+                roiInfo={simData?.roi_info}
+            />
+
+            {/* Field Selector UI (Solo visible en modo 'fields') */}
+            {selectedViz === 'fields' && (
+                <div className="absolute top-4 left-4 z-20">
+                    <GlassPanel className="p-2">
+                        <Stack gap={2}>
+                            <Text size="xs" weight="bold">Field Selector</Text>
+                            <div className="flex gap-1">
+                                <button
+                                    onClick={() => setChannelMode(0)}
+                                    className={`px-2 py-1 text-xs rounded ${channelMode === 0 ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                                >
+                                    Composite
+                                </button>
+                                <button
+                                    onClick={() => setChannelMode(1)}
+                                    className={`px-2 py-1 text-xs rounded ${channelMode === 1 ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                                    title="Electromagnetic Field (Energy)"
+                                >
+                                    EM (R)
+                                </button>
+                                <button
+                                    onClick={() => setChannelMode(2)}
+                                    className={`px-2 py-1 text-xs rounded ${channelMode === 2 ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                                    title="Gravitational Field (Curvature)"
+                                >
+                                    Grav (G)
+                                </button>
+                                <button
+                                    onClick={() => setChannelMode(3)}
+                                    className={`px-2 py-1 text-xs rounded ${channelMode === 3 ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                                    title="Higgs Field (Mass)"
+                                >
+                                    Higgs (B)
+                                </button>
                             </div>
-                            {tooltipData.value !== null && (
-                                <div className="flex items-center justify-between gap-3">
-                                    <span className="text-gray-400 font-mono uppercase text-[9px] tracking-wider">Valor</span>
-                                    <span className="text-emerald-400 font-mono font-bold">
-                                        {tooltipData.value.toFixed(4)}
-                                    </span>
-                                </div>
-                            )}
-                            {simData?.step !== undefined && simData.step !== null && (
-                                <div className="flex items-center justify-between gap-3">
-                                    <span className="text-gray-400 font-mono uppercase text-[9px] tracking-wider">Paso</span>
-                                    <span className="text-blue-400 font-mono font-bold">
-                                        {simData.step.toLocaleString()}
-                                    </span>
-                                </div>
-                            )}
-                            {zoom && (
-                                <div className="flex items-center justify-between gap-3">
-                                    <span className="text-gray-400 font-mono uppercase text-[9px] tracking-wider">Zoom</span>
-                                    <span className="text-amber-400 font-mono font-bold">
-                                        {zoom.toFixed(2)}x
-                                    </span>
-                                </div>
-                            )}
-                            {selectedViz && (
-                                <div className="flex items-center justify-between gap-3 pt-1 border-t border-white/10">
-                                    <span className="text-gray-400 font-mono uppercase text-[9px] tracking-wider">Vista</span>
-                                    <span className="text-purple-400 font-mono font-bold text-[9px]">
-                                        {selectedViz.toUpperCase()}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
+                        </Stack>
                     </GlassPanel>
                 </div>
             )}
-            
-            {/* Indicador de atajos de teclado - Vistas Rápidas (siempre visible) */}
-            {/* Ajustado bottom para no solaparse con HistoryControls */}
-            <Box className="absolute bottom-32 left-2.5 z-20 opacity-70 hover:opacity-100 transition-opacity">
-                <GlassPanel className="p-2.5">
-                    <div className="space-y-2">
-                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
-                            Vistas Rápidas
-                        </div>
-                        <div className="space-y-1.5 text-[10px]">
-                            <div className="flex items-center gap-2">
-                                <kbd className="px-1.5 py-0.5 bg-white/10 border border-white/20 rounded text-[9px] font-mono text-gray-300">
-                                    Ctrl+1
-                                </kbd>
-                                <span className="text-gray-500">Densidad</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <kbd className="px-1.5 py-0.5 bg-white/10 border border-white/20 rounded text-[9px] font-mono text-gray-300">
-                                    Ctrl+2
-                                </kbd>
-                                <span className="text-gray-500">Fase</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <kbd className="px-1.5 py-0.5 bg-white/10 border border-white/20 rounded text-[9px] font-mono text-gray-300">
-                                    Ctrl+3
-                                </kbd>
-                                <span className="text-gray-500">Flujo</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <kbd className="px-1.5 py-0.5 bg-white/10 border border-white/20 rounded text-[9px] font-mono text-gray-300">
-                                    Ctrl+4
-                                </kbd>
-                                <span className="text-gray-500">Espectral</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <kbd className="px-1.5 py-0.5 bg-white/10 border border-white/20 rounded text-[9px] font-mono text-gray-300">
-                                    Ctrl+5
-                                </kbd>
-                                <span className="text-gray-500">Poincaré</span>
-                            </div>
-                            <div className="pt-1.5 border-t border-white/10 mt-1.5">
-                                <div className="flex items-center gap-2">
-                                    <kbd className="px-1.5 py-0.5 bg-white/10 border border-white/20 rounded text-[9px] font-mono text-gray-300">
-                                        R
-                                    </kbd>
-                                    <span className="text-gray-500">Resetear vista</span>
-                                </div>
-                            </div>
-                        </div>
+
+            {/* Controles de Overlay (Toggle) */}
+            <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-2">
+                <div className="flex gap-2">
+                    {/* Botón para alternar modo de renderizado (WebGL vs Canvas2D) */}
+                    {shaderShouldBeAvailable && (
+                        <ActionIcon 
+                            onClick={() => setUseShaderRendering(!useShaderRendering)}
+                            variant="filled"
+                            color={useShaderRendering ? "blue" : "gray"}
+                            title={useShaderRendering ? "Usando WebGL (GPU)" : "Usando Canvas2D (CPU)"}
+                        >
+                            <span className="text-xs font-bold">GL</span>
+                        </ActionIcon>
+                    )}
+                    
+                    <ActionIcon 
+                        onClick={() => setShowOverlayControls(!showOverlayControls)}
+                        variant="filled"
+                        color={showOverlayControls ? "blue" : "gray"}
+                    >
+                        <Settings size={16} />
+                    </ActionIcon>
+                </div>
+
+                {showOverlayControls && (
+                    <GlassPanel className="p-3">
+                        <Stack gap={2}>
+                            <OverlayControls
+                                config={overlayConfig}
+                                onConfigChange={setOverlayConfig}
+                            />
+                            <Box className="border-t border-white/10 pt-2 mt-1">
+                                <Text size="xs" className="text-gray-500 mb-1">ROI Automático</Text>
+                                <Switch
+                                    checked={autoROIEnabled}
+                                    onChange={(e) => setAutoROIEnabled(e.currentTarget.checked)}
+                                    label="Activar"
+                                    size="sm"
+                                />
+                                {autoROIEnabled && (
+                                    <Text size="xs" color="dimmed" className="mt-1 block">
+                                        El ROI se actualiza automáticamente según el zoom y pan. Solo se procesa la región visible.
+                                    </Text>
+                                )}
+                            </Box>
+                        </Stack>
+                    </GlassPanel>
+                )}
+            </div>
+
+            {/* Tooltip de información del punto */}
+            {tooltipData && tooltipData.visible && (
+                <div 
+                    className="fixed z-50 pointer-events-none bg-black/80 border border-white/20 rounded p-2 text-xs text-white backdrop-blur-sm shadow-xl"
+                    style={{
+                        left: tooltipData.x + 15,
+                        top: tooltipData.y + 15,
+                    }}
+                >
+                    <div className="font-mono text-cyan-400 mb-1">
+                        Pos: ({tooltipData.gridX}, {tooltipData.gridY})
                     </div>
-                </GlassPanel>
-            </Box>
-        </Box>
+                    {tooltipData.value !== null && (
+                        <div className="font-mono">
+                            Val: <span className="text-yellow-400">{tooltipData.value.toFixed(6)}</span>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Controles de Zoom (Bottom Right) */}
+            <div className="absolute bottom-4 right-4 z-20 flex gap-2">
+                <ActionIcon onClick={() => resetView()} title="Reset View">
+                    <ZoomOut size={16} />
+                </ActionIcon>
+            </div>
+            
+            {/* Indicador de Modo Toroidal (Bottom Left) */}
+            {overlayConfig.showToroidalBorders && (
+                <div className="absolute bottom-4 left-4 z-20 pointer-events-none">
+                    <div className="bg-orange-900/50 border border-orange-500/50 text-orange-200 text-xs px-2 py-1 rounded backdrop-blur-sm flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                        Modo Toroidal: Bordes Conectados
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }

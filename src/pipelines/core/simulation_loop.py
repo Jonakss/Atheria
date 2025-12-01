@@ -550,7 +550,7 @@ async def simulation_loop():
                                         
                                         # Agregar al historial (buffer circular)
                                         # Usamos frame_payload_raw para tener los datos sin comprimir/serializar
-                                        if 'simulation_history' in g_state:
+                                        if 'simulation_history' in g_state and g_state.get('history_enabled', True):
                                             # Crear payload para historial que incluye el estado psi (si existe)
                                             # Esto permite restaurar la simulación exacta, no solo visualizar
                                             history_payload = frame_payload_raw.copy()

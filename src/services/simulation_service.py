@@ -56,7 +56,13 @@ class SimulationService(BaseService):
                 
                 # 3. Ejecutar paso de física (Physics Step)
                 # Offload to thread pool to avoid blocking event loop
+                if logging.getLogger().isEnabledFor(logging.DEBUG):
+                    logging.debug(f"🔄 Ejecutando paso de física (Step {g_state.get('simulation_step', 0)})...")
+                
                 await asyncio.get_event_loop().run_in_executor(None, self.motor.evolve_internal_state)
+                
+                if logging.getLogger().isEnabledFor(logging.DEBUG):
+                    logging.debug("✅ Paso de física completado.")
                 
                 # 4. Actualizar contadores
                 current_step = g_state.get('simulation_step', 0)

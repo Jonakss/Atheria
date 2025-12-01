@@ -12,6 +12,7 @@ import {
     FRAGMENT_SHADER_DENSITY,
     FRAGMENT_SHADER_ENERGY,
     FRAGMENT_SHADER_ENTROPY,
+    FRAGMENT_SHADER_FIELDS,
     FRAGMENT_SHADER_FLOW,
     FRAGMENT_SHADER_GRADIENT,
     FRAGMENT_SHADER_HSV,
@@ -26,12 +27,13 @@ import {
 } from '../../utils/shaderVisualization';
 
 interface ShaderCanvasProps {
-    mapData: number[][];
+    mapData: number[][] | number[][][]; // Support 3D array for fields
     width: number;
     height: number;
     selectedViz: string;
     minValue?: number;
     maxValue?: number;
+    channelMode?: number; // 0=Composite, 1=Ch0, 2=Ch1, 3=Ch2
     className?: string;
     style?: React.CSSProperties;
 }
@@ -43,6 +45,7 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
     selectedViz,
     minValue,
     maxValue,
+    channelMode = 0,
     className,
     style
 }) => {
@@ -90,6 +93,8 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
             fragmentShader = FRAGMENT_SHADER_GRADIENT;
         } else if (selectedViz === 'flow') {
             fragmentShader = FRAGMENT_SHADER_FLOW;
+        } else if (selectedViz === 'fields') {
+            fragmentShader = FRAGMENT_SHADER_FIELDS;
         } else {
             // Default: density
             fragmentShader = FRAGMENT_SHADER_DENSITY;
@@ -137,9 +142,13 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
             let minVal = Infinity;
             let maxVal = -Infinity;
             
+            // Check if 3D
+            const is3D = mapData.length > 0 && Array.isArray(mapData[0][0]);
+            
             for (let y = 0; y < Math.min(10, mapDataHeight); y++) {
                 for (let x = 0; x < Math.min(10, mapDataWidth); x++) {
-                    const val = mapData[y]?.[x];
+                    // @ts-ignore
+                    const val = is3D ? mapData[y]?.[x]?.[0] : mapData[y]?.[x];
                     if (typeof val === 'number' && !isNaN(val)) {
                         validCount++;
                         minVal = Math.min(minVal, val);
@@ -148,7 +157,7 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
                 }
             }
             
-            console.log(`🔍 ShaderCanvas: mapData stats - shape: [${mapDataHeight}, ${mapDataWidth}], valid samples: ${validCount}, min: ${minVal}, max: ${maxVal}`);
+            console.log(`🔍 ShaderCanvas: mapData stats - shape: [${mapDataHeight}, ${mapDataWidth}${is3D ? ', 3' : ''}], valid samples: ${validCount}, min: ${minVal}, max: ${maxVal}`);
         }
         
         // CRÍTICO: Si minValue y maxValue están definidos explícitamente (especialmente 0 y 1),
@@ -161,8 +170,12 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
             // Muestreo para rendimiento en grids grandes
             const step = Math.max(1, Math.floor(mapData.length * mapData[0].length / 10000));
             
+            // Skip min/max calc for 3D fields (assumed normalized)
+            if (selectedViz === 'fields') return 0;
+
             for (let y = 0; y < mapData.length; y++) {
                 for (let x = 0; x < mapData[y]?.length || 0; x += step) {
+                    // @ts-ignore
                     const val = mapData[y]?.[x];
                     if (typeof val === 'number' && !isNaN(val) && isFinite(val)) {
                         values.push(val);
@@ -184,12 +197,16 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
         })();
         
         const dataMax = maxValue !== undefined ? maxValue : (() => {
+            // Skip min/max calc for 3D fields (assumed normalized)
+            if (selectedViz === 'fields') return 1;
+
             // Implementación robusta usando percentiles
             const values: number[] = [];
             const step = Math.max(1, Math.floor(mapData.length * mapData[0].length / 10000));
             
             for (let y = 0; y < mapData.length; y++) {
                 for (let x = 0; x < mapData[y]?.length || 0; x += step) {
+                    // @ts-ignore
                     const val = mapData[y]?.[x];
                     if (typeof val === 'number' && !isNaN(val) && isFinite(val)) {
                         values.push(val);
@@ -218,6 +235,7 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
           textureRef.current = null;
         }
         // Crear/actualizar textura
+        // @ts-ignore - createTextureFromData now handles any[][]
         const texture = createTextureFromData(gl, mapData, width, height, dataMin, dataMax);
         if (!texture) {
           console.error('❌ ShaderCanvas: Error creando textura WebGL');
@@ -237,7 +255,8 @@ export const ShaderCanvas: React.FC<ShaderCanvasProps> = ({
             colormap: 'viridis',
             minValue: 0,  // Shader no usa estos valores cuando datos ya están normalizados, pero los pasamos para compatibilidad
             maxValue: 1,  // Shader no usa estos valores cuando datos ya están normalizados, pero los pasamos para compatibilidad
-            gamma: 1.0
+            gamma: 1.0,
+            channelMode: channelMode
         };
         
         // Renderizar

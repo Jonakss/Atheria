@@ -57,9 +57,19 @@ def _downsample_array_sync(arr: np.ndarray, factor: int) -> np.ndarray:
         # Asegurar que las dimensiones sean divisibles por downsample_factor
         h_crop = new_H * factor
         w_crop = new_W * factor
-        arr_cropped = arr[:h_crop, :w_crop]
-        # Usar mean para downsampling suave
-        return arr_cropped.reshape(new_H, factor, new_W, factor).mean(axis=(1, 3)).astype(arr.dtype)
+        
+        if arr.ndim == 3:
+            # Handle 3D array (H, W, C)
+            C = arr.shape[2]
+            arr_cropped = arr[:h_crop, :w_crop, :]
+            # Reshape to (new_H, factor, new_W, factor, C)
+            # Mean over axis 1 and 3 (the factor dimensions)
+            return arr_cropped.reshape(new_H, factor, new_W, factor, C).mean(axis=(1, 3)).astype(arr.dtype)
+        else:
+            # Handle 2D array (H, W)
+            arr_cropped = arr[:h_crop, :w_crop]
+            # Usar mean para downsampling suave
+            return arr_cropped.reshape(new_H, factor, new_W, factor).mean(axis=(1, 3)).astype(arr.dtype)
     
     return arr
 
