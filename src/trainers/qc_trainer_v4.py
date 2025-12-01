@@ -6,6 +6,7 @@ import os
 import logging
 import shutil
 from typing import Dict, Optional
+from types import SimpleNamespace
 
 # Tensorboard es opcional
 try:
@@ -100,8 +101,19 @@ class QC_Trainer_v4:
         self.noise_injector = QuantumNoiseInjector(device)
         
         # 3. Optimizador
-        self.optimizer = optim.AdamW(self.motor.operator.parameters(), lr=lr, weight_decay=1e-5)
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', patience=100, factor=0.5)
+        # Obtener el modelo del motor (puede llamarse 'operator' o 'model' según el motor)
+        self.model_operator = getattr(self.motor, 'operator', getattr(self.motor, 'model', None))
+        
+        if self.model_operator is None:
+            # Si es LatticeEngine u otro sin modelo, advertir pero no fallar (a menos que se intente entrenar)
+            logging.warning(f"⚠️ El motor {type(self.motor).__name__} no expone un modelo entrenable ('operator' o 'model').")
+            self.optimizer = None
+        else:
+            self.optimizer = optim.AdamW(self.model_operator.parameters(), lr=lr, weight_decay=1e-5)
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', patience=100, factor=0.5)
+        
+        if self.optimizer is None:
+             self.scheduler = None
         
         # 4. Mixed Precision Training (AMP) - reduce memoria ~50%
         self.use_amp = (str(device).startswith('cuda'))
@@ -187,13 +199,28 @@ class QC_Trainer_v4:
         return total_loss, metrics
 
     def train_episode(self, episode_num):
-        self.motor.operator.train()
-        self.optimizer.zero_grad()
+        if self.model_operator:
+            self.model_operator.train()
+        if self.optimizer:
+            self.optimizer.zero_grad()
         
         # Estado inicial aleatorio (Sopa Primordial)
-        self.motor.state._reset_state_random()
-        psi = self.motor.state.psi
-        psi_initial = psi.clone()
+        if hasattr(self.motor, 'state') and hasattr(self.motor.state, '_reset_state_random'):
+            self.motor.state._reset_state_random()
+        elif hasattr(self.motor, '_initialize_links'):
+            # For LatticeEngine
+            self.motor.links = self.motor._initialize_links()
+        if hasattr(self.motor, 'state') and hasattr(self.motor.state, 'psi'):
+            psi = self.motor.state.psi
+            psi_initial = psi.clone()
+        elif hasattr(self.motor, 'get_initial_state'):
+             # For engines like Lattice/Harmonic that generate state on fly or don't expose it directly
+             psi_initial = self.motor.get_initial_state(self.batch_size)
+             if hasattr(psi_initial, 'requires_grad_'):
+                 psi_initial.requires_grad_(True)
+        else:
+             # Fallback or error
+             raise AttributeError(f"Engine {type(self.motor).__name__} does not expose state.psi or get_initial_state")
         
         psi_history = []
         
@@ -249,13 +276,16 @@ class QC_Trainer_v4:
                 # Backward pass con gradient scaling (AMP)
                 self.scaler.scale(loss).backward()
                 self.scaler.unscale_(self.optimizer)
-                torch.nn.utils.clip_grad_norm_(self.motor.operator.parameters(), 1.0)
+                if self.model_operator:
+                    torch.nn.utils.clip_grad_norm_(self.model_operator.parameters(), 1.0)
                 self.scaler.step(self.optimizer)
                 self.scaler.update()
             else:
                 # Backward pass estándar (FP32)
+                # Backward pass estándar (FP32)
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.motor.operator.parameters(), 1.0)
+                if self.model_operator:
+                    torch.nn.utils.clip_grad_norm_(self.model_operator.parameters(), 1.0)
                 self.optimizer.step()
         except torch.cuda.OutOfMemoryError as e:
             # Si hay error de memoria CUDA, limpiar caché y reintentar una vez
@@ -267,12 +297,14 @@ class QC_Trainer_v4:
                 if self.use_amp and self.scaler:
                     self.scaler.scale(loss).backward()
                     self.scaler.unscale_(self.optimizer)
-                    torch.nn.utils.clip_grad_norm_(self.motor.operator.parameters(), 1.0)
+                    if self.model_operator:
+                        torch.nn.utils.clip_grad_norm_(self.model_operator.parameters(), 1.0)
                     self.scaler.step(self.optimizer)
                     self.scaler.update()
                 else:
                     loss.backward()
-                    torch.nn.utils.clip_grad_norm_(self.motor.operator.parameters(), 1.0)
+                    if self.model_operator:
+                        torch.nn.utils.clip_grad_norm_(self.model_operator.parameters(), 1.0)
                     self.optimizer.step()
                 logging.info("✅ Recuperado después de limpiar caché CUDA")
             except torch.cuda.OutOfMemoryError:
@@ -330,9 +362,9 @@ class QC_Trainer_v4:
         # Guardar checkpoint
         checkpoint_data = {
             'episode': episode,
-            'model_state_dict': self.motor.operator.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
-            'scheduler_state_dict': self.scheduler.state_dict(),
+            'model_state_dict': self.model_operator.state_dict() if self.model_operator else None,
+            'optimizer_state_dict': self.optimizer.state_dict() if self.optimizer else None,
+            'scheduler_state_dict': self.scheduler.state_dict() if self.scheduler else None,
             'loss': current_loss,
             'metrics': current_metrics.copy(),
             'combined_metric': combined_metric
