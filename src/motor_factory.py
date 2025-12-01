@@ -51,6 +51,17 @@ def get_motor(config, device, model: nn.Module = None):
         d_state = config.D_STATE
     elif isinstance(config, dict) and 'D_STATE' in config:
         d_state = config['D_STATE']
+    # Check inside MODEL_PARAMS (common in experiment configs)
+    elif hasattr(config, 'MODEL_PARAMS'):
+        model_params = config.MODEL_PARAMS
+        if hasattr(model_params, 'd_state'):
+            d_state = model_params.d_state
+        elif isinstance(model_params, dict) and 'd_state' in model_params:
+            d_state = model_params['d_state']
+    elif isinstance(config, dict) and 'MODEL_PARAMS' in config:
+        model_params = config['MODEL_PARAMS']
+        if isinstance(model_params, dict) and 'd_state' in model_params:
+            d_state = model_params['d_state']
         
     # Validation: Check for compatibility
     # TODO: Add more robust validation checking model architecture metadata if available
@@ -59,7 +70,7 @@ def get_motor(config, device, model: nn.Module = None):
         logging.info("🌀 Initializing Polar Engine (Rotational/Stability optimized)")
         # Check if model is compatible with Polar engine if possible
         # For now, we assume the user knows what they are doing or the model is generic enough
-        return PolarEngine(model, grid_size)
+        return PolarEngine(model, grid_size, d_state=d_state, device=backend.get_device())
         
     elif engine_type == 'QUANTUM':
         logging.info("⚛️ Initializing Quantum Hybrid Engine")

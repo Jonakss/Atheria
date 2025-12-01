@@ -12,9 +12,9 @@ try:
     import redis
     import zstandard as zstd
     CACHE_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     CACHE_AVAILABLE = False
-    logging.warning("redis o zstandard no disponibles. Caché deshabilitado.")
+    logging.warning(f"redis o zstandard no disponibles. Caché deshabilitado. Error: {e}")
 
 
 class DragonflyCache:
