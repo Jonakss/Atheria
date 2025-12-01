@@ -69,6 +69,7 @@ def main():
     parser.add_argument("--continue_training", action="store_true")
     parser.add_argument("--noise_level", type=float, default=0.05, help="Maximum noise level for training")
     parser.add_argument("--engine_type", type=str, default="PYTHON", choices=["PYTHON", "NATIVE", "LATTICE", "HARMONIC"], help="Physics engine type")
+    parser.add_argument("--backend_type", type=str, default="LOCAL", choices=["LOCAL", "QUANTUM_MOCK", "QUANTUM_IONQ", "QUANTUM_IBM"], help="Compute backend type")
     
     args = parser.parse_args()
     
@@ -92,7 +93,8 @@ def main():
         "DEVICE": global_cfg.DEVICE,
         "GAMMA_DECAY": getattr(global_cfg, 'GAMMA_DECAY', 0.01),  # Término Lindbladian (decaimiento)
         "NOISE_LEVEL": args.noise_level,
-        "ENGINE_TYPE": args.engine_type
+        "ENGINE_TYPE": args.engine_type,
+        "BACKEND_TYPE": args.backend_type
     }
     
     # Convertir MODEL_PARAMS a SimpleNamespace si es necesario para compatibilidad

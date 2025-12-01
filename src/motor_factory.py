@@ -2,6 +2,7 @@ import logging
 import torch.nn as nn
 from .engines.qca_engine import Aetheria_Motor
 from .engines.qca_engine_polar import PolarEngine
+from .engines.compute_backend import LocalBackend, MockQuantumBackend, ComputeBackend
 
 def get_motor(config, model: nn.Module, device):
     """
@@ -10,7 +11,7 @@ def get_motor(config, model: nn.Module, device):
     Args:
         config: Configuration object or dict containing ENGINE_TYPE
         model: The neural network model (operator)
-        device: The device to run on (cpu/cuda)
+        device: The device to run on (cpu/cuda) - DEPRECATED in favor of backend, but kept for compat
         
     Returns:
         An instance of the selected motor class
@@ -22,7 +23,18 @@ def get_motor(config, model: nn.Module, device):
     elif isinstance(config, dict) and 'ENGINE_TYPE' in config:
         engine_type = config['ENGINE_TYPE']
         
-    logging.info(f"🏭 Motor Factory: Requesting engine type '{engine_type}'")
+    # Determine Backend
+    # TODO: In the future, read BACKEND_TYPE from config. Default to LocalBackend.
+    backend_type = getattr(config, 'BACKEND_TYPE', 'LOCAL')
+    
+    backend: ComputeBackend
+    if backend_type == 'QUANTUM_MOCK':
+        backend = MockQuantumBackend()
+    else:
+        # Default to LocalBackend using the passed device
+        backend = LocalBackend(device)
+        
+    logging.info(f"🏭 Motor Factory: Requesting engine type '{engine_type}' on backend '{backend.__class__.__name__}'")
     
     # Extract grid size and d_state from config or model
     # Try to get from config first
@@ -52,11 +64,12 @@ def get_motor(config, model: nn.Module, device):
         # Placeholder for Quantum Engine
         # For now fallback to Cartesian or raise NotImplementedError
         logging.warning("Quantum Engine not fully implemented, falling back to Cartesian with Quantum flags")
-        return Aetheria_Motor(model, grid_size, d_state, device, cfg=config)
+        # Pass backend to engine (Engine needs update to accept it)
+        return Aetheria_Motor(model, grid_size, d_state, backend.get_device(), cfg=config)
         
     else: # CARTESIAN or default
         if engine_type != 'CARTESIAN':
             logging.warning(f"Unknown engine type '{engine_type}', defaulting to CARTESIAN")
             
         logging.info("🌊 Initializing Standard Cartesian Engine")
-        return Aetheria_Motor(model, grid_size, d_state, device, cfg=config)
+        return Aetheria_Motor(model, grid_size, d_state, backend.get_device(), cfg=config)

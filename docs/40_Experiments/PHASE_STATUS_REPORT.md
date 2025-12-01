@@ -159,6 +159,7 @@
 | **SparseMap (C++)** | ✅ Completo | `src/cpp_core/src/sparse_map.h` | Motor nativo C++ |
 | **Motor Nativo C++** | ✅ Funcional | `src/cpp_core/src/sparse_engine.cpp` | Inferencia de alto rendimiento |
 | **HarmonicVacuum** | ✅ Completo | `src/cpp_core/src/sparse_engine.cpp` | Generación de vacío cuántico |
+| **ComputeBackend** | ✅ Completo | `src/engines/compute_backend.py` | Abstracción de hardware (Local/Quantum) |
 | **LatticeEngine** | 🟡 Prototipo | `src/engines/lattice_engine.py` | Simulación Gauge Theory (Fase 4) |
 
 ### Fases
@@ -169,6 +170,7 @@
 | **Fase 2** | Motor nativo C++ | 🟡 En progreso | ~85% |
 | **Fase 3** | Visualización y UX | ✅ Completado | 100% |
 | **Fase 4** | Holographic Lattice (AdS/CFT) | 🔵 En progreso | 25% |
+| **Infraestructura** | Compute Backend & Cloud | 🟡 En progreso | ~40% |
 | **Optimización** | Inference & Serving (LitServe/Quant) | 🟣 Planificación | 0% |
 | **Fase 5** | 3D Volumetric (Backlog) | ⚪ Backlog | 0% |
 | **Infraestructura** | DevOps & Tooling | 🟡 En progreso | ~60% |
