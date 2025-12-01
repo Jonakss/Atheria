@@ -62,22 +62,36 @@ class QC_Trainer_v4:
         
         # 1. Motor de Física (Ley M)
         # Si se proporciona un modelo ya instanciado, usarlo; sino, crear uno nuevo
+        from src.motor_factory import get_motor
+        
+        # Preparar configuración para el factory
+        # El factory espera un objeto config con GRID_SIZE_TRAINING, MODEL_PARAMS, etc.
+        # Creamos un SimpleNamespace temporal si no tenemos uno completo
+        factory_cfg = SimpleNamespace(
+            GRID_SIZE_TRAINING=grid_size,
+            MODEL_PARAMS=model_params if not isinstance(model_params, dict) else SimpleNamespace(**model_params),
+            GAMMA_DECAY=gamma_decay,
+            ENGINE_TYPE=global_cfg.ENGINE_TYPE # Usar global o permitir inyección
+        )
+        
         if model is not None:
             # Si ya es un motor, usarlo directamente
-            if isinstance(model, Aetheria_Motor):
+            if hasattr(model, 'evolve_internal_state'): # Check duck typing for Motor
                 self.motor = model
             else:
                 # Usar modelo ya instanciado (para checkpoints/transfer learning)
-                d_state = model_params.get('d_state', 2) if isinstance(model_params, dict) else getattr(model_params, 'd_state', 2)
-                self.motor = Aetheria_Motor(model, grid_size, d_state, device)
+                # d_state se extrae dentro de get_motor o del config
+                self.motor = get_motor(factory_cfg, device, model=model)
         elif model_class is not None and model_params is not None:
             # Crear nuevo modelo
             if isinstance(model_params, dict):
-                self.motor = Aetheria_Motor(model_class(**model_params), grid_size, model_params['d_state'], device)
+                model_instance = model_class(**model_params)
             else:
                 # Si model_params es SimpleNamespace o similar
                 params_dict = vars(model_params) if hasattr(model_params, '__dict__') else model_params
-                self.motor = Aetheria_Motor(model_class(**params_dict), grid_size, params_dict['d_state'], device)
+                model_instance = model_class(**params_dict)
+                
+            self.motor = get_motor(factory_cfg, device, model=model_instance)
         else:
             raise ValueError("Debe proporcionarse 'model' o ('model_class' y 'model_params')")
         

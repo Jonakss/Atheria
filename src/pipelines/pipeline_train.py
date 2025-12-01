@@ -140,7 +140,12 @@ def run_training_pipeline(exp_cfg: SimpleNamespace, checkpoint_path: str | None 
         # QC_Trainer_v3 usa la interfaz tradicional - necesita el motor creado
         # 2. Inicializar el Motor Aetheria
         # Pasar exp_cfg para que el motor tenga acceso a GAMMA_DECAY (término Lindbladian)
-        motor = Aetheria_Motor(ley_M, exp_cfg.GRID_SIZE_TRAINING, exp_cfg.MODEL_PARAMS.d_state, device, cfg=exp_cfg)
+        # Usar Factory para soportar múltiples motores
+        from src.motor_factory import get_motor
+        
+        # Asegurar que el config tiene el modelo instanciado si es necesario, 
+        # pero get_motor espera el modelo como argumento opcional 'model'
+        motor = get_motor(exp_cfg, device, model=ley_M)
 
         # 3. Compilar el modelo si es compatible
         if getattr(ley_M, '_compiles', True):

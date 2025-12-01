@@ -253,7 +253,11 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
                                         className="flex-1 px-2 py-1 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
                                     >
                                         <option value="auto">Automático</option>
-                                        <option value="python">🐍 Python (Estable)</option>
+                                        <option value="python">🐍 Python (Standard)</option>
+                                        <option value="polar">🌀 Polar (Rotational)</option>
+                                        <option value="quantum">⚛️ Quantum (Hybrid)</option>
+                                        <option value="harmonic">🌊 Harmonic (Sparse)</option>
+                                        <option value="lattice">🕸️ Lattice (AdS/CFT)</option>
                                         <option value="native">⚡ Nativo C++ (Experimental)</option>
                                     </select>
                                 </div>

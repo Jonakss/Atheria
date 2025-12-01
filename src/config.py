@@ -2,6 +2,7 @@
 import os
 import logging
 import warnings
+from pathlib import Path
 
 # --- Silenciar warnings ANTES de importar torch ---
 # Los warnings de CUDA se emiten durante la importación de torch,
@@ -140,6 +141,13 @@ def get_device():
                 logging.info(f"💻 Dispositivo PyTorch inicializado: {_DEVICE} (CUDA no disponible o falló la inicialización)")
     return _DEVICE
 DEVICE = get_device()
+
+# ---# Configuración del Motor de Física
+# Opciones: 'CARTESIAN', 'POLAR', 'QUANTUM'
+ENGINE_TYPE = 'CARTESIAN'
+
+# Configuración de Rutas
+BASE_DIR = Path(__file__).parent.parent
 
 # --- Configuración del Motor Nativo C++ ---
 # Parámetro para forzar el device del motor nativo:

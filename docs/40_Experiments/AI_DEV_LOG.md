@@ -16,6 +16,7 @@
 
 ## 📋 Índice de Entradas
 
+- [[logs/2025-12-01_quantum_tuner|2025-12-01 - Feature: Quantum Tuner (Qiskit SPSA Optimization)]]
 - [[logs/2025-12-01_field_theory_ui|2025-12-01 - Feature: Field Theory UI Implementation (Field Selector)]]
 - [[logs/2025-12-01_fix_fps_display|2025-12-01 - Fix: FPS Display in SimulationService]]
 - [[docs/40_Experiments/EXP_005_QUALITY_DIVERSITY|2025-12-01 - Research: Quantum Architecture & Polar Migration (VQE, MAP-Elites, PennyLane, Polar Engine)]]
