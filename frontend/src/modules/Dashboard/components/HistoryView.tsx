@@ -57,7 +57,7 @@ export const HistoryView: React.FC = () => {
     setUploadStatus({ type: 'info', message: `Subiendo ${file.name}...` });
 
     const formData = new FormData();
-    formData.append('file', file);
+    const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
 
     try {
         const response = await fetch('/api/upload_model', {
