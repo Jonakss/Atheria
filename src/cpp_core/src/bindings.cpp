@@ -148,9 +148,9 @@ PYBIND11_MODULE(atheria_core, m) {
              "Obtiene el estado en una coordenada (materia o vacío)",
              py::arg("coord"))
         .def("step_native", &Engine::step_native,
+             py::call_guard<py::gil_scoped_release>(),  // Release GIL during C++ computation
              "Ejecuta un paso completo de simulación en C++ (todo el trabajo pesado)",
-             "Retorna el número de partículas activas",
-             py::call_guard<py::gil_scoped_release>())
+             "Retorna el número de partículas activas")
         .def("get_matter_count", &Engine::get_matter_count,
              "Retorna el número de partículas de materia")
         .def("get_step_count", &Engine::get_step_count,

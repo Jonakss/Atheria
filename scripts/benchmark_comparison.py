@@ -62,8 +62,12 @@ def benchmark_engine(engine_type, name, steps=500, warmup=50):
     
     # Warmup
     print(f"Warming up ({warmup} steps)...")
-    for _ in range(warmup):
-        engine.evolve_internal_state(step=_)
+    for i in range(warmup):
+        engine.evolve_internal_state(step=i)
+        # Add periodic yield to prevent blocking and allow signal handlers
+        if (i+1) % 10 == 0:
+            time.sleep(0.001)  # 1ms yield
+            print(f"  Warmup: {i+1}/{warmup}")
         
     # Benchmark
     print(f"Running benchmark ({steps} steps)...")
