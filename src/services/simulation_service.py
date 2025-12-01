@@ -19,6 +19,11 @@ class SimulationService(BaseService):
         self.target_fps = 60.0
         self.frame_time = 1.0 / self.target_fps
         
+        # FPS Calculation
+        self.fps_counter = 0
+        self.fps_start_time = time.time()
+        self.fps_update_interval = 0.5 # Update every 0.5 seconds
+        
     async def _start_impl(self):
         """Inicia el bucle de simulación."""
         self._task = asyncio.create_task(self._simulation_loop())
@@ -56,6 +61,23 @@ class SimulationService(BaseService):
                 # 4. Actualizar contadores
                 current_step = g_state.get('simulation_step', 0)
                 g_state['simulation_step'] = current_step + 1
+                
+                # FPS Calculation
+                self.fps_counter += 1
+                current_time = time.time()
+                time_diff = current_time - self.fps_start_time
+                
+                if time_diff >= self.fps_update_interval:
+                    current_fps = self.fps_counter / time_diff
+                    g_state['current_fps'] = current_fps
+                    
+                    # Reset counter
+                    self.fps_counter = 0
+                    self.fps_start_time = current_time
+                    
+                    # Log FPS occasionally
+                    if logging.getLogger().isEnabledFor(logging.DEBUG):
+                        logging.debug(f"📊 FPS: {current_fps:.1f}")
                 
                 # 5. Enviar estado a cola de procesamiento (si hay espacio)
                 # Solo enviamos referencias o datos ligeros, el procesamiento pesado lo hace DataProcessingService
