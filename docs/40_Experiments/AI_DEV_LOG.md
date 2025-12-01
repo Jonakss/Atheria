@@ -95,6 +95,13 @@
 - [[#2025-11-20 - CLI Simple y Manejo de Errores Robusto]]
 - [[#2025-11-20 - Checkpoint Step Tracking y Grid Scaling Info]]
 - [[#2025-11-20 - Frame Skip Solo Cuando Live Feed OFF]]
+- **[[2025-12-01_benchmarking]]**: Resultados preliminares del benchmark comparativo. Python Engine alcanza ~60 FPS en CPU. Native Engine presenta bloqueos durante warmup que requieren debugging.
+- **[[2025-12-01_native_performance]]**: Optimización crítica en `sparse_engine.cpp` reduciendo `patch_size` a 3x3, resolviendo el hang en benchmarks.
+- **[[2025-12-01_memory_pools]]**: Implementación de `TensorPool` en C++ para reutilización de memoria y reducción de overhead de asignación.
+- **[[2025-12-01_compute_backend]]**: Diseño de la arquitectura `ComputeBackend` para abstracción de hardware (CPU/GPU/QPU).
+- **[[2025-12-01_octree_integration]]**: Integración de Octree en el motor nativo para optimización espacial 3D.
+- **[[2025-12-01_modular_physics_engine]]**: Refactorización para selección modular de motores de física (Cartesiano, Polar, Cuántico).
+- **[[2025-12-01_phase_space_viz]]**: Implementación de visualización de Espacio de Fases con PCA y UMAP.Clustering)]]
 - [[#2025-11-20 - Optimizaciones Críticas Motor Nativo Implementadas]]
 - [[#2024-12-20 - Problemas Críticos Motor Nativo Identificados]]
 - [[#2024-12-20 - Corrección Segfault: Cleanup Motor Nativo]]
@@ -108,3 +115,4 @@
 - [[logs/2025-12-01_compute_backend|2025-12-01 - Feature: Compute Backend Abstraction]]
 - [[logs/2025-12-01_memory_pools|2025-12-01 - Feature: Memory Pools & Concurrency Fixes]]
 - [[logs/2025-12-01_native_performance|2025-12-01 - Performance: Native Engine Patch Size Optimization]]
+```

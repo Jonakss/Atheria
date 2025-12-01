@@ -98,8 +98,13 @@
 #### Componentes Pendientes:
 -   ✅ **Integración Octree en Engine** - Usar el Octree para consultas de vecindad eficientes en `step_native`
 -   ✅ **Memory Pools** - Optimización de memoria para evitar fragmentación
--   ⏳ **Paralelismo** - OpenMP activado pero requiere tuning y verificación de thread-safety
--   ⏳ **Pruebas Completas** - Benchmark comparativo Python vs C++ pendiente
+-   [x] **Parallelism Tuning**
+    -   [x] OpenMP Threading (`OMP_NUM_THREADS`)
+    -   [x] Benchmark Script (`scripts/benchmark_parallelism.py`)
+-   [ ] **Comprehensive Benchmarking**
+    -   [x] Comparison Script (`scripts/benchmark_comparison.py`)
+    -   [ ] Python vs C++ Comparison (⚠️ Native Engine blocked during warmup)
+    -   [x] Documentation (`docs/40_Experiments/logs/2025-12-01_benchmarking.md`)
 
 #### Estado General: 🟡 **90% Completado**
 
