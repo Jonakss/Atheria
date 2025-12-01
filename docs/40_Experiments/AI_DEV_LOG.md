@@ -16,6 +16,8 @@
 
 ## 📋 Índice de Entradas
 
+- [[docs/10_core/ROADMAP_INFERENCE_OPTIMIZATION|2025-12-01 - Strategy: Inference Optimization Roadmap (LitServe, Quantization, Compile)]]
+- [[logs/2025-12-01_phase_space_viz|2025-12-01 - Feature: Phase Space Visualization (PCA + Clustering)]]
 - [[logs/2025-12-01_fix_fps_display|2025-12-01 - Fix: FPS Display in SimulationService]]
 - [[UI_DASHBOARD_IMPROVEMENTS_2025_11_29|2025-11-29 - Feature: Scientific Metrics Display & UI Investigation]]
 - **2025-11-28 - Fix: Docker Compose Compatibility & CUDA Optimization Backlog**
