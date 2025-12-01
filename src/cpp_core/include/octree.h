@@ -39,6 +39,12 @@ public:
     /**
      * Returns the number of elements in the index.
      */
+    // Check if a coordinate exists in the index
+    bool contains(const Coord3D& coord) const;
+
+    // Query all points within a bounding box (inclusive)
+    std::vector<Coord3D> query_box(const Coord3D& min, const Coord3D& max) const;
+
     size_t size() const;
 
     /**

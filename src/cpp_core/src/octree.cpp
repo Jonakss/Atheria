@@ -54,4 +54,41 @@ const std::vector<uint64_t>& OctreeIndex::get_codes() const {
     return codes_;
 }
 
+bool OctreeIndex::contains(const Coord3D& coord) const {
+    // Ensure offset matches insert
+    const int64_t OFFSET = 1048576; 
+    int64_t x = std::max(int64_t(0), std::min(coord.x + OFFSET, int64_t(2097151)));
+    int64_t y = std::max(int64_t(0), std::min(coord.y + OFFSET, int64_t(2097151)));
+    int64_t z = std::max(int64_t(0), std::min(coord.z + OFFSET, int64_t(2097151)));
+
+    uint64_t code = coord_to_morton(x, y, z);
+    
+    // Binary search since codes_ is sorted after build()
+    return std::binary_search(codes_.begin(), codes_.end(), code);
+}
+
+std::vector<Coord3D> OctreeIndex::query_box(const Coord3D& min, const Coord3D& max) const {
+    std::vector<Coord3D> result;
+    const int64_t OFFSET = 1048576; 
+
+    // Simple linear scan over sorted codes
+    // Optimization: We could use lower_bound/upper_bound on Z-curve ranges, 
+    // but that's complex. For now, O(N) scan is fast enough for < 1M particles.
+    for (uint64_t code : codes_) {
+        Coord3D c = morton_to_coord(code);
+        
+        // Remove offset to get back to world coordinates
+        c.x -= OFFSET;
+        c.y -= OFFSET;
+        c.z -= OFFSET;
+
+        if (c.x >= min.x && c.x <= max.x &&
+            c.y >= min.y && c.y <= max.y &&
+            c.z >= min.z && c.z <= max.z) {
+            result.push_back(c);
+        }
+    }
+    return result;
+}
+
 } // namespace atheria

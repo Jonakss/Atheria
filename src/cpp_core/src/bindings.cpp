@@ -167,6 +167,9 @@ PYBIND11_MODULE(atheria_core, m) {
         .def("compute_visualization", &Engine::compute_visualization,
              "Calcula la visualización directamente en C++",
              py::arg("viz_type"),
-             py::call_guard<py::gil_scoped_release>());
+             py::call_guard<py::gil_scoped_release>())
+        .def("query_radius", &Engine::query_radius,
+             "Consulta partículas dentro de un radio (caja) usando el Octree",
+             py::arg("center"), py::arg("radius"));
 #endif
 }

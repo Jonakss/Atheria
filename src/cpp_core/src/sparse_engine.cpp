@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <omp.h> // OpenMP re-enabled
+#include "../include/morton_utils.h"
 
 namespace atheria {
 
@@ -102,6 +103,23 @@ int64_t Engine::step_native() {
     
     // Procesar todas las coordenadas activas
     std::vector<Coord3D> processed_coords(active_region_.begin(), active_region_.end());
+
+    // OPTIMIZATION: Sort by Morton code for spatial locality
+    // This ensures that particles close in space are processed together,
+    // improving cache locality and reducing memory jumps.
+    const int64_t OFFSET = 1048576; 
+    std::sort(processed_coords.begin(), processed_coords.end(), [OFFSET](const Coord3D& a, const Coord3D& b) {
+        // Clamp to valid range for Morton encoding
+        int64_t ax = std::max(int64_t(0), std::min(a.x + OFFSET, int64_t(2097151)));
+        int64_t ay = std::max(int64_t(0), std::min(a.y + OFFSET, int64_t(2097151)));
+        int64_t az = std::max(int64_t(0), std::min(a.z + OFFSET, int64_t(2097151)));
+        
+        int64_t bx = std::max(int64_t(0), std::min(b.x + OFFSET, int64_t(2097151)));
+        int64_t by = std::max(int64_t(0), std::min(b.y + OFFSET, int64_t(2097151)));
+        int64_t bz = std::max(int64_t(0), std::min(b.z + OFFSET, int64_t(2097151)));
+
+        return coord_to_morton(ax, ay, az) < coord_to_morton(bx, by, bz);
+    });
     
     // Agrupar coordenadas para procesamiento por batch
     const int64_t batch_size = 32; // Procesar en batches de 32
@@ -487,6 +505,18 @@ torch::Tensor Engine::compute_visualization(const std::string& viz_type) {
     }
     
     return viz_tensor;
+}
+
+std::vector<Coord3D> Engine::query_radius(const Coord3D& center, int radius) const {
+    Coord3D min(center.x - radius, center.y - radius, center.z - radius);
+    Coord3D max(center.x + radius, center.y + radius, center.z + radius);
+    
+    // Use Octree for efficient box query
+    // Note: This returns all points in the bounding box.
+    // We could filter strictly by radius here if needed, but for "neighborhood" 
+    // in this grid context, box is often what we want (Moore neighborhood).
+    // If strict Euclidean radius is needed, we can filter the result.
+    return octree_.query_box(min, max);
 }
 
 } // namespace atheria

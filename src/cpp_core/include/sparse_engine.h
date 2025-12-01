@@ -104,6 +104,11 @@ public:
     std::string get_last_error() const;
 
     /**
+     * Query particles within a radius
+     */
+    std::vector<Coord3D> query_radius(const Coord3D& center, int radius) const;
+
+    /**
      * Calcula la visualización directamente en C++ para evitar conversiones costosas.
      * 
      * @param viz_type Tipo de visualización ("density", "phase", "energy")
