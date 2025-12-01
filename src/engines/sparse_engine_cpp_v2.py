@@ -289,3 +289,30 @@ class SparseQuantumEngineCppV2:
                 'auxiliary_dict': False
             }
 
+    def compile_model(self):
+        """
+        Compila el modelo para optimización (no-op para SparseQuantumEngineCppV2).
+        """
+        pass
+
+    def get_model_for_params(self):
+        """
+        Retorna el modelo para contar parámetros.
+        """
+        return self.model
+
+    def get_initial_state(self, batch_size=1):
+        """
+        Retorna el estado inicial (dummy para SparseQuantumEngineCppV2).
+        """
+        # SparseQuantumEngineCppV2 maneja su propio estado interno (sparse map)
+        # Retornamos un tensor dummy para satisfacer la API del trainer
+        return torch.zeros(batch_size, self.d_state, 64, 64, device=self.device)
+
+    def evolve_step(self, current_psi):
+        """
+        Evoluciona el estado un paso.
+        """
+        self.step()
+        return current_psi
+
