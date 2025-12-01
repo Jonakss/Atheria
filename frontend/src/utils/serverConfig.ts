@@ -18,6 +18,14 @@ const DEFAULT_CONFIG: ServerConfig = {
 };
 
 /**
+ * API Endpoints configuration
+ */
+export const API_ENDPOINTS = {
+    UPLOAD_MODEL: '/api/upload_model',
+    EXPORT_EXPERIMENT: '/api/export_experiment'
+};
+
+/**
  * Obtiene la configuración del servidor desde localStorage
  */
 export function getServerConfig(): ServerConfig {
@@ -75,4 +83,3 @@ export function resetServerConfig(): void {
         console.error('Error reseteando configuración del servidor:', e);
     }
 }
-

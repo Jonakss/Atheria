@@ -4,6 +4,8 @@ import { Database, Clock, Download, Trash2, Upload, RefreshCw, Search, Loader2 }
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { GlassPanel } from './GlassPanel';
 import { Alert } from './Alert';
+import { Modal } from './Modal';
+import { API_ENDPOINTS } from '../../../utils/serverConfig';
 
 export const HistoryView: React.FC = () => {
   const { experimentsData, connectionStatus, sendCommand } = useWebSocket();
@@ -12,6 +14,9 @@ export const HistoryView: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error' | 'info', message: string } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [experimentToDelete, setExperimentToDelete] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Filtrar experimentos
@@ -57,10 +62,10 @@ export const HistoryView: React.FC = () => {
     setUploadStatus({ type: 'info', message: `Subiendo ${file.name}...` });
 
     const formData = new FormData();
-    const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    formData.append('file', file);
 
     try {
-        const response = await fetch('/api/upload_model', {
+        const response = await fetch(API_ENDPOINTS.UPLOAD_MODEL, {
             method: 'POST',
             body: formData,
         });
@@ -87,11 +92,21 @@ export const HistoryView: React.FC = () => {
         // Clear input so same file can be selected again if needed
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
+    try {
+        const response = await fetch(API_ENDPOINTS.UPLOAD_MODEL, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Error al subir el modelo: ${response.status} ${response.statusText} - ${errorText}`);
         }
-    }
-  };
+
+        setUploadStatus({ type: 'success', message: '¡Modelo subido exitosamente!' });
+        sendCommand('experiment', 'list'); // Refresh the list
     } catch (error) {
-        let errorMessage = 'Error al conectar con el servidor.';
+        let errorMessage = 'Error al conectar con el servidor o al subir el archivo.';
         if (error instanceof Error) {
             errorMessage = error.message;
         } else if (typeof error === 'string') {
@@ -101,14 +116,28 @@ export const HistoryView: React.FC = () => {
             type: 'error',
             message: errorMessage,
         });
-      if (confirm(`¿Estás seguro de que deseas eliminar el experimento '${expName}'? Esta acción no se puede deshacer.`)) {
-          sendCommand('experiment', 'delete', { EXPERIMENT_NAME: expName });
+    } finally {
+        setIsUploading(false);
+    }
+    }
+  };
+
+  const handleDeleteClick = (expName: string) => {
+      setExperimentToDelete(expName);
+      setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+      if (experimentToDelete) {
+          sendCommand('experiment', 'delete', { EXPERIMENT_NAME: experimentToDelete });
+          setDeleteConfirmOpen(false);
+          setExperimentToDelete(null);
       }
   };
 
   const handleExportClick = async (expName: string) => {
       // Use window.location to trigger download
-      window.open(`/api/export_experiment?name=${encodeURIComponent(expName)}`, '_blank');
+      window.open(`${API_ENDPOINTS.EXPORT_EXPERIMENT}?name=${encodeURIComponent(expName)}`, '_blank');
   };
 
   if (!isConnected) {
@@ -259,6 +288,36 @@ export const HistoryView: React.FC = () => {
           </GlassPanel>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        opened={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        title="Confirmar eliminación"
+        size="sm"
+      >
+          <div className="space-y-4">
+              <p className="text-sm text-gray-300">
+                  ¿Estás seguro de que deseas eliminar el experimento <span className="font-bold text-white">{experimentToDelete}</span>?
+                  <br /><br />
+                  <span className="text-red-400">Esta acción no se puede deshacer.</span>
+              </p>
+              <div className="flex justify-end gap-3 pt-2">
+                  <button
+                      onClick={() => setDeleteConfirmOpen(false)}
+                      className="px-3 py-2 text-xs font-bold text-gray-400 hover:text-white transition-colors"
+                  >
+                      Cancelar
+                  </button>
+                  <button
+                      onClick={confirmDelete}
+                      className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded text-xs font-bold transition-all"
+                  >
+                      Eliminar
+                  </button>
+              </div>
+          </div>
+      </Modal>
     </div>
   );
 };
