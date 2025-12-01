@@ -32,7 +32,9 @@ related: [[10_core/00_CORE_MOC]], [[40_Experiments/00_EXPERIMENTS_MOC]]
 - [[LATTICE_ENGINE]]: Motor de física de retícula (Lattice Gauge Theory). simulación
 - [[GPU_OPTIMIZATION]] - Optimizaciones de GPU
 - [[DRAGONFLY_CACHE]] - Caché distribuido (Dragonfly/Redis)
+- [[DRAGONFLY_CACHE]] - Caché distribuido (Dragonfly/Redis)
 - [[REFACTORING_PLAN]] - Plan de refactorización (archivos atómicos) - Estado actual
+- [[NATIVE_ENGINE_TESTS]] - Guía de pruebas y troubleshooting para el motor nativo
 
 ---
 

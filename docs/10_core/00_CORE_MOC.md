@@ -37,6 +37,7 @@ related: [[30_Components/00_COMPONENTS_MOC]], [[40_Experiments/00_EXPERIMENTS_MO
 - [[ROADMAP_PHASE_3]] - Optimización de visualización y UX - 🟢 ~95% completado
 - [[ROADMAP_INFERENCE_OPTIMIZATION]] - Roadmap de Optimización de Inferencia - 🟣 Planificación
 - [[ROADMAP_PHASE_4]] - Universo Volumétrico (3D) - ⚪ Planificación Futura
+- [[ROADMAP_PHASE_5_BACKLOG]] - Backlog de ideas y características futuras
 
 **Ver:** [[40_Experiments/PHASE_STATUS_REPORT|Informe de Estado de Fases]] para detalles completos
 

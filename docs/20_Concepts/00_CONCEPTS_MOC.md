@@ -27,6 +27,15 @@
 
 - **[WebGL Shaders](../20_Concepts/WEBGL_SHADERS.md)** - Guía completa para trabajar con shaders WebGL GPU-accelerated
 - **[Visualización del Espacio de Fases](../20_Concepts/PHASE_SPACE_VISUALIZATION.md)** - Análisis topológico del estado cuántico usando PCA y Clustering
+- **[Field Visualizations](../20_Concepts/FIELD_VISUALIZATIONS.md)** - Visualización de campos cuánticos y sus interpretaciones
+- **[Field Theory Interpretation](../20_Concepts/FIELD_THEORY_INTERPRETATION.md)** - Interpretación de campos (EM, Gravedad, Higgs) en el vector de estado
+
+## 🏗️ Arquitecturas Experimentales
+
+- **[Polar Architecture V3](../20_Concepts/POLAR_ARCHITECTURE_V3.md)** - Arquitectura basada en coordenadas polares (Deprecada/Referencia)
+- **[Quantum Native Architecture V1](../20_Concepts/QUANTUM_NATIVE_ARCHITECTURE_V1.md)** - Propuesta inicial de arquitectura cuántica nativa
+- **[Quantum Compute Services](../20_Concepts/QUANTUM_COMPUTE_SERVICES.md)** - Abstracción para backends de computación cuántica (IonQ, Braket, IBM)
+- **[History Buffer Future](../20_Concepts/HISTORY_BUFFER_FUTURE.md)** - Visión futura para el sistema de historial (Compression, Streaming)
 
 ---
 
