@@ -92,7 +92,33 @@ export const HistoryView: React.FC = () => {
         // Clear input so same file can be selected again if needed
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
+    try {
+        const response = await fetch(API_ENDPOINTS.UPLOAD_MODEL, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Error al subir el modelo: ${response.status} ${response.statusText} - ${errorText}`);
         }
+
+        setUploadStatus({ type: 'success', message: '¡Modelo subido exitosamente!' });
+        sendCommand('experiment', 'list'); // Refresh the list
+    } catch (error) {
+        let errorMessage = 'Error al conectar con el servidor o al subir el archivo.';
+        if (error instanceof Error) {
+            errorMessage = error.message;
+        } else if (typeof error === 'string') {
+            errorMessage = error;
+        }
+        setUploadStatus({
+            type: 'error',
+            message: errorMessage,
+        });
+    } finally {
+        setIsUploading(false);
+    }
     }
   };
 
