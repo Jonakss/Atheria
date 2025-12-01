@@ -35,6 +35,7 @@ related: [[30_Components/00_COMPONENTS_MOC]], [[40_Experiments/00_EXPERIMENTS_MO
 - [[ROADMAP_PHASE_1]] - Plan de desarrollo inicial - 🟢 ~80% completado
 - [[ROADMAP_PHASE_2]] - Motor Nativo C++ - 🟡 ~70% completado
 - [[ROADMAP_PHASE_3]] - Optimización de visualización y UX - 🟢 ~95% completado
+- [[ROADMAP_INFERENCE_OPTIMIZATION]] - Roadmap de Optimización de Inferencia - 🟣 Planificación
 - [[ROADMAP_PHASE_4]] - Universo Volumétrico (3D) - ⚪ Planificación Futura
 
 **Ver:** [[40_Experiments/PHASE_STATUS_REPORT|Informe de Estado de Fases]] para detalles completos

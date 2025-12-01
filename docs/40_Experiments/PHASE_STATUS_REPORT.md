@@ -161,6 +161,7 @@
 | **Fase 2** | Motor nativo C++ | 🟡 En progreso | ~70% |
 | **Fase 3** | Visualización y UX | ✅ Completado | 100% |
 | **Fase 4** | Holographic Lattice (AdS/CFT) | 🔵 Planificación | 10% |
+| **Optimización** | Inference & Serving (LitServe/Quant) | 🟣 Planificación | 0% |
 | **Fase 5** | 3D Volumetric (Backlog) | ⚪ Backlog | 0% |
 | **Infraestructura** | DevOps & Tooling | 🟡 En progreso | ~60% |
 | **AI Research** | The Brain (Ley M) | ♾️ Continuo | N/A |
@@ -203,6 +204,7 @@
 
 - [[ROADMAP_PHASE_2]]: Fase 2 - Motor Nativo C++
 - [[ROADMAP_PHASE_3]]: Fase 3 - Optimización Visualización y UX
+- [[ROADMAP_INFERENCE_OPTIMIZATION]]: Roadmap de Optimización de Inferencia
 - [[QUADTREE_BINARY]]: Documentación de Quadtree Binario
 - [[SPATIAL_INDEXING]]: Documentación de Índices Espaciales
 - [[SPARSE_ARCHITECTURE_V4]]: Arquitectura Sparse en V4
