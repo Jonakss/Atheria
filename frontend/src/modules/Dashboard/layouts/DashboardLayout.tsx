@@ -214,10 +214,6 @@ export const DashboardLayout: React.FC = () => {
         {/* Design System: flex-1 (Ocupa todo el espacio restante), relative para overlays */}
         <main className="flex-1 relative bg-dark-990 flex flex-col overflow-hidden">
           
-
-
-// ... inside component ...
-
           {/* Viewport (Fondo) - Design System: bg-[#050505] a black según mockup */}
           {renderContentView()}
           

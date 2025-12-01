@@ -29,3 +29,10 @@ zstandard>=0.21.0  # Compresión zstd para caché eficiente
 # matplotlib>=3.5.0  # Para visualizaciones de análisis (descomentar si se usa)
 # scipy>=1.8.0  # Para análisis científico (descomentar si se usa)
 # pandas>=1.4.0  # Para análisis de datos (descomentar si se usa)
+
+# Quantum Computing (Qiskit & PennyLane)
+qiskit>=1.0.0
+qiskit-algorithms>=0.3.0
+qiskit-aer>=0.13.0
+pennylane>=0.35.0
+pennylane-lightning>=0.35.0
