@@ -68,9 +68,11 @@ class QuantumKernel(nn.Module):
         # Unfold to get 3x3 patches
         # Output: (Batch, Channels*kernel*kernel, L) where L = H*W (if padding is correct)
         # We need padding=1 to keep same size
-        unfold = nn.Unfold(kernel_size=self.kernel_size, padding=1)
-        patches = unfold(x) # (B, 9, H*W)
+        if c != 1:
+            # For POC simplicity, take the mean across channels or raise warning
+            raise NotImplementedError("QuantumKernel currently only supports single-channel inputs.")
 
+        # Unfold to get 3x3 patches
         # Prepare for Quantum Layer
         # Reshape to (Batch * H * W, 9)
         patches_flat = patches.transpose(1, 2).reshape(-1, self.kernel_size**2 * c)
