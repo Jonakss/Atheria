@@ -27,6 +27,7 @@ interface ExperimentConfig {
     QCA_STEPS_TRAINING: number;
     INITIAL_STATE_MODE_INFERENCE: string;
     TOTAL_EPISODES?: number;
+    ENGINE_TYPE?: string;
 }
 
 interface TransferLearningWizardProps {
@@ -73,7 +74,8 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
                     GAMMA_DECAY: expConfig.GAMMA_DECAY || 0.01,
                     QCA_STEPS_TRAINING: expConfig.QCA_STEPS_TRAINING || 10,
                     INITIAL_STATE_MODE_INFERENCE: expConfig.INITIAL_STATE_MODE_INFERENCE || 'complex_noise',
-                    TOTAL_EPISODES: expConfig.TOTAL_EPISODES || 0
+                    TOTAL_EPISODES: expConfig.TOTAL_EPISODES || 0,
+                    ENGINE_TYPE: expConfig.ENGINE_TYPE || 'PYTHON'
                 };
                 setBaseConfig(config);
                 setNewConfig({ ...config });
@@ -162,7 +164,8 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
             MODEL_PARAMS: newConfig.MODEL_PARAMS,
             GAMMA_DECAY: newConfig.GAMMA_DECAY,
             INITIAL_STATE_MODE_INFERENCE: newConfig.INITIAL_STATE_MODE_INFERENCE,
-            LOAD_FROM_EXPERIMENT: baseExperiment
+            LOAD_FROM_EXPERIMENT: baseExperiment,
+            ENGINE_TYPE: newConfig.ENGINE_TYPE
         };
 
         sendCommand('experiment', 'create', args);
@@ -200,7 +203,8 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
             baseConfig.MODEL_PARAMS.d_state !== newConfig.MODEL_PARAMS.d_state ||
             baseConfig.MODEL_PARAMS.hidden_channels !== newConfig.MODEL_PARAMS.hidden_channels ||
             baseConfig.GAMMA_DECAY !== newConfig.GAMMA_DECAY ||
-            baseConfig.QCA_STEPS_TRAINING !== newConfig.QCA_STEPS_TRAINING
+            baseConfig.QCA_STEPS_TRAINING !== newConfig.QCA_STEPS_TRAINING ||
+            baseConfig.ENGINE_TYPE !== newConfig.ENGINE_TYPE
         );
     }, [baseConfig, newConfig]);
 
@@ -483,6 +487,32 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
                                                     <Badge color="blue" size="sm">
                                                         {newConfig.QCA_STEPS_TRAINING > baseConfig.QCA_STEPS_TRAINING ? '↑' : '↓'}
                                                     </Badge>
+                                                )}
+                                            </TableTd>
+                                            </TableTd>
+                                        </TableRow>
+                                        <TableRow>
+                                            <TableTd><span className="text-xs font-medium">Engine Type</span></TableTd>
+                                            <TableTd><span className="text-xs">{baseConfig.ENGINE_TYPE || 'PYTHON'}</span></TableTd>
+                                            <TableTd>
+                                                <select
+                                                    value={newConfig.ENGINE_TYPE || 'PYTHON'}
+                                                    onChange={(e) => setNewConfig({
+                                                        ...newConfig,
+                                                        ENGINE_TYPE: e.target.value
+                                                    })}
+                                                    className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50"
+                                                    style={{ width: 120 }}
+                                                >
+                                                    <option value="PYTHON">Python (Standard)</option>
+                                                    <option value="NATIVE">Native (C++ Optimized)</option>
+                                                    <option value="LATTICE">Lattice (Gauge Theory)</option>
+                                                    <option value="HARMONIC">Harmonic (Spectral)</option>
+                                                </select>
+                                            </TableTd>
+                                            <TableTd>
+                                                {newConfig.ENGINE_TYPE !== baseConfig.ENGINE_TYPE && (
+                                                    <Badge color="blue" size="sm">Changed</Badge>
                                                 )}
                                             </TableTd>
                                         </TableRow>

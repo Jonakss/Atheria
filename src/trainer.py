@@ -68,6 +68,7 @@ def main():
     parser.add_argument("--model_params", type=str, required=True, help='JSON string of model parameters')
     parser.add_argument("--continue_training", action="store_true")
     parser.add_argument("--noise_level", type=float, default=0.05, help="Maximum noise level for training")
+    parser.add_argument("--engine_type", type=str, default="PYTHON", choices=["PYTHON", "NATIVE", "LATTICE", "HARMONIC"], help="Physics engine type")
     
     args = parser.parse_args()
     
@@ -90,7 +91,8 @@ def main():
         "MODEL_PARAMS": model_params_dict,
         "DEVICE": global_cfg.DEVICE,
         "GAMMA_DECAY": getattr(global_cfg, 'GAMMA_DECAY', 0.01),  # Término Lindbladian (decaimiento)
-        "NOISE_LEVEL": args.noise_level
+        "NOISE_LEVEL": args.noise_level,
+        "ENGINE_TYPE": args.engine_type
     }
     
     # Convertir MODEL_PARAMS a SimpleNamespace si es necesario para compatibilidad

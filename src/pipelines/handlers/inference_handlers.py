@@ -458,11 +458,8 @@ async def handle_load_experiment(args):
 
         if force_engine == "native":
             use_native = True
-        elif force_engine == "python":
+        elif force_engine in ["python", "harmonic", "polar", "quantum", "lattice"]:
             use_native = False
-        elif force_engine == "harmonic":
-            use_native = False
-            # Harmonic engine is a special python engine
         else:
             # Auto-detectar: Respetar configuración global si no se fuerza
             if global_cfg.USE_NATIVE_ENGINE:
@@ -585,20 +582,44 @@ async def handle_load_experiment(args):
                 g_state["motor_is_native"] = True
                 g_state["motor_type"] = "native"
             else:
-                # Motor Python (Standard, Polar, Quantum/Harmonic)
+                # Usar Motor Factory para todos los motores Python (Standard, Polar, Quantum, Harmonic, Lattice)
                 from ...utils import load_experiment_config
+                from ...model_loader import load_model
                 from src.motor_factory import get_motor
+                from ...engines.qca_engine import QuantumState # Needed for initial state if not handled by factory
 
                 exp_cfg = load_experiment_config(exp_name)
                 if not exp_cfg:
                     raise ValueError(f"No se pudo cargar configuración de {exp_name}")
 
+                # Configurar el tipo de motor en cfg si es forzado
+                if force_engine:
+                    # Mapear nombre de engine a constante de config
+                    engine_map = {
+                        'python': 'CARTESIAN',
+                        'polar': 'POLAR',
+                        'quantum': 'QUANTUM',
+                        'harmonic': 'HARMONIC',
+                        'lattice': 'LATTICE'
+                    }
+                    if force_engine in engine_map:
+                        global_cfg.ENGINE_TYPE = engine_map[force_engine]
+                
+                # Cargar modelo base (necesario para Cartesian, Polar, Quantum)
+                # Harmonic y Lattice pueden ignorar esto dentro de get_motor si no lo necesitan
+                model = None
+                checkpoint_path = get_latest_checkpoint(exp_name)
+                if global_cfg.ENGINE_TYPE not in ['HARMONIC', 'LATTICE']:
+                    model = load_model(exp_cfg, checkpoint_path)
+                    if model is None:
+                        raise ValueError(f"No se pudo cargar modelo para {exp_name}")
+
                 if ws:
                     engine_type_display = "Python Standard"
-                    if force_engine == "harmonic": engine_type_display = "Harmónico"
-                    elif force_engine == "lattice": engine_type_display = "Lattice (AdS/CFT)"
-                    elif force_engine == "polar": engine_type_display = "Polar (Rotacional)"
-                    elif force_engine == "quantum": engine_type_display = "Quantum (Híbrido)"
+                    if global_cfg.ENGINE_TYPE == "HARMONIC": engine_type_display = "Harmónico"
+                    elif global_cfg.ENGINE_TYPE == "LATTICE": engine_type_display = "Lattice (AdS/CFT)"
+                    elif global_cfg.ENGINE_TYPE == "POLAR": engine_type_display = "Polar (Rotacional)"
+                    elif global_cfg.ENGINE_TYPE == "QUANTUM": engine_type_display = "Quantum (Híbrido)"
                     
                     await send_notification(
                         ws,
@@ -609,21 +630,14 @@ async def handle_load_experiment(args):
                 checkpoint_path = get_latest_checkpoint(exp_name)
 
                 # CRÍTICO: Ejecutar inicialización en thread pool para no bloquear event loop
+                # CRÍTICO: Ejecutar inicialización en thread pool para no bloquear event loop
                 def create_python_motor():
-                    model = load_model(exp_cfg, checkpoint_path)
-                    if model is None:
-                        raise ValueError(f"No se pudo cargar modelo de {exp_name}")
-
                     # Configurar tipo de motor en cfg temporalmente si se fuerza
                     if force_engine:
                         if force_engine == "harmonic":
-                            # Harmonic tiene su propia clase especial por ahora, 
-                            # pero idealmente debería ir al factory también.
-                            # Por compatibilidad mantenemos lógica especial si es muy distinta,
-                            # o usamos factory si lo soporta.
-                            # El factory actual no tiene Harmonic, así que lo dejamos aparte o lo añadimos.
-                            # El usuario pidió factory para Cartesian, Polar, Quantum.
-                            pass 
+                            exp_cfg.ENGINE_TYPE = 'HARMONIC'
+                        elif force_engine == "lattice":
+                            exp_cfg.ENGINE_TYPE = 'LATTICE'
                         elif force_engine == "polar":
                             exp_cfg.ENGINE_TYPE = 'POLAR'
                         elif force_engine == "quantum":
@@ -631,62 +645,30 @@ async def handle_load_experiment(args):
                         elif force_engine == "python": # Standard
                             exp_cfg.ENGINE_TYPE = 'CARTESIAN'
 
-                    # Casos especiales que aún no están en factory (Harmonic, Lattice)
-                    if force_engine == "harmonic":
-                        # Usar SparseHarmonicEngine
-                        motor = SparseHarmonicEngine(
-                            model=model,
-                            d_state=exp_cfg.MODEL_PARAMS.d_state,
-                            device=device,
-                            grid_size=g_state.get(
-                                "inference_grid_size", global_cfg.GRID_SIZE_INFERENCE
-                            ),
-                        )
-                        # Inyectar materia inicial
-                        initial_state = torch.randn(
-                            exp_cfg.MODEL_PARAMS.d_state, device=device
-                        )
-                        motor.add_matter(0, 0, 0, initial_state)
-                        return motor
-                        
-                    elif force_engine == "lattice":
-                        # Usar LatticeEngine (Phase 4)
-                        motor = LatticeEngine(
-                            grid_size=g_state.get(
-                                "inference_grid_size", global_cfg.GRID_SIZE_INFERENCE
-                            ),
-                            d_state=exp_cfg.MODEL_PARAMS.d_state,
-                            device=device,
-                            group="SU3" # Default por ahora
-                        )
-                        return motor
+                    # Cargar modelo base (necesario para Cartesian, Polar, Quantum)
+                    # Harmonic y Lattice pueden ignorar esto dentro de get_motor si no lo necesitan
+                    model = None
+                    if getattr(exp_cfg, 'ENGINE_TYPE', 'CARTESIAN') not in ['HARMONIC', 'LATTICE']:
+                        model = load_model(exp_cfg, checkpoint_path)
+                        if model is None:
+                            raise ValueError(f"No se pudo cargar modelo de {exp_name}")
 
-                    # Usar Factory para Standard, Polar, Quantum
                     # Asegurar que grid_size de inferencia se use
-                    exp_cfg.GRID_SIZE_INFERENCE = g_state.get("inference_grid_size", global_cfg.GRID_SIZE_INFERENCE)
+                    inference_grid_size = g_state.get("inference_grid_size", global_cfg.GRID_SIZE_INFERENCE)
+                    exp_cfg.GRID_SIZE_INFERENCE = inference_grid_size
                     # El factory usa GRID_SIZE_TRAINING por defecto, pero podemos inyectar el de inferencia
                     # Modificamos exp_cfg para que el factory use el tamaño correcto si mira GRID_SIZE_TRAINING
-                    # O mejor, pasamos un config modificado/enriquecido
+                    exp_cfg.GRID_SIZE_TRAINING = inference_grid_size
                     
-                    # Hack: sobrescribir GRID_SIZE_TRAINING en el objeto cfg pasado al factory 
-                    # para que inicialice el motor con el tamaño de inferencia
-                    exp_cfg.GRID_SIZE_TRAINING = exp_cfg.GRID_SIZE_INFERENCE
-                    
+                    # Usar Factory para TODOS los motores
                     motor = get_motor(exp_cfg, device, model=model)
                     
                     # Configurar estado inicial si es necesario (Aetheria_Motor lo hace en init)
                     # Pero si el motor fue creado con un modelo ya cargado, el estado puede necesitar reset
-                    if hasattr(motor, 'state') and (motor.state is None or motor.state.psi is None):
-                         initial_mode = getattr(
-                            global_cfg, "INITIAL_STATE_MODE_INFERENCE", "complex_noise"
-                        )
-                         motor.state = QuantumState(
-                            motor.grid_size,
-                            motor.d_state,
-                            motor.device,
-                            initial_mode=initial_mode,
-                        )
-                        
+                    if hasattr(motor, 'state') and (motor.state is None or getattr(motor.state, 'psi', None) is None):
+                         # Re-inicializar estado si está vacío (aunque init debería haberlo hecho)
+                         pass
+
                     return motor
 
                 # Ejecutar en thread pool

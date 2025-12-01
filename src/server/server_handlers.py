@@ -59,6 +59,7 @@ async def create_experiment_handler(args):
             "LOAD_FROM_EXPERIMENT": args.get("LOAD_FROM_EXPERIMENT"),  # Para transfer learning
             "GAMMA_DECAY": args.get("GAMMA_DECAY", getattr(global_cfg, 'GAMMA_DECAY', 0.01)),  # Término Lindbladian (decaimiento)
             "INITIAL_STATE_MODE_INFERENCE": args.get("INITIAL_STATE_MODE_INFERENCE", getattr(global_cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')),  # Modo de inicialización del estado
+            "ENGINE_TYPE": args.get("ENGINE_TYPE", "PYTHON"),
             # Información del motor y dispositivo
             "TRAINING_DEVICE": device_str,  # CPU o CUDA (gráfica)
             "USE_NATIVE_ENGINE": use_native_engine  # Si se intentó usar motor nativo
@@ -74,7 +75,8 @@ async def create_experiment_handler(args):
             "--qca_steps_training", str(args.get("QCA_STEPS_TRAINING")),
             "--total_episodes", str(args.get("TOTAL_EPISODES")),
             # Serializamos el diccionario MODEL_PARAMS a un string JSON
-            "--model_params", json.dumps(args.get("MODEL_PARAMS", {}))
+            "--model_params", json.dumps(args.get("MODEL_PARAMS", {})),
+            "--engine_type", args.get("ENGINE_TYPE", "PYTHON")
         ]
         
         if args.get('CONTINUE_TRAINING', False):
