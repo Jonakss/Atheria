@@ -59,7 +59,7 @@ async def create_experiment_handler(args):
             "LOAD_FROM_EXPERIMENT": args.get("LOAD_FROM_EXPERIMENT"),  # Para transfer learning
             "GAMMA_DECAY": args.get("GAMMA_DECAY", getattr(global_cfg, 'GAMMA_DECAY', 0.01)),  # Término Lindbladian (decaimiento)
             "INITIAL_STATE_MODE_INFERENCE": args.get("INITIAL_STATE_MODE_INFERENCE", getattr(global_cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')),  # Modo de inicialización del estado
-            "ENGINE_TYPE": args.get("ENGINE_TYPE", "PYTHON"),
+            "ENGINE_TYPE": args.get("ENGINE_TYPE", "CARTESIAN"),
             # Información del motor y dispositivo
             "TRAINING_DEVICE": device_str,  # CPU o CUDA (gráfica)
             "USE_NATIVE_ENGINE": use_native_engine  # Si se intentó usar motor nativo
@@ -76,7 +76,7 @@ async def create_experiment_handler(args):
             "--total_episodes", str(args.get("TOTAL_EPISODES")),
             # Serializamos el diccionario MODEL_PARAMS a un string JSON
             "--model_params", json.dumps(args.get("MODEL_PARAMS", {})),
-            "--engine_type", args.get("ENGINE_TYPE", "PYTHON")
+            "--engine_type", args.get("ENGINE_TYPE", "CARTESIAN")
         ]
         
         if args.get('CONTINUE_TRAINING', False):
@@ -515,7 +515,7 @@ async def handle_load_experiment(args):
         from ..utils import load_experiment_config, get_latest_checkpoint
         from .. import config as global_cfg
         from ..model_loader import load_model
-        from ..engines.qca_engine import Aetheria_Motor
+        from ..motor_factory import get_motor
         from ..managers.roi_manager import ROIManager
         
         config = load_experiment_config(exp_name)
@@ -564,8 +564,8 @@ async def handle_load_experiment(args):
         elif training_grid_size and training_grid_size != inference_grid_size:
              logging.info(f"Escalando grid de entrenamiento ({training_grid_size}) a inferencia ({inference_grid_size})")
         
-        # Inicializar motor
-        g_state['motor'] = Aetheria_Motor(model, inference_grid_size, d_state, global_cfg.DEVICE, cfg=config)
+        # Inicializar motor usando la fábrica
+        g_state['motor'] = get_motor(config, model, global_cfg.DEVICE)
         g_state['simulation_step'] = 0
         
         # Compilación opcional
@@ -816,6 +816,57 @@ async def handle_delete_checkpoint(args):
     except Exception as e:
         logging.error(f"Error al eliminar checkpoint: {e}", exc_info=True)
         if ws: await send_notification(ws, f"Error al eliminar checkpoint: {str(e)}", "error")
+
+async def handle_analyze_snapshot(args):
+    """
+    Ejecuta un análisis profundo (UMAP) sobre el estado actual.
+    Pausa la simulación para realizar el cálculo pesado.
+    """
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    motor = g_state.get('motor')
+    
+    if not motor:
+        if ws: await send_notification(ws, "⚠️ No hay simulación activa para analizar.", "warning")
+        return
+
+    try:
+        # 1. Pausar simulación si está corriendo
+        was_running = not g_state.get('is_paused', True)
+        if was_running:
+            g_state['is_paused'] = True
+            await broadcast({"type": "inference_status_update", "payload": {"status": "paused"}})
+            if ws: await send_notification(ws, "Simulación pausada para análisis profundo...", "info")
+            
+        # 2. Obtener estado actual
+        psi = motor.state.psi
+        
+        # 3. Ejecutar análisis (UMAP)
+        # Esto puede tardar unos segundos, por eso pausamos
+        if ws: await send_notification(ws, "Ejecutando UMAP (esto puede tardar unos segundos)...", "info")
+        
+        # Ejecutar en un thread separado para no bloquear el event loop principal
+        # aunque UMAP es intensivo en CPU, liberar el loop permite mantener pings de WS
+        from ..pipelines.viz.phase_space import get_phase_space_data
+        import functools
+        
+        loop = asyncio.get_running_loop()
+        # Ejecutar get_phase_space_data en un executor
+        result = await loop.run_in_executor(
+            None, 
+            functools.partial(get_phase_space_data, psi, method='umap', n_clusters=4, subsample=0.1)
+        )
+        
+        # 4. Enviar resultados
+        await send_to_websocket(ws, "analysis_result", result)
+        if ws: await send_notification(ws, "✅ Análisis UMAP completado.", "success")
+        
+        # Nota: No reanudamos automáticamente para dar tiempo al usuario de ver el resultado
+        # El usuario puede reanudar manualmente
+        
+    except Exception as e:
+        logging.error(f"Error en análisis de snapshot: {e}", exc_info=True)
+        if ws: await send_notification(ws, f"❌ Error en análisis: {str(e)}", "error")
+
 
 async def handle_delete_experiment(args):
     """Elimina un experimento completo (configuración y checkpoints)."""

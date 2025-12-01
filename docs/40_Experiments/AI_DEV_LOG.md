@@ -98,3 +98,24 @@
 - [[#2024-12-XX - Fase 3 Completada: Migración de Componentes UI]]
 - [[#2024-12-XX - Fase 2 Iniciada: Setup Motor Nativo C++]]
 - [[#2024-12-XX - Optimización de Logs y Reducción de Verbosidad]]
+
+## [2025-12-01] Phase Space Visualization Implementation
+
+### Summary
+Implemented a new "Phase Space" visualization system to analyze the topology of quantum states. This includes a backend pipeline for PCA and UMAP dimensionality reduction and a frontend 3D viewer using React Three Fiber.
+
+### Changes
+- **Backend**:
+    - Added `umap-learn` dependency.
+    - Created `src/pipelines/viz/phase_space.py` with PCA and UMAP logic.
+    - Added `handle_analyze_snapshot` in `server_handlers.py` to trigger UMAP analysis.
+- **Frontend**:
+    - Added `@react-three/fiber` and `@react-three/drei` dependencies.
+    - Created `PhaseSpaceViewer` component for 3D point cloud visualization.
+    - Integrated viewer into `DashboardLayout`.
+    - Updated `WebSocketContext` to handle `analysis_result` events.
+
+### Technical Details
+- **UMAP Integration**: Runs in a separate thread executor to prevent blocking the main asyncio loop, although it pauses the simulation logic to ensure state consistency.
+- **Data Format**: Optimized JSON structure sending `x, y, z, cluster, color` for each point.
+- **Visualization**: Uses `instancedMesh` in Three.js for efficient rendering of thousands of points.

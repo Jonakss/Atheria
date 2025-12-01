@@ -6,6 +6,7 @@ import { TimelineViewer } from '../../../components/ui/TimelineViewer';
 import HolographicViewer from '../../../components/visualization/HolographicViewer';
 import HolographicViewer2 from '../../../components/visualization/HolographicViewer2';
 import { useWebSocket } from '../../../hooks/useWebSocket';
+import PhaseSpaceViewer from '../../PhaseSpaceViewer/PhaseSpaceViewer';
 import { AnalysisView } from '../components/AnalysisView';
 import { HistoryView } from '../components/HistoryView';
 import { LogsView } from '../components/LogsView';
@@ -123,6 +124,12 @@ export const DashboardLayout: React.FC = () => {
               </div>
             </div>
           );
+        } else if (selectedViz === 'phase_space') {
+            return (
+                <div className="absolute inset-0 z-0 bg-slate-900 overflow-hidden p-4">
+                    <PhaseSpaceViewer />
+                </div>
+            );
         } else {
           // Vista 2D con PanZoomCanvas
           return (

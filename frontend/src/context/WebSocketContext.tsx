@@ -605,6 +605,10 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                     case 'snapshot_list':
                         setInferenceSnapshots(payload.snapshots || []);
                         break;
+                    case 'analysis_result':
+                        // Resultado de análisis UMAP recibido
+                        window.dispatchEvent(new CustomEvent('analysis_result_received', { detail: payload }));
+                        break;
                 }
             } catch (error) {
                 console.error("Error procesando mensaje:", error);
