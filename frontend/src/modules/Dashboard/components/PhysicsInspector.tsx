@@ -44,7 +44,8 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
     { id: 0, label: 'Densidad', desc: 'Amplitud |ψ|', icon: '📊', color: 'text-blue-400', border: 'border-blue-500/50' },
     { id: 1, label: 'Fase', desc: 'Argumento φ', icon: '🌈', color: 'text-purple-400', border: 'border-purple-500/50' },
     { id: 2, label: 'Energía', desc: 'Hamiltoniano', icon: '⚡', color: 'text-yellow-400', border: 'border-yellow-500/50' },
-    { id: 3, label: 'Flujo', desc: 'Corriente J', icon: '🌊', color: 'text-cyan-400', border: 'border-cyan-500/50' }
+    { id: 3, label: 'Flujo', desc: 'Corriente J', icon: '🌊', color: 'text-cyan-400', border: 'border-cyan-500/50' },
+    { id: 4, label: 'Chunks', desc: 'Meta-Estructura', icon: '🧩', color: 'text-green-400', border: 'border-green-500/50' }
   ];
 
   const handleGammaChange = (value: number) => {

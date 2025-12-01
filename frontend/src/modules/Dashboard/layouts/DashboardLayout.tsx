@@ -25,6 +25,7 @@ const getLegendProps = (layer: number) => {
     case 1: return { mode: 'PHASE', min: -3.14, max: 3.14, gradient: 'linear-gradient(to top, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)' };
     case 2: return { mode: 'ENERGY', min: 0, max: 1.0, gradient: 'linear-gradient(to top, #000, #f00, #ff0, #fff)' };
     case 3: return { mode: 'FLOW', min: 0, max: 1.0, gradient: 'linear-gradient(to top, #000, #0ff, #fff)' };
+    case 4: return { mode: 'CHUNKS', min: 0, max: 1, gradient: 'linear-gradient(to top, #000, #0f0, #fff)' };
     default: return { mode: 'UNKNOWN', min: 0, max: 1, gradient: 'linear-gradient(to top, #000, #fff)' };
   }
 };
