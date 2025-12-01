@@ -17,6 +17,7 @@ from .advanced import (
     calculate_complex_3d_data,
     calculate_phase_hsv_data
 )
+from .phase_space import get_phase_space_data
 
 
 def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Tensor = None, motor=None, downsample_factor: int = 1):
@@ -173,6 +174,10 @@ def get_visualization_data(psi: torch.Tensor, viz_type: str, delta_psi: torch.Te
         result["flow_data"] = calculate_flow_data(delta_psi)
     else:
         result["flow_data"] = None
+    
+    # --- Phase Space (PCA + KMeans) ---
+    if viz_type == 'phase_space':
+        result["phase_space_data"] = get_phase_space_data(psi)
     
     return result
 
