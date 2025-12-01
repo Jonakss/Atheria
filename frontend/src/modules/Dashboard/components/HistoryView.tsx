@@ -1,11 +1,11 @@
 // frontend/src/modules/Dashboard/components/HistoryView.tsx
+import { Clock, Database, Download, Loader2, RefreshCw, Search, Trash2, Upload } from 'lucide-react';
 import React, { useRef, useState } from 'react';
-import { Database, Clock, Download, Trash2, Upload, RefreshCw, Search, Loader2 } from 'lucide-react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
-import { GlassPanel } from './GlassPanel';
-import { Alert } from './Alert';
-import { Modal } from './Modal';
 import { API_ENDPOINTS } from '../../../utils/serverConfig';
+import { Alert } from './Alert';
+import { GlassPanel } from './GlassPanel';
+import { Modal } from './Modal';
 
 export const HistoryView: React.FC = () => {
   const { experimentsData, connectionStatus, sendCommand } = useWebSocket();
@@ -92,33 +92,7 @@ export const HistoryView: React.FC = () => {
         // Clear input so same file can be selected again if needed
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
-    try {
-        const response = await fetch(API_ENDPOINTS.UPLOAD_MODEL, {
-            method: 'POST',
-            body: formData,
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Error al subir el modelo: ${response.status} ${response.statusText} - ${errorText}`);
         }
-
-        setUploadStatus({ type: 'success', message: '¡Modelo subido exitosamente!' });
-        sendCommand('experiment', 'list'); // Refresh the list
-    } catch (error) {
-        let errorMessage = 'Error al conectar con el servidor o al subir el archivo.';
-        if (error instanceof Error) {
-            errorMessage = error.message;
-        } else if (typeof error === 'string') {
-            errorMessage = error;
-        }
-        setUploadStatus({
-            type: 'error',
-            message: errorMessage,
-        });
-    } finally {
-        setIsUploading(false);
-    }
     }
   };
 
