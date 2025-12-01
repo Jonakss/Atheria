@@ -454,6 +454,16 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
             const coords = simData?.poincare_coords;
             if (!coords || !Array.isArray(coords) || coords.length === 0) {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#1A1B1E';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#666';
+                ctx.font = '14px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('Poincaré data unavailable', canvas.width / 2, canvas.height / 2 - 10);
+                ctx.font = '12px monospace';
+                ctx.fillText('(Not supported by current engine)', canvas.width / 2, canvas.height / 2 + 10);
                 return;
             }
             
@@ -508,8 +518,53 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
         } else if (selectedViz === 'flow') {
             // Visualización de flujo (quiver plot) - solo funciona con datos en tiempo real
             const flowData = simData?.flow_data;
+            
+            // Fallback si no hay datos de flujo: Renderizar background y mostrar aviso
             if (!flowData || !flowData.dx || !flowData.dy) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                // Intentar renderizar background (densidad) si existe
+                const mapData = simData?.map_data;
+                const gridHeight = mapData?.length || 0;
+                const gridWidth = mapData?.[0]?.length || 0;
+                
+                if (gridWidth > 0 && gridHeight > 0) {
+                    canvas.width = gridWidth;
+                    canvas.height = gridHeight;
+                    
+                    // Renderizar densidad
+                    for (let y = 0; y < gridHeight; y++) {
+                        for (let x = 0; x < gridWidth; x++) {
+                            if (!mapData || !mapData[y]) continue;
+                            const value = mapData[y][x];
+                            if (typeof value === 'number' && !isNaN(value)) {
+                                ctx.fillStyle = getColor(value);
+                                ctx.fillRect(x, y, 1, 1);
+                            }
+                        }
+                    }
+                    
+                    // Overlay de aviso
+                    ctx.save();
+                    ctx.scale(1, 1); // Reset scale for text
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.fillRect(0, gridHeight / 2 - 20, gridWidth, 40);
+                    
+                    ctx.fillStyle = '#FFF';
+                    ctx.font = `${Math.max(12, gridWidth / 20)}px monospace`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('Flow data unavailable', gridWidth / 2, gridHeight / 2 - 5);
+                    ctx.font = `${Math.max(10, gridWidth / 25)}px monospace`;
+                    ctx.fillStyle = '#AAA';
+                    ctx.fillText('(Native Engine limitation)', gridWidth / 2, gridHeight / 2 + 10);
+                    ctx.restore();
+                } else {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = '#1A1B1E';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = '#666';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('Flow data unavailable', canvas.width / 2, canvas.height / 2);
+                }
                 return;
             }
             

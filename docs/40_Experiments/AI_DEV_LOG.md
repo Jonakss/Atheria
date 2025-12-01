@@ -16,6 +16,7 @@
 
 ## 📋 Índice de Entradas
 
+- [[logs/2025-12-01_viz_ui_refactor_and_native_fixes|2025-12-01 - Refactor: Visualization UI & Native Engine Fixes]]
 - [[logs/2025-12-01_engine_selection_training|2025-12-01 - Feature: Engine Selection for Training]]
 - **2025-12-01 - Fix: Syntax Error in TransferLearningWizard (Extra Tag)**
 - [[logs/2025-12-01_quantum_tuner|2025-12-01 - Feature: Quantum Tuner (Qiskit SPSA Optimization)]]
@@ -54,17 +55,19 @@
 - [[logs/2025-11-28_fix_inference_persistence|2025-11-28 - Fix: Inference Persistence & Import Errors]]
 - [[logs/2025-11-28_harlow_limit_theory|2025-11-28 - Knowledge: Harlow Limit Theory Ingestion]]
 - [[logs/2025-11-28_fix_native_freeze|2025-11-28 - Fix: Native Engine Freeze (Fast Path Visualization)]]
+
 - 2025-11-28: [PHASE 4] Initialization of Phase 4: Holographic Lattice.
-    - Implemented `LatticeEngine` backend (Python prototype).
-    - Integrated `LatticeEngine` into `inference_handlers.py`.
-    - Created documentation `docs/30_Components/LATTICE_ENGINE.md`.
-    - Planned `HolographicViewer2` for AdS/CFT visualization.
-    - Implemented `HolographicViewer2` frontend component with visual indicator.
-    - Added UI toggle in `PhysicsInspector` to switch between Viewer v1 and v2.
-    - Updated `DashboardLayout` to handle viewer switching.
-    - **Backend:** Implemented SU(3) Wilson Action and Metropolis-Hastings update in `LatticeEngine`.
-    - **Frontend:** Implemented Scale-Radius Duality visualization using custom Vertex Shader in `HolographicViewer2`.
-    - Verified backend physics with `tests/test_lattice_engine.py`.
+  - Implemented `LatticeEngine` backend (Python prototype).
+  - Integrated `LatticeEngine` into `inference_handlers.py`.
+  - Created documentation `docs/30_Components/LATTICE_ENGINE.md`.
+  - Planned `HolographicViewer2` for AdS/CFT visualization.
+  - Implemented `HolographicViewer2` frontend component with visual indicator.
+  - Added UI toggle in `PhysicsInspector` to switch between Viewer v1 and v2.
+  - Updated `DashboardLayout` to handle viewer switching.
+  - **Backend:** Implemented SU(3) Wilson Action and Metropolis-Hastings update in `LatticeEngine`.
+  - **Frontend:** Implemented Scale-Radius Duality visualization using custom Vertex Shader in `HolographicViewer2`.
+  - Verified backend physics with `tests/test_lattice_engine.py`.
+
 - [[logs/2025-11-28_history_system_verification|2025-11-28 - Fix: History System Verification (Native Engine Support)]]
 - [2025-11-28: Visualizaciones Avanzadas de Campos (WebGL)](logs/2025-11-28_advanced_visualizations.md)
 - [2025-11-28: Implementación de OctreeIndex (Morton Codes)](logs/2025-11-28_octree_implementation.md)

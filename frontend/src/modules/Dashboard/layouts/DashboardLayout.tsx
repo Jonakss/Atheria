@@ -14,6 +14,7 @@ import { NavigationSidebar } from '../components/NavigationSidebar';
 import { PhysicsInspector } from '../components/PhysicsInspector';
 import { ScientificHeader } from '../components/ScientificHeader';
 import { TrainingView } from '../components/TrainingView';
+import { VisualizationPanel } from '../components/VisualizationPanel';
 
 type TabType = 'lab' | 'analysis' | 'history' | 'logs';
 type LabSection = 'inference' | 'training' | 'analysis';
@@ -35,6 +36,7 @@ export const DashboardLayout: React.FC = () => {
   const [labPanelOpen, setLabPanelOpen] = useState(true);
   const [activeLabSection, setActiveLabSection] = useState<LabSection>('inference');
   const [physicsInspectorCollapsed, setPhysicsInspectorCollapsed] = useState(false);
+  const [visualizationPanelCollapsed, setVisualizationPanelCollapsed] = useState(false);
   const [viewerVersion, setViewerVersion] = useState<'v1' | 'v2'>('v1');
   const [selectedLayer, setSelectedLayer] = useState(0); // 0: Density, 1: Phase, 2: Energy, 3: Flow
   const [selectedTimelineFrame, setSelectedTimelineFrame] = useState<{
@@ -235,13 +237,20 @@ export const DashboardLayout: React.FC = () => {
         {/* Design System: w-72 (288px) o w-80 (320px) - usando w-72 según mockup */}
         {/* Panel Lateral Derecho (Inspector y Controles) - Colapsible */}
         {/* Design System: w-72 (288px) o w-80 (320px) - usando w-72 según mockup */}
-        <PhysicsInspector 
-          isCollapsed={physicsInspectorCollapsed}
-          onToggleCollapse={() => setPhysicsInspectorCollapsed(!physicsInspectorCollapsed)}
+        {/* Panel Lateral Derecho (Visualización) - Colapsible */}
+        <VisualizationPanel 
+          isCollapsed={visualizationPanelCollapsed}
+          onToggleCollapse={() => setVisualizationPanelCollapsed(!visualizationPanelCollapsed)}
           viewerVersion={viewerVersion}
           onViewerVersionChange={setViewerVersion}
           selectedLayer={selectedLayer}
           onLayerChange={setSelectedLayer}
+        />
+
+        {/* Panel Lateral Derecho (Inspector de Física) - Colapsible */}
+        <PhysicsInspector 
+          isCollapsed={physicsInspectorCollapsed}
+          onToggleCollapse={() => setPhysicsInspectorCollapsed(!physicsInspectorCollapsed)}
         />
       </div>
     </div>

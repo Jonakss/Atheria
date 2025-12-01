@@ -401,6 +401,16 @@ async def handle_load_experiment(args):
             )
         return
 
+    from ...utils import load_experiment_config
+    exp_cfg = load_experiment_config(exp_name)
+    if not exp_cfg:
+        logging.error(f"No se encontró configuración para '{exp_name}'")
+        if ws:
+            await send_notification(
+                ws, f"❌ No se encontró configuración para '{exp_name}'", "error"
+            )
+        return
+
     device = global_cfg.DEVICE
     device_str = str(device).split(":")[0]
 
@@ -461,19 +471,28 @@ async def handle_load_experiment(args):
         elif force_engine in ["python", "harmonic", "polar", "quantum", "lattice"]:
             use_native = False
         else:
-            # Auto-detectar: Respetar configuración global si no se fuerza
-            if global_cfg.USE_NATIVE_ENGINE:
-                try:
-                    import atheria_core
-
-                    use_native = True
-                except ImportError:
-                    logging.warning(
-                        "USE_NATIVE_ENGINE=True pero atheria_core no está disponible. Usando Python."
-                    )
-                    use_native = False
-            else:
+            # Auto-detectar basado en configuración del experimento
+            engine_type = getattr(exp_cfg, 'ENGINE_TYPE', None)
+            
+            if engine_type == 'NATIVE':
+                use_native = True
+            elif engine_type in ['PYTHON', 'CARTESIAN']:
                 use_native = False
+            elif engine_type in ['LATTICE', 'HARMONIC', 'POLAR', 'QUANTUM']:
+                use_native = False
+            else:
+                # Si no está especificado (experimentos antiguos), usar configuración global
+                if global_cfg.USE_NATIVE_ENGINE:
+                    try:
+                        import atheria_core
+                        use_native = True
+                    except ImportError:
+                        logging.warning(
+                            "USE_NATIVE_ENGINE=True pero atheria_core no está disponible. Usando Python."
+                        )
+                        use_native = False
+                else:
+                    use_native = False
 
         # Cargar modelo
         try:
@@ -547,11 +566,8 @@ async def handle_load_experiment(args):
                     logging.info(f"✅ Exportación JIT completada: {jit_path}")
 
                 from ...engines.native_engine_wrapper import NativeEngineWrapper
-                from ...utils import load_experiment_config
-
-                exp_cfg = load_experiment_config(exp_name)
-                if not exp_cfg:
-                    raise ValueError(f"No se pudo cargar configuración de {exp_name}")
+                from ...engines.native_engine_wrapper import NativeEngineWrapper
+                # exp_cfg ya cargado al inicio
 
                 if ws:
                     await send_notification(
@@ -583,14 +599,11 @@ async def handle_load_experiment(args):
                 g_state["motor_type"] = "native"
             else:
                 # Usar Motor Factory para todos los motores Python (Standard, Polar, Quantum, Harmonic, Lattice)
-                from ...utils import load_experiment_config
                 from ...model_loader import load_model
                 from src.motor_factory import get_motor
                 from ...engines.qca_engine import QuantumState # Needed for initial state if not handled by factory
 
-                exp_cfg = load_experiment_config(exp_name)
-                if not exp_cfg:
-                    raise ValueError(f"No se pudo cargar configuración de {exp_name}")
+                # exp_cfg ya cargado al inicio
 
                 # Configurar el tipo de motor en cfg si es forzado
                 if force_engine:

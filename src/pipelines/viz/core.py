@@ -93,12 +93,26 @@ def get_visualization_data(psi, viz_type: str, delta_psi: torch.Tensor = None, m
     result = {
         "map_data": map_data,
         "hist_data": {},
-        "poincare_coords": [[0.0, 0.0]]
+        "poincare_coords": [],
+        "phase_attractor": None,
+        "flow_data": None
     }
     
-    # Extra calcs
+    # Advanced calculations based on viz_type
+    if viz_type in ['poincare', 'poincare_3d']:
+        result['poincare_coords'] = calculate_poincare_coords(psi)
+    
+    if viz_type == 'phase_attractor':
+        result['phase_attractor'] = calculate_phase_attractor(psi)
+        
+    if viz_type == 'flow':
+        result['flow_data'] = calculate_flow_data(psi)
+    
     if viz_type == 'phase_hsv':
         result['phase_hsv_data'] = calculate_phase_hsv_data(phase, density)
+        
+    if viz_type == 'complex_3d':
+        result['complex_3d_data'] = calculate_complex_3d_data(psi)
 
     return result
 
