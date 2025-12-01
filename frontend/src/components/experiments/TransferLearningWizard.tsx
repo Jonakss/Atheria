@@ -489,7 +489,6 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
                                                     </Badge>
                                                 )}
                                             </TableTd>
-                                            </TableTd>
                                         </TableRow>
                                         <TableRow>
                                             <TableTd><span className="text-xs font-medium">Engine Type</span></TableTd>
