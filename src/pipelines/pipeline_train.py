@@ -131,9 +131,14 @@ def run_training_pipeline(exp_cfg: SimpleNamespace, checkpoint_path: str | None 
         trainer = QC_Trainer_v4(**trainer_kwargs)
         
         # Log de parámetros
-        num_params = sum(p.numel() for p in trainer.motor.operator.parameters() if p.requires_grad)
-        print(f"Motor y Ley-M ({exp_cfg.MODEL_ARCHITECTURE}) inicializados (V4). Cuadrícula: {exp_cfg.GRID_SIZE_TRAINING}x{exp_cfg.GRID_SIZE_TRAINING}.")
-        print(f"Parámetros Entrenables: {num_params}")
+        # Log de parámetros
+        model_operator = getattr(trainer.motor, 'operator', getattr(trainer.motor, 'model', None))
+        if model_operator:
+            num_params = sum(p.numel() for p in model_operator.parameters() if p.requires_grad)
+            print(f"Motor y Ley-M ({exp_cfg.MODEL_ARCHITECTURE}) inicializados (V4). Cuadrícula: {exp_cfg.GRID_SIZE_TRAINING}x{exp_cfg.GRID_SIZE_TRAINING}.")
+            print(f"Parámetros Entrenables: {num_params}")
+        else:
+            print(f"Motor ({type(trainer.motor).__name__}) inicializado (V4). Sin modelo entrenable.")
         
         # V4 tiene un método diferente: train_episode(episode_num) que retorna (loss, metrics)
         _run_v4_training_loop(trainer, exp_cfg)
@@ -157,9 +162,12 @@ def run_training_pipeline(exp_cfg: SimpleNamespace, checkpoint_path: str | None 
         # Usar get_model_for_params() para acceder a los parámetros correctamente
         # (maneja el caso cuando el modelo está compilado)
         model_for_params = motor.get_model_for_params()
-        num_params = sum(p.numel() for p in model_for_params.parameters() if p.requires_grad)
-        print(f"Motor y Ley-M ({exp_cfg.MODEL_ARCHITECTURE}) inicializados (V3). Cuadrícula: {exp_cfg.GRID_SIZE_TRAINING}x{exp_cfg.GRID_SIZE_TRAINING}.")
-        print(f"Parámetros Entrenables: {num_params}")
+        if model_for_params:
+            num_params = sum(p.numel() for p in model_for_params.parameters() if p.requires_grad)
+            print(f"Motor y Ley-M ({exp_cfg.MODEL_ARCHITECTURE}) inicializados (V3). Cuadrícula: {exp_cfg.GRID_SIZE_TRAINING}x{exp_cfg.GRID_SIZE_TRAINING}.")
+            print(f"Parámetros Entrenables: {num_params}")
+        else:
+            print(f"Motor ({type(motor).__name__}) inicializado (V3). Sin modelo entrenable.")
 
         # Inicializar el Entrenador V3
         trainer = QC_Trainer_v3(motor, exp_cfg.LR_RATE_M, global_cfg, exp_cfg)
