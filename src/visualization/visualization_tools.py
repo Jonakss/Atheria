@@ -2,10 +2,10 @@
 import numpy as np
 from io import BytesIO
 import base64
+import torch
 
 def get_complex_parts(psi_tensor):
     """Divide un tensor complejo (real, imag) en dos tensores."""
-    import torch
     if psi_tensor is None or psi_tensor.shape[-1] % 2 != 0:
         return None, None
     d_state = psi_tensor.shape[-1] // 2
@@ -13,18 +13,35 @@ def get_complex_parts(psi_tensor):
     imag_parts = psi_tensor[..., d_state:]
     return real_parts, imag_parts
 
-def get_density_map(psi) -> np.ndarray:
+def get_density_map(psi, absolute_scale=True) -> np.ndarray:
     """Calcula el mapa de densidad (norma al cuadrado) de un estado psi."""
-    import torch
     if psi is None: return np.zeros((256, 256))
-    real, imag = get_complex_parts(psi.cpu())
-    if real is None: return np.zeros((psi.shape[1], psi.shape[2]))
-    density = torch.sum(real**2 + imag**2, dim=-1)
-    return density.squeeze(0).numpy()
+
+    # Manejar QuantumStatePolar u objetos similares si se pasa directamente
+    if hasattr(psi, 'magnitude'):
+         density = psi.magnitude.squeeze()**2
+    else:
+        real, imag = get_complex_parts(psi.cpu())
+        if real is None: return np.zeros((psi.shape[1], psi.shape[2]))
+        density = torch.sum(real**2 + imag**2, dim=-1)
+
+    density = density.squeeze()
+    if density.ndim == 3: # Handle batch if present
+         density = density[0]
+
+    if absolute_scale:
+        # ESCALA FIJA: Asumimos que la energía máxima "interesante" es 1.0
+        # Esto hace que el ruido (0.001) se vea negro, y la materia (0.9) se vea brillante.
+        norm_density = torch.clamp(density, 0, 1.0)
+    else:
+        # ESCALA RELATIVA (La vieja, que causa el ruido)
+        mi, ma = density.min(), density.max()
+        norm_density = (density - mi) / (ma - mi + 1e-8)
+
+    return (norm_density * 255).cpu().numpy().astype(np.uint8)
 
 def get_change_map(psi, prev_psi) -> np.ndarray:
     """Calcula la magnitud del cambio entre dos estados psi."""
-    import torch
     if psi is None or prev_psi is None: return np.zeros((256, 256))
     change = psi.cpu() - prev_psi.cpu()
     real, imag = get_complex_parts(change)
