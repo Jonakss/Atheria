@@ -124,6 +124,27 @@ if cache.exists(f"checkpoint:{exp_name}:latest"):
     checkpoint = cache.get(f"checkpoint:{exp_name}:latest")  # <50ms!
 ```
 
+### 4. Cache Buffering (Streaming)
+
+El sistema de buffering desacopla la velocidad de simulación de la velocidad de visualización, permitiendo un flujo de datos constante al frontend.
+
+**Flujo:**
+1. **Productor (`DataProcessingService`)**: Empuja frames serializados a una lista en Dragonfly (`RPUSH`).
+2. **Buffer (Dragonfly List)**: Almacena hasta `CACHE_STREAM_MAX_LEN` frames.
+3. **Consumidor (`WebSocketService`)**: Consume frames (`LPOP`) a una tasa constante (`target_fps`) y los transmite.
+
+**Configuración (`src/config.py`):**
+```python
+CACHE_BUFFERING_ENABLED = True
+CACHE_STREAM_KEY = "simulation:stream"
+CACHE_STREAM_MAX_LEN = 60
+```
+
+**Beneficios:**
+- Evita saturación del frontend si la simulación es muy rápida.
+- Suaviza la visualización (elimina "saltos").
+- Maneja backpressure automáticamente (descarta frames antiguos si el buffer se llena).
+
 ## Monitoreo
 
 ### Ver Estadísticas

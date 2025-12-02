@@ -127,15 +127,74 @@ class DataProcessingService(BaseService):
                     'epoch_metrics': epoch_metrics
                 }
                 
-                # 6. Enviar a cola de broadcast
-                if not self.broadcast_queue.full():
+                # 6. Enviar a cola de broadcast o Cache Buffering
+                from src.config import CACHE_BUFFERING_ENABLED, CACHE_STREAM_KEY, CACHE_STREAM_MAX_LEN
+                from src.server.server_state import g_state
+                
+                # Si el buffering está habilitado y el caché está activo
+                if CACHE_BUFFERING_ENABLED and g_state.get('cache') and g_state['cache'].is_enabled():
                     try:
-                        self.broadcast_queue.put_nowait({
-                            'type': 'simulation_frame',
-                            'payload': final_payload
-                        })
-                    except asyncio.QueueFull:
-                        pass
+                        # Serializar payload completo
+                        import pickle
+                        import zstandard as zstd
+                        
+                        # Usar el mismo compresor que DragonflyClient si es posible, o crear uno nuevo
+                        # Para simplicidad y rendimiento, usamos pickle+zstd aquí directo o delegamos al cliente
+                        # El cliente DragonflyClient tiene métodos set/get, pero para listas necesitamos acceso al cliente raw
+                        # o extender DragonflyClient.
+                        
+                        # Opción A: Extender DragonflyClient (Mejor diseño)
+                        # Opción B: Usar cliente raw aquí (Más rápido de implementar ahora)
+                        
+                        # Vamos a usar el cliente raw del cache si existe
+                        cache_client = g_state['cache'].client
+                        if cache_client:
+                            # Serializar
+                            serialized = pickle.dumps(final_payload, protocol=pickle.HIGHEST_PROTOCOL)
+                            # Comprimir (opcional, pero recomendado para red)
+                            # DragonflyClient ya tiene compresor, usémoslo si es público o creemos uno
+                            compressor = zstd.ZstdCompressor(level=3)
+                            compressed = compressor.compress(serialized)
+                            
+                            # Push a la lista (RPUSH)
+                            cache_client.rpush(CACHE_STREAM_KEY, compressed)
+                            
+                            # Trim para evitar crecimiento infinito (LTRIM)
+                            # Mantener solo los últimos N frames
+                            # LTRIM key start stop
+                            # Queremos mantener los últimos MAX_LEN. 
+                            # Si longitud es L, queremos indices desde L-MAX_LEN hasta L.
+                            # Redis soporta índices negativos: -MAX_LEN a -1
+                            cache_client.ltrim(CACHE_STREAM_KEY, -CACHE_STREAM_MAX_LEN, -1)
+                            
+                            # Logging ocasional
+                            if step % 100 == 0:
+                                logging.debug(f"buffer: Frame {step} pushed to stream. Size: {len(compressed)} bytes")
+                        else:
+                            # Fallback si cliente no está listo
+                            raise Exception("Cache client not ready")
+                            
+                    except Exception as e:
+                        logging.warning(f"⚠️ Error pushing to cache buffer: {e}. Falling back to direct broadcast.")
+                        # Fallback a broadcast directo
+                        if not self.broadcast_queue.full():
+                            try:
+                                self.broadcast_queue.put_nowait({
+                                    'type': 'simulation_frame',
+                                    'payload': final_payload
+                                })
+                            except asyncio.QueueFull:
+                                pass
+                else:
+                    # Comportamiento Legacy (Direct Broadcast)
+                    if not self.broadcast_queue.full():
+                        try:
+                            self.broadcast_queue.put_nowait({
+                                'type': 'simulation_frame',
+                                'payload': final_payload
+                            })
+                        except asyncio.QueueFull:
+                            pass
                 
                 self.state_queue.task_done()
                 

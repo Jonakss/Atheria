@@ -23,6 +23,10 @@ class WebSocketService(BaseService):
     async def _start_impl(self):
         """Inicia el bucle de transmisión."""
         self._task = asyncio.create_task(self._broadcast_loop())
+        # Iniciar loop de streaming si el buffering está habilitado
+        from src.config import CACHE_BUFFERING_ENABLED
+        if CACHE_BUFFERING_ENABLED:
+            self._stream_task = asyncio.create_task(self._stream_loop())
         
     async def _stop_impl(self):
         """Detiene el servicio y cierra conexiones."""
@@ -191,3 +195,115 @@ class WebSocketService(BaseService):
             except Exception as e:
                 logging.error(f"❌ Error en bucle de transmisión: {e}")
                 await asyncio.sleep(0.1)
+
+    async def _stream_loop(self):
+        """
+        Bucle de streaming que consume del buffer (cache) a una tasa constante.
+        Esto desacopla la simulación de la visualización.
+        """
+        from src.config import CACHE_STREAM_KEY, CACHE_BUFFERING_ENABLED
+        from src.server.server_state import g_state
+        import pickle
+        import zstandard as zstd
+        import time
+        
+        logging.info("🌊 WebSocketService: Bucle de streaming iniciado.")
+        
+        # Compresor para descomprimir
+        decompressor = zstd.ZstdDecompressor()
+        
+        # Rate limiting
+        target_fps = g_state.get('target_fps', 30.0)
+        frame_time = 1.0 / target_fps
+        
+        while self._is_running:
+            try:
+                start_time = time.time()
+                
+                # Verificar si cache está disponible
+                if not g_state.get('cache') or not g_state['cache'].is_enabled():
+                    await asyncio.sleep(1.0)
+                    continue
+                
+                cache_client = g_state['cache'].client
+                if not cache_client:
+                    await asyncio.sleep(1.0)
+                    continue
+                
+                # Intentar obtener frame del buffer (LPOP)
+                # LPOP saca el elemento más antiguo (FIFO queue)
+                compressed = cache_client.lpop(CACHE_STREAM_KEY)
+                
+                if compressed:
+                    # Descomprimir y deserializar
+                    try:
+                        serialized = decompressor.decompress(compressed)
+                        payload = pickle.loads(serialized)
+                        
+                        # Construir mensaje
+                        message = {
+                            'type': 'simulation_frame',
+                            'payload': payload
+                        }
+                        
+                        # Enviar a través de la lógica de broadcast existente
+                        # pero sin pasar por la cola broadcast_queue para evitar duplicados
+                        # si el productor también enviara a la cola (que ya no lo hace si buffering=True)
+                        
+                        # Reutilizamos la lógica de envío directo
+                        await self._broadcast_message(message)
+                        
+                    except Exception as e:
+                        logging.error(f"❌ Error procesando frame de stream: {e}")
+                else:
+                    # Buffer vacío, esperar un poco
+                    await asyncio.sleep(0.01)
+                    continue
+                
+                # Control de FPS (Rate Limiting)
+                # Actualizar target_fps dinámicamente
+                target_fps = g_state.get('target_fps', 30.0)
+                frame_time = 1.0 / max(target_fps, 1.0)
+                
+                elapsed = time.time() - start_time
+                wait_time = max(0, frame_time - elapsed)
+                
+                if wait_time > 0:
+                    await asyncio.sleep(wait_time)
+                else:
+                    await asyncio.sleep(0)
+                    
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logging.error(f"❌ Error en bucle de streaming: {e}")
+                await asyncio.sleep(1.0)
+
+    async def _broadcast_message(self, message):
+        """Helper para enviar un mensaje a todos los clientes (lógica extraída de _broadcast_loop)."""
+        if not self.active_websockets:
+            return
+
+        use_binary = should_use_binary(message.get('type'), message.get('payload'))
+        
+        if use_binary:
+            binary_data, format_used = serialize_frame_binary(message.get('payload', {}))
+            tasks = []
+            for ws in self.active_websockets:
+                if not ws.closed:
+                    header = {
+                        "type": message.get("type"),
+                        "format": format_used,
+                        "is_binary": True
+                    }
+                    tasks.append(ws.send_json(header))
+                    tasks.append(ws.send_bytes(binary_data))
+        else:
+            json_str = json.dumps(message)
+            tasks = []
+            for ws in self.active_websockets:
+                if not ws.closed:
+                    tasks.append(ws.send_str(json_str))
+        
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)

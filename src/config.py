@@ -352,3 +352,16 @@ CACHE_STATE_INTERVAL = int(os.getenv('CACHE_STATE_INTERVAL', '100'))
 # TTL (Time To Live) por defecto para estados cacheados en segundos
 # Estados más antiguos se eliminan automáticamente
 CACHE_TTL = int(os.getenv('CACHE_TTL', '7200'))  # 2 horas
+
+# Configuración de Buffering (Streaming)
+# Desacopla la velocidad de simulación de la velocidad de visualización
+CACHE_BUFFERING_ENABLED = os.getenv('CACHE_BUFFERING_ENABLED', 'true').lower() == 'true'
+CACHE_STREAM_KEY = os.getenv('CACHE_STREAM_KEY', 'simulation:stream')
+CACHE_STREAM_MAX_LEN = int(os.getenv('CACHE_STREAM_MAX_LEN', '60'))  # Mantener máx 60 frames en buffer
+
+# ==============================================================================
+# --- IONQ CONFIGURATION ---
+# ==============================================================================
+IONQ_API_KEY = os.getenv('IONQ_API_KEY', None)
+# 'ionq_simulator' or 'ionq_qpu'
+IONQ_BACKEND_NAME = os.getenv('IONQ_BACKEND_NAME', 'ionq_simulator')
