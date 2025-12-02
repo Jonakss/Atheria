@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { useExperimentStore } from '../../store/experimentStore';
 
 interface HolographicViewerProps {
     data: number[]; // Array plano de magnitudes [mag0, mag1, ...]
@@ -25,6 +26,10 @@ const HolographicViewer: React.FC<HolographicViewerProps> = ({
     const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
     const pointsRef = useRef<THREE.Points | null>(null);
     const controlsRef = useRef<OrbitControls | null>(null);
+
+    // Quantum Ripple Effect Ref
+    const rippleMeshRef = useRef<THREE.Mesh | null>(null);
+    const { isQuantumInjecting } = useExperimentStore();
 
     // 1. Inicialización de Three.js
     useEffect(() => {
@@ -105,6 +110,121 @@ const HolographicViewer: React.FC<HolographicViewerProps> = ({
             renderer.dispose();
         };
     }, []);
+
+    // 1.5 Quantum Ripple Effect Initialization
+    useEffect(() => {
+        if (!sceneRef.current) return;
+
+        // Create a large plane or sphere for the ripple effect
+        // Using a billboard plane facing the camera or a sphere surrounding the scene
+        const geometry = new THREE.SphereGeometry(200, 32, 32);
+        const material = new THREE.ShaderMaterial({
+            transparent: true,
+            side: THREE.BackSide, // Render inside of sphere
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            uniforms: {
+                time: { value: 0 },
+                active: { value: 0.0 }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float time;
+                uniform float active;
+                varying vec2 vUv;
+
+                void main() {
+                    if (active < 0.01) discard;
+
+                    // Simple radial ripple based on time
+                    float dist = length(vUv - 0.5) * 2.0;
+                    float ripple = sin(dist * 20.0 - time * 10.0) * 0.5 + 0.5;
+                    float fade = 1.0 - dist;
+
+                    vec3 color = vec3(0.6, 0.2, 1.0); // Purple
+                    gl_FragColor = vec4(color, ripple * fade * active * 0.3);
+                }
+            `
+        });
+
+        const rippleMesh = new THREE.Mesh(geometry, material);
+        sceneRef.current.add(rippleMesh);
+        rippleMeshRef.current = rippleMesh;
+
+        return () => {
+            if (sceneRef.current && rippleMesh) {
+                sceneRef.current.remove(rippleMesh);
+                rippleMesh.geometry.dispose();
+                rippleMesh.material.dispose();
+            }
+        };
+    }, []);
+
+    // Update Ripple State
+    useEffect(() => {
+        if (rippleMeshRef.current) {
+            const material = rippleMeshRef.current.material as THREE.ShaderMaterial;
+            // We'll animate this in the loop ideally, but for now we set a target
+            // To make it smooth, we rely on the requestAnimationFrame loop to update 'time'
+            // But we need to update 'active' uniform.
+
+            // For simplicity, we just set active to 1.0 when injecting, but we need an animation loop to handle fade out/in properly
+            // or just bind it to the state directly.
+
+            // Let's hook into the existing animate loop?
+            // The existing animate loop is closed over in the first useEffect.
+            // We can use a ref to communicate.
+        }
+    }, [isQuantumInjecting]);
+
+    // Independent Animation Loop for Ripple (since the main loop is closed)
+    // Actually, we can just start a temporary loop or rely on the main one if we could access it.
+    // But since we can't easily modify the main loop without full rewrite, let's add a secondary updater
+    // OR: Modify the main loop in the first useEffect to read a ref.
+
+    // Better approach: Use a ref to store the state, and let the main loop read it.
+    const quantumStateRef = useRef({ isInjecting: false, startTime: 0 });
+
+    useEffect(() => {
+        if (isQuantumInjecting) {
+            quantumStateRef.current.isInjecting = true;
+            quantumStateRef.current.startTime = performance.now();
+        } else {
+             // We don't immediately set false to allow fade out, but store handles timeout.
+             // But visual fade out might be longer.
+             quantumStateRef.current.isInjecting = false;
+        }
+    }, [isQuantumInjecting]);
+
+    // We need to inject the update logic into the main loop.
+    // Since I can't easily merge into the big block, I'll use a separate useFrame equivalent.
+    // React allows multiple requestAnimationFrames.
+    useEffect(() => {
+        let frameId: number;
+        const animateRipple = () => {
+            if (rippleMeshRef.current) {
+                const material = rippleMeshRef.current.material as THREE.ShaderMaterial;
+                const now = performance.now();
+                material.uniforms.time.value = now * 0.001;
+
+                // Smooth transition
+                const target = quantumStateRef.current.isInjecting ? 1.0 : 0.0;
+                // Linear interpolation for 'active'
+                const current = material.uniforms.active.value;
+                material.uniforms.active.value += (target - current) * 0.1;
+            }
+            frameId = requestAnimationFrame(animateRipple);
+        };
+        animateRipple();
+        return () => cancelAnimationFrame(frameId);
+    }, []);
+
 
     // 2. Actualización de la Geometría (La Magia de los Vóxeles)
     useEffect(() => {
