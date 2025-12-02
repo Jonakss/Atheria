@@ -1,3 +1,4 @@
+import { Minimize } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ColorScaleLegend } from '../../../components/ui/ColorScaleLegend';
 import { LabSider } from '../../../components/ui/LabSider';
@@ -46,7 +47,20 @@ export const DashboardLayout: React.FC = () => {
     timestamp: string;
     map_data: number[][];
   } | null>(null);
+  const [theaterMode, setTheaterMode] = useState(false);
   const { simData, selectedViz, connectionStatus, inferenceStatus } = useWebSocket();
+
+  // Efecto para Modo Teatro: Colapsar paneles cuando se activa
+  useEffect(() => {
+    if (theaterMode) {
+      setLabPanelOpen(false);
+      setRightDrawerCollapsed(true);
+    } else {
+      // Al salir, restaurar paneles (opcional, o dejar como estaban antes? Por ahora restauramos defaults)
+      setLabPanelOpen(true);
+      setRightDrawerCollapsed(false);
+    }
+  }, [theaterMode]);
 
   useEffect(() => {
     if (inferenceStatus === 'running' && selectedTimelineFrame !== null) {
@@ -136,7 +150,10 @@ export const DashboardLayout: React.FC = () => {
             <div className="absolute inset-0 z-0 bg-gradient-deep-space overflow-hidden">
               {connectionStatus === 'connected' ? (
                 <>
-                  <PanZoomCanvas historyFrame={selectedTimelineFrame} />
+                  <PanZoomCanvas 
+                    historyFrame={selectedTimelineFrame} 
+                    theaterMode={theaterMode}
+                  />
                   {/* Timeline Viewer - Panel flotante */}
                   {/* TEMPORALMENTE DESHABILITADO - Revisar performance issues */}
                   {false && (
@@ -241,6 +258,17 @@ export const DashboardLayout: React.FC = () => {
 
           {/* Panel Inferior (Controles + Logs) - Design System: bg-[#050505]/95 backdrop-blur-sm */}
           <MetricsBar />
+
+          {/* Floating Exit Theater Mode Button */}
+          {theaterMode && (
+            <button
+              onClick={() => setTheaterMode(false)}
+              className="absolute top-4 right-4 z-50 bg-black/50 hover:bg-black/80 text-white px-4 py-2 rounded-full backdrop-blur-md border border-white/10 transition-all flex items-center gap-2 shadow-xl"
+            >
+              <Minimize size={16} />
+              <span className="text-xs font-bold">Salir Modo Teatro</span>
+            </button>
+          )}
         </main>
 
         {/* Panel Lateral Derecho (Unified Drawer) - Colapsible */}
@@ -256,6 +284,8 @@ export const DashboardLayout: React.FC = () => {
               onViewerVersionChange={setViewerVersion}
               selectedLayer={selectedLayer}
               onLayerChange={setSelectedLayer}
+              theaterMode={theaterMode}
+              onToggleTheaterMode={setTheaterMode}
             />
           ) : (
             <PhysicsSection />

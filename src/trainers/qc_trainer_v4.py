@@ -54,6 +54,7 @@ class QC_Trainer_v4:
             max_noise: Nivel máximo de ruido a inyectar (default 0.05)
             engine_type: Tipo de motor de física (opcional, por defecto usa global_cfg)
         """
+        self.motor: 'CartesianEngine' = None # Type hint for IDE support
         self.experiment_name = experiment_name
         self.device = device
         self.grid_size = grid_size

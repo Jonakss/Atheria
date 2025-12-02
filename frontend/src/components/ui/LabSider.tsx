@@ -1,12 +1,13 @@
 // frontend/src/components/ui/LabSider.tsx
-import { ArrowRightLeft, Play, RotateCcw, Upload, X, AlertTriangle } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { AlertTriangle, ArrowRightLeft, Play, RotateCcw, Upload, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
 import { modelOptions } from '../../utils/vizOptions';
 import { ExperimentInfo } from '../experiments/ExperimentInfo';
 import { ExperimentManager } from '../experiments/ExperimentManager';
 import { TransferLearningWizard } from '../experiments/TransferLearningWizard';
+import { QuantumToolbox } from '../QuantumToolbox';
 import { CheckpointManager } from '../training/CheckpointManager';
 import { TrainingCanvas } from '../training/TrainingCanvas';
 
@@ -447,14 +448,21 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
                                 </div>
                             </div>
 
-                                    {/* Gestión de Experimentos (Compacta) */}
-                                    <div className="space-y-3 pt-3 border-t border-white/5">
-                                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">GESTIÓN</div>
-                                        <ExperimentManager />
-                                        <CheckpointManager />
-                                    </div>
+
+                            {/* Gestión de Experimentos (Compacta) */}
+                            <div className="space-y-3 pt-3 border-t border-white/5">
+                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">GESTIÓN</div>
+                                <ExperimentManager />
+                                <CheckpointManager />
+                            </div>
+
+                            {/* Quantum Toolbox */}
+                            <div className="pt-3 border-t border-white/5">
+                                <QuantumToolbox />
+                            </div>
                         </div>
                     )}
+
 
                     {/* SECCIÓN: ENTRENAMIENTO */}
                     {activeSection === 'training' && (

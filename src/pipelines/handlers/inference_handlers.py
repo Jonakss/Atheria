@@ -689,6 +689,8 @@ async def handle_load_experiment(args):
                     # El factory usa GRID_SIZE_TRAINING por defecto, pero podemos inyectar el de inferencia
                     # Modificamos exp_cfg para que el factory use el tamaño correcto si mira GRID_SIZE_TRAINING
                     exp_cfg.GRID_SIZE_TRAINING = inference_grid_size
+                    # CRÍTICO: El motor factory busca 'GRID_SIZE', así que debemos setearlo también
+                    exp_cfg.GRID_SIZE = inference_grid_size
                     
                     # Usar Factory para TODOS los motores
                     motor = get_motor(exp_cfg, device, model=model)
@@ -767,39 +769,43 @@ async def handle_load_experiment(args):
                 logging.debug(f"No se pudo mostrar info de grid scaling: {e}")
 
             # OPTIMIZACIÓN: Activar ROI automáticamente para grids grandes (>256) para evitar saturar el navegador
-            # Esto envía solo una ventana de 256x256 centrada, reduciendo drásticamente el payload
+            # MODIFICACIÓN: Solo si NO se ha desactivado explícitamente (por ahora desactivamos auto-ROI para respetar "See All")
+            # El usuario puede activarlo manualmente si lo desea.
             inference_grid_size = g_state.get(
                 "inference_grid_size", global_cfg.GRID_SIZE_INFERENCE
             )
-            if inference_grid_size > 256:
-                roi_manager = g_state.get("roi_manager")
-                if not roi_manager:
-                    from ...managers.roi_manager import ROIManager
-
-                    roi_manager = ROIManager(grid_size=inference_grid_size)
-                    g_state["roi_manager"] = roi_manager
-                else:
-                    roi_manager.grid_size = inference_grid_size
-
-                # Configurar ROI centrado de 256x256
-                roi_size = 256
-                roi_x = max(0, (inference_grid_size - roi_size) // 2)
-                roi_y = max(0, (inference_grid_size - roi_size) // 2)
-
-                success = roi_manager.set_roi(roi_x, roi_y, roi_size, roi_size)
-                if success:
-                    roi_msg = f"🔍 ROI automático activado: ventana {roi_size}x{roi_size} centrada (grid {inference_grid_size}x{inference_grid_size} es muy grande)"
-                    logging.info(roi_msg)
-                    if ws:
-                        await send_notification(ws, roi_msg, "info")
-
-                    # Broadcast ROI status
-                    await broadcast(
-                        {
-                            "type": "roi_status_update",
-                            "payload": roi_manager.get_roi_info(),
-                        }
-                    )
+            
+            # Comentado para permitir "See All" por defecto si el usuario lo prefiere
+            # if inference_grid_size > 256:
+            #     roi_manager = g_state.get("roi_manager")
+            #     if not roi_manager:
+            #         from ...managers.roi_manager import ROIManager
+            # 
+            #         roi_manager = ROIManager(grid_size=inference_grid_size)
+            #         g_state["roi_manager"] = roi_manager
+            #     else:
+            #         roi_manager.grid_size = inference_grid_size
+            # 
+            #     # Configurar ROI centrado de 256x256
+            #     roi_size = 256
+            #     roi_x = max(0, (inference_grid_size - roi_size) // 2)
+            #     roi_y = max(0, (inference_grid_size - roi_size) // 2)
+            # 
+            #     success = roi_manager.set_roi(roi_x, roi_y, roi_size, roi_size)
+            #     if success:
+            #         roi_msg = f"🔍 ROI automático activado: ventana {roi_size}x{roi_size} centrada (grid {inference_grid_size}x{inference_grid_size} es muy grande)"
+            #         logging.info(roi_msg)
+            #         if ws:
+            #             await send_notification(ws, roi_msg, "info")
+            # 
+            #         # Broadcast ROI status
+            #         await broadcast(
+            #             {
+            #                 "type": "roi_status_update",
+            #                 "payload": roi_manager.get_roi_info(),
+            #             }
+            #         )
+            #         )
 
             # Notificar éxito
             msg = f"✅ Experimento '{exp_name}' cargado exitosamente ({'Nativo' if use_native else 'Python'})."
@@ -1180,3 +1186,76 @@ HANDLERS = {
     "set_viz": handle_set_viz,
     "set_roi_mode": handle_set_roi_mode,
 }
+
+async def handle_tool_action(args):
+    """
+    Maneja acciones de herramientas cuánticas (Quantum Toolbox).
+    Ej: Colapso, Vórtice, Onda Plana.
+    """
+    ws = g_state["websockets"].get(args.get("ws_id"))
+    action = args.get("action") # 'collapse', 'vortex', 'wave'
+    params = args.get("params", {})
+    
+    logging.info(f"🛠️ Tool Action: {action} | Params: {params}")
+    
+    motor = g_state.get("motor")
+    if not motor or not hasattr(motor, 'state') or motor.state.psi is None:
+        if ws: await send_notification(ws, "⚠️ No hay simulación activa para aplicar herramientas.", "warning")
+        return
+
+    try:
+        # Lazy import de herramientas
+        from ...physics import IonQCollapse, QuantumSteering, QuantumNoiseInjector
+        
+        device = motor.device
+        new_psi = None
+        
+        if action == 'collapse':
+            # IonQ Collapse
+            intensity = float(params.get('intensity', 0.5))
+            # Center opcional
+            center = None
+            if 'x' in params and 'y' in params:
+                center = (int(params['y']), int(params['x']))
+                
+            collapser = IonQCollapse(device)
+            new_psi = collapser.collapse(motor.state.psi, region_center=center, intensity=intensity)
+            
+            if ws: await send_notification(ws, "⚡ Colapso Cuántico aplicado.", "success")
+            
+        elif action == 'vortex':
+            # Quantum Vortex
+            x = int(params.get('x', motor.grid_size // 2))
+            y = int(params.get('y', motor.grid_size // 2))
+            radius = int(params.get('radius', 5))
+            strength = float(params.get('strength', 1.0))
+            
+            steering = QuantumSteering(device)
+            new_psi = steering.inject(motor.state.psi, 'vortex', x=x, y=y, radius=radius, strength=strength)
+            
+            if ws: await send_notification(ws, "🌀 Vórtice inyectado.", "success")
+            
+        elif action == 'wave':
+            # Plane Wave
+            k_x = float(params.get('k_x', 1.0))
+            k_y = float(params.get('k_y', 1.0))
+            
+            steering = QuantumSteering(device)
+            new_psi = steering.inject(motor.state.psi, 'plane_wave', k_x=k_x, k_y=k_y)
+            
+            if ws: await send_notification(ws, "🌊 Onda Plana inyectada.", "success")
+            
+        else:
+            logging.warning(f"Acción de herramienta desconocida: {action}")
+            return
+
+        # Actualizar estado
+        if new_psi is not None:
+            motor.state.psi = new_psi
+            # Invalidar caché si existe
+            if hasattr(motor, 'last_delta_psi'):
+                motor.last_delta_psi = None
+                
+    except Exception as e:
+        logging.error(f"❌ Error aplicando herramienta {action}: {e}", exc_info=True)
+        if ws: await send_notification(ws, f"Error aplicando herramienta: {e}", "error")

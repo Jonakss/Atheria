@@ -64,10 +64,18 @@ else:
     # Local: Asumimos que el script está en scripts/ o root
     # Si __file__ es scripts/train_progressive.py, parent es scripts, parent.parent es root
     current_file = Path(__file__).resolve()
-    if current_file.parent.name == "scripts":
+    if (current_file.parent / "src").exists():
+        PROJECT_ROOT = current_file.parent
+    elif (current_file.parent.parent / "src").exists():
         PROJECT_ROOT = current_file.parent.parent
     else:
-        PROJECT_ROOT = Path.cwd()
+        # Fallback: Try to find 'src' in current working directory
+        cwd = Path.cwd()
+        if (cwd / "src").exists():
+            PROJECT_ROOT = cwd
+        else:
+            print("⚠️ No se pudo detectar PROJECT_ROOT automáticamente. Usando CWD.")
+            PROJECT_ROOT = cwd
 
 print(f"📁 Proyecto configurado en: {PROJECT_ROOT}")
 

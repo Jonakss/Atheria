@@ -267,9 +267,18 @@ async def simulation_loop():
                                         metrics = {}
                                         if epoch_detector:
                                             # Analizar estado y determinar época
-                                            metrics = epoch_detector.analyze_state(psi_tensor)
-                                            epoch = epoch_detector.determine_epoch(metrics)
-                                            g_state['current_epoch'] = epoch
+                                            try:
+                                                metrics = epoch_detector.analyze_state(psi_tensor)
+                                                epoch = epoch_detector.determine_epoch(metrics)
+                                                g_state['current_epoch'] = epoch
+                                            except RuntimeError as e:
+                                                if "size of tensor a" in str(e) and "match the size of tensor b" in str(e):
+                                                    # Mismatch de dimensiones (ej: LatticeEngine vs UNet)
+                                                    # Desactivar detector para esta sesión para evitar spam
+                                                    logging.warning(f"⚠️ Desactivando EpochDetector por incompatibilidad de dimensiones: {e}")
+                                                    g_state['epoch_detector'] = None
+                                                else:
+                                                    raise e
                                         
                                         # Calcular métricas adicionales para Harlow Limit (siempre)
                                         from ...physics.metrics import calculate_fidelity, calculate_entanglement_entropy

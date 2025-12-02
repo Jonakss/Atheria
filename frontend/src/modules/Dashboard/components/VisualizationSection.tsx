@@ -7,13 +7,17 @@ interface VisualizationSectionProps {
   onViewerVersionChange?: (version: 'v1' | 'v2') => void;
   selectedLayer?: number;
   onLayerChange?: (layer: number) => void;
+  theaterMode?: boolean;
+  onToggleTheaterMode?: (enabled: boolean) => void;
 }
 
 export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
   viewerVersion = 'v1',
   onViewerVersionChange,
   selectedLayer = 0,
-  onLayerChange
+  onLayerChange,
+  theaterMode = false,
+  onToggleTheaterMode
 }) => {
   const { sendCommand, selectedViz, setSelectedViz, roiInfo } = useWebSocket();
   const [gammaDecay, setGammaDecay] = useState(0.015);
@@ -119,6 +123,23 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
             <p>Ratio de reducción: {roiInfo.reduction_ratio?.toFixed(1)}x</p>
           </div>
         )}
+
+        {/* Theater Mode Toggle */}
+        <button
+          onClick={() => onToggleTheaterMode?.(!theaterMode)}
+          className={`w-full flex items-center justify-between p-2 rounded border transition-all mt-2 ${
+            theaterMode
+              ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-200'
+              : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {theaterMode ? <Minimize size={14} /> : <Maximize size={14} />}
+            <span className="text-xs font-medium">
+              {theaterMode ? 'Salir Modo Teatro' : 'Modo Teatro'}
+            </span>
+          </div>
+        </button>
       </div>
 
       {/* Global Parameters */}

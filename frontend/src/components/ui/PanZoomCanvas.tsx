@@ -45,9 +45,10 @@ interface PanZoomCanvasProps {
         timestamp: string;
         map_data: number[][];
     } | null;
+    theaterMode?: boolean;
 }
 
-export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
+export function PanZoomCanvas({ historyFrame, theaterMode = false }: PanZoomCanvasProps = {}) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     const { simData, selectedViz, inferenceStatus, sendCommand } = useWebSocket();
@@ -270,17 +271,17 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
     // Sincronizar ROI automáticamente con la vista visible del canvas
     // Usa debounce para evitar actualizaciones excesivas durante pan/zoom activos
     useEffect(() => {
-        if (!autoROIEnabled || !canvasRef.current || !mapData || gridWidth === 0 || gridHeight === 0) {
-            // Si ROI está desactivado, cancelar cualquier actualización pendiente
+        // Si autoROIEnabled es falso, NO hacer nada automáticamente (respetar decisión del usuario)
+        // La única excepción es si queremos desactivarlo explícitamente al cambiar autoROIEnabled a false
+        if (!autoROIEnabled) {
             if (roiUpdateTimeoutRef.current) {
                 clearTimeout(roiUpdateTimeoutRef.current);
                 roiUpdateTimeoutRef.current = null;
             }
-            // Desactivar ROI si estaba activo
-            if (autoROIEnabled === false && lastROIUpdate.current > 0) {
-                sendCommand('simulation', 'set_roi', { enabled: false });
-                lastROIUpdate.current = 0;
-            }
+            return;
+        }
+
+        if (!canvasRef.current || !mapData || gridWidth === 0 || gridHeight === 0) {
             return;
         }
         
@@ -1059,6 +1060,22 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                     
                     {/* Bordes indicativos */}
                     <div className="absolute inset-4 border border-orange-500/20 rounded-lg border-dashed opacity-50" />
+                </div>
+            )}
+
+            {/* Theater Mode Vignette & Blur */}
+            {theaterMode && (
+                <div 
+                    className="absolute inset-0 pointer-events-none z-20 transition-all duration-500"
+                    style={{
+                        boxShadow: 'inset 0 0 150px 60px rgba(0, 0, 0, 0.9)',
+                        backdropFilter: 'blur(1px)' // Sutil blur global
+                    }}
+                >
+                    {/* Bordes difuminados extra */}
+                    <div className="absolute inset-0" style={{
+                         background: 'radial-gradient(circle, transparent 60%, rgba(0,0,0,0.8) 100%)'
+                    }} />
                 </div>
             )}
 
