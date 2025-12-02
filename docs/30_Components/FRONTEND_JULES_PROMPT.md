@@ -46,3 +46,54 @@ Update the frontend (`frontend/src/modules/ExperimentControl`, `LabSider`, etc.)
 
 **Tech Stack:** React, TypeScript, TailwindCSS, Zustand.
 **Design System:** Atheria Dark Mode (Glassmorphism).
+
+## 4. Quantum Steering (Quantum Brush)
+**Location:** Right Sidebar (Interaction Tools) or Floating Toolbar.
+
+**Features:**
+-   **Tool Selector:** "Quantum Brush" toggle.
+-   **Pattern Selector:** Dropdown or Icons for:
+    -   `Vortex` (Spiral icon)
+    -   `Soliton` (Dot icon)
+    -   `Entanglement` (Link icon)
+-   **Interaction:**
+    -   When "Quantum Brush" is active, clicking/dragging on the `PanZoomCanvas` should send `interaction` events via WebSocket.
+    -   **Payload:**
+        ```json
+        {
+            "type": "interaction",
+            "payload": {
+                "action": "quantum_steer",
+                "pattern": "vortex", # selected pattern
+                "x": 0.5, # normalized coordinate
+                "y": 0.5
+            }
+        }
+        ```
+    -   **Visual Feedback:** Show a small glowing cursor or effect where the brush is applied.
+
+## 5. Quantum Tuner (Optimization)
+**Location:** `NewExperimentModal` (Advanced Settings).
+
+**Features:**
+-   **Button:** "✨ Optimize Initial State (Quantum Tuner)".
+-   **Action:**
+    -   Triggers a backend process (via WebSocket or API) to run the SPSA optimizer.
+    -   Shows a progress bar or spinner: "Tuning Quantum Circuit...".
+    -   Upon completion, automatically fills the "Model Params" or "Initial State" config with the optimized parameters.
+    -   **Display:** Show the achieved "Complexity Score" (Entropy * Stability).
+
+## 6. Quantum Vision (Microscope)
+**Location:** Right Sidebar (Analysis Tools).
+
+**Features:**
+-   **Tool:** "Quantum Vision" (Eye/Microscope icon).
+-   **Interaction:**
+    -   Clicking on the canvas sends `action: "quantum_analyze"`.
+    -   **Visuals:** Show a scanning animation (radar sweep) on the clicked region.
+-   **Result Display:**
+    -   Show a floating "Quantum HUD" or Popover with the results:
+        -   **Complexity Index:** (Bar/Gauge).
+        -   **Quantum Activity:** (Value).
+        -   **Coherence:** (Value).
+        -   **Feature Vector:** (Small radar chart or sparkline).

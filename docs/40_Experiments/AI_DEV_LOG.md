@@ -30,6 +30,14 @@
     - Updated `QC_Trainer_v4` to handle engines without `state.psi` attribute (using `get_initial_state` fallback).
     - Added `CARTESIAN` to allowed `engine_type` choices in `trainer.py`.
   - **Verification**: Successfully verified training loop for `LATTICE`, `HARMONIC`, and `CARTESIAN` engines.
+## [2025-12-02] Advanced Quantum Features Implementation
+-   **Quantum Tuner**: Implementado `scripts/quantum_tuner.py` con optimización SPSA para encontrar estados iniciales complejos.
+-   **Hybrid Compute**: Creado `src/physics/quantum_collapse.py` (`IonQCollapse`) para inyectar colapsos dependientes del estado durante la simulación.
+-   **Quantum Steering**: Implementado `src/physics/steering.py` (`QuantumSteering`) y `handle_interaction` para permitir "Quantum Brush" (Vortex, Soliton) desde el frontend.
+-   **Quantum Microscope**: Implementado `src/physics/quantum_kernel.py` (`QuantumMicroscope`) usando Deep Quantum Kernels (ZZ Feature Map) para análisis de complejidad estructural.
+-   **Docs**: Creado `docs/20_Concepts/ADVANCED_QUANTUM_FEATURES.md` y actualizado `FRONTEND_JULES_PROMPT.md`.
+
+## [2025-12-02] Quantum Multiverse Implementation
 - **2025-12-02**: Implemented Cache Buffering (Streaming) using Dragonfly. Decoupled simulation speed from frontend visualization by pushing frames to a Redis list (`simulation:stream`) and consuming them at a constant rate. Added `CACHE_BUFFERING_ENABLED` to config. Updated `DataProcessingService` (producer) and `WebSocketService` (consumer). Verified with `scripts/verify_buffering.py`. [Log](logs/2025-12-02_cache_buffering_implementation.md)
 - **2025-12-01**: Fixed `motor_factory.py` to support `LATTICE` and `HARMONIC` engines. Added `shape` property to `QuantumStatePolar`. Investigated Native Engine crash (`terminate called recursively`) but could not resolve it without C++ debugging access; suspected tensor interface mismatch. [Log](logs/2025-12-01_fix_engine_support_and_native_crash.md)
 - [[logs/2025-12-01_fix_trainer_engine_and_motor_factory|2025-12-01 - Fix: Trainer Engine Type Support & Motor Factory Signature]]

@@ -719,6 +719,80 @@ async def handle_reset(args):
         msg = f"❌ Error al reiniciar: {str(e)}"
         if ws: await send_notification(ws, msg, "error")
 
+async def handle_interaction(args):
+    """
+    Maneja interacciones en tiempo real con la simulación.
+    Soporta: 'quantum_steer' (Quantum Brush), 'perturb', etc.
+    """
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    motor = g_state.get('motor')
+
+    if not motor:
+        return # Silencioso si no hay motor
+
+    action = args.get('action')
+    x = args.get('x')
+    y = args.get('y')
+
+    if action == 'quantum_steer':
+        pattern_type = args.get('pattern', 'vortex')
+
+        # Lazy init del steering
+        if not hasattr(motor, 'steering_module'):
+            from ..physics.steering import QuantumSteering
+            motor.steering_module = QuantumSteering(motor.device)
+
+        # Inyectar
+        # Asumimos coordenadas normalizadas [0, 1] o absolutas?
+        # Frontend suele mandar relativas o absolutas. Asumamos absolutas del grid.
+        # Si vienen normalizadas (0.5, 0.5), escalar.
+        if x < 1.0 and y < 1.0 and isinstance(x, float):
+            x = int(x * motor.grid_size)
+            y = int(y * motor.grid_size)
+
+        motor.state.psi = motor.steering_module.inject(motor.state.psi, pattern_type, x, y)
+
+        # Feedback visual inmediato (opcional, el loop lo mandará)
+        if ws: await send_notification(ws, f"Quantum Brush: {pattern_type}", "info")
+
+    elif action == 'quantum_analyze':
+        # Quantum Microscope
+        # Lazy init
+        if not hasattr(motor, 'microscope'):
+            from ..physics.quantum_kernel import QuantumMicroscope
+            motor.microscope = QuantumMicroscope(motor.device)
+
+        # Coordenadas y radio
+        if x < 1.0 and y < 1.0 and isinstance(x, float):
+            x = int(x * motor.grid_size)
+            y = int(y * motor.grid_size)
+
+        radius = args.get('radius', 2) # Radio del parche (2 -> 4x4 aprox)
+
+        # Extraer parche
+        H, W = motor.state.psi.shape[1], motor.state.psi.shape[2]
+        y_start = max(0, y - radius)
+        y_end = min(H, y + radius)
+        x_start = max(0, x - radius)
+        x_end = min(W, x + radius)
+
+        patch = motor.state.psi[0, y_start:y_end, x_start:x_end, :]
+
+        # Analizar
+        metrics = motor.microscope.analyze_patch(patch)
+
+        # Enviar resultados al frontend
+        if ws:
+            await send_to_websocket(ws, "quantum_analysis_result", {
+                "x": x, "y": y,
+                "metrics": metrics
+            })
+            await send_notification(ws, f"🔬 Analysis Complete. Complexity: {metrics['complexity']:.2f}", "success")
+
+    elif action == 'perturb':
+        # Perturbación clásica simple
+        pass # Implementar si necesario
+
 async def handle_refresh_experiments(args):
     """Refresca la lista de experimentos y la envía a todos los clientes conectados."""
     try:
