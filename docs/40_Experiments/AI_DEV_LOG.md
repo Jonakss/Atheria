@@ -163,3 +163,7 @@
 - **[[logs/2025-12-02_fix_polar_viz_error|2025-12-02 - Fix: Polar Engine Visualization Error]]**:
   - **Issue**: `TypeError: 'QuantumStatePolar' object is not subscriptable` in `calculate_poincare_coords` and `calculate_phase_attractor`.
   - **Fix**: Updated `src/pipelines/viz/advanced.py` to handle `QuantumStatePolar` objects (via `.to_cartesian()` or `.squeeze()`) and correctly permute Channels-First tensors `(C, H, W)` to `(H, W, C)` expected by visualization functions.
+- **[[logs/2025-12-02_spectrum_viz_and_snapshot_fix|2025-12-02 - Fix: Spectrum Visualization & Snapshot Handler]]**:
+  - **Spectrum Viz**: Fixed "single particle" appearance in spectral view by masking the DC component (zero frequency) which was dominating the dynamic range.
+  - **Snapshot Fix**: Resolved `ValueError` when saving snapshots with `LatticeEngine` by adding a check for `get_dense_state` method in `snapshot_handlers.py`.
+  - **Verification**: Verified spectrum improvement with `reproduce_spectrum.py` and confirmed snapshot handler logic via code analysis.

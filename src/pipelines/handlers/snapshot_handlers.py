@@ -32,11 +32,11 @@ async def handle_save_snapshot(args):
 
         # Obtener el estado (psi) del motor
         psi = None
-        if hasattr(motor, 'native_engine') and motor.native_engine:
-            # Para motor nativo, necesitamos obtener el estado denso
+        if hasattr(motor, 'get_dense_state'):
+            # Motores que soportan obtención explícita de estado denso (Native, Lattice, etc.)
             psi = motor.get_dense_state()
         elif hasattr(motor, 'state') and hasattr(motor.state, 'psi'):
-            # Para motor Python
+            # Para motor Python estándar
             psi = motor.state.psi
 
         if psi is None or not isinstance(psi, torch.Tensor):

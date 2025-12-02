@@ -205,6 +205,18 @@ def select_map_data(viz_type, density, phase, real_part, imag_part, gradient_mag
             fft = np.fft.fft2(density)
             fft_shifted = np.fft.fftshift(fft)
             spectral_magnitude = np.abs(fft_shifted)
+            
+            # Mask DC component (center pixel) to avoid it dominating the view
+            # Replace with max of neighbors to preserve continuity
+            cy, cx = spectral_magnitude.shape[0] // 2, spectral_magnitude.shape[1] // 2
+            # Get 3x3 neighborhood around center
+            neighborhood = spectral_magnitude[cy-1:cy+2, cx-1:cx+2]
+            # Mask center
+            mask = np.ones_like(neighborhood, dtype=bool)
+            mask[1, 1] = False
+            # Replace center with max of neighbors
+            spectral_magnitude[cy, cx] = np.max(neighborhood[mask])
+            
             # Log scale para mejor visualización
             return np.log1p(spectral_magnitude)
         else:
