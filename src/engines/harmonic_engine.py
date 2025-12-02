@@ -174,8 +174,8 @@ class SparseHarmonicEngine:
                 viewport_state[ly, lx] = m_state
                 local_matter_mask[ly, lx] = 1.0
                 
-        # Permutar a [C, H, W] y agregar dimensión de batch [1, C, H, W]
-        viewport_state = viewport_state.permute(2, 0, 1).unsqueeze(0)
+        # Permutar a [1, H, W, C] para compatibilidad con CartesianEngine y VisualizationPipeline
+        viewport_state = viewport_state.unsqueeze(0)
         
         return torch.complex(viewport_state, torch.zeros_like(viewport_state))
 

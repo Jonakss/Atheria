@@ -9,6 +9,7 @@ class PolarEngine(nn.Module):
         self.grid_size = grid_size
         self.d_state = d_state
         self.device = device
+        self.model.to(device)
         
         # Initialize state
         self.state = PolarStateContainer(grid_size, d_state, device)
