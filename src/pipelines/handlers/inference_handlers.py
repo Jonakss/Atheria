@@ -1173,19 +1173,7 @@ async def handle_set_roi_mode(args):
     await handle_set_viz({'ws_id': args.get('ws_id'), 'viz_type': g_state.get('viz_type', 'density')})
 
 
-HANDLERS = {
-    "play": handle_play,
-    "pause": handle_pause,
-    "load_experiment": handle_load_experiment,
-    "unload_model": handle_unload_model,
-    "switch_engine": handle_switch_engine,
-    "reset": handle_reset,
-    "inject_energy": handle_inject_energy,
-    "set_inference_config": handle_set_inference_config,
-    "set_config": handle_set_inference_config,
-    "set_viz": handle_set_viz,
-    "set_roi_mode": handle_set_roi_mode,
-}
+# HANDLERS moved to end of file
 
 async def handle_tool_action(args):
     """
@@ -1259,3 +1247,18 @@ async def handle_tool_action(args):
     except Exception as e:
         logging.error(f"❌ Error aplicando herramienta {action}: {e}", exc_info=True)
         if ws: await send_notification(ws, f"Error aplicando herramienta: {e}", "error")
+
+HANDLERS = {
+    "play": handle_play,
+    "pause": handle_pause,
+    "load_experiment": handle_load_experiment,
+    "unload_model": handle_unload_model,
+    "switch_engine": handle_switch_engine,
+    "reset": handle_reset,
+    "inject_energy": handle_inject_energy,
+    "set_inference_config": handle_set_inference_config,
+    "set_config": handle_set_inference_config,
+    "set_viz": handle_set_viz,
+    "set_roi_mode": handle_set_roi_mode,
+    "tool_action": handle_tool_action,
+}

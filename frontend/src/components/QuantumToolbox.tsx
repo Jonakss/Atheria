@@ -1,32 +1,32 @@
 import React, { useState } from 'react';
-import { useWebSocketContext } from '../context/WebSocketContext';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 interface QuantumToolboxProps {
     className?: string;
 }
 
 export const QuantumToolbox: React.FC<QuantumToolboxProps> = ({ className }) => {
-    const { sendMessage } = useWebSocketContext();
+    const { sendCommand } = useWebSocket();
     const [collapseIntensity, setCollapseIntensity] = useState(0.5);
     const [vortexRadius, setVortexRadius] = useState(5);
     const [waveK, setWaveK] = useState(1.0);
 
     const handleCollapse = () => {
-        sendMessage('tool_action', {
+        sendCommand('inference', 'tool_action', {
             action: 'collapse',
             params: { intensity: collapseIntensity }
         });
     };
 
     const handleVortex = () => {
-        sendMessage('tool_action', {
+        sendCommand('inference', 'tool_action', {
             action: 'vortex',
             params: { radius: vortexRadius, strength: 1.0 }
         });
     };
 
     const handleWave = () => {
-        sendMessage('tool_action', {
+        sendCommand('inference', 'tool_action', {
             action: 'wave',
             params: { k_x: waveK, k_y: waveK }
         });
