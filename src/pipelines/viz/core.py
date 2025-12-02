@@ -28,7 +28,7 @@ def get_visualization_data(psi, viz_type: str, delta_psi: torch.Tensor = None, m
         psi: Tensor complejo O objeto QuantumStatePolar
         viz_type: Tipo de visualización
         delta_psi: Tensor opcional
-        motor: Instancia opcional de Aetheria_Motor
+        motor: Instancia opcional de CartesianEngine
         downsample_factor: Factor de downsampling
     
     Returns:

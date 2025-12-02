@@ -1,7 +1,7 @@
 """
 Wrapper para integrar el motor nativo de C++ (atheria_core.Engine) con el frontend.
 
-Este wrapper proporciona una interfaz compatible con Aetheria_Motor para que
+Este wrapper proporciona una interfaz compatible con CartesianEngine para que
 el motor nativo de alto rendimiento pueda usarse como reemplazo directo.
 """
 
@@ -162,7 +162,7 @@ def export_model_to_jit(
 class NativeEngineWrapper:
     """
     Wrapper que envuelve atheria_core.Engine para mantener compatibilidad
-    con el código existente que usa Aetheria_Motor.
+    con el código existente que usa CartesianEngine.
 
     Convierte entre el formato disperso del motor nativo y el formato
     denso (grid) usado por el frontend.

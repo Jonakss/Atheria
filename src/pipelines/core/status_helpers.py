@@ -48,7 +48,7 @@ def get_compile_status() -> Optional[Dict[str, Any]]:
             }
         else:
             # Motor Python
-            from ...engines.qca_engine import Aetheria_Motor
+            from ...engines.qca_engine import CartesianEngine
             
             device_str = str(motor.device) if hasattr(motor, 'device') else 'cpu'
             if 'cuda' in device_str.lower():

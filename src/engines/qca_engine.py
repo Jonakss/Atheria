@@ -128,7 +128,7 @@ class QuantumState:
             save_dict['c_state'] = self.c_state.cpu()
         torch.save(save_dict, filepath)
 
-class Aetheria_Motor:
+class CartesianEngine:
     """
     Motor Python de Atheria 4 para simulaciones cuánticas.
     
@@ -139,26 +139,9 @@ class Aetheria_Motor:
     # Versión del motor
     VERSION = ENGINE_VERSION
     
-    def get_version(self):
-        """Retorna la versión del motor Python."""
-        return ENGINE_VERSION
     def __init__(self, model_operator: nn.Module, grid_size: int, d_state: int, device, cfg=None, d_memory=None):
         self.device = device
         self.grid_size = int(grid_size)
-        self.d_state = int(d_state)
-        
-        # Guardar referencia al modelo original antes de cualquier optimización
-        self.original_model = model_operator
-        
-        # Optimizar modelo para inferencia
-        from ..optimization.gpu_optimizer import get_optimizer
-        self.optimizer = get_optimizer(device)
-        model_operator = self.optimizer.optimize_model(model_operator)
-        
-        self.operator = model_operator.to(self.device)
-        
-        # Detectar si el modelo usa ConvLSTM (usar modelo original para detección)
-        self.has_memory = hasattr(self.original_model, 'convlstm') or 'ConvLSTM' in self.original_model.__class__.__name__
         
         # Obtener modo de inicialización desde cfg o usar default
         initial_mode = 'complex_noise'

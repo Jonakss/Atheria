@@ -49,9 +49,9 @@ class QuantumVacuum:
         return noise
 
 
-class SparseQuantumEngineCpp:
+class SparseBackendCpp:
     """
-    Motor de simulación para un universo potencialmente infinito usando C++ con tensores nativos.
+    Backend de almacenamiento/cómputo disperso usando C++ con tensores nativos.
     
     Esta versión usa atheria_core.SparseMap con almacenamiento directo de torch::Tensor
     en C++, eliminando completamente los diccionarios auxiliares de Python.
@@ -296,30 +296,3 @@ class SparseQuantumEngineCpp:
                 'torch_support': False,
                 'auxiliary_dict': False
             }
-
-    def compile_model(self):
-        """
-        Compila el modelo para optimización (no-op para SparseQuantumEngineCpp).
-        """
-        pass
-
-    def get_model_for_params(self):
-        """
-        Retorna el modelo para contar parámetros.
-        """
-        return self.model
-
-    def get_initial_state(self, batch_size=1):
-        """
-        Retorna el estado inicial (dummy para SparseQuantumEngineCpp).
-        """
-        # SparseQuantumEngineCpp maneja su propio estado interno (sparse map)
-        # Retornamos un tensor dummy para satisfacer la API del trainer
-        return torch.zeros(batch_size, self.d_state, 64, 64, device=self.device)
-
-    def evolve_step(self, current_psi):
-        """
-        Evoluciona el estado un paso.
-        """
-        self.step()
-        return current_psi

@@ -110,7 +110,7 @@ async def handle_set_inference_config(args):
             )
 
 
-from ...engines.qca_engine import Aetheria_Motor, QuantumState
+from ...engines.qca_engine import CartesianEngine, QuantumState
 from ...engines.harmonic_engine import SparseHarmonicEngine
 from ...engines.lattice_engine import LatticeEngine
 from ..viz import get_visualization_data
@@ -681,7 +681,7 @@ async def handle_load_experiment(args):
                     # Usar Factory para TODOS los motores
                     motor = get_motor(exp_cfg, device, model=model)
                     
-                    # Configurar estado inicial si es necesario (Aetheria_Motor lo hace en init)
+                    # Configurar estado inicial si es necesario (CartesianEngine lo hace en init)
                     # Pero si el motor fue creado con un modelo ya cargado, el estado puede necesitar reset
                     if hasattr(motor, 'state') and (motor.state is None or getattr(motor.state, 'psi', None) is None):
                          # Re-inicializar estado si está vacío (aunque init debería haberlo hecho)

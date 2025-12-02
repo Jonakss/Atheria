@@ -1,6 +1,6 @@
 import logging
 import torch.nn as nn
-from .engines.qca_engine import Aetheria_Motor
+from .engines.qca_engine import CartesianEngine
 from .engines.qca_engine_polar import PolarEngine
 from .engines.lattice_engine import LatticeEngine
 from .engines.harmonic_engine import SparseHarmonicEngine
@@ -78,7 +78,7 @@ def get_motor(config, device, model: nn.Module = None):
         # For now fallback to Cartesian or raise NotImplementedError
         logging.warning("Quantum Engine not fully implemented, falling back to Cartesian with Quantum flags")
         # Pass backend to engine (Engine needs update to accept it)
-        return Aetheria_Motor(model, grid_size, d_state, backend.get_device(), cfg=config)
+        return CartesianEngine(model, grid_size, d_state, backend.get_device(), cfg=config)
         
     elif engine_type == 'LATTICE':
         logging.info("🌌 Initializing Lattice Engine (AdS/CFT)")
@@ -94,6 +94,6 @@ def get_motor(config, device, model: nn.Module = None):
     else: # CARTESIAN or default
         if engine_type != 'CARTESIAN':
             logging.warning(f"Unknown engine type '{engine_type}', defaulting to CARTESIAN")
-            
-        logging.info("🌊 Initializing Standard Cartesian Engine")
-        return Aetheria_Motor(model, grid_size, d_state, backend.get_device(), cfg=config)
+            # Default: Cartesian (Standard QCA)
+    logging.info("📦 Initializing Cartesian Engine (Standard QCA)")
+    return CartesianEngine(model, grid_size, d_state, backend.get_device(), cfg=config)

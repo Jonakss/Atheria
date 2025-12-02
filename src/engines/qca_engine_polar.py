@@ -43,7 +43,7 @@ class PolarEngine(nn.Module):
         # Por ahora asumimos que el modelo predice el nuevo estado directamente o un delta
         # Si es UNetUnitary, suele ser una transformación.
         # Asumimos que el modelo retorna el NUEVO estado o un delta aditivo.
-        # Para consistencia con Aetheria_Motor, asumimos delta si es aditivo, o estado si es directo.
+        # Para consistencia con CartesianEngine, asumimos delta si es aditivo, o estado si es directo.
         # Dado que es "Polar", quizás deberíamos trabajar en magnitud/fase, pero el modelo es convolucional estándar.
         
         # Simplemente retornamos el output como el nuevo estado por ahora.

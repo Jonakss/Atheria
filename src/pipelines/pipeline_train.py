@@ -6,7 +6,7 @@ import os
 
 from .. import config as global_cfg
 from ..model_loader import instantiate_model, load_model
-from ..engines.qca_engine import Aetheria_Motor
+from ..engines.qca_engine import CartesianEngine
 from ..trainers import QC_Trainer_v3, QC_Trainer_v4
 from ..utils import get_latest_checkpoint, load_experiment_config
 

@@ -37,7 +37,9 @@
 - **[WebGL Shaders](../20_Concepts/WEBGL_SHADERS.md)** - Guía completa para trabajar con shaders WebGL GPU-accelerated
 - **[Visualización del Espacio de Fases](../20_Concepts/PHASE_SPACE_VISUALIZATION.md)** - Análisis topológico del estado cuántico usando PCA y Clustering
 - **[Field Visualizations](../20_Concepts/FIELD_VISUALIZATIONS.md)** - Visualización de campos cuánticos y sus interpretaciones
-- **[Field Theory Interpretation](../20_Concepts/FIELD_THEORY_INTERPRETATION.md)** - Interpretación de campos (EM, Gravedad, Higgs) en el vector de estado
+- [[ENGINE_ARCHITECTURE]]: Separación entre Física (Engines) y Cómputo (Backends).
+- [[FIELD_THEORY_INTERPRETATION]]: Interpretación de canales como campos físicos.
+(EM, Gravedad, Higgs) en el vector de estado
 
 ## 🏗️ Arquitecturas Experimentales
 

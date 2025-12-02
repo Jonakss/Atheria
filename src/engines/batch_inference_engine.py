@@ -12,7 +12,7 @@ import logging
 from typing import List, Optional, Dict, Any
 import numpy as np
 
-from .qca_engine import QuantumState, Aetheria_Motor
+from .qca_engine import QuantumState, CartesianEngine
 from .. import config as global_cfg
 
 
@@ -172,7 +172,7 @@ class BatchInferenceEngine:
         """
         Lógica de evolución para un batch de estados.
         
-        Similar a Aetheria_Motor._evolve_logic pero para batch.
+        Similar a CartesianEngine._evolve_logic pero para batch.
         
         Args:
             psi_batch: Tensor de estados [batch_size, H, W, d_state] (complejo)

@@ -49,9 +49,9 @@ class QuantumVacuum:
         return noise
 
 
-class SparseQuantumEngineCppV2:
+class SparseBackendCppV2:
     """
-    Motor de simulación para un universo potencialmente infinito usando C++ con tensores nativos.
+    Backend de almacenamiento/cómputo disperso usando C++ con tensores nativos.
     
     Esta versión usa atheria_core.SparseMap con almacenamiento directo de torch::Tensor
     en C++, eliminando completamente los diccionarios auxiliares de Python.

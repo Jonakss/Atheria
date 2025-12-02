@@ -84,7 +84,7 @@ class SparseHarmonicEngine:
     def get_dense_state(self, check_pause_callback=None):
         """
         Retorna el estado denso completo del universo (o viewport).
-        Compatible con la interfaz de Aetheria_Motor.
+        Compatible con la interfaz de CartesianEngine.
         """
         # Usar centro del grid (0,0,0) y tamaño completo
         # Nota: En universo infinito, esto solo muestra la región central

@@ -54,8 +54,8 @@ async def websocket_handler(request, handlers):
     compile_status_without_model = None
     try:
         # Intentar obtener versiones de los engines disponibles
-        from ...engines.qca_engine import Aetheria_Motor
-        python_version = getattr(Aetheria_Motor, 'VERSION', None) or getattr(Aetheria_Motor, 'get_version', lambda: "unknown")() if hasattr(Aetheria_Motor, 'get_version') else "unknown"
+        from ...engines.qca_engine import CartesianEngine
+        python_version = getattr(CartesianEngine, 'VERSION', None) or getattr(CartesianEngine, 'get_version', lambda: "unknown")() if hasattr(CartesianEngine, 'get_version') else "unknown"
         
         native_version = None
         wrapper_version = None

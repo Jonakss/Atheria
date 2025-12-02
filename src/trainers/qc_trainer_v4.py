@@ -17,7 +17,7 @@ except ImportError:
     logging.warning("Tensorboard no está disponible. El logging de métricas se deshabilitará.")
 
 # Importamos componentes del sistema
-from ..engines.qca_engine import Aetheria_Motor
+from ..engines.qca_engine import CartesianEngine
 from ..physics.noise import QuantumNoiseInjector
 from .. import config as global_cfg
 from ..utils.experiment_logger import ExperimentLogger

@@ -16,6 +16,10 @@
 
 ## 📋 Índice de Entradas
 
+- **[[logs/2025-12-01_engine_architecture_refactor|2025-12-01 - Refactor: Engine Architecture (Physics vs Backend)]]**:
+  - **Backend Separation**: Moved `SparseQuantumEngineCpp/V2` to `src/engines/backends/` and renamed to `SparseBackendCpp/V2`. Removed trainer methods from backends.
+  - **Engine Renaming**: Renamed `Aetheria_Motor` to `CartesianEngine` to clarify its role as the Standard QCA engine.
+  - **Frontend Prep**: Created prompt for Jules to implement Engine/Backend selectors.
 - **[[PHASE_STATUS_REPORT]]**: 2025-12-01 (17:28) - Actualización comprehensiva del estado del proyecto. Progreso de Fase 2 (benchmarking Python vs C++, bloqueo en Native Engine), Fase 3 100% completado (frontend linting, Phase Space Viz, Field Theory UI), y Compute Backend 100% completado. Tareas críticas actualizadas.
 - **Fixing Engine Compatibility**:
   - **Native Engine Crash**: Mitigated by forcing `CARTESIAN` engine (Python backend) in `config.json` and `trainer.py` arguments.

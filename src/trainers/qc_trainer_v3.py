@@ -19,7 +19,7 @@ class QC_Trainer_v3:
         Inicializa el entrenador.
         
         Args:
-            motor: Instancia de Aetheria_Motor con el modelo
+            motor: Instancia de CartesianEngine con el modelo
             lr_rate: Learning rate
             global_cfg: Configuración global
             exp_cfg: Configuración del experimento (SimpleNamespace)
