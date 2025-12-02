@@ -16,7 +16,8 @@ Para evitar la degradación numérica en simulaciones largas:
 ## 3. Estrategia de Implementación
 ### Prototipo FPGA
 * **Plataforma:** Xilinx Alveo o Intel Agilex.
-* **Lógica:** Implementación de celdas "OpticalCell" (Beam Splitter + Phase Shifter) en Verilog.
+* **Implementación Edge:** **PYNQ-Z2**. Se ha definido una estrategia específica de integración utilizando el SoC Zynq-7000 (ARM + FPGA) como un "Remote Worker" conectado vía API REST. Ver [[PYNQ_Z2_INTEGRATION]].
+* **Lógica:** Implementación de celdas "OpticalCell" (Beam Splitter + Phase Shifter) en Verilog/HLS.
 * **Simulación:** Verificada en EDA Playground usando Icarus Verilog.
 
 ### ASIC Analógico (Futuro)
@@ -28,11 +29,17 @@ Para evitar la degradación numérica en simulaciones largas:
 ```mermaid
 graph TD
     A[Memoria Tensor (HBM/CXL)] -->|Tensores Polares| B(Matriz Sistólica CORDIC)
+    B -->|Rotaciones| C{ALU Posit/Quire}
+    C -->|Acumulación Exacta| D[Activación No-Lineal]
+    D -->|Nuevo Estado| A
+
+```mermaid
 graph TD
     A[Memoria Tensor (HBM/CXL)] --> |Tensores Polares| B(Matriz Sistólica CORDIC)
     B --> |Rotaciones| C{ALU Posit/Quire}
     C --> |Acumulación Exacta| D[Activación No-Lineal]
     D --> |Nuevo Estado| A
+```
 ## Referencias
 * **Mythic AI:** Arquitectura CIM basada en Flash.
 * **Gustafson:** Posit Arithmetic.

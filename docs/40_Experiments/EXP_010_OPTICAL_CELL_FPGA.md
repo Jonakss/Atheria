@@ -10,9 +10,9 @@ Validar que la lógica fundamental de Aetheria (interacción local + actualizaci
 Implementamos una célula que promedia el estado de sus vecinos (difusión) y aplica una transformación.
 ```verilog
 module AetheriaCell (
-    // Física: (L + R) / 2 + 1
-    // Equivalente a Beam Splitter 50:50
-    state <= ((neighbor_L + neighbor_R) >> 1) + 8'd1;
+    input clk, rst,
+    input [7:0] neighbor_L, neighbor_R,
+    output reg [7:0] state
 );
     // Física: (L + R) / 2 + 1
     // Equivalente a Beam Splitter 50:50
