@@ -153,3 +153,10 @@
   - **Linting Fixes**: Resolved unused `useRef` and missing `useEffect` dependency in `HistoryControls.tsx`.
   - **Build Fixes**: Removed unused `@ts-expect-error` directive in `PhaseSpaceViewer.tsx` that was causing build failure.
   - **Verification**: Verified successful `npm run lint` and `npm run build`. Frontend is ready for deployment.
+- **[[logs/2025-12-02_native_engine_crash_fix|2025-12-02 - Critical Fix: Native Engine Crash & Quantum Tools Verification]]**:
+  - **Native Engine Fix**: Resolved `terminate called recursively` crash in `atheria_core`.
+    - **Cause**: Uncaught exception in OpenMP parallel region during batch processing and thread-safety issue with CUDA generator in `HarmonicVacuum`.
+    - **Resolution**: Added `try-catch` block in `sparse_engine.cpp` and switched `HarmonicVacuum` to use CPU-based noise generation (thread-safe) with explicit move to device.
+  - **Epoch Detector Fix**: Resolved tensor shape mismatch (`(C, H, W)` vs `(H, W, C)`) in `EpochDetector` for `PolarEngine` and `HarmonicEngine`.
+  - **Quantum Tools**: Verified integration of `IonQCollapse` and `QuantumSteering` with `NativeEngineWrapper` via `apply_tool`.
+  - **Verification**: Verified fix with `reproduce_crash.py` on CUDA (64x64 and 512x512).

@@ -34,6 +34,11 @@ class EpochDetector:
         else:
             psi = psi_tensor
 
+        # Detectar formato (C, H, W) y convertir a (H, W, C)
+        # Esto pasa con PolarEngine/HarmonicEngine que usan convención PyTorch
+        if psi.ndim == 3 and psi.shape[0] < psi.shape[1] and psi.shape[1] == psi.shape[2]:
+            psi = psi.permute(1, 2, 0)
+
         metrics = {}
         
         # 1. Energía Total (Estabilidad del Vacío)

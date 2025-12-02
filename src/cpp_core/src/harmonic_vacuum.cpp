@@ -20,22 +20,28 @@ torch::Tensor HarmonicVacuum::get_fluctuation(const Coord3D& coord, int64_t step
     // Crear generador local para evitar modificar estado global (thread-safe)
     auto gen = torch::make_generator<torch::CPUGeneratorImpl>(seed);
     
-    auto options = torch::TensorOptions()
+    // Generar en CPU primero para thread safety y evitar problemas con generadores CUDA en paralelo
+    auto options_cpu = torch::TensorOptions()
         .dtype(torch::kFloat32)
-        .device(device_)
+        .device(torch::kCPU)
         .requires_grad(false);
     
     // Generar ruido complejo (similar a Python: complex_noise mode)
     // Python usa: noise = randn * strength; real = cos(noise); imag = sin(noise)
     const float complex_noise_strength = 0.1f;
-    torch::Tensor noise = torch::randn({d_state_}, gen, options) * complex_noise_strength;
+    torch::Tensor noise = torch::randn({d_state_}, gen, options_cpu) * complex_noise_strength;
     
-    // Convertir a complejo usando cos y sin (como en Python)
+    // Convertir a complejo usando cos y sin
     torch::Tensor real = torch::cos(noise);
     torch::Tensor imag = torch::sin(noise);
-    torch::Tensor complex_state = torch::complex(real, imag);
+    torch::Tensor complex_state_cpu = torch::complex(real, imag);
     
-    return complex_state;
+    // Mover al dispositivo destino (si es necesario)
+    if (device_.type() != torch::kCPU) {
+        return complex_state_cpu.to(device_);
+    }
+    
+    return complex_state_cpu;
     
 
 }

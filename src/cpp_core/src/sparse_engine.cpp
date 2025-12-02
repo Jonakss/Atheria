@@ -251,14 +251,15 @@ int64_t Engine::step_native() {
         // Procesar batch restante (si quedó algo)
         if (!local_batch_coords.empty()) {
              // Construir entrada del batch
-            torch::Tensor batch_input = build_batch_input(local_batch_coords);
-            
-            torch::NoGradGuard no_grad;
-            std::vector<torch::jit::IValue> inputs;
-            inputs.push_back(batch_input);
-            
-            torch::Tensor batch_output;
             try {
+                // Construir entrada del batch
+                torch::Tensor batch_input = build_batch_input(local_batch_coords);
+                
+                torch::NoGradGuard no_grad;
+                std::vector<torch::jit::IValue> inputs;
+                inputs.push_back(batch_input);
+                
+                torch::Tensor batch_output;
                 auto output_ivalue = model_.forward(inputs);
 
                 if (output_ivalue.isTuple()) {
