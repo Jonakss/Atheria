@@ -1,7 +1,8 @@
 import { BackwardIcon, ForwardIcon, PauseIcon, PlayIcon } from '@heroicons/react/24/solid';
-import { Clock, Eye, EyeOff, RefreshCw, Save } from 'lucide-react';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Clock, Eye, EyeOff, RefreshCw, Save, Zap } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
+import { useExperimentStore } from '../../store/experimentStore';
 import { calculateParticleCount } from '../../utils/simulationUtils';
 
 interface HistoryRange {
@@ -12,7 +13,141 @@ interface HistoryRange {
   current_step: number;
 }
 
+// Helper hook for debouncing
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value);
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [value, delay]);
+    return debouncedValue;
+}
+
 // --- Sub-components ---
+
+const HybridControls: React.FC<{
+    controlsEnabled: boolean;
+    onUpdateConfig: (config: any) => void;
+}> = ({ controlsEnabled, onUpdateConfig }) => {
+    const {
+        hybridMode, setHybridMode,
+        injectionInterval, setInjectionInterval,
+        quantumNoiseRate, setQuantumNoiseRate
+    } = useExperimentStore();
+    const [showHybrid, setShowHybrid] = useState(false);
+
+    // Local state for immediate UI feedback
+    const [localInterval, setLocalInterval] = useState(injectionInterval);
+    const [localNoise, setLocalNoise] = useState(quantumNoiseRate);
+
+    // Sync local state with store
+    useEffect(() => {
+        setLocalInterval(injectionInterval);
+    }, [injectionInterval]);
+
+    useEffect(() => {
+        setLocalNoise(quantumNoiseRate);
+    }, [quantumNoiseRate]);
+
+    // Debounce updates
+    const debouncedInterval = useDebounce(localInterval, 500);
+    const debouncedNoise = useDebounce(localNoise, 500);
+
+    // Effect to trigger update when debounced value changes
+    useEffect(() => {
+        if (debouncedInterval !== injectionInterval) {
+            setInjectionInterval(debouncedInterval);
+            onUpdateConfig({ injection_interval: debouncedInterval });
+        }
+    }, [debouncedInterval, injectionInterval, setInjectionInterval, onUpdateConfig]);
+
+    useEffect(() => {
+        if (debouncedNoise !== quantumNoiseRate) {
+            setQuantumNoiseRate(debouncedNoise);
+            onUpdateConfig({ quantum_noise_rate: debouncedNoise });
+        }
+    }, [debouncedNoise, quantumNoiseRate, setQuantumNoiseRate, onUpdateConfig]);
+
+
+    const handleToggle = () => {
+        const newState = !hybridMode;
+        setHybridMode(newState);
+        onUpdateConfig({ hybrid_mode: newState });
+    };
+
+    return (
+        <div className="relative">
+             <button
+                onClick={() => setShowHybrid(!showHybrid)}
+                disabled={!controlsEnabled}
+                className={`p-1.5 rounded transition-all border ${
+                    hybridMode
+                    ? 'bg-purple-500/10 text-purple-400 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.2)]'
+                    : 'text-gray-400 hover:text-white hover:bg-white/10 border-transparent'
+                }`}
+                title="Hybrid Simulation Controls"
+            >
+                <Zap size={14} className={hybridMode ? 'fill-purple-500/20' : ''} />
+            </button>
+
+            {showHybrid && (
+                <div className="absolute bottom-full left-0 mb-2 w-64 bg-dark-950 border border-purple-500/30 rounded-lg shadow-xl p-3 z-50 backdrop-blur-xl">
+                    <div className="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
+                        <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">Hybrid Simulation</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[9px] text-gray-500">{hybridMode ? 'ACTIVE' : 'INACTIVE'}</span>
+                            <div
+                                onClick={handleToggle}
+                                className={`w-8 h-4 rounded-full cursor-pointer transition-colors relative ${hybridMode ? 'bg-purple-600' : 'bg-gray-700'}`}
+                            >
+                                <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${hybridMode ? 'translate-x-4' : 'translate-x-0'}`} />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className={`space-y-3 transition-opacity ${hybridMode ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+                        <div>
+                            <div className="flex justify-between text-[10px] text-gray-400 mb-1">
+                                <span>Injection Interval</span>
+                                <span className="text-white font-mono">{localInterval} steps</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="10"
+                                max="100"
+                                step="1"
+                                value={localInterval}
+                                onChange={(e) => setLocalInterval(parseInt(e.target.value))}
+                                className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                            />
+                        </div>
+
+                        <div>
+                            <div className="flex justify-between text-[10px] text-gray-400 mb-1">
+                                <span>Quantum Noise Rate</span>
+                                <span className="text-white font-mono">{localNoise.toFixed(2)}</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="0.01"
+                                max="0.10"
+                                step="0.01"
+                                value={localNoise}
+                                onChange={(e) => setLocalNoise(parseFloat(e.target.value))}
+                                className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showHybrid && <div className="fixed inset-0 z-40" onClick={() => setShowHybrid(false)} />}
+        </div>
+    );
+};
 
 const SimulationControls: React.FC<{
   isPlaying: boolean;
@@ -20,7 +155,8 @@ const SimulationControls: React.FC<{
   onPlayPause: () => void;
   onReset: () => void;
   onSaveSnapshot: () => void;
-}> = ({ isPlaying, controlsEnabled, onPlayPause, onReset, onSaveSnapshot }) => (
+  onUpdateConfig: (config: any) => void;
+}> = ({ isPlaying, controlsEnabled, onPlayPause, onReset, onSaveSnapshot, onUpdateConfig }) => (
   <div className="flex items-center gap-2">
     <button
       onClick={onPlayPause}
@@ -59,6 +195,10 @@ const SimulationControls: React.FC<{
     >
       <Save size={14} />
     </button>
+
+    <div className="w-px h-4 bg-white/10 mx-1" />
+
+    <HybridControls controlsEnabled={controlsEnabled} onUpdateConfig={onUpdateConfig} />
   </div>
 );
 
@@ -251,6 +391,7 @@ interface HistoryControlsProps {
 
 export const HistoryControls: React.FC<HistoryControlsProps> = ({ mode = 'full' }) => {
   const { sendCommand, ws, simData, inferenceStatus, connectionStatus, liveFeedEnabled, setLiveFeedEnabled, setStepsInterval } = useWebSocket();
+  const { triggerQuantumInjection } = useExperimentStore();
   const [historyRange, setHistoryRange] = useState<HistoryRange>({
     available: false,
     min_step: null,
@@ -305,66 +446,21 @@ export const HistoryControls: React.FC<HistoryControlsProps> = ({ mode = 'full' 
     sendCommand('snapshot', 'save_snapshot');
   };
 
+  const handleUpdateConfig = (config: any) => {
+      sendCommand('inference', 'set_config', config);
+  };
+
   const handleToggleLiveFeed = () => {
     setLiveFeedEnabled(!liveFeedEnabled);
   };
 
   const handleSetInterval = (interval: number) => {
       // Si el intervalo es -1, desactivamos el live feed (comportamiento legacy/backend)
-      // Pero el backend set_steps_interval con -1 ya hace que no envíe frames.
-      // Además podemos desactivar el live feed explícitamente para sincronizar el estado UI.
-
       setStepsInterval(interval);
-
-      // Si el intervalo es -1, también actualizamos el estado visual de liveFeedEnabled a false
       if (interval === -1) {
           setLiveFeedEnabled(false);
       } else {
-          // Si establecemos un intervalo positivo, aseguramos que el live feed esté habilitado (o el backend lo use)
-          // Nota: El backend usa live_feed_enabled como switch maestro. steps_interval es para cuando NO es live feed?
-          // No, steps_interval es "Configura el intervalo de pasos para el envío de frames cuando live_feed está DESACTIVADO."
-          // Wait, let's re-read backend code.
-
-          /*
-            async def handle_set_steps_interval(args):
-                "Configura el intervalo de pasos para el envío de frames cuando live_feed está DESACTIVADO."
-          */
-
-          // Ah, steps_interval is ONLY effective when live_feed is DISABLED?
-          // Let's check `simulation_handlers.py`.
-          // `handle_set_live_feed` says: "Live feed activado... enviando datos en tiempo real."
-          // `handle_set_steps_interval` says: "Configura el intervalo... cuando live_feed está DESACTIVADO."
-
-          // So if user wants "-1 to disable", they mean they want to disable live feed AND set interval to -1 (fullspeed).
-          // If they want "10 steps to show", they likely mean they want live feed DISABLED but getting updates every 10 steps?
-          // OR they want live feed ENABLED but throttled?
-
-          // In `handle_set_live_feed`: "Live feed activado... simulación continuará... enviando datos en tiempo real." (Implies every step or controlled by something else?)
-
-          // Actually, if `live_feed_enabled` is TRUE, it sends frames. Does it respect `steps_interval`?
-          // Let's check where `simulation_frame` is sent.
-          // It's usually in the inference loop.
-
-          // Regardless, based on user request: "cambiar de live feed a desactivado con nros de pasoss a mostrar, -1 era desactivado."
-          // It implies they used this control to set the interval AND disable live feed (or enable it in a specific mode).
-
-          // If I set interval to 10, I probably want to see updates every 10 steps.
-          // If I set to -1, I want NO updates (Disabled).
-
-          // So:
-          if (interval === -1) {
-              setLiveFeedEnabled(false);
-          } else {
-              // If setting a specific interval, we probably want to ENABLE live feed?
-              // Or does the backend send frames even if live_feed is false IF steps_interval > 0?
-
-              // Backend comment: "Configura el intervalo de pasos para el envío de frames cuando live_feed está DESACTIVADO."
-              // So if live_feed is FALSE, it uses steps_interval.
-              // So to "show every 10 steps", we should set live_feed = FALSE and steps_interval = 10.
-              // To "disable" (-1), set live_feed = FALSE and steps_interval = -1.
-
-              setLiveFeedEnabled(false);
-          }
+          setLiveFeedEnabled(false);
       }
   };
 
@@ -391,6 +487,9 @@ export const HistoryControls: React.FC<HistoryControlsProps> = ({ mode = 'full' 
           if (payload.step !== undefined) {
             setSelectedStep(payload.step);
           }
+        } else if (message.type === 'quantum_injection') {
+             triggerQuantumInjection();
+             console.log("⚡ Quantum Injection Triggered");
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -424,6 +523,7 @@ export const HistoryControls: React.FC<HistoryControlsProps> = ({ mode = 'full' 
           onPlayPause={handlePlayPause}
           onReset={handleReset}
           onSaveSnapshot={handleSaveSnapshot}
+          onUpdateConfig={handleUpdateConfig}
         />
         <StatusIndicators
           fps={fps}

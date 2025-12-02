@@ -95,11 +95,63 @@ class QuantumTuner:
         
         # Normalize stability to avoid explosion
         stability = min(stability, 10.0)
-        
+
         score = avg_entropy * stability
         logging.info(f"   📊 Score: {score:.4f} (Entropy: {avg_entropy:.2f}, Stability: {stability:.2f})")
-        
+
         return -score # Minimize negative score
+
+    def tune(self):
+        logging.info("🎛️ Starting Quantum Tuner (SPSA)...")
+
+        # SPSA Parameters
+        n_params = 11 # One per qubit
+        theta = np.random.rand(n_params) * 2 * np.pi # Initial random angles
+
+        alpha = 0.602
+        gamma = 0.101
+        a = 0.16
+        c = 0.1
+        A = self.max_iter * 0.1
+
+        best_score = float('inf')
+        best_theta = theta.copy()
+
+        for k in range(self.max_iter):
+            ak = a / (k + 1 + A)**alpha
+            ck = c / (k + 1)**gamma
+
+            delta = np.sign(np.random.rand(n_params) - 0.5)
+
+            theta_plus = theta + ck * delta
+            theta_minus = theta - ck * delta
+
+            y_plus = self.objective_function(theta_plus)
+            y_minus = self.objective_function(theta_minus)
+
+            grad = (y_plus - y_minus) / (2 * ck * delta)
+
+            theta = theta - ak * grad
+
+            # Keep track of best
+            current_score = (y_plus + y_minus) / 2
+            if current_score < best_score:
+                best_score = current_score
+                best_theta = theta.copy()
+                logging.info(f"   🌟 New Best Score: {-best_score:.4f} at iter {k}")
+
+        logging.info("✅ Tuning Complete.")
+        logging.info(f"   🏆 Best Score: {-best_score:.4f}")
+        logging.info(f"   Best Params: {best_theta.tolist()}")
+
+        # Save results
+        results = {
+            "best_score": -best_score,
+            "best_params": best_theta.tolist(),
+            "timestamp": datetime.now().isoformat()
+        }
+        with open("best_quantum_params.json", "w") as f:
+            json.dump(results, f, indent=2)
 
     def tune(self):
         logging.info("🎛️ Starting Quantum Tuner (SPSA)...")

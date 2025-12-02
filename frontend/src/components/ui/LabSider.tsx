@@ -79,6 +79,7 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
     const [selectedEngine, setSelectedEngine] = useState<string>('auto');
     const [creationEngineType, setCreationEngineType] = useState<string>('CARTESIAN');
     const [creationBackendType, setCreationBackendType] = useState<string>('PYTHON');
+    const [isQuantumGenesis, setIsQuantumGenesis] = useState(false);
 
     // Encontrar el experimento activo
     const currentExperiment = activeExperiment 
@@ -138,9 +139,10 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
             TOTAL_EPISODES: episodesToAdd,
             MODEL_PARAMS: { d_state: dState, hidden_channels: hiddenChannels, alpha: 0.9, beta: 0.85 },
             GAMMA_DECAY: gammaDecay,
-            INITIAL_STATE_MODE_INFERENCE: initialStateMode,
+            INITIAL_STATE_MODE_INFERENCE: isQuantumGenesis ? 'ionq' : initialStateMode,
             ENGINE_TYPE: creationEngineType,
-            BACKEND_TYPE: creationBackendType // Nuevo campo
+            BACKEND_TYPE: creationBackendType, // Nuevo campo
+            BATCH_MODE: isQuantumGenesis
         };
         
         if (transferFromExperiment) {
@@ -555,6 +557,41 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
                                                 </span>
                                             </div>
                                         )}
+
+                                        {/* Quantum Genesis (Batch Mode) */}
+                                        <div className={`p-3 rounded border transition-all ${
+                                            isQuantumGenesis
+                                            ? 'bg-purple-900/20 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
+                                            : 'bg-white/5 border-white/10'
+                                        }`}>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="flex items-center gap-2 cursor-pointer">
+                                                    <div className="relative inline-flex items-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="sr-only peer"
+                                                            checked={isQuantumGenesis}
+                                                            onChange={(e) => setIsQuantumGenesis(e.target.checked)}
+                                                            disabled={!isConnected}
+                                                        />
+                                                        <div className="w-9 h-5 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                                                    </div>
+                                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                                                        isQuantumGenesis ? 'text-purple-300' : 'text-gray-400'
+                                                    }`}>
+                                                        Quantum Genesis (IonQ)
+                                                    </span>
+                                                </label>
+                                                {isQuantumGenesis && (
+                                                    <span className="text-[9px] px-1.5 py-0.5 bg-purple-500 text-white rounded font-bold">PREMIUM</span>
+                                                )}
+                                            </div>
+                                            <div className="text-[10px] text-gray-500 leading-tight">
+                                                {isQuantumGenesis
+                                                    ? "Inicializar todos los universos desde un único evento cuántico (colapso de superposición)."
+                                                    : "Modo estándar: Semilla aleatoria o definida."}
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div>
@@ -735,19 +772,21 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
                                         <div className="text-[10px] text-gray-600 mt-1">Sistema abierto (&gt;0) o cerrado (=0)</div>
                                     </div>
 
-                                    <div>
-                                        <label className="block text-[10px] text-gray-400 mb-1 uppercase">Inicialización</label>
-                                        <select
-                                            value={initialStateMode}
-                                            onChange={(e) => setInitialStateMode(e.target.value)}
-                                            disabled={!isConnected}
-                                            className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
-                                        >
-                                            <option value="complex_noise">Ruido Complejo (estable)</option>
-                                            <option value="random">Aleatorio Normalizado</option>
-                                            <option value="zeros">Ceros</option>
-                                        </select>
-                                    </div>
+                                    {!isQuantumGenesis && (
+                                        <div>
+                                            <label className="block text-[10px] text-gray-400 mb-1 uppercase">Inicialización</label>
+                                            <select
+                                                value={initialStateMode}
+                                                onChange={(e) => setInitialStateMode(e.target.value)}
+                                                disabled={!isConnected}
+                                                className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                                            >
+                                                <option value="complex_noise">Ruido Complejo (estable)</option>
+                                                <option value="random">Aleatorio Normalizado</option>
+                                                <option value="zeros">Ceros</option>
+                                            </select>
+                                        </div>
+                                    )}
 
                                     <button
                                         onClick={handleCreateExperiment}
