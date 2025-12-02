@@ -77,7 +77,7 @@ async def create_experiment_handler(args):
             # Serializamos el diccionario MODEL_PARAMS a un string JSON
             "--model_params", json.dumps(args.get("MODEL_PARAMS", {})),
             "--engine_type", args.get("ENGINE_TYPE", "CARTESIAN"),
-            "--backend_type", args.get("BACKEND_TYPE", "LOCAL")
+            "--backend_type", args.get("BACKEND_TYPE") if args.get("BACKEND_TYPE") in ["LOCAL", "QUANTUM_MOCK", "QUANTUM_IONQ", "QUANTUM_IBM", "GPU"] else "LOCAL"
         ]
         
         if args.get('CONTINUE_TRAINING', False):

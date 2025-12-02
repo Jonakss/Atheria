@@ -20,6 +20,11 @@ class PolarEngine(nn.Module):
     def forward(self, x):
         # Placeholder forward pass
         return x
+
+    @property
+    def operator(self):
+        """Alias for model, required by QC_Trainer_v4 for checkpointing."""
+        return self.model
         
     def evolve_step(self, current_psi):
         # Evolución física para entrenamiento
@@ -122,3 +127,13 @@ class QuantumStatePolar:
         if dim is None:
             return complex_tensor.squeeze()
         return complex_tensor.squeeze(dim)
+
+    def clone(self):
+        """
+        Returns a deep copy of the QuantumStatePolar object.
+        Required by QC_Trainer_v4 for state preservation.
+        """
+        new_state = QuantumStatePolar(self.grid_size, self.d_state, self.device)
+        new_state.magnitude = self.magnitude.clone()
+        new_state.phase = self.phase.clone()
+        return new_state
