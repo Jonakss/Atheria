@@ -81,15 +81,15 @@ graph TD
     User[Usuario / Frontend] -->|Steering (Brush)| API[Server API]
     User -->|Tuner (Script)| Tuner[Quantum Tuner]
     User -->|Vision (Microscope)| API
-
+    
     subgraph Atheria Engine
         Sim[Cartesian Engine] <-->|Hybrid Step| Collapse[IonQCollapse]
         Sim <-->|Injection| Steering[Quantum Steering]
         Sim -->|Analysis| Microscope[Quantum Microscope]
     end
-
+    
     Tuner -->|Params| Sim
-
+    
     Collapse <-->|API| IonQ[IonQ Backend / Simulator]
     Steering <-->|API| IonQ
     Tuner <-->|API| IonQ

@@ -148,7 +148,7 @@ class QuantumState:
         """
         Generates a state using a Variational Quantum Circuit (VQC) on IonQ.
         Used by Quantum Tuner to optimize initialization.
-
+        
         Args:
             params (list): List of rotation angles [theta_0, theta_1, ...]
         """
@@ -156,46 +156,46 @@ class QuantumState:
         from .compute_backend import IonQBackend
         from .. import config as cfg
         from qiskit import QuantumCircuit
-
+        
         logging.info(f"⚛️ Variational Genesis: Params={params[:3]}...")
-
+        
         try:
             backend = IonQBackend(api_key=cfg.IONQ_API_KEY, backend_name=cfg.IONQ_BACKEND_NAME)
             n_qubits = 11
             qc = QuantumCircuit(n_qubits)
-
+            
             # Variational Layer: Ry(theta) + Entanglement
             # We map params to qubits. If fewer params than qubits, recycle.
             for i in range(n_qubits):
                 theta = params[i % len(params)]
                 qc.ry(theta, i)
                 qc.rx(theta/2, i) # Add some complexity
-
+                
             # Entanglement Ring
             for i in range(n_qubits - 1):
                 qc.cx(i, i+1)
             qc.cx(n_qubits-1, 0)
-
+            
             qc.measure_all()
-
+            
             # Execute
             counts = backend.execute('run_circuit', qc, shots=1024)
-
+            
             # Process to Tensor (Same as _get_ionq_state)
             bit_stream = []
             for bitstring, count in counts.items():
                 bits = [1.0 if c == '1' else -1.0 for c in bitstring]
                 bit_stream.extend(bits * count)
-
+                
             quantum_data = torch.tensor(bit_stream, device=device, dtype=torch.float32)
             total_needed = grid_size * grid_size * d_state
             repeats = (total_needed // len(quantum_data)) + 1
             quantum_data = quantum_data.repeat(repeats)[:total_needed]
             noise = quantum_data.reshape(1, grid_size, grid_size, d_state) * strength
-
+            
             real, imag = torch.cos(noise), torch.sin(noise)
             return torch.complex(real, imag)
-
+            
         except Exception as e:
             logging.error(f"❌ Variational Genesis Failed: {e}")
             # Fallback to random
@@ -392,17 +392,17 @@ class CartesianEngine:
             if not hasattr(self, 'ionq_collapse'):
                 from ..physics.quantum_collapse import IonQCollapse
                 self.ionq_collapse = IonQCollapse(self.device)
-
+            
             # Inyectar Colapso IonQ
             # Elegimos un centro aleatorio para el evento de colapso
             # O podríamos usar una región de alta entropía (más "cuántica")
             import numpy as np
             cx = np.random.randint(0, self.grid_size)
             cy = np.random.randint(0, self.grid_size)
-
+            
             new_psi = self.ionq_collapse.collapse(new_psi, region_center=(cy, cx), intensity=noise_rate)
             
-            # También podemos mantener el ruido de fondo si se desea,
+            # También podemos mantener el ruido de fondo si se desea, 
             # pero el colapso es el evento principal aquí.
             
             import logging
