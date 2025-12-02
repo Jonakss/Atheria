@@ -100,7 +100,6 @@ const PhaseSpaceViewer: React.FC = () => {
                         <ambientLight intensity={0.5} />
                         <pointLight position={[10, 10, 10]} />
                         <PointsCloud data={analysisData.points} />
-                        {/* @ts-expect-error TS2322: Type 'typeof OrbitControls' is not assignable to type 'FunctionComponent<Partial<Omit<OrbitControlsProps, "ref"> & RefAttributes<OrbitControlsImpl>>>'. */}
                         <OrbitControls />
                         <gridHelper args={[20, 20, 0x444444, 0x222222]} />
                         <axesHelper args={[5]} />

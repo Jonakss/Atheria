@@ -1,6 +1,6 @@
 // frontend/src/components/ui/LabSider.tsx
-import { ArrowRightLeft, Play, RotateCcw, Upload, X } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowRightLeft, Play, RotateCcw, Upload, X, AlertTriangle } from 'lucide-react';
+import { useState, useMemo } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { GlassPanel } from '../../modules/Dashboard/components/GlassPanel';
 import { modelOptions } from '../../utils/vizOptions';
@@ -16,6 +16,33 @@ interface LabSiderProps {
     activeSection: LabSection;
     onClose?: () => void;
 }
+
+// Nuevas constantes para Arquitectura Separada
+const ENGINE_OPTIONS = [
+    { value: "CARTESIAN", label: "🌊 Cartesian (Standard QCA)" },
+    { value: "POLAR", label: "🌀 Polar (Rotational)" },
+    { value: "HARMONIC", label: "🌊 Harmonic (Wave)" },
+    { value: "LATTICE", label: "🕸️ Lattice (AdS/CFT)" },
+    { value: "QUANTUM", label: "⚛️ Quantum (Legacy/Hybrid)" }, // Mantener por compatibilidad si es necesario
+];
+
+const BACKEND_OPTIONS = [
+    { value: "PYTHON", label: "🐍 Python (CPU/Legacy)" },
+    { value: "CPP", label: "⚡ CPP (Native/Fast)" },
+    { value: "GPU", label: "🎮 GPU (CUDA)" },
+    { value: "TPU", label: "☁️ TPU (Cloud)" },
+    { value: "QPU", label: "🔮 QPU (Quantum)" },
+];
+
+// Mapa de Compatibilidad (Motor -> Backends Soportados)
+// Si no está listado, se asume soporte experimental/limitado
+const COMPATIBILITY_MAP: Record<string, string[]> = {
+    "CARTESIAN": ["PYTHON", "CPP", "GPU"],
+    "POLAR": ["PYTHON", "GPU"], // Asumiendo Polar requiere GPU o Python por ahora
+    "HARMONIC": ["PYTHON", "CPP"], // Sparse implementations
+    "LATTICE": ["PYTHON"], // Muy experimental
+    "QUANTUM": ["PYTHON", "QPU"],
+};
 
 export function LabSider({ activeSection, onClose }: LabSiderProps) {
     const { 
@@ -51,11 +78,22 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
 
     const [selectedEngine, setSelectedEngine] = useState<string>('auto');
     const [creationEngineType, setCreationEngineType] = useState<string>('CARTESIAN');
+    const [creationBackendType, setCreationBackendType] = useState<string>('PYTHON');
 
     // Encontrar el experimento activo
     const currentExperiment = activeExperiment 
         ? experimentsData?.find(exp => exp.name === activeExperiment) 
         : null;
+
+    // Verificar compatibilidad
+    const compatibilityWarning = useMemo(() => {
+        const supported = COMPATIBILITY_MAP[creationEngineType];
+        if (!supported) return null; // No info
+        if (!supported.includes(creationBackendType)) {
+            return `Combinación experimental: ${creationEngineType} podría no funcionar correctamente en ${creationBackendType}.`;
+        }
+        return null;
+    }, [creationEngineType, creationBackendType]);
 
     const handleCreateExperiment = () => {
         if (!isConnected) {
@@ -101,7 +139,8 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
             MODEL_PARAMS: { d_state: dState, hidden_channels: hiddenChannels, alpha: 0.9, beta: 0.85 },
             GAMMA_DECAY: gammaDecay,
             INITIAL_STATE_MODE_INFERENCE: initialStateMode,
-            ENGINE_TYPE: creationEngineType
+            ENGINE_TYPE: creationEngineType,
+            BACKEND_TYPE: creationBackendType // Nuevo campo
         };
         
         if (transferFromExperiment) {
@@ -469,22 +508,53 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
                                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Nuevo Experimento</div>
                                 
                                 <div className="space-y-3">
-                                    {/* Selector de Motor Físico (Primer Paso) */}
-                                    <div>
-                                        <label className="block text-[10px] text-gray-400 mb-1 uppercase">Motor Físico</label>
-                                        <select
-                                            value={creationEngineType}
-                                            onChange={(e) => setCreationEngineType(e.target.value)}
-                                            disabled={!isConnected}
-                                            className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
-                                        >
-                                            <option value="CARTESIAN">🌊 Estándar (Cartesiano)</option>
-                                            <option value="POLAR">🌀 Rotacional (Polar)</option>
-                                            <option value="QUANTUM">⚛️ Quantum (Híbrido)</option>
-                                        </select>
-                                        <div className="text-[10px] text-gray-600 mt-1">
-                                            Define la topología y física base del universo.
+                                    {/* Engine & Backend Selectors */}
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {/* Motor Físico */}
+                                        <div>
+                                            <label className="block text-[10px] text-gray-400 mb-1 uppercase">Motor Físico (Engine)</label>
+                                            <select
+                                                value={creationEngineType}
+                                                onChange={(e) => setCreationEngineType(e.target.value)}
+                                                disabled={!isConnected}
+                                                className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                                            >
+                                                {ENGINE_OPTIONS.map(opt => (
+                                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                ))}
+                                            </select>
                                         </div>
+
+                                        {/* Backend de Cómputo */}
+                                        <div>
+                                            <label className="block text-[10px] text-gray-400 mb-1 uppercase">Backend de Cómputo</label>
+                                            <select
+                                                value={creationBackendType}
+                                                onChange={(e) => setCreationBackendType(e.target.value)}
+                                                disabled={!isConnected}
+                                                className="w-full px-3 py-1.5 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+                                            >
+                                                {BACKEND_OPTIONS.map(opt => (
+                                                    <option key={opt.value} value={opt.value} disabled={
+                                                        // Opcional: Deshabilitar si se sabe que es 100% incompatible
+                                                        // Pero por ahora solo advertimos
+                                                        false
+                                                    }>
+                                                        {opt.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {/* Advertencia de Compatibilidad */}
+                                        {compatibilityWarning && (
+                                            <div className="p-2 bg-yellow-500/10 border border-yellow-500/30 rounded flex items-start gap-2">
+                                                <AlertTriangle size={14} className="text-yellow-400 shrink-0 mt-0.5" />
+                                                <span className="text-[10px] text-yellow-300/90 leading-tight">
+                                                    {compatibilityWarning}
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div>
@@ -694,6 +764,9 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
                                             <div><span className="text-gray-400">Nombre:</span> {selectedModel ? `${selectedModel}-d${dState}-h${hiddenChannels}-g${gridSize}-lr${learningRate.toExponential(0)}` : 'N/A'}</div>
                                             <div><span className="text-gray-400">Grid:</span> {gridSize}x{gridSize} | <span className="text-gray-400">Steps:</span> {qcaSteps}</div>
                                             <div><span className="text-gray-400">Episodios:</span> {episodesToAdd} | <span className="text-gray-400">LR:</span> {learningRate.toExponential(2)}</div>
+                                            <div>
+                                                <span className="text-gray-400">Engine:</span> {creationEngineType} | <span className="text-gray-400">Backend:</span> {creationBackendType}
+                                            </div>
                                             {transferFromExperiment && (
                                                 <div className="text-blue-400"><span className="text-gray-400">Transfer:</span> {transferFromExperiment}</div>
                                             )}
