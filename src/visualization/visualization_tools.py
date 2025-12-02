@@ -15,7 +15,13 @@ def get_complex_parts(psi_tensor):
 
 def get_density_map(psi, absolute_scale=True) -> np.ndarray:
     """Calcula el mapa de densidad (norma al cuadrado) de un estado psi."""
-    import torch
+import torch
+import numpy as np
+...
+def get_density_map(psi, absolute_scale=True) -> np.ndarray:
+    """Calcula el mapa de densidad (norma al cuadrado) de un estado psi."""
+    if psi is None: return np.zeros((256, 256))
+...
     if psi is None: return np.zeros((256, 256))
 
     # Manejar QuantumStatePolar u objetos similares si se pasa directamente
