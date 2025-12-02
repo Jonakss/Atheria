@@ -53,6 +53,12 @@ Update: Actualizar estado disperso. Borrar celdas con $E < \epsilon$.
 
 Viewport: Muestrear región de cámara (Lazy Conversion) -> Enviar a Frontend.
 
+D. Cache Buffering (Streaming) - Desacoplamiento
+
+Simulation Service -> Data Processing -> Dragonfly Cache (List) -> WebSocket Service (Stream Loop) -> Frontend
+
+*Nota: Permite que la simulación corra a máxima velocidad (e.g. 100 FPS) mientras el frontend visualiza a una tasa constante (e.g. 30 FPS), evitando saturación.*
+
 3. Stack Tecnológico
 
 Backend: Python 3.10+, PyTorch (CUDA), Aiohttp.
