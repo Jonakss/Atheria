@@ -32,8 +32,14 @@ graph TD
     B -->|Rotaciones| C{ALU Posit/Quire}
     C -->|Acumulación Exacta| D[Activación No-Lineal]
     D -->|Nuevo Estado| A
-```
 
+```mermaid
+graph TD
+    A[Memoria Tensor (HBM/CXL)] --> |Tensores Polares| B(Matriz Sistólica CORDIC)
+    B --> |Rotaciones| C{ALU Posit/Quire}
+    C --> |Acumulación Exacta| D[Activación No-Lineal]
+    D --> |Nuevo Estado| A
+```
 ## Referencias
 * **Mythic AI:** Arquitectura CIM basada en Flash.
 * **Gustafson:** Posit Arithmetic.
