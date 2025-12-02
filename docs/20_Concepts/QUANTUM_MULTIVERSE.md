@@ -16,6 +16,8 @@ In standard Copenhagen interpretation, a measurement collapses the wavefunction 
 3.  **Branching**: Instead of discarding the variations, we map each unique shot (or distribution of shots) to a separate simulation instance in our `BatchInferenceEngine`.
 4.  **Parallel Evolution**: We evolve all these N universes simultaneously on the GPU.
 
+![Quantum Multiverse Divergence](../assets/quantum_multiverse_viz.png)
+
 ## Key Components
 
 ### 1. `initialize_from_ionq_multiverse`

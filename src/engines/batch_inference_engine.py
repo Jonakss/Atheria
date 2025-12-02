@@ -241,16 +241,22 @@ class BatchInferenceEngine:
                     batch_indices = range(batch_start, batch_end)
                     
                     # Obtener estados del batch actual
+                    # psi_batch shape: [batch_size, 1, grid_size, grid_size, d_state]
                     psi_batch = torch.stack([
                         self.states[i].psi for i in batch_indices
-                    ])  # [batch_size, grid_size, grid_size, d_state]
+                    ])
+                    
+                    # Remove extra dimension if present (QuantumState.psi is [1, H, W, d])
+                    if psi_batch.dim() == 5:
+                        psi_batch = psi_batch.squeeze(1) # [batch_size, grid_size, grid_size, d_state]
                     
                     # Evolucionar batch
                     new_psi_batch = self._evolve_batch_logic(psi_batch, batch_indices)
                     
                     # Actualizar estados
                     for idx, i in enumerate(batch_indices):
-                        self.states[i].psi = new_psi_batch[idx]
+                        # Restore batch dimension [1, H, W, d] to match QuantumState expectation
+                        self.states[i].psi = new_psi_batch[idx].unsqueeze(0)
                 
                 self.current_step += 1
     
