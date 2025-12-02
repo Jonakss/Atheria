@@ -100,7 +100,7 @@ const PhaseSpaceViewer: React.FC = () => {
                         <ambientLight intensity={0.5} />
                         <pointLight position={[10, 10, 10]} />
                         <PointsCloud data={analysisData.points} />
-                        {/* @ts-expect-error: OrbitControls type definition issue in current version */}
+
                         <OrbitControls />
                         <gridHelper args={[20, 20, 0x444444, 0x222222]} />
                         <axesHelper args={[5]} />

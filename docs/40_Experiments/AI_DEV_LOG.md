@@ -149,3 +149,7 @@
 - [[logs/2025-12-01_compute_backend|2025-12-01 - Feature: Compute Backend Abstraction]]
 - [[logs/2025-12-01_memory_pools|2025-12-01 - Feature: Memory Pools & Concurrency Fixes]]
 - [[logs/2025-12-01_native_performance|2025-12-01 - Performance: Native Engine Patch Size Optimization]]
+- **[[logs/2025-12-02_frontend_build_and_lint_fixes|2025-12-02 - Fix: Frontend Build and Lint for Deployment]]**:
+  - **Linting Fixes**: Resolved unused `useRef` and missing `useEffect` dependency in `HistoryControls.tsx`.
+  - **Build Fixes**: Removed unused `@ts-expect-error` directive in `PhaseSpaceViewer.tsx` that was causing build failure.
+  - **Verification**: Verified successful `npm run lint` and `npm run build`. Frontend is ready for deployment.

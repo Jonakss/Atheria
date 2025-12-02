@@ -1,6 +1,6 @@
 import { BackwardIcon, ForwardIcon, PauseIcon, PlayIcon } from '@heroicons/react/24/solid';
 import { Clock, Eye, EyeOff, RefreshCw, Save, Zap } from 'lucide-react';
-import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { useExperimentStore } from '../../store/experimentStore';
 import { calculateParticleCount } from '../../utils/simulationUtils';
@@ -497,7 +497,7 @@ export const HistoryControls: React.FC<HistoryControlsProps> = ({ mode = 'full' 
     };
     ws.addEventListener('message', handleMessage);
     return () => ws.removeEventListener('message', handleMessage);
-  }, [ws]);
+  }, [ws, triggerQuantumInjection]);
 
   useEffect(() => {
     setIsPlaying(inferenceStatus === 'running');
