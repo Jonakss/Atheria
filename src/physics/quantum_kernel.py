@@ -46,12 +46,21 @@ class QuantumMicroscope:
         n_qubits = 4
         
         # Aplanar y reducir dimensionalidad
-        # Tomamos la magnitud promedio de los canales
+        # Tomamos la magnitud promedio de los canales (dim 0)
+        # Asumimos input (C, H, W)
         if state_patch.is_complex():
-            magnitude = state_patch.abs().mean(dim=-1) # [H, W] si input es [H, W, C]
+            magnitude = state_patch.abs().mean(dim=0) 
         else:
-            magnitude = state_patch.mean(dim=-1)
+            magnitude = state_patch.mean(dim=0)
             
+        if len(magnitude.shape) == 3:
+            magnitude = magnitude[0]
+            
+        print(f"DEBUG Magnitude Shape: {magnitude.shape}")
+        print(f"DEBUG Magnitude Content:\n{magnitude}")
+            
+        # Reducir a 4 qubits (2x2) si es más grande
+        # El backend IonQ básico suele ser de 11 qubits, pero para este kernel usamos 4
         # Interpolamos a 2x2 (4 valores)
         # Asumimos input torch tensor
         if len(magnitude.shape) == 2:
@@ -69,8 +78,11 @@ class QuantumMicroscope:
             
         # Normalizar a [0, 2pi] para rotaciones
         inputs = np.array(inputs)
+        print(f"DEBUG Pre-Norm Inputs: {inputs}")
         inputs = (inputs - inputs.min()) / (inputs.max() - inputs.min() + 1e-6) # [0, 1]
         inputs = inputs * np.pi # [0, pi] (ZZ map usa esto mejor)
+        
+        print(f"DEBUG Microscope Inputs: {inputs}")
         
         if self.backend is None:
             return self._mock_analysis(inputs)
@@ -83,7 +95,7 @@ class QuantumMicroscope:
             # Mapea datos a correlaciones cuánticas (difícil de simular clásicamente)
             # reps=1 para velocidad, entanglement='linear' o 'circular'
             feature_map = ZZFeatureMap(feature_dimension=n_qubits, reps=1, entanglement='circular')
-            qc_encode = feature_map.bind_parameters(inputs)
+            qc_encode = feature_map.assign_parameters(inputs)
             
             # --- 2. PROCESAMIENTO PROFUNDO (Ansatz) ---
             # "Strongly Entangling Layers" simplificado para Qiskit
@@ -92,7 +104,7 @@ class QuantumMicroscope:
             # Fijamos parámetros del ansatz a valores aleatorios (o entrenados) para que actúe como un "filtro" fijo
             # Por ahora, usamos parámetros fijos para consistencia
             fixed_params = [0.5] * ansatz.num_parameters
-            qc_process = ansatz.bind_parameters(fixed_params)
+            qc_process = ansatz.assign_parameters(fixed_params)
             
             # Combinar
             qc = QuantumCircuit(n_qubits)
@@ -100,8 +112,15 @@ class QuantumMicroscope:
             qc.compose(qc_process, inplace=True)
             qc.measure_all()
             
+            # Transpilar para el backend (necesario para IonQ)
+            # Usamos basis_gates genéricos de IonQ para evitar errores de atributo en el backend object
+            from qiskit import transpile
+            qc = transpile(qc, basis_gates=['rx', 'ry', 'rz', 'rxx', 'cx'], optimization_level=1)
+            
             # --- 3. EJECUCIÓN ---
-            counts = self.backend.execute('run_circuit', qc, shots=1024)
+            # Execute the transpiled circuit
+            job = self.backend.run(qc, shots=1024)
+            counts = job.result().get_counts(qc)
             
             # --- 4. ANÁLISIS DE RESULTADOS ---
             # Calcular Expectation Values <Z_i>

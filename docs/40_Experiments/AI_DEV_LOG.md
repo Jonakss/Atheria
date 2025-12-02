@@ -36,6 +36,8 @@
 -   **Quantum Steering**: Implementado `src/physics/steering.py` (`QuantumSteering`) y `handle_interaction` para permitir "Quantum Brush" (Vortex, Soliton) desde el frontend.
 -   **Quantum Microscope**: Implementado `src/physics/quantum_kernel.py` (`QuantumMicroscope`) usando Deep Quantum Kernels (ZZ Feature Map) para análisis de complejidad estructural.
 -   **Docs**: Creado `docs/20_Concepts/ADVANCED_QUANTUM_FEATURES.md` y actualizado `FRONTEND_JULES_PROMPT.md`.
+-   **Verificación**: Ejecutado `scripts/run_full_quantum_experiment.py` con éxito (Tuner Score ~83, Steering Delta ~170).
+-   **Frontend Repro**: Generado `docs/40_Experiments/frontend_repro_data.json` con payloads de ejemplo para WebSocket (`interaction_ack`, `quantum_analysis_result`).
 
 ## [2025-12-02] Quantum Multiverse Implementation
 - **2025-12-02**: Implemented Cache Buffering (Streaming) using Dragonfly. Decoupled simulation speed from frontend visualization by pushing frames to a Redis list (`simulation:stream`) and consuming them at a constant rate. Added `CACHE_BUFFERING_ENABLED` to config. Updated `DataProcessingService` (producer) and `WebSocketService` (consumer). Verified with `scripts/verify_buffering.py`. [Log](logs/2025-12-02_cache_buffering_implementation.md)

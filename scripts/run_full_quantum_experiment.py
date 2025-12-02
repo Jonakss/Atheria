@@ -32,11 +32,13 @@ def run_full_experiment():
     
     # Mock model for tuner (since we might not have a trained one)
     # Must return 8 channels (real+imag for 4 states)
+    # CartesianEngine detects 'convlstm' on MagicMock, so it expects (out, h, c)
     mock_model = MagicMock()
-    mock_model.return_value = torch.zeros(1, 8, grid_size, grid_size)
+    output = torch.zeros(1, 8, grid_size, grid_size)
+    mock_model.return_value = (output, None, None)
     
-    tuner = QuantumTuner(mock_model, grid_size, d_state, device)
-    tuner.max_iter = 3 # Short run
+    # Updated signature: model, grid_size, d_state, device, max_iter
+    tuner = QuantumTuner(model=mock_model, grid_size=grid_size, d_state=d_state, device=device, max_iter=3)
     
     # Run tuning
     tuner.tune()
@@ -44,18 +46,21 @@ def run_full_experiment():
     # Load best params
     with open('best_quantum_params.json', 'r') as f:
         best_params = json.load(f)
-    print(f"   ✅ Tuner finished. Best Score: {best_params['score']:.4f}")
+    print(f"   ✅ Tuner finished. Best Score: {best_params['best_score']:.4f}")
     
     # Generate Optimal Initial State
     print("   Generating optimal initial state...")
     psi_init = QuantumState.create_variational_state(
-        grid_size, d_state, device, best_params['params'], strength=0.8
+        grid_size, d_state, device, best_params['best_params'], strength=0.8
     )
     
     # ==============================================================================
     # PHASE 2: HYBRID SIMULATION (Evolution)
     # ==============================================================================
     print("\n⚛️ PHASE 2: Hybrid Simulation (Running with IonQ Collapse)...")
+    
+    # Reset mock for Phase 2 (Engine forced to no-memory, so expects single tensor)
+    mock_model.return_value = torch.zeros(1, 8, grid_size, grid_size)
     
     engine = CartesianEngine(mock_model, grid_size, d_state, device, precomputed_state=psi_init)
     engine.has_memory = False # Disable memory for mock
@@ -104,6 +109,34 @@ def run_full_experiment():
     else:
         print("   ❌ Steering failed (no change).")
         
+    # ==============================================================================
+    # PHASE 4: QUANTUM MICROSCOPE (Deep Analysis)
+    # ==============================================================================
+    print("\n🔬 PHASE 4: Quantum Microscope (Deep Kernel Analysis)...")
+    
+    from src.physics.quantum_kernel import QuantumMicroscope
+    microscope = QuantumMicroscope(device)
+    
+    # 1. Analyze Uniform Patch (Low Complexity)
+    print("   Analyzing Uniform Patch (Should have Low Complexity)...")
+    patch_uniform = torch.ones(1, 4, 4, device=device) * 0.5
+    metrics_uniform = microscope.analyze_patch(patch_uniform)
+    print(f"   Uniform -> Complexity: {metrics_uniform['complexity']:.4f}, Activity: {metrics_uniform['activity']:.4f}")
+    
+    # 2. Analyze Random Patch (High Complexity?)
+    print("   Analyzing Random Patch (Should have High Complexity)...")
+    patch_random = torch.rand(1, 4, 4, device=device)
+    metrics_random = microscope.analyze_patch(patch_random)
+    print(f"   Random -> Complexity: {metrics_random['complexity']:.4f}, Activity: {metrics_random['activity']:.4f}")
+    
+    # 3. Analyze Structured Patch (Gradient/Vortex-like)
+    print("   Analyzing Structured Patch (Gradient)...")
+    y, x = torch.meshgrid(torch.linspace(0, 1, 4), torch.linspace(0, 1, 4), indexing='ij')
+    patch_struct = (x + y) / 2.0
+    patch_struct = patch_struct.unsqueeze(0).to(device)
+    metrics_struct = microscope.analyze_patch(patch_struct)
+    print(f"   Structured -> Complexity: {metrics_struct['complexity']:.4f}, Activity: {metrics_struct['activity']:.4f}")
+
     print("\n🎉 Full Experiment Completed Successfully!")
 
 if __name__ == "__main__":

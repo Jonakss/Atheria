@@ -16,17 +16,17 @@ from src import config as cfg
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class QuantumTuner:
-    def __init__(self, grid_size=32, d_state=4, max_iter=20):
+    def __init__(self, model=None, grid_size=32, d_state=4, device=None, max_iter=20):
         self.grid_size = grid_size
         self.d_state = d_state
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.max_iter = max_iter
         
-        # Load a dummy model (or real one if available)
-        # For tuning, we want to see how the INITIAL state evolves under the standard physics
-        # We can use a simple identity or diffusion model if no trained model is loaded
-        # But ideally we use the trained model to see interaction
-        self.model = self._load_model()
+        # Load model (injected or loaded from config)
+        if model:
+            self.model = model
+        else:
+            self.model = self._load_model()
         
     def _load_model(self):
         # Try to load latest experiment model

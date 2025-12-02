@@ -1,0 +1,28 @@
+[
+  {
+    "timestamp": "2025-12-02T04:04:52.118938",
+    "type": "interaction_ack",
+    "action": "quantum_steer",
+    "details": {
+      "pattern": "vortex",
+      "applied_at": [
+        16,
+        16
+      ],
+      "state_change_magnitude": 0.0
+    }
+  },
+  {
+    "timestamp": "2025-12-02T04:04:53.222591",
+    "type": "quantum_analysis_result",
+    "data": {
+      "complexity": 12.336968490427092,
+      "activity": 1.5707939881588442,
+      "coherence": 0.5612140150517039,
+      "coordinates": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    }
+  }
+]
