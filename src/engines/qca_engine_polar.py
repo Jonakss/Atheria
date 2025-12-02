@@ -32,8 +32,12 @@ class PolarEngine(nn.Module):
         
         # 1. Preparar input para el modelo
         # El modelo espera [B, 2*C, H, W] (Real)
-        real = current_psi.real
-        imag = current_psi.imag
+        if hasattr(current_psi, 'to_cartesian'):
+            real, imag = current_psi.to_cartesian()
+        else:
+            real = current_psi.real
+            imag = current_psi.imag
+            
         model_input = torch.cat([real, imag], dim=1)
         
         # 2. Inferencia
@@ -110,6 +114,17 @@ class QuantumStatePolar:
         real = self.magnitude * torch.cos(self.phase)
         imag = self.magnitude * torch.sin(self.phase)
         return real, imag
+    
+    @property
+    def real(self):
+        return self.magnitude * torch.cos(self.phase)
+    
+    @property
+    def imag(self):
+        return self.magnitude * torch.sin(self.phase)
+        
+    def abs(self):
+        return self.magnitude
         
     @property
     def shape(self):

@@ -41,7 +41,9 @@
 -   **Lifecycle Demo**: Creado y ejecutado `scripts/experiment_quantum_lifecycle.py` demostrando el ciclo completo: Entrenamiento Híbrido -> Tuning Cuántico -> Inferencia Interactiva (Steering + Microscope).
 
 ## [2025-12-02] Quantum Multiverse Implementation
-- **[[logs/2025-12-02_fix_polar_engine_and_trainer|2025-12-02 - Fix: Polar Engine Compatibility & Trainer Arguments]]**
+- **[[logs/2025-12-02_fix_polar_engine_and_trainer|2025-12-02 - Fix: Polar Engine Compatibility & Trainer Arguments]]**:
+  - **Polar Engine Fix**: Added `.real`, `.imag`, and `.abs()` to `QuantumStatePolar` to satisfy `QC_Trainer_v4` interface. Optimized `evolve_step` to use `to_cartesian()` if available.
+  - **Verification**: Verified with reproduction script `tests/reproduce_polar_error.py`.
 - **[[logs/2025-12-02_roi_visualization_improvements|2025-12-02 - Feature: ROI Visualization Improvements ("See All" Toggle & Gradient Overlay)]]**
 - **2025-12-02**: Refactored Quantum Tools (`IonQCollapse`, `QuantumSteering`) into `src/physics/` and exposed them via `__init__.py`. Added unit tests `tests/test_quantum_tools.py`. Implemented Frontend Quantum Toolbox (`QuantumToolbox.tsx`) and integrated it into `LabSider`. Added backend handler `handle_tool_action` for real-time interaction. Fixed `train_progressive.py` root detection and `qc_trainer_v4.py` type hints. [Log](logs/2025-12-02_quantum_tools_refactor_and_frontend.md)
 - **2025-12-02**: Implemented Cache Buffering (Streaming) using Dragonfly. Decoupled simulation speed from frontend visualization by pushing frames to a Redis list (`simulation:stream`) and consuming them at a constant rate. Added `CACHE_BUFFERING_ENABLED` to config. Updated `DataProcessingService` (producer) and `WebSocketService` (consumer). Verified with `scripts/verify_buffering.py`. [Log](logs/2025-12-02_cache_buffering_implementation.md)
