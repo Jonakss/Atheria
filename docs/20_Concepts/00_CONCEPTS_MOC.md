@@ -46,8 +46,12 @@
 - **[Polar Architecture V3](../20_Concepts/POLAR_ARCHITECTURE_V3.md)** - Arquitectura basada en coordenadas polares (Deprecada/Referencia)
 - **[Quantum Native Architecture V1](../20_Concepts/QUANTUM_NATIVE_ARCHITECTURE_V1.md)** - Propuesta inicial de arquitectura cuántica nativa
 - **[Quantum Compute Services](../20_Concepts/QUANTUM_COMPUTE_SERVICES.md)** - Abstracción para backends de computación cuántica (IonQ, Braket, IBM)
-- [[QUANTUM_GENESIS]] - Initializing the grid with IonQ state.
-- [[QUANTUM_MULTIVERSE]] - Simulating Many Worlds via Batch Inference.
+- [[QUANTUM_NATIVE_ARCHITECTURE_V1]]
+- [[QUANTUM_OPTIMIZATION_VQE]]
+- [[QUANTUM_GENESIS]]
+- [[QUANTUM_MULTIVERSE]]
+- [[ADVANCED_QUANTUM_FEATURES]] - Tuner, Hybrid Compute, Steering
+- [[QUANTUM_COMPUTE_SERVICES]]imulating Many Worlds via Batch Inference.
 - **[History Buffer Future](../20_Concepts/HISTORY_BUFFER_FUTURE.md)** - Visión futura para el sistema de historial (Compression, Streaming)
 
 ---

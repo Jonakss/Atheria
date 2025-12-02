@@ -143,6 +143,64 @@ class QuantumState:
             logging.error(f"❌ Quantum Genesis Failed: {e}. Falling back to pseudo-random noise.")
             return self._initialize_state(mode='complex_noise', complex_noise_strength=strength)
     
+    @staticmethod
+    def create_variational_state(grid_size, d_state, device, params, strength=0.1):
+        """
+        Generates a state using a Variational Quantum Circuit (VQC) on IonQ.
+        Used by Quantum Tuner to optimize initialization.
+        
+        Args:
+            params (list): List of rotation angles [theta_0, theta_1, ...]
+        """
+        import logging
+        from .compute_backend import IonQBackend
+        from .. import config as cfg
+        from qiskit import QuantumCircuit
+        
+        logging.info(f"⚛️ Variational Genesis: Params={params[:3]}...")
+        
+        try:
+            backend = IonQBackend(api_key=cfg.IONQ_API_KEY, backend_name=cfg.IONQ_BACKEND_NAME)
+            n_qubits = 11
+            qc = QuantumCircuit(n_qubits)
+            
+            # Variational Layer: Ry(theta) + Entanglement
+            # We map params to qubits. If fewer params than qubits, recycle.
+            for i in range(n_qubits):
+                theta = params[i % len(params)]
+                qc.ry(theta, i)
+                qc.rx(theta/2, i) # Add some complexity
+                
+            # Entanglement Ring
+            for i in range(n_qubits - 1):
+                qc.cx(i, i+1)
+            qc.cx(n_qubits-1, 0)
+            
+            qc.measure_all()
+            
+            # Execute
+            counts = backend.execute('run_circuit', qc, shots=1024)
+            
+            # Process to Tensor (Same as _get_ionq_state)
+            bit_stream = []
+            for bitstring, count in counts.items():
+                bits = [1.0 if c == '1' else -1.0 for c in bitstring]
+                bit_stream.extend(bits * count)
+                
+            quantum_data = torch.tensor(bit_stream, device=device, dtype=torch.float32)
+            total_needed = grid_size * grid_size * d_state
+            repeats = (total_needed // len(quantum_data)) + 1
+            quantum_data = quantum_data.repeat(repeats)[:total_needed]
+            noise = quantum_data.reshape(1, grid_size, grid_size, d_state) * strength
+            
+            real, imag = torch.cos(noise), torch.sin(noise)
+            return torch.complex(real, imag)
+            
+        except Exception as e:
+            logging.error(f"❌ Variational Genesis Failed: {e}")
+            # Fallback to random
+            return QuantumState(grid_size, d_state, device, initial_mode='complex_noise').psi
+
     def _replicate_state(self, base_state, base_grid_size, target_grid_size):
         """
         Replica (tile) un estado de un grid más pequeño en un grid más grande.
@@ -223,7 +281,7 @@ class CartesianEngine:
     # Versión del motor
     VERSION = ENGINE_VERSION
     
-    def __init__(self, model_operator: nn.Module, grid_size: int, d_state: int, device, cfg=None, d_memory=None, initial_mode=None):
+    def __init__(self, model_operator: nn.Module, grid_size: int, d_state: int, device, cfg=None, d_memory=None, initial_mode=None, precomputed_state=None):
         self.device = device
         self.grid_size = int(grid_size)
         self.d_state = int(d_state)
@@ -256,7 +314,7 @@ class CartesianEngine:
         # Inicializar estado cuántico con soporte para memoria si es necesario
         # Si hay base_state, se replicará automáticamente en _initialize_state
         self.state = QuantumState(self.grid_size, self.d_state, device, d_memory=d_memory, 
-                                   initial_mode=initial_mode, base_state=base_state, base_grid_size=base_grid_size)
+                                   initial_mode=initial_mode, base_state=base_state, base_grid_size=base_grid_size, precomputed_state=precomputed_state)
         
         self.is_compiled = False
         self.cfg = cfg
@@ -328,19 +386,27 @@ class CartesianEngine:
         # 1. Evolución Normal
         new_psi = self.evolve_step(current_psi)
         
-        # 2. Inyección Cuántica
+        # 2. Inyección Cuántica (Hybrid Compute)
         if step_num % injection_interval == 0:
             # Lazy init del inyector para no cargar dependencias si no se usa
-            if not hasattr(self, 'quantum_injector'):
-                from ..physics.noise import QuantumNoiseInjector
-                self.quantum_injector = QuantumNoiseInjector(self.device)
+            if not hasattr(self, 'ionq_collapse'):
+                from ..physics.quantum_collapse import IonQCollapse
+                self.ionq_collapse = IonQCollapse(self.device)
             
-            # Inyectar ruido IonQ
-            # Esto usará el buffer interno del inyector para ser eficiente
-            new_psi = self.quantum_injector.apply_ionq_noise(new_psi, rate=noise_rate)
+            # Inyectar Colapso IonQ
+            # Elegimos un centro aleatorio para el evento de colapso
+            # O podríamos usar una región de alta entropía (más "cuántica")
+            import numpy as np
+            cx = np.random.randint(0, self.grid_size)
+            cy = np.random.randint(0, self.grid_size)
+            
+            new_psi = self.ionq_collapse.collapse(new_psi, region_center=(cy, cx), intensity=noise_rate)
+            
+            # También podemos mantener el ruido de fondo si se desea, 
+            # pero el colapso es el evento principal aquí.
             
             import logging
-            logging.info(f"⚡ Quantum Injection at step {step_num}")
+            logging.info(f"⚡ Hybrid Event: Quantum Collapse at step {step_num}")
             
         return new_psi
 

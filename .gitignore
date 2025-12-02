@@ -156,3 +156,4 @@ frontend/node_modules/
 # CMake build artifacts
 build/
 local_install/
+best_quantum_params.json

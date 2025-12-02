@@ -3,6 +3,10 @@ import os
 import logging
 import warnings
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde .env si existe
+load_dotenv()
 
 # --- Silenciar warnings ANTES de importar torch ---
 # Los warnings de CUDA se emiten durante la importación de torch,
