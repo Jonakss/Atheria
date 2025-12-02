@@ -95,3 +95,81 @@ class MockQuantumBackend(ComputeBackend):
             "qubits": self.num_qubits,
             "queue_depth": 0
         }
+
+class IonQBackend(ComputeBackend):
+    """
+    Backend for execution on IonQ quantum computers via Qiskit or API.
+    """
+    
+    def __init__(self, api_key: Optional[str] = None, backend_name: str = "ionq_simulator"):
+        self.api_key = api_key
+        self.backend_name = backend_name
+        self.device = torch.device("cpu") # Classical interface
+        self.provider = None
+        self.backend = None
+        
+        # Try to initialize Qiskit IonQ Provider
+        try:
+            from qiskit_ionq import IonQProvider
+            if self.api_key:
+                self.provider = IonQProvider(token=self.api_key)
+                self.backend = self.provider.get_backend(self.backend_name)
+                logging.info(f"⚛️ Initialized IonQBackend connected to {self.backend_name}")
+            else:
+                logging.warning("⚠️ IonQBackend initialized without API Key. Execution will fail.")
+        except ImportError:
+            logging.error("❌ qiskit-ionq not installed. Please run: pip install qiskit-ionq")
+        except Exception as e:
+            logging.error(f"❌ Error initializing IonQBackend: {e}")
+
+    def execute(self, operation: str, *args, **kwargs) -> Any:
+        """
+        Executes a quantum circuit on IonQ.
+        
+        Args:
+            operation: Must be 'run_circuit'
+            args[0]: QuantumCircuit object
+            kwargs: 'shots' (default 1024)
+        """
+        if operation != 'run_circuit':
+            raise ValueError(f"IonQBackend does not support operation: {operation}")
+            
+        if not self.backend:
+            raise RuntimeError("IonQ backend not initialized (missing key or library)")
+            
+        circuit = args[0]
+        shots = kwargs.get('shots', 1024)
+        
+        try:
+            job = self.backend.run(circuit, shots=shots)
+            logging.info(f"🚀 Job submitted to IonQ: {job.job_id()}")
+            
+            # Wait for result (blocking for now, can be made async)
+            result = job.result()
+            counts = result.get_counts()
+            return counts
+        except Exception as e:
+            logging.error(f"❌ IonQ execution failed: {e}")
+            raise
+
+    def get_device(self) -> torch.device:
+        return self.device
+    
+    def get_status(self) -> Dict[str, Any]:
+        status = "offline"
+        queue = 0
+        if self.backend:
+            try:
+                # This might vary based on backend status availability
+                b_status = self.backend.status()
+                status = "online" if b_status.operational else "maintenance"
+                queue = b_status.pending_jobs
+            except:
+                status = "unknown"
+                
+        return {
+            "type": "quantum_ionq",
+            "device": self.backend_name,
+            "status": status,
+            "queue_depth": queue
+        }

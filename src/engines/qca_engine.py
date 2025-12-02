@@ -17,18 +17,18 @@ class QuantumState:
     """
     Estado cuántico con soporte para memoria temporal (ConvLSTM).
     """
-    def __init__(self, grid_size, d_state, device, d_memory=None, initial_mode='complex_noise', base_state=None, base_grid_size=None):
+    def __init__(self, grid_size, d_state, device, d_memory=None, initial_mode='complex_noise', base_state=None, base_grid_size=None, precomputed_state=None):
         self.grid_size = grid_size
         self.d_state = d_state
         self.device = device
         self.d_memory = d_memory  # Dimensión de memoria para ConvLSTM
-        self.psi = self._initialize_state(mode=initial_mode, base_state=base_state, base_grid_size=base_grid_size)
+        self.psi = self._initialize_state(mode=initial_mode, base_state=base_state, base_grid_size=base_grid_size, precomputed_state=precomputed_state)
         # Estados de memoria para ConvLSTM (h_state y c_state)
         # Se inicializarán cuando se use un modelo ConvLSTM
         self.h_state = None
         self.c_state = None
         
-    def _initialize_state(self, mode='complex_noise', complex_noise_strength=0.1, base_state=None, base_grid_size=None):
+    def _initialize_state(self, mode='complex_noise', complex_noise_strength=0.1, base_state=None, base_grid_size=None, precomputed_state=None):
         """
         Inicializa el estado cuántico.
         
@@ -37,10 +37,15 @@ class QuantumState:
             complex_noise_strength: Intensidad del ruido complejo
             base_state: Estado base opcional a replicar (tensor complejo de tamaño menor)
             base_grid_size: Tamaño del grid del estado base (si se proporciona base_state)
+            precomputed_state: Tensor de estado ya calculado (para inyección directa)
         
         Si se proporciona base_state y base_grid_size < self.grid_size,
         el estado base se replicará (tile) en el grid más grande.
         """
+        # Si se proporciona un estado precalculado, usarlo directamente
+        if precomputed_state is not None:
+            return precomputed_state.to(self.device)
+
         # Si hay un estado base y el grid actual es más grande, replicar (tile) el estado
         if base_state is not None and base_grid_size is not None and base_grid_size < self.grid_size:
             return self._replicate_state(base_state, base_grid_size, self.grid_size)
@@ -56,8 +61,87 @@ class QuantumState:
             noise = torch.randn(1, self.grid_size, self.grid_size, self.d_state, device=self.device) * complex_noise_strength
             real, imag = torch.cos(noise), torch.sin(noise)
             return torch.complex(real, imag)
+        elif mode == 'ionq':
+            return self._get_ionq_state(complex_noise_strength)
         else:
             return torch.zeros(1, self.grid_size, self.grid_size, self.d_state, device=self.device, dtype=torch.complex64)
+
+    def _get_ionq_state(self, strength=0.1):
+        """
+        Generates an initial state using the IonQ Quantum Computer.
+        "Quantum Genesis": The universe starts from true quantum superposition/entanglement.
+        """
+        logging.info("⚛️ Quantum Genesis: Initializing universe from IonQ...")
+        try:
+            # Lazy import to avoid circular dependencies/errors if not used
+            from .compute_backend import IonQBackend
+            from .. import config as cfg
+            
+            # Initialize Backend
+            backend = IonQBackend(api_key=cfg.IONQ_API_KEY, backend_name=cfg.IONQ_BACKEND_NAME)
+            
+            # Create a Quantum Circuit (Superposition + Entanglement)
+            # We use a simple circuit to generate complex correlations
+            from qiskit import QuantumCircuit
+            n_qubits = 11 # Standard for IonQ basic access
+            qc = QuantumCircuit(n_qubits)
+            
+            # 1. Superposition (Hadamard on all)
+            qc.h(range(n_qubits))
+            
+            # 2. Entanglement (CNOT chain)
+            for i in range(n_qubits - 1):
+                qc.cx(i, i+1)
+            qc.cx(n_qubits-1, 0) # Close the loop
+            
+            # 3. Measurement
+            qc.measure_all()
+            
+            # Execute
+            # We request enough shots to fill a reasonable portion of the grid
+            # Cost Optimization: Use the bitstrings from shots to fill the grid
+            # 1024 shots * 11 bits = ~11k bits. 
+            # Grid 256x256 = 65k cells. We will tile/repeat.
+            shots = 1024 
+            counts = backend.execute('run_circuit', qc, shots=shots)
+            
+            # Convert counts to a tensor
+            # We'll construct a noise tensor from the bitstrings
+            # This is a simple mapping: '0' -> -1, '1' -> +1
+            
+            # Flatten results into a long string of bits
+            bit_stream = []
+            for bitstring, count in counts.items():
+                # Repeat bitstring 'count' times to respect probability distribution
+                # or just use unique bitstrings? 
+                # For "noise", respecting distribution is better representation of the wavefunction
+                bits = [1.0 if c == '1' else -1.0 for c in bitstring]
+                bit_stream.extend(bits * count)
+                
+            # Convert to tensor
+            quantum_data = torch.tensor(bit_stream, device=self.device, dtype=torch.float32)
+            
+            # Reshape/Resize to match grid
+            total_needed = self.grid_size * self.grid_size * self.d_state
+            
+            # Repeat the stream to fill the grid
+            repeats = (total_needed // len(quantum_data)) + 1
+            quantum_data = quantum_data.repeat(repeats)[:total_needed]
+            
+            # Reshape to (1, H, W, d_state)
+            noise = quantum_data.reshape(1, self.grid_size, self.grid_size, self.d_state)
+            
+            # Scale by strength
+            noise = noise * strength
+            
+            # Map to complex phase
+            real, imag = torch.cos(noise), torch.sin(noise)
+            logging.info("✨ Quantum Genesis Complete.")
+            return torch.complex(real, imag)
+            
+        except Exception as e:
+            logging.error(f"❌ Quantum Genesis Failed: {e}. Falling back to pseudo-random noise.")
+            return self._initialize_state(mode='complex_noise', complex_noise_strength=strength)
     
     def _replicate_state(self, base_state, base_grid_size, target_grid_size):
         """
@@ -139,14 +223,18 @@ class CartesianEngine:
     # Versión del motor
     VERSION = ENGINE_VERSION
     
-    def __init__(self, model_operator: nn.Module, grid_size: int, d_state: int, device, cfg=None, d_memory=None):
+    def __init__(self, model_operator: nn.Module, grid_size: int, d_state: int, device, cfg=None, d_memory=None, initial_mode=None):
         self.device = device
         self.grid_size = int(grid_size)
+        self.d_state = int(d_state)
+        self.operator = model_operator
+        self.original_model = model_operator
         
-        # Obtener modo de inicialización desde cfg o usar default
-        initial_mode = 'complex_noise'
-        if cfg is not None:
-            initial_mode = getattr(cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')
+        # Obtener modo de inicialización: argumento > cfg > default
+        if initial_mode is None:
+            initial_mode = 'complex_noise'
+            if cfg is not None:
+                initial_mode = getattr(cfg, 'INITIAL_STATE_MODE_INFERENCE', 'complex_noise')
         
         # Si hay un training_grid_size diferente (menor) que inference_grid_size,
         # crear un estado base del tamaño de entrenamiento y replicarlo (tile) en el grid más grande
@@ -160,6 +248,10 @@ class CartesianEngine:
                 base_state = base_state_temp.psi
                 base_grid_size = training_grid_size
                 logging.info(f"🔄 Grid escalado: Creando estado base {training_grid_size}x{training_grid_size} para replicar (tile) en {self.grid_size}x{self.grid_size}")
+        
+        # Detectar si el modelo tiene memoria (ConvLSTM)
+        self.has_memory = hasattr(model_operator, 'convlstm') or 'ConvLSTM' in model_operator.__class__.__name__
+        self.d_memory = d_memory
         
         # Inicializar estado cuántico con soporte para memoria si es necesario
         # Si hay base_state, se replicará automáticamente en _initialize_state
@@ -175,6 +267,10 @@ class CartesianEngine:
         
         if self.has_memory:
             logging.info(f"Motor con memoria temporal (ConvLSTM) inicializado. d_memory={d_memory}")
+            
+        # Inicializar optimizador GPU
+        from ..optimization.gpu_optimizer import GPUOptimizer
+        self.optimizer = GPUOptimizer(self.device)
 
     def evolve_internal_state(self, step=None):
         if self.state.psi is None: return
@@ -221,6 +317,32 @@ class CartesianEngine:
     def evolve_step(self, current_psi):
         with torch.set_grad_enabled(True):
             return self._evolve_logic(current_psi)
+
+    def evolve_hybrid_step(self, current_psi, step_num, injection_interval=10, noise_rate=0.05):
+        """
+        Evolución Híbrida: Ley M (Clásica/Neural) + Perturbación Cuántica (IonQ).
+        
+        Cada 'injection_interval' pasos, se inyecta ruido cuántico real para
+        sacar al sistema de atractores cíclicos y fomentar la complejidad.
+        """
+        # 1. Evolución Normal
+        new_psi = self.evolve_step(current_psi)
+        
+        # 2. Inyección Cuántica
+        if step_num % injection_interval == 0:
+            # Lazy init del inyector para no cargar dependencias si no se usa
+            if not hasattr(self, 'quantum_injector'):
+                from ..physics.noise import QuantumNoiseInjector
+                self.quantum_injector = QuantumNoiseInjector(self.device)
+            
+            # Inyectar ruido IonQ
+            # Esto usará el buffer interno del inyector para ser eficiente
+            new_psi = self.quantum_injector.apply_ionq_noise(new_psi, rate=noise_rate)
+            
+            import logging
+            logging.info(f"⚡ Quantum Injection at step {step_num}")
+            
+        return new_psi
 
     def _evolve_logic(self, psi_in):
         """

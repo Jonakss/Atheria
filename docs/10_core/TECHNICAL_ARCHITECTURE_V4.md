@@ -7,6 +7,9 @@ src/
 │   ├── include/       # Headers (.h)
 │   └── src/           # Implementación (.cpp, .cu)
 ├── engines/           # Motores de Simulación
+│   ├── backends/           # Backends de Cómputo (Hardware Abstraction)
+│   │   ├── compute_backend.py  # Interfaz Base + IonQBackend
+│   │   └── ...
 │   ├── native_engine_wrapper.py # Wrapper Híbrido (Native -> Python Fallback)
 │   ├── harmonic_engine.py  # Motor Disperso Python (Legacy/Fallback)
 │   └── qca_engine.py       # Motor Denso (Laboratorio/Entrenamiento)
@@ -27,6 +30,10 @@ src/
 A. Entrenamiento (The Lab)
 
 Trainer -> Dense Engine (QCA) -> Noise Injector -> U-Net -> Loss (Stability + Symmetry) -> Update Weights
+
+C. Computación Cuántica (IonQ Integration)
+
+Engine -> ComputeBackend (IonQBackend) -> Qiskit/API -> IonQ QPU/Simulator -> Results -> Engine
 
 B. Inferencia (The Universe) - Arquitectura Híbrida
 

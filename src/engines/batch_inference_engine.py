@@ -131,6 +131,96 @@ class BatchInferenceEngine:
         self.current_step = 0
         logging.info(f"Inicializados {num_simulations} estados cuánticos")
     
+    def initialize_from_ionq_multiverse(self, num_universes: int, strength: float = 0.1):
+        """
+        Quantum Multiverse Initialization:
+        Executes a SINGLE quantum circuit on IonQ with `shots=num_universes`.
+        Each shot (measurement outcome) seeds a separate universe in the batch.
+        
+        This creates a "Many Worlds" simulation where each instance represents
+        a different collapse of the same initial quantum wavefunction.
+        """
+        import logging
+        from .compute_backend import IonQBackend
+        from .. import config as cfg
+        from qiskit import QuantumCircuit
+        
+        logging.info(f"🌌 Quantum Multiverse: Spawning {num_universes} universes from IonQ...")
+        
+        try:
+            # 1. Setup Backend & Circuit
+            backend = IonQBackend(api_key=cfg.IONQ_API_KEY, backend_name=cfg.IONQ_BACKEND_NAME)
+            n_qubits = 11
+            qc = QuantumCircuit(n_qubits)
+            qc.h(range(n_qubits)) # Superposition
+            for i in range(n_qubits - 1): # Entanglement
+                qc.cx(i, i+1)
+            qc.cx(n_qubits-1, 0)
+            qc.measure_all()
+            
+            # 2. Execute ONE job with shots = num_universes
+            # This is cost-efficient: 1 job credit for N universes
+            counts = backend.execute('run_circuit', qc, shots=num_universes)
+            
+            # 3. Process results into individual seeds
+            # We need exactly num_universes seeds. 
+            # 'counts' gives us unique bitstrings and their frequency.
+            # We expand this back into a list of bitstrings.
+            bitstrings = []
+            for bitstring, count in counts.items():
+                bitstrings.extend([bitstring] * count)
+            
+            # Ensure we have enough (IonQ might return fewer shots if some failed, though rare)
+            # Or if shots > num_universes requested (unlikely via API but possible logic wise)
+            if len(bitstrings) < num_universes:
+                # Pad with random choice if missing
+                import random
+                bitstrings.extend(random.choices(bitstrings, k=num_universes - len(bitstrings)))
+            
+            bitstrings = bitstrings[:num_universes]
+            
+            # 4. Initialize States
+            self.states = []
+            for i, bitstring in enumerate(bitstrings):
+                # Convert bitstring to tensor noise
+                # '0' -> -1, '1' -> 1
+                bits = [1.0 if c == '1' else -1.0 for c in bitstring]
+                quantum_data = torch.tensor(bits, device=self.device, dtype=torch.float32)
+                
+                # Tile to fill grid
+                total_needed = self.grid_size * self.grid_size * self.d_state
+                repeats = (total_needed // len(quantum_data)) + 1
+                quantum_data = quantum_data.repeat(repeats)[:total_needed]
+                noise = quantum_data.reshape(1, self.grid_size, self.grid_size, self.d_state)
+                
+                # Map to complex state
+                noise = noise * strength
+                real, imag = torch.cos(noise), torch.sin(noise)
+                psi_universe = torch.complex(real, imag)
+                
+                # Create QuantumState with this specific seed
+                state = QuantumState(
+                    self.grid_size,
+                    self.d_state,
+                    self.device,
+                    precomputed_state=psi_universe
+                )
+                self.states.append(state)
+                
+            logging.info(f"✨ Multiverse Created: {len(self.states)} universes initialized.")
+            
+            # Initialize memory if needed
+            if hasattr(self.model, 'convlstm') or 'ConvLSTM' in self.model.__class__.__name__:
+                memory_shape = (len(self.states), 64, self.grid_size, self.grid_size) # 64 is d_model usually
+                self.h_states = torch.zeros(*memory_shape, device=self.device)
+                self.c_states = torch.zeros(*memory_shape, device=self.device)
+                
+            self.current_step = 0
+                
+        except Exception as e:
+            logging.error(f"❌ Quantum Multiverse Failed: {e}. Falling back to random.")
+            self.initialize_states(num_universes, initial_mode='complex_noise')
+    
     def evolve_batch(self, steps: int = 1):
         """
         Evoluciona todos los estados en batch por N pasos.

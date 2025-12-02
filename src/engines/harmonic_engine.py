@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import math
+import logging
 
 class HarmonicVacuum:
     """
@@ -80,6 +81,45 @@ class SparseHarmonicEngine:
         self.matter = {} 
         self.active_coords = set()
         self.step_count = 0
+
+    def initialize_matter(self, mode='random', strength=1.0):
+        """
+        Inicializa la materia del universo.
+        Soporta 'ionq' para Quantum Genesis.
+        """
+        from .qca_engine import QuantumState
+        
+        logging.info(f"🌌 HarmonicEngine: Initializing matter with mode='{mode}'...")
+        
+        # Usamos QuantumState para generar la distribución inicial (sea random o ionq)
+        # Esto reutiliza la lógica de conexión a IonQ de qca_engine
+        qs = QuantumState(self.grid_size, self.d_state, self.device, initial_mode=mode)
+        
+        # Si el modo es ionq o complex_noise, qs.psi tendrá datos
+        # Convertimos ese estado denso a partículas en el HarmonicEngine
+        if qs.psi is not None:
+            # Extraer energía para decidir dónde poner partículas
+            # qs.psi es [1, H, W, d_state]
+            psi = qs.psi[0]
+            density = psi.abs().pow(2).sum(dim=-1) # [H, W]
+            
+            # Umbral para crear materia
+            # En modo ionq/noise, queremos que surjan partículas en los picos
+            threshold = density.mean() + density.std()
+            
+            indices = torch.nonzero(density > threshold)
+            
+            count = 0
+            for idx in indices:
+                y, x = idx[0].item(), idx[1].item()
+                # Tomamos el estado del tensor y lo inyectamos como materia
+                state_vec = psi[y, x] * strength
+                self.add_matter(x, y, 0, state_vec) # Z=0 por defecto
+                count += 1
+                
+            logging.info(f"✨ Quantum Genesis: {count} particles created from {mode} distribution.")
+        else:
+            logging.warning("⚠️ QuantumState returned None. No matter initialized.")
 
     def get_dense_state(self, check_pause_callback=None):
         """
