@@ -306,6 +306,17 @@ async def handle_pause(args):
         }
     )
 
+    # Limpiar buffer de cache para detener reproducción inmediata
+    try:
+        if g_state.get('cache') and g_state['cache'].is_enabled():
+            from src.config import CACHE_STREAM_KEY
+            cache_client = g_state['cache'].client
+            if cache_client:
+                cache_client.delete(CACHE_STREAM_KEY)
+                logging.info("🧹 Buffer de cache limpiado al pausar.")
+    except Exception as e:
+        logging.warning(f"Error limpiando cache al pausar: {e}")
+
     await broadcast({"type": "inference_status_update", "payload": status_payload})
     if ws:
         await send_notification(ws, "Simulación pausada.", "info")
@@ -530,6 +541,7 @@ async def handle_load_experiment(args):
                         # Re-importar dentro del thread para evitar problemas de contexto
                         import torch
                         import gc
+                        from ...model_loader import load_model
 
                         exp_cfg_thread = load_experiment_config(exp_name)
                         if not exp_cfg_thread:
@@ -1060,6 +1072,101 @@ async def handle_inject_energy(args):
             await send_notification(ws, f"Error: {str(e)}", "error")
 
 
+async def handle_set_viz(args):
+    """Cambia el tipo de visualización."""
+    viz_type = args.get("viz_type", "density")
+    g_state['viz_type'] = viz_type
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    
+    if ws:
+        await send_notification(ws, f"Visualización cambiada a: {viz_type}", "info")
+    
+    # Si hay un motor activo, enviar un frame actualizado inmediatamente
+    # SOLO si live_feed está habilitado
+    live_feed_enabled = g_state.get('live_feed_enabled', True)
+    if g_state.get('motor') and live_feed_enabled:
+        try:
+            motor = g_state['motor']
+            # Verificar si el motor tiene estado válido antes de intentar visualizar
+            if hasattr(motor, 'state') and motor.state and motor.state.psi is None:
+                # Si es motor Python y psi es None, no hacer nada
+                return
+            
+            # Para motores que no usan state.psi (Harmonic/Lattice), get_visualization_data manejará la extracción
+            
+            from ..viz import get_visualization_data
+            delta_psi = motor.last_delta_psi if hasattr(motor, 'last_delta_psi') else None
+            
+            # Obtener psi de forma segura según el tipo de motor
+            psi = None
+            if hasattr(motor, 'get_dense_state'):
+                 # Usar get_dense_state para motores que lo soporten (Harmonic, Lattice, Native)
+                 # No pasamos ROI aquí para la actualización inmediata, o podríamos si tuviéramos acceso al ROI manager
+                 # Por simplicidad, dejamos que get_visualization_data maneje la lógica o pasamos None
+                 psi = motor.get_dense_state()
+            elif hasattr(motor, 'state') and motor.state:
+                psi = motor.state.psi
+                
+            if psi is not None:
+                viz_data = get_visualization_data(psi, viz_type, delta_psi=delta_psi, motor=motor)
+                if viz_data and isinstance(viz_data, dict):
+                    frame_payload = {
+                        "step": g_state.get('simulation_step', 0),
+                        "map_data": viz_data.get("map_data", []),
+                        "hist_data": viz_data.get("hist_data", {}),
+                        "poincare_coords": viz_data.get("poincare_coords", []),
+                        "phase_attractor": viz_data.get("phase_attractor"),
+                        "flow_data": viz_data.get("flow_data"),
+                        "phase_hsv_data": viz_data.get("phase_hsv_data"),
+                        "complex_3d_data": viz_data.get("complex_3d_data")
+                    }
+                    await broadcast({"type": "simulation_frame", "payload": frame_payload})
+        except Exception as e:
+            logging.error(f"Error al actualizar visualización: {e}", exc_info=True)
+
+
+async def handle_set_roi_mode(args):
+    """Configura el modo ROI (Region of Interest)."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    enabled = args.get('enabled', True)
+    
+    roi_manager = g_state.get('roi_manager')
+    if not roi_manager:
+        if ws:
+            await send_notification(ws, "⚠️ ROI Manager no inicializado.", "warning")
+        return
+
+    if enabled:
+        # Activar ROI (volver a ventana centrada de 256x256 o lo que estaba configurado)
+        # Por defecto, si no hay configuración previa, centrar 256x256
+        grid_size = roi_manager.grid_size
+        roi_size = 256
+        if grid_size > roi_size:
+            roi_x = max(0, (grid_size - roi_size) // 2)
+            roi_y = max(0, (grid_size - roi_size) // 2)
+            roi_manager.set_roi(roi_x, roi_y, roi_size, roi_size)
+            msg = "🔍 ROI activado: Vista enfocada."
+        else:
+            msg = "ℹ️ Grid es pequeño, ROI no es necesario."
+    else:
+        # Desactivar ROI (mostrar todo)
+        roi_manager.clear_roi()
+        msg = "🌍 ROI desactivado: Vista completa."
+
+    logging.info(msg)
+    if ws:
+        await send_notification(ws, msg, "info")
+
+    # Broadcast ROI status update
+    await broadcast({
+        "type": "roi_status_update",
+        "payload": roi_manager.get_roi_info()
+    })
+    
+    # Forzar actualización de frame inmediata
+    await handle_set_viz({'ws_id': args.get('ws_id'), 'viz_type': g_state.get('viz_type', 'density')})
+
+
 HANDLERS = {
     "play": handle_play,
     "pause": handle_pause,
@@ -1070,4 +1177,6 @@ HANDLERS = {
     "inject_energy": handle_inject_energy,
     "set_inference_config": handle_set_inference_config,
     "set_config": handle_set_inference_config,
+    "set_viz": handle_set_viz,
+    "set_roi_mode": handle_set_roi_mode,
 }

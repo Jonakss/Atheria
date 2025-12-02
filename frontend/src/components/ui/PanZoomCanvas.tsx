@@ -1043,6 +1043,25 @@ export function PanZoomCanvas({ historyFrame }: PanZoomCanvasProps = {}) {
                 />
             </div>
 
+            {/* ROI Gradient Overlay */}
+            {simData?.roi_info?.enabled && (simData.roi_info.reduction_ratio > 1) && (
+                <div 
+                    className="absolute inset-0 pointer-events-none z-10"
+                    style={{
+                        boxShadow: 'inset 0 0 100px 30px rgba(0, 0, 0, 0.7)',
+                        background: 'radial-gradient(circle, transparent 50%, rgba(0, 0, 0, 0.3) 100%)'
+                    }}
+                >
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-orange-500/20 border border-orange-500/50 text-orange-200 px-3 py-1 rounded-full text-xs font-mono backdrop-blur-sm flex items-center gap-2 shadow-lg">
+                        <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                        ROI ACTIVO ({simData.roi_info.width}x{simData.roi_info.height})
+                    </div>
+                    
+                    {/* Bordes indicativos */}
+                    <div className="absolute inset-4 border border-orange-500/20 rounded-lg border-dashed opacity-50" />
+                </div>
+            )}
+
             {/* Overlays (Grid, Coords, etc) */}
             <CanvasOverlays 
                 canvasRef={useShaderRendering ? (containerRefShader.current?.querySelector('canvas') as any) : canvasRef}

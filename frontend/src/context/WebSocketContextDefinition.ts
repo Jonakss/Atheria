@@ -84,9 +84,9 @@ export interface TrainingCheckpoint {
 }
 
 export interface InferenceSnapshot {
-    step: number;
-    timestamp: string;
-    filepath_pt: string;
+  step: number;
+  timestamp: string;
+  filepath_pt: string;
 }
 
 export interface CompileStatus {
@@ -138,6 +138,7 @@ export interface WebSocketContextType {
   liveFeedEnabled: boolean; // Estado del live feed (sincronizado con backend)
   setLiveFeedEnabled: (enabled: boolean) => void; // Función para cambiar live feed
   setStepsInterval: (interval: number) => void; // Función para cambiar el intervalo de pasos
+  roiInfo: any; // Información de ROI actual
 }
 
 export const WebSocketContext = createContext<WebSocketContextType | undefined>(

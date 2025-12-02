@@ -69,9 +69,13 @@ def main():
     parser.add_argument("--continue_training", action="store_true")
     parser.add_argument("--noise_level", type=float, default=0.05, help="Maximum noise level for training")
     parser.add_argument("--engine_type", type=str, default="PYTHON", choices=["PYTHON", "NATIVE", "LATTICE", "HARMONIC", "POLAR", "CARTESIAN"], help="Physics engine type")
-    parser.add_argument("--backend_type", type=str, default="LOCAL", choices=["LOCAL", "QUANTUM_MOCK", "QUANTUM_IONQ", "QUANTUM_IBM"], help="Compute backend type")
+    parser.add_argument("--backend_type", type=str, default="LOCAL", choices=["LOCAL", "QUANTUM_MOCK", "QUANTUM_IONQ", "QUANTUM_IBM", "GPU"], help="Compute backend type")
     
     args = parser.parse_args()
+
+    # Remap GPU to LOCAL for compatibility
+    if args.backend_type == "GPU":
+        args.backend_type = "LOCAL"
     
     # Decodificamos el string JSON a un diccionario de Python
     try:

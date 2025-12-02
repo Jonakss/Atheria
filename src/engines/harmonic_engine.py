@@ -121,13 +121,14 @@ class SparseHarmonicEngine:
         else:
             logging.warning("⚠️ QuantumState returned None. No matter initialized.")
 
-    def get_dense_state(self, check_pause_callback=None):
+    def get_dense_state(self, roi=None, check_pause_callback=None):
         """
         Retorna el estado denso completo del universo (o viewport).
         Compatible con la interfaz de CartesianEngine.
         """
         # Usar centro del grid (0,0,0) y tamaño completo
         # Nota: En universo infinito, esto solo muestra la región central
+        # Si se pasa ROI, podríamos optimizar, pero por ahora ignoramos ROI y devolvemos todo o el viewport central
         return self.get_viewport_tensor((0, 0, 0), self.grid_size, self.step_count * 0.1)
 
     def add_matter(self, x, y, z, state):
@@ -173,7 +174,10 @@ class SparseHarmonicEngine:
                 viewport_state[ly, lx] = m_state
                 local_matter_mask[ly, lx] = 1.0
                 
-        return viewport_state
+        # Permutar a [C, H, W] y agregar dimensión de batch [1, C, H, W]
+        viewport_state = viewport_state.permute(2, 0, 1).unsqueeze(0)
+        
+        return torch.complex(viewport_state, torch.zeros_like(viewport_state))
 
     def step(self):
         self.step_count += 1
@@ -292,3 +296,9 @@ class SparseHarmonicEngine:
         """
         self.step()
         return current_psi
+
+    def evolve_internal_state(self, step=None):
+        """
+        Alias para step() para compatibilidad.
+        """
+        self.step()

@@ -106,13 +106,15 @@ def get_visualization_data(psi, viz_type: str, delta_psi: torch.Tensor = None, m
         result['phase_attractor'] = calculate_phase_attractor(psi)
         
     if viz_type == 'flow':
-        result['flow_data'] = calculate_flow_data(psi)
+        # Use delta_psi if available, otherwise fallback to psi (though flow usually implies change)
+        flow_input = delta_psi if delta_psi is not None else psi
+        result['flow_data'] = calculate_flow_data(flow_input)
     
     if viz_type == 'phase_hsv':
         result['phase_hsv_data'] = calculate_phase_hsv_data(phase, density)
         
     if viz_type == 'complex_3d':
-        result['complex_3d_data'] = calculate_complex_3d_data(psi)
+        result['complex_3d_data'] = calculate_complex_3d_data(real_part, imag_part)
 
     return result
 

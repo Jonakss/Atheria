@@ -108,6 +108,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'running' | 'completed' | 'cancelled' | 'error'>('idle');
     const [analysisType, setAnalysisType] = useState<'universe_atlas' | 'cell_chemistry' | null>(null);
     const [compileStatus, setCompileStatus] = useState<CompileStatus | null>(null);
+    const [roiInfo, setRoiInfo] = useState<any>(null); // Estado de ROI
     // Usar una referencia para acceder al valor actual de activeExperiment en callbacks
     const activeExperimentRef = useRef<string | null>(null);
     
@@ -609,6 +610,13 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         // Resultado de análisis UMAP recibido
                         window.dispatchEvent(new CustomEvent('analysis_result_received', { detail: payload }));
                         break;
+                    case 'roi_status_update':
+                        // Actualización de estado ROI
+                        if (process.env.NODE_ENV === 'development') {
+                            console.log('🔍 WebSocketContext - ROI status update:', payload);
+                        }
+                        setRoiInfo(payload);
+                        break;
                 }
             } catch (error) {
                 console.error("Error procesando mensaje:", error);
@@ -696,6 +704,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         liveFeedEnabled, // Estado del live feed (sincronizado con backend)
         setLiveFeedEnabled, // Función para cambiar live feed
         setStepsInterval, // Función para cambiar el intervalo de pasos
+        roiInfo, // Información de ROI actual
     };
 
     return (

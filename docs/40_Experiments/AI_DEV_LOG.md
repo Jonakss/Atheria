@@ -41,6 +41,7 @@
 -   **Lifecycle Demo**: Creado y ejecutado `scripts/experiment_quantum_lifecycle.py` demostrando el ciclo completo: Entrenamiento Híbrido -> Tuning Cuántico -> Inferencia Interactiva (Steering + Microscope).
 
 ## [2025-12-02] Quantum Multiverse Implementation
+- **[[logs/2025-12-02_roi_visualization_improvements|2025-12-02 - Feature: ROI Visualization Improvements ("See All" Toggle & Gradient Overlay)]]**
 - **2025-12-02**: Implemented Cache Buffering (Streaming) using Dragonfly. Decoupled simulation speed from frontend visualization by pushing frames to a Redis list (`simulation:stream`) and consuming them at a constant rate. Added `CACHE_BUFFERING_ENABLED` to config. Updated `DataProcessingService` (producer) and `WebSocketService` (consumer). Verified with `scripts/verify_buffering.py`. [Log](logs/2025-12-02_cache_buffering_implementation.md)
 - **2025-12-01**: Fixed `motor_factory.py` to support `LATTICE` and `HARMONIC` engines. Added `shape` property to `QuantumStatePolar`. Investigated Native Engine crash (`terminate called recursively`) but could not resolve it without C++ debugging access; suspected tensor interface mismatch. [Log](logs/2025-12-01_fix_engine_support_and_native_crash.md)
 - [[logs/2025-12-01_fix_trainer_engine_and_motor_factory|2025-12-01 - Fix: Trainer Engine Type Support & Motor Factory Signature]]

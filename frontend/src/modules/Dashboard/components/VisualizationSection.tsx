@@ -1,4 +1,4 @@
-import { Activity, Box, Eye, Microscope, Zap } from 'lucide-react';
+import { Activity, Box, Eye, Maximize, Microscope, Minimize, Zap } from 'lucide-react';
 import React, { useState } from 'react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 
@@ -15,7 +15,7 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
   selectedLayer = 0,
   onLayerChange
 }) => {
-  const { sendCommand, selectedViz } = useWebSocket();
+  const { sendCommand, selectedViz, setSelectedViz, roiInfo } = useWebSocket();
   const [gammaDecay, setGammaDecay] = useState(0.015);
   const [thermalNoise, setThermalNoise] = useState(0.002);
   const [pointSize, setPointSize] = useState(1.0);
@@ -82,6 +82,43 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* ROI Control */}
+      <div className="space-y-3 pt-4 border-t border-white/5">
+        <div className="flex items-center gap-2 text-gray-200 text-xs font-bold uppercase tracking-wider mb-2">
+          <Maximize size={12} className="text-orange-500" /> Control de Vista
+        </div>
+        
+        <button
+          onClick={() => sendCommand('inference', 'set_roi_mode', { enabled: !roiInfo?.enabled })}
+          className={`w-full flex items-center justify-between p-2 rounded border transition-all ${
+            !roiInfo?.enabled
+              ? 'bg-orange-500/20 border-orange-500/50 text-orange-200'
+              : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {!roiInfo?.enabled ? <Minimize size={14} /> : <Maximize size={14} />}
+            <span className="text-xs font-medium">
+              {!roiInfo?.enabled ? 'Vista Completa (See All)' : 'Vista Enfocada (ROI)'}
+            </span>
+          </div>
+          {roiInfo && (
+            <span className="text-[9px] font-mono opacity-70">
+              {roiInfo.enabled 
+                ? `${roiInfo.width}x${roiInfo.height}` 
+                : 'Full Grid'}
+            </span>
+          )}
+        </button>
+        
+        {roiInfo?.enabled && (
+          <div className="text-[9px] text-gray-500 px-1">
+            <p>Viendo región de interés optimizada.</p>
+            <p>Ratio de reducción: {roiInfo.reduction_ratio?.toFixed(1)}x</p>
+          </div>
+        )}
       </div>
 
       {/* Global Parameters */}
@@ -193,7 +230,11 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
         
         <select
           value={selectedViz || 'density'}
-          onChange={(e) => sendCommand('inference', 'set_viz', { viz_type: e.target.value })}
+          onChange={(e) => {
+            const newViz = e.target.value;
+            setSelectedViz(newViz);
+            sendCommand('inference', 'set_viz', { viz_type: newViz });
+          }}
           className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-cyan-500/50"
         >
           <option value="density">Densidad |ψ|²</option>

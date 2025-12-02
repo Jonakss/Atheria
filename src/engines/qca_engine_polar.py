@@ -109,3 +109,16 @@ class QuantumStatePolar:
     @property
     def shape(self):
         return self.magnitude.shape
+
+    def squeeze(self, dim=None):
+        """
+        Returns a squeezed complex tensor representation of the state.
+        Required by VisualizationPipeline which expects a tensor.
+        """
+        real = self.magnitude * torch.cos(self.phase)
+        imag = self.magnitude * torch.sin(self.phase)
+        complex_tensor = torch.complex(real, imag)
+        
+        if dim is None:
+            return complex_tensor.squeeze()
+        return complex_tensor.squeeze(dim)

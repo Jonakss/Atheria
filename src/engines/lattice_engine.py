@@ -208,3 +208,18 @@ class LatticeEngine:
         """
         self.step()
 
+    def get_dense_state(self, roi=None, check_pause_callback=None):
+        """
+        Retorna el estado denso para visualización.
+        Convierte la densidad de acción/energía a un tensor complejo compatible.
+        """
+        # Obtener densidad de energía [H, W]
+        energy = self.get_visualization_data("density")
+        
+        # Reshape a [1, H, W, 1]
+        energy = energy.unsqueeze(0).unsqueeze(-1)
+        
+        # Retornar como complejo (Real=Energía, Imag=0)
+        # Esto asegura compatibilidad con pipelines que esperan complejos
+        return torch.complex(energy, torch.zeros_like(energy))
+

@@ -129,7 +129,7 @@ class DataProcessingService(BaseService):
                 
                 # 6. Enviar a cola de broadcast o Cache Buffering
                 from src.config import CACHE_BUFFERING_ENABLED, CACHE_STREAM_KEY, CACHE_STREAM_MAX_LEN
-                from src.server.server_state import g_state
+                # from src.server.server_state import g_state  <-- REMOVED: Redundant and causes UnboundLocalError
                 
                 # Si el buffering está habilitado y el caché está activo
                 if CACHE_BUFFERING_ENABLED and g_state.get('cache') and g_state['cache'].is_enabled():
