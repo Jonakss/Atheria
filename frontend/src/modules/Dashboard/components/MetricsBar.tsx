@@ -35,23 +35,24 @@ export const MetricsBar: React.FC = () => {
 
   return (
     <div className="mt-auto z-30 border-t border-white/10 bg-[#050505]/95 backdrop-blur-sm p-2 transition-all duration-300">
-      <div className="max-w-7xl mx-auto flex items-stretch gap-4">
+      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-stretch gap-2 md:gap-4">
         
         {/* Controls Section */}
-        <div className={`transition-all duration-300 ease-in-out ${ viewMode === 'controls' ? 'flex-1' : 'w-auto'
+        <div className={`transition-all duration-300 ease-in-out ${ viewMode === 'controls' ? 'flex-1 w-full' : 'w-full md:w-auto'
         }`}>
             <HistoryControls mode={viewMode === 'controls' ? 'full' : 'compact'} />
         </div>
 
-        {/* Scientific Metrics - Compact Display */}
+        {/* Scientific Metrics - Compact Display (Hidden on Mobile) */}
         {viewMode === 'controls' && (
-          <div className="flex items-center px-4 border-l border-white/5">
+          <div className="hidden md:flex items-center px-4 border-l border-white/5">
             <ScientificMetrics compact={true} />
           </div>
         )}
 
-        {/* Separator / Toggle Button */}
-        <div className="flex items-center">
+        {/* Separator / Toggle Button (Hidden on Mobile, or repurposed?) */}
+        {/* On mobile, maybe we want tabs instead of a side toggle? For now, keep it simple but ensure it doesn't break layout */}
+        <div className="hidden md:flex items-center">
             <button
                 onClick={() => setViewMode(prev => prev === 'controls' ? 'logs' : 'controls')}
                 className="p-1.5 rounded-full hover:bg-white/10 text-gray-500 hover:text-white transition-colors border border-transparent hover:border-white/10"

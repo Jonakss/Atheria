@@ -5,11 +5,13 @@ import { getFormattedVersion } from '../../../utils/version';
 import { EpochBadge } from './EpochBadge';
 import { SettingsPanel } from './SettingsPanel';
 
+import { Menu } from 'lucide-react';
+
 interface ScientificHeaderProps {
-  // No props are currently used, but the interface is kept for future reference.
+  onToggleMobileMenu?: () => void;
 }
 
-export const ScientificHeader: React.FC<ScientificHeaderProps> = () => {
+export const ScientificHeader: React.FC<ScientificHeaderProps> = ({ onToggleMobileMenu }) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [engineDropdownOpen, setEngineDropdownOpen] = useState(false);
   const { connectionStatus, compileStatus, connect, disconnect, sendCommand, simData } = useWebSocket();
@@ -165,14 +167,14 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = () => {
   }, [connectionStatus, compileStatus, sendCommand]);
 
   return (
-    <header className="h-12 border-b border-white/10 bg-dark-990/90 backdrop-blur-md flex items-center justify-between px-4 z-50 shrink-0">
-      <div className="flex items-center gap-6">
+    <header className="h-12 border-b border-white/10 bg-dark-990/90 backdrop-blur-md flex items-center justify-between px-2 md:px-4 z-50 shrink-0">
+      <div className="flex items-center gap-3 md:gap-6">
         {/* Identidad */}
         <div className="flex items-center gap-3 group cursor-pointer opacity-90 hover:opacity-100 transition-opacity">
           <div className="relative w-6 h-6 flex items-center justify-center border border-white/10 rounded bg-white/5">
             <Aperture size={14} className="text-dark-200" />
           </div>
-          <div className="flex flex-col leading-none">
+          <div className="hidden md:flex flex-col leading-none">
             <span className="text-xs font-bold text-dark-100 tracking-wide">
               ATHERIA<span className="text-teal-400">_LAB</span>
             </span>
@@ -181,15 +183,15 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = () => {
         </div>
 
         {/* Separador Vertical */}
-        <div className="h-4 w-px bg-white/10" />
+        <div className="hidden md:block h-4 w-px bg-white/10" />
 
         {/* Indicador de Estado del Sistema - Minimalista */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           {/* Badge del Engine (clickeable para cambiar) */}
           <div className="relative">
             <button
               onClick={() => connectionStatus === 'connected' && setEngineDropdownOpen(!engineDropdownOpen)}
-              className={`flex items-center gap-2 px-2 py-1 bg-white/5 rounded border ${engineInfo.borderColor} transition-all ${
+              className={`flex items-center gap-1 md:gap-2 px-2 py-1 bg-white/5 rounded border ${engineInfo.borderColor} transition-all ${
                 connectionStatus === 'connected'
                   ? 'hover:bg-white/10 cursor-pointer' 
                   : 'cursor-default'
@@ -199,8 +201,11 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = () => {
               <div className={`w-1.5 h-1.5 rounded-full ${engineInfo.dotColor} ${
                 connectionStatus === 'connected' && compileStatus?.is_native ? 'animate-pulse' : ''
               }`} />
-              <span className={`text-[10px] font-mono ${engineInfo.color} tracking-wide font-bold`}>
+              <span className={`text-[10px] font-mono ${engineInfo.color} tracking-wide font-bold hidden md:inline`}>
                 {systemStatus.engineText}
+              </span>
+              <span className={`text-[10px] font-mono ${engineInfo.color} tracking-wide font-bold md:hidden`}>
+                {systemStatus.engineText.substring(0, 3)}
               </span>
               {connectionStatus === 'connected' && (
                 <ChevronDown size={10} className={`text-gray-500 transition-transform ${engineDropdownOpen ? 'rotate-180' : ''}`} />
@@ -260,19 +265,28 @@ export const ScientificHeader: React.FC<ScientificHeaderProps> = () => {
             )}
           </div>
           
-          {/* Status Badge */}
+          {/* Status Badge - Ocultar texto en móvil */}
           <div className="flex items-center gap-2 px-2 py-1 bg-white/5 rounded border border-white/5">
             <div className={`w-1.5 h-1.5 rounded-full ${systemStatus.dotColor} ${
               systemStatus.pulse ? `animate-pulse ${systemStatus.shadow}` : ''
             }`} />
-            <span className={`text-[10px] font-mono ${systemStatus.textColor} tracking-wide font-bold`}>
+            <span className={`text-[10px] font-mono ${systemStatus.textColor} tracking-wide font-bold hidden md:inline`}>
               {systemStatus.statusText}
             </span>
           </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 md:gap-4">
+        {/* Mobile Menu Toggle (Right Drawer) */}
+        <button
+          onClick={onToggleMobileMenu}
+          className="md:hidden p-1.5 text-gray-500 hover:text-gray-300 transition-colors"
+          title="Abrir Panel Lateral"
+        >
+          <Menu size={16} />
+        </button>
+
         {/* Perfil / Config */}
         <button 
           onClick={() => setSettingsOpen(true)}

@@ -38,9 +38,25 @@ export const DashboardLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('lab');
   const [labPanelOpen, setLabPanelOpen] = useState(true);
   const [activeLabSection, setActiveLabSection] = useState<LabSection>('inference');
-  const [rightDrawerCollapsed, setRightDrawerCollapsed] = useState(false);
+  // Initialize collapsed by default for better mobile UX and cleaner desktop start
+  const [rightDrawerCollapsed, setRightDrawerCollapsed] = useState(true);
   const [activeDrawerTab, setActiveDrawerTab] = useState<'visualization' | 'physics'>('visualization');
   const [viewerVersion, setViewerVersion] = useState<'v1' | 'v2'>('v1');
+
+  // Inicializar estado responsivo y listener
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768 && !rightDrawerCollapsed) {
+        setRightDrawerCollapsed(true);
+      } else if (window.innerWidth >= 768 && rightDrawerCollapsed) {
+          // Optional: Auto-expand on desktop? Maybe not to respect user choice.
+          // setRightDrawerCollapsed(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [rightDrawerCollapsed]);
   const [selectedLayer, setSelectedLayer] = useState(0); // 0: Density, 1: Phase, 2: Energy, 3: Flow
   const [selectedTimelineFrame, setSelectedTimelineFrame] = useState<{
     step: number;
@@ -154,23 +170,6 @@ export const DashboardLayout: React.FC = () => {
                     historyFrame={selectedTimelineFrame} 
                     theaterMode={theaterMode}
                   />
-                  {/* Timeline Viewer - Panel flotante */}
-                  {/* TEMPORALMENTE DESHABILITADO - Revisar performance issues */}
-                  {false && (
-                      <TimelineViewer
-                        className="absolute bottom-0 left-0 right-0 z-30"
-                        onFrameSelect={(frame) => {
-                          if (frame) {
-                            setSelectedTimelineFrame({
-                              ...frame,
-                              timestamp: String(frame.timestamp),
-                            });
-                          } else {
-                            setSelectedTimelineFrame(null);
-                          }
-                        }}
-                      />
-                    )}
                 </>
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-300 text-sm">
@@ -199,7 +198,9 @@ export const DashboardLayout: React.FC = () => {
     <div className="h-screen bg-dark-bg text-dark-200 font-sans selection:bg-teal-500/30 overflow-hidden flex flex-col">
       
               {/* Header: Barra de Comando Técnica */}
-              <ScientificHeader />
+              <ScientificHeader
+                onToggleMobileMenu={() => setRightDrawerCollapsed(!rightDrawerCollapsed)}
+              />
 
       {/* Contenedor Principal */}
       <div className="flex-1 flex overflow-hidden">
@@ -231,7 +232,10 @@ export const DashboardLayout: React.FC = () => {
 
         {/* Panel de Laboratorio (Experimentos/Entrenamiento) - Controlado por NavigationSidebar */}
         {labPanelOpen && activeTab === 'lab' && (
-          <aside className="flex-col border-r border-white/5 bg-dark-980/40 backdrop-blur-md z-40 shrink-0 transition-all duration-300 w-[380px] flex overflow-hidden relative">
+          <aside className="
+            flex-col border-r border-white/5 bg-dark-980/95 backdrop-blur-md z-50 shrink-0 transition-all duration-300 flex overflow-hidden
+            fixed inset-0 w-full h-full md:relative md:w-[380px] md:h-auto
+          ">
             <LabSider 
               activeSection={activeLabSection} 
               onClose={() => setLabPanelOpen(false)}

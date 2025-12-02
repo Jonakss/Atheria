@@ -516,24 +516,29 @@ export const HistoryControls: React.FC<HistoryControlsProps> = ({ mode = 'full' 
 
   return (
     <div className={`flex flex-col gap-2 relative z-30 ${mode === 'compact' ? 'w-fit' : 'w-full'}`}>
-      <div className={`flex items-center ${mode === 'compact' ? 'gap-4' : 'justify-between'}`}>
-        <SimulationControls
-          isPlaying={isPlaying}
-          controlsEnabled={controlsEnabled}
-          onPlayPause={handlePlayPause}
-          onReset={handleReset}
-          onSaveSnapshot={handleSaveSnapshot}
-          onUpdateConfig={handleUpdateConfig}
-        />
-        <StatusIndicators
-          fps={fps}
-          particleCount={particleCount}
-          liveFeedEnabled={liveFeedEnabled}
-          controlsEnabled={controlsEnabled}
-          onToggleLiveFeed={handleToggleLiveFeed}
-          onSetInterval={handleSetInterval}
-          currentStep={currentStep}
-        />
+      {/* Container flex para desktop, columna para móvil si es necesario */}
+      <div className={`flex flex-col md:flex-row items-start md:items-center ${mode === 'compact' ? 'gap-4' : 'justify-between gap-2'}`}>
+        <div className="w-full md:w-auto overflow-x-auto no-scrollbar">
+            <SimulationControls
+                isPlaying={isPlaying}
+                controlsEnabled={controlsEnabled}
+                onPlayPause={handlePlayPause}
+                onReset={handleReset}
+                onSaveSnapshot={handleSaveSnapshot}
+                onUpdateConfig={handleUpdateConfig}
+            />
+        </div>
+        <div className="w-full md:w-auto overflow-x-auto no-scrollbar">
+            <StatusIndicators
+                fps={fps}
+                particleCount={particleCount}
+                liveFeedEnabled={liveFeedEnabled}
+                controlsEnabled={controlsEnabled}
+                onToggleLiveFeed={handleToggleLiveFeed}
+                onSetInterval={handleSetInterval}
+                currentStep={currentStep}
+            />
+        </div>
       </div>
       {mode === 'full' && (
         <HistoryTimeline
