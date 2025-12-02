@@ -166,23 +166,6 @@ const HolographicViewer: React.FC<HolographicViewerProps> = ({
         };
     }, []);
 
-    // Update Ripple State
-    useEffect(() => {
-        if (rippleMeshRef.current) {
-            const material = rippleMeshRef.current.material as THREE.ShaderMaterial;
-            // We'll animate this in the loop ideally, but for now we set a target
-            // To make it smooth, we rely on the requestAnimationFrame loop to update 'time'
-            // But we need to update 'active' uniform.
-
-            // For simplicity, we just set active to 1.0 when injecting, but we need an animation loop to handle fade out/in properly
-            // or just bind it to the state directly.
-
-            // Let's hook into the existing animate loop?
-            // The existing animate loop is closed over in the first useEffect.
-            // We can use a ref to communicate.
-        }
-    }, [isQuantumInjecting]);
-
     // Independent Animation Loop for Ripple (since the main loop is closed)
     // Actually, we can just start a temporary loop or rely on the main one if we could access it.
     // But since we can't easily modify the main loop without full rewrite, let's add a secondary updater

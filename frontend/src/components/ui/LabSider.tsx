@@ -142,8 +142,7 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
             INITIAL_STATE_MODE_INFERENCE: isQuantumGenesis ? 'ionq' : initialStateMode,
             ENGINE_TYPE: creationEngineType,
             BACKEND_TYPE: creationBackendType, // Nuevo campo
-            BATCH_MODE: isQuantumGenesis,
-            initial_mode: isQuantumGenesis ? 'ionq' : undefined // Redundant but safe
+            BATCH_MODE: isQuantumGenesis
         };
         
         if (transferFromExperiment) {

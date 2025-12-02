@@ -1,6 +1,6 @@
 import { BackwardIcon, ForwardIcon, PauseIcon, PlayIcon } from '@heroicons/react/24/solid';
 import { Clock, Eye, EyeOff, RefreshCw, Save, Zap } from 'lucide-react';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { useExperimentStore } from '../../store/experimentStore';
 import { calculateParticleCount } from '../../utils/simulationUtils';
@@ -11,6 +11,20 @@ interface HistoryRange {
   max_step: number | null;
   total_frames: number;
   current_step: number;
+}
+
+// Helper hook for debouncing
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value);
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [value, delay]);
+    return debouncedValue;
 }
 
 // --- Sub-components ---
@@ -26,21 +40,43 @@ const HybridControls: React.FC<{
     } = useExperimentStore();
     const [showHybrid, setShowHybrid] = useState(false);
 
+    // Local state for immediate UI feedback
+    const [localInterval, setLocalInterval] = useState(injectionInterval);
+    const [localNoise, setLocalNoise] = useState(quantumNoiseRate);
+
+    // Sync local state with store
+    useEffect(() => {
+        setLocalInterval(injectionInterval);
+    }, [injectionInterval]);
+
+    useEffect(() => {
+        setLocalNoise(quantumNoiseRate);
+    }, [quantumNoiseRate]);
+
+    // Debounce updates
+    const debouncedInterval = useDebounce(localInterval, 500);
+    const debouncedNoise = useDebounce(localNoise, 500);
+
+    // Effect to trigger update when debounced value changes
+    useEffect(() => {
+        if (debouncedInterval !== injectionInterval) {
+            setInjectionInterval(debouncedInterval);
+            onUpdateConfig({ injection_interval: debouncedInterval });
+        }
+    }, [debouncedInterval, injectionInterval, setInjectionInterval, onUpdateConfig]);
+
+    useEffect(() => {
+        if (debouncedNoise !== quantumNoiseRate) {
+            setQuantumNoiseRate(debouncedNoise);
+            onUpdateConfig({ quantum_noise_rate: debouncedNoise });
+        }
+    }, [debouncedNoise, quantumNoiseRate, setQuantumNoiseRate, onUpdateConfig]);
+
+
     const handleToggle = () => {
         const newState = !hybridMode;
         setHybridMode(newState);
         onUpdateConfig({ hybrid_mode: newState });
-    };
-
-    const handleIntervalChange = (val: number) => {
-        setInjectionInterval(val);
-        // Debouncing logic could go here, for now direct update
-        onUpdateConfig({ injection_interval: val });
-    };
-
-    const handleNoiseChange = (val: number) => {
-        setQuantumNoiseRate(val);
-        onUpdateConfig({ quantum_noise_rate: val });
     };
 
     return (
@@ -77,15 +113,15 @@ const HybridControls: React.FC<{
                         <div>
                             <div className="flex justify-between text-[10px] text-gray-400 mb-1">
                                 <span>Injection Interval</span>
-                                <span className="text-white font-mono">{injectionInterval} steps</span>
+                                <span className="text-white font-mono">{localInterval} steps</span>
                             </div>
                             <input
                                 type="range"
                                 min="10"
                                 max="100"
                                 step="1"
-                                value={injectionInterval}
-                                onChange={(e) => handleIntervalChange(parseInt(e.target.value))}
+                                value={localInterval}
+                                onChange={(e) => setLocalInterval(parseInt(e.target.value))}
                                 className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
                             />
                         </div>
@@ -93,15 +129,15 @@ const HybridControls: React.FC<{
                         <div>
                             <div className="flex justify-between text-[10px] text-gray-400 mb-1">
                                 <span>Quantum Noise Rate</span>
-                                <span className="text-white font-mono">{quantumNoiseRate.toFixed(2)}</span>
+                                <span className="text-white font-mono">{localNoise.toFixed(2)}</span>
                             </div>
                             <input
                                 type="range"
                                 min="0.01"
                                 max="0.10"
                                 step="0.01"
-                                value={quantumNoiseRate}
-                                onChange={(e) => handleNoiseChange(parseFloat(e.target.value))}
+                                value={localNoise}
+                                onChange={(e) => setLocalNoise(parseFloat(e.target.value))}
                                 className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
                             />
                         </div>
