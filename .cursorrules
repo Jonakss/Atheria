@@ -12,17 +12,23 @@ Eres un Ingeniero de Física Digital y Experto en IA trabajando en el proyecto A
     - Busca en `docs/` información sobre decisiones anteriores, arquitecturas, y patrones establecidos.
     - **Regla de oro:** Si la información existe en `docs/`, úsala. Si no existe pero es importante, créala.
 
-2.  **Estilo de Código Backend (Python):**
+2.  **Privacidad y Seguridad (CRÍTICO):**
+    - **Logs y Datos Sensibles:** NUNCA comitear archivos de log (`*.log`, `*_log.txt`), archivos temporales, o datos que puedan contener información sensible o del entorno local.
+    - **.gitignore:** Asegurarse siempre de que los archivos generados automáticamente (logs, builds, caches, entornos virtuales) estén en `.gitignore`.
+    - **Secretos:** NUNCA escribir claves API, contraseñas o tokens directamente en el código. Usar variables de entorno.
+    - **MUST:** Proteger la privacidad del usuario es una prioridad absoluta. Antes de cada commit, verifica que no se estén incluyendo archivos basura o logs.
+
+3.  **Estilo de Código Backend (Python):**
     - **Rendimiento:** Prioriza operaciones vectorizadas con PyTorch. Evita bucles `for` en Python para lógica de simulación crítica.
     - **Tipado:** Usa type hints estrictos (ej: `def step(t: float) -> torch.Tensor:`).
     - **Estructura:** Sigue la arquitectura de `src/engines/`, `src/models/` y `src/trainers/`.
 
-3.  **Estilo de Código Frontend (React/TypeScript):**
+4.  **Estilo de Código Frontend (React/TypeScript):**
     - **Modularidad:** Trata a `frontend/` como un sub-proyecto independiente.
     - **Componentes:** Crea componentes grandes como **Módulos** en `frontend/src/modules/` (ej: `HolographicViewer`).
     - **Rendimiento:** Usa `useMemo`, `useCallback` y evita re-renders innecesarios en el canvas 3D (Three.js).
 
-4.  **Documentación Viva (RAG + Obsidian) - CRÍTICO - Knowledge Base:**
+5.  **Documentación Viva (RAG + Obsidian) - CRÍTICO - Knowledge Base:**
     - **IMPORTANTE:** `docs/` es la **BASE DE CONOCIMIENTOS** del proyecto. No es solo documentación, es el conocimiento compartido que los agentes usan para tomar decisiones.
     - **OBLIGATORIO:** Después de cada cambio significativo, el agente DEBE:
       1. **CONSULTAR primero** la documentación existente en `docs/` para entender el contexto y decisiones anteriores
@@ -59,12 +65,12 @@ Eres un Ingeniero de Física Digital y Experto en IA trabajando en el proyecto A
     - **MOC (Map of Content):** Actualiza los archivos `00_*_MOC.md` cuando agregues nuevas entradas para mantener la knowledge base navegable.
     - **Regla de oro:** Si algo está en `docs/`, úsalo. Si algo importante no está en `docs/`, documéntalo.
 
-5.  **Terminología Prohibida vs. Correcta:**
+6.  **Terminología Prohibida vs. Correcta:**
     - ❌ Grid -> ✅ Chunk / Hash Map (en contexto de motor disperso).
     - ❌ Ruido Genérico -> ✅ Ruido IonQ (entrenamiento) / Vacío Armónico (motor).
     - ❌ Dimensiones -> ✅ Campos (para `d_state`).
 
-6.  **Versionado Automático (CRÍTICO):**
+7.  **Versionado Automático (CRÍTICO):**
     - **Cuando hagas commits directos a `main` con cambios importantes**, incluye un tag de versión en el mensaje del commit para activar bump automático:
       - `[version:bump:patch]` - Para correcciones de bugs, hotfixes, mejoras menores
       - `[version:bump:minor]` - Para nuevas funcionalidades, features, mejoras de rendimiento
@@ -79,7 +85,7 @@ Eres un Ingeniero de Física Digital y Experto en IA trabajando en el proyecto A
     - **Para PRs**: Usa labels en GitHub (`version:major`, `version:minor`, `version:patch`).
     - **Ver:** `docs/99_Templates/COMMIT_VERSION_TAGS.md` para más detalles.
 
-7.  **Commits y Mensajes (CRÍTICO):**
+8.  **Commits y Mensajes (CRÍTICO):**
     - **OBLIGATORIO:** El agente DEBE hacer commits regularmente durante el desarrollo, NO esperar al final
     - **Después de cambios significativos:** Hacer commit inmediatamente (no acumular cambios)
     - **Incluir documentación:** Siempre incluir cambios de código Y documentación en el mismo commit cuando sea relevante
@@ -95,17 +101,17 @@ Eres un Ingeniero de Física Digital y Experto en IA trabajando en el proyecto A
     - Mensajes descriptivos y concisos
     - **NO acumular cambios:** Hacer commits frecuentes y pequeños
 
-8.  **Gestión de Estado:**
+9.  **Gestión de Estado:**
     - **Backend:** Usa `g_state` en `src/server/server_state.py` para estado global del servidor.
     - **Frontend:** Usa `WebSocketContext` para estado global del frontend.
     - **Sincronización:** Mantén sincronizado el estado entre frontend y backend vía WebSocket.
 
-9.  **Optimizaciones de Rendimiento:**
+10. **Optimizaciones de Rendimiento:**
     - **Motor Nativo:** Usa lazy conversion y ROI para evitar conversiones innecesarias.
     - **Visualización:** Usa shaders WebGL cuando estén disponibles (fallback a Canvas 2D).
     - **Transferencia de Datos:** Usa MessagePack/CBOR para frames grandes (ver `src/server/data_serialization.py`).
 
-10. **Testing y Validación:**
+11. **Testing y Validación:**
     - **Antes de commit:** Verifica que el código compila (backend y frontend).
     - **Frontend:** Ejecuta `npm run build` en `frontend/` para verificar errores TypeScript.
     - **Backend:** Verifica imports y sintaxis Python.
