@@ -119,8 +119,13 @@ class QuantumMicroscope:
             
             # --- 3. EJECUCIÓN ---
             # Execute the transpiled circuit
-            job = self.backend.run(qc, shots=1024)
-            counts = job.result().get_counts(qc)
+            # Our IonQBackend wrapper uses 'execute'
+            if hasattr(self.backend, 'run'):
+                job = self.backend.run(qc, shots=1024)
+                counts = job.result().get_counts(qc)
+            else:
+                # Fallback for our custom wrapper
+                counts = self.backend.execute('run_circuit', qc, shots=1024)
             
             # --- 4. ANÁLISIS DE RESULTADOS ---
             # Calcular Expectation Values <Z_i>

@@ -155,7 +155,7 @@ class IonQCollapse:
             logging.error(f"❌ IonQ Collapse Failed: {e}")
             return self._mock_collapse(state_tensor, intensity)
 
-    def _mock_collapse(self, state_tensor, intensity):
+    def _mock_collapse(self, state_tensor, region_center=None, intensity=0.1):
         """Simulación local de colapso (ruido)."""
         noise = torch.randn_like(state_tensor) * intensity
         return state_tensor + noise
