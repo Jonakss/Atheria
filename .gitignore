@@ -164,3 +164,4 @@ best_quantum_params.json
 backend_log.txt
 frontend_log.txt
 frontend/frontend_log.txt
+frontend/verification/

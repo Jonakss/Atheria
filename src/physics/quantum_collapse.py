@@ -134,23 +134,23 @@ class IonQCollapse:
                 target_mag * torch.cos(target_phase),
                 target_mag * torch.sin(target_phase)
             ).unsqueeze(1).repeat(1, state_tensor.shape[-1])
-            
+
             # Interpolación (Intensity)
             # new = old * (1-intensity) + target * intensity
             # Pero solo en la región
-            
+
             # Necesitamos rebanar el tensor original para escribir
             # PyTorch no soporta asignación compleja directa en slices a veces, cuidado
-            
+
             new_region = current_region * (1 - intensity) + target_complex[:len(current_region)] * intensity
-            
+
             # Escribir de vuelta (clonamos para no mutar in-place si afecta autograd)
             new_state = state_tensor.clone()
             new_state[0, cy, start_x:end_x, :] = new_region
-            
+
             logging.info(f"⚡ IonQ Collapse at ({cx}, {cy}): {measured_bitstring}")
             return new_state
-            
+
         except Exception as e:
             logging.error(f"❌ IonQ Collapse Failed: {e}")
             return self._mock_collapse(state_tensor, intensity)
