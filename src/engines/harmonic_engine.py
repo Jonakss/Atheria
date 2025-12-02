@@ -302,3 +302,50 @@ class SparseHarmonicEngine:
         Alias para step() para compatibilidad.
         """
         self.step()
+
+    def apply_tool(self, action, params):
+        """
+        Aplica una herramienta cuántica al universo armónico.
+        """
+        import numpy as np # Import numpy locally if not already imported globally
+        logging.info(f"🛠️ HarmonicEngine aplicando herramienta: {action} | Params: {params}")
+        
+        if action == 'collapse':
+            # Interpretar colapso como inyección de materia en una región
+            intensity = float(params.get('intensity', 0.5))
+            center = None
+            if 'x' in params and 'y' in params:
+                center = (int(params['y']), int(params['x']))
+            
+            # Generar materia aleatoria en la región
+            if center:
+                cy, cx = center
+                radius = int(self.grid_size * 0.1)
+                num_particles = int(intensity * 20)
+                
+                for _ in range(num_particles):
+                    # Aleatorio dentro del radio
+                    r = np.sqrt(np.random.random()) * radius
+                    theta = np.random.random() * 2 * np.pi
+                    
+                    px = int(cx + r * np.cos(theta))
+                    py = int(cy + r * np.sin(theta))
+                    pz = 0
+                    
+                    # Estado aleatorio
+                    state = torch.randn(self.d_state, dtype=torch.complex64, device=self.device)
+                    self.add_matter(px, py, pz, state)
+                    
+                logging.info(f"✨ Inyectadas {num_particles} partículas en ({cx}, {cy})")
+                return True
+            else:
+                # Global injection?
+                return False
+                
+        elif action in ['vortex', 'wave']:
+            logging.warning(f"⚠️ Herramienta {action} no soportada aún en HarmonicEngine (requiere manipulación de campo de vacío).")
+            return False
+            
+        else:
+            logging.warning(f"⚠️ Herramienta no soportada: {action}")
+            return False

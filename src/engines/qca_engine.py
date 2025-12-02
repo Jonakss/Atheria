@@ -696,3 +696,58 @@ class CartesianEngine:
             return self.original_model
         # Si no está compilado, devolver el operador directamente
         return self.operator
+
+    def apply_tool(self, action, params):
+        """
+        Aplica una herramienta cuántica al estado.
+        """
+        if self.state.psi is None:
+            return False
+            
+        logging.info(f"🛠️ CartesianEngine aplicando herramienta: {action} | Params: {params}")
+        
+        try:
+            # Lazy import de herramientas
+            from ..physics import IonQCollapse, QuantumSteering
+            
+            device = self.device
+            new_psi = None
+            
+            if action == 'collapse':
+                intensity = float(params.get('intensity', 0.5))
+                center = None
+                if 'x' in params and 'y' in params:
+                    center = (int(params['y']), int(params['x']))
+                    
+                collapser = IonQCollapse(device)
+                new_psi = collapser.collapse(self.state.psi, region_center=center, intensity=intensity)
+                
+            elif action == 'vortex':
+                x = int(params.get('x', self.grid_size // 2))
+                y = int(params.get('y', self.grid_size // 2))
+                radius = int(params.get('radius', 5))
+                strength = float(params.get('strength', 1.0))
+                
+                steering = QuantumSteering(device)
+                new_psi = steering.inject(self.state.psi, 'vortex', x=x, y=y, radius=radius, strength=strength)
+                
+            elif action == 'wave':
+                k_x = float(params.get('k_x', 1.0))
+                k_y = float(params.get('k_y', 1.0))
+                
+                steering = QuantumSteering(device)
+                new_psi = steering.inject(self.state.psi, 'plane_wave', k_x=k_x, k_y=k_y)
+                
+            else:
+                logging.warning(f"⚠️ Herramienta no soportada: {action}")
+                return False
+    
+            if new_psi is not None:
+                self.state.psi = new_psi
+                # Invalidar caché
+                self.last_delta_psi = None
+                return True
+                
+        except Exception as e:
+            logging.error(f"❌ Error aplicando herramienta {action}: {e}", exc_info=True)
+            return False

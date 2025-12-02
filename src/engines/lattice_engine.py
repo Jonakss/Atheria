@@ -223,3 +223,163 @@ class LatticeEngine:
         # Esto asegura compatibilidad con pipelines que esperan complejos
         return torch.complex(energy, torch.zeros_like(energy))
 
+    def apply_tool(self, action, params):
+        """
+        Aplica una herramienta cuántica al estado del retículo.
+        Interfaz genérica para QuantumToolbox.
+        """
+        logging.info(f"🛠️ LatticeEngine aplicando herramienta: {action} | Params: {params}")
+        
+        if action == 'collapse':
+            intensity = float(params.get('intensity', 0.5))
+            center = None
+            if 'x' in params and 'y' in params:
+                center = (int(params['y']), int(params['x'])) # (H, W)
+            self._apply_collapse(intensity, center)
+            return True
+            
+        elif action == 'vortex':
+            x = int(params.get('x', self.grid_size // 2))
+            y = int(params.get('y', self.grid_size // 2))
+            radius = int(params.get('radius', 5))
+            strength = float(params.get('strength', 1.0))
+            self._apply_vortex(x, y, radius, strength)
+            return True
+            
+        elif action == 'wave':
+            k_x = float(params.get('k_x', 1.0))
+            k_y = float(params.get('k_y', 1.0))
+            self._apply_wave(k_x, k_y)
+            return True
+            
+        else:
+            logging.warning(f"⚠️ Herramienta no soportada por LatticeEngine: {action}")
+            return False
+
+    def _apply_collapse(self, intensity, center=None):
+        """
+        Simula un 'colapso' (termalización local) aleatorizando links.
+        """
+        # Generar ruido SU(3) fuerte
+        noise = self._generate_random_su3(epsilon=intensity * 2.0)
+        
+        if center:
+            cy, cx = center
+            # Radio fijo o basado en intensidad
+            radius = int(self.grid_size * 0.15) 
+            
+            # Crear máscara circular
+            y, x = torch.meshgrid(torch.arange(self.grid_size, device=self.device), torch.arange(self.grid_size, device=self.device), indexing='ij')
+            dist = torch.sqrt((x - cx)**2 + (y - cy)**2)
+            mask = (dist < radius).float()
+            
+            # Suavizar bordes (opcional, aquí hard cut)
+            mask = mask.view(1, 1, self.grid_size, self.grid_size, 1, 1)
+            
+            # Aplicar ruido solo en la región
+            # U_new = Noise * U_old
+            # Interpolamos: U_final = (1-mask)*U_old + mask*(Noise*U_old)
+            perturbed_links = self._matmul(noise, self.links)
+            self.links = (1 - mask) * self.links + mask * perturbed_links
+        else:
+            # Global collapse (quench)
+            self.links = self._matmul(noise, self.links)
+
+    def _apply_vortex(self, x, y, radius, strength):
+        """
+        Inyecta un defecto topológico (vórtice) en los links.
+        Modifica los links alrededor de (x,y) para crear holonomía no trivial.
+        """
+        # Coordenadas centradas en (x,y)
+        yy, xx = torch.meshgrid(torch.arange(self.grid_size, device=self.device), torch.arange(self.grid_size, device=self.device), indexing='ij')
+        xx = xx - x
+        yy = yy - y
+        
+        # Ángulo polar theta
+        theta = torch.atan2(yy, xx)
+        
+        # Matriz de rotación SU(3) dependiente del ángulo (Vortex ansatz simplificado)
+        # U(theta) = exp(i * strength * theta * Lambda_3)
+        # Lambda_3 = diag(1, -1, 0)
+        
+        # Construir generador diagonal [H, W, 3]
+        # strength * theta para diag 0, -strength * theta para diag 1
+        phase = strength * theta
+        
+        # Crear matriz diagonal [H, W, 3, 3]
+        # exp(i*phase)
+        # Elemento (0,0)
+        u00 = torch.exp(1j * phase)
+        u11 = torch.exp(-1j * phase)
+        u22 = torch.ones_like(phase, dtype=torch.complex64)
+        
+        # Ensamblar matriz de transformación G(x)
+        G = torch.zeros(self.grid_size, self.grid_size, self.N, self.N, dtype=torch.complex64, device=self.device)
+        G[..., 0, 0] = u00
+        G[..., 1, 1] = u11
+        G[..., 2, 2] = u22
+        
+        # Aplicar transformación de gauge local: U_mu(n) -> G(n) U_mu(n) G^dag(n+mu)
+        # Esto inyecta el vórtice en la configuración de gauge
+        
+        # Expandir G para batch [1, 1, H, W, N, N]
+        G = G.view(1, 1, self.grid_size, self.grid_size, self.N, self.N)
+        
+        # Shift G para G^dag(n+mu)
+        # G_px = G(n+x)
+        G_px = torch.roll(G, shifts=-1, dims=3) # Shift en W
+        # G_py = G(n+y)
+        G_py = torch.roll(G, shifts=-1, dims=2) # Shift en H
+        
+        # Links actuales
+        Ux = self.links[:, 0:1] # [B, 1, H, W, N, N]
+        Uy = self.links[:, 1:2] # [B, 1, H, W, N, N]
+        
+        # Transformar
+        # Ux' = G * Ux * G_px^dag
+        Ux_new = torch.matmul(torch.matmul(G, Ux), G_px.conj().transpose(-2, -1))
+        
+        # Uy' = G * Uy * G_py^dag
+        Uy_new = torch.matmul(torch.matmul(G, Uy), G_py.conj().transpose(-2, -1))
+        
+        # Aplicar solo dentro del radio (smooth envelope)
+        dist = torch.sqrt(xx**2 + yy**2)
+        mask = (dist < radius * 2).float().view(1, 1, self.grid_size, self.grid_size, 1, 1)
+        # Smooth transition sigmoid
+        mask = torch.sigmoid((radius - dist) * 0.5).view(1, 1, self.grid_size, self.grid_size, 1, 1)
+        
+        # Mezclar
+        self.links[:, 0:1] = (1 - mask) * Ux + mask * Ux_new
+        self.links[:, 1:2] = (1 - mask) * Uy + mask * Uy_new
+
+    def _apply_wave(self, k_x, k_y):
+        """
+        Inyecta una onda plana en la fase de los links.
+        """
+        # Grid coordinates
+        y, x = torch.meshgrid(torch.arange(self.grid_size, device=self.device), torch.arange(self.grid_size, device=self.device), indexing='ij')
+        
+        # Phase = k_x * x + k_y * y
+        phase = (k_x * x + k_y * y).float()
+        
+        # Modulación periódica pequeña
+        epsilon = 0.3
+        
+        # Generador SU(3) (Lambda 2 para parte imaginaria/fase)
+        # O simplemente rotación global de fase U(1) subgroup
+        
+        # U_wave = exp(i * epsilon * sin(phase) * Lambda)
+        phi = epsilon * torch.sin(phase / 10.0) # Frecuencia ajustada
+        
+        # Matriz unitaria diagonal [H, W, 3, 3]
+        u_wave = torch.zeros(self.grid_size, self.grid_size, self.N, self.N, dtype=torch.complex64, device=self.device)
+        u_wave[..., 0, 0] = torch.exp(1j * phi)
+        u_wave[..., 1, 1] = torch.exp(-1j * phi) # Traceless-ish phase
+        u_wave[..., 2, 2] = 1.0
+        
+        u_wave = u_wave.view(1, 1, self.grid_size, self.grid_size, self.N, self.N)
+        
+        # Perturbar links
+        self.links = torch.matmul(u_wave, self.links)
+
+

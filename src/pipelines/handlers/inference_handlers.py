@@ -1187,63 +1187,24 @@ async def handle_tool_action(args):
     logging.info(f"🛠️ Tool Action: {action} | Params: {params}")
     
     motor = g_state.get("motor")
-    if not motor or not hasattr(motor, 'state') or motor.state.psi is None:
+    if not motor:
         if ws: await send_notification(ws, "⚠️ No hay simulación activa para aplicar herramientas.", "warning")
         return
 
     try:
-        # Lazy import de herramientas
-        from ...physics import IonQCollapse, QuantumSteering, QuantumNoiseInjector
-        
-        device = motor.device
-        new_psi = None
-        
-        if action == 'collapse':
-            # IonQ Collapse
-            intensity = float(params.get('intensity', 0.5))
-            # Center opcional
-            center = None
-            if 'x' in params and 'y' in params:
-                center = (int(params['y']), int(params['x']))
-                
-            collapser = IonQCollapse(device)
-            new_psi = collapser.collapse(motor.state.psi, region_center=center, intensity=intensity)
-            
-            if ws: await send_notification(ws, "⚡ Colapso Cuántico aplicado.", "success")
-            
-        elif action == 'vortex':
-            # Quantum Vortex
-            x = int(params.get('x', motor.grid_size // 2))
-            y = int(params.get('y', motor.grid_size // 2))
-            radius = int(params.get('radius', 5))
-            strength = float(params.get('strength', 1.0))
-            
-            steering = QuantumSteering(device)
-            new_psi = steering.inject(motor.state.psi, 'vortex', x=x, y=y, radius=radius, strength=strength)
-            
-            if ws: await send_notification(ws, "🌀 Vórtice inyectado.", "success")
-            
-        elif action == 'wave':
-            # Plane Wave
-            k_x = float(params.get('k_x', 1.0))
-            k_y = float(params.get('k_y', 1.0))
-            
-            steering = QuantumSteering(device)
-            new_psi = steering.inject(motor.state.psi, 'plane_wave', k_x=k_x, k_y=k_y)
-            
-            if ws: await send_notification(ws, "🌊 Onda Plana inyectada.", "success")
-            
-        else:
-            logging.warning(f"Acción de herramienta desconocida: {action}")
+        # 1. Intentar usar la interfaz genérica apply_tool (Modularidad)
+        if hasattr(motor, 'apply_tool'):
+            success = motor.apply_tool(action, params)
+            if success:
+                if ws: await send_notification(ws, f"Acción {action} aplicada exitosamente.", "success")
+            else:
+                if ws: await send_notification(ws, f"No se pudo aplicar {action} (no soportado o falló).", "warning")
             return
 
-        # Actualizar estado
-        if new_psi is not None:
-            motor.state.psi = new_psi
-            # Invalidar caché si existe
-            if hasattr(motor, 'last_delta_psi'):
-                motor.last_delta_psi = None
-                
+        # Si el motor no tiene apply_tool, no soportamos herramientas
+        logging.warning(f"⚠️ El motor actual {type(motor).__name__} no soporta apply_tool.")
+        if ws: await send_notification(ws, "⚠️ El motor actual no soporta herramientas cuánticas.", "warning")
+
     except Exception as e:
         logging.error(f"❌ Error aplicando herramienta {action}: {e}", exc_info=True)
         if ws: await send_notification(ws, f"Error aplicando herramienta: {e}", "error")

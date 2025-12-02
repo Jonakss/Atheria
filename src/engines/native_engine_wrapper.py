@@ -1215,3 +1215,73 @@ class NativeEngineWrapper:
         """
         if self.state.psi is None or self._dense_state_stale:
             self.get_dense_state(check_pause_callback=lambda: False)
+        # Si no está compilado, devolver el operador directamente
+        return self.operator
+
+    def apply_tool(self, action, params):
+        """
+        Aplica una herramienta cuántica al estado.
+        Estrategia: Aplicar a estado denso (Python) y re-sincronizar con C++.
+        """
+        with self._lock:
+            # Asegurar que tenemos estado denso actualizado
+            self.get_dense_state()
+            
+            if self.state.psi is None:
+                return False
+                
+            logging.info(f"🛠️ NativeEngineWrapper aplicando herramienta: {action} | Params: {params}")
+            
+            try:
+                # Lazy import de herramientas
+                from ..physics import IonQCollapse, QuantumSteering
+                
+                device = self.device
+                new_psi = None
+                
+                if action == 'collapse':
+                    intensity = float(params.get('intensity', 0.5))
+                    center = None
+                    if 'x' in params and 'y' in params:
+                        center = (int(params['y']), int(params['x']))
+                        
+                    collapser = IonQCollapse(device)
+                    new_psi = collapser.collapse(self.state.psi, region_center=center, intensity=intensity)
+                    
+                elif action == 'vortex':
+                    x = int(params.get('x', self.grid_size // 2))
+                    y = int(params.get('y', self.grid_size // 2))
+                    radius = int(params.get('radius', 5))
+                    strength = float(params.get('strength', 1.0))
+                    
+                    steering = QuantumSteering(device)
+                    new_psi = steering.inject(self.state.psi, 'vortex', x=x, y=y, radius=radius, strength=strength)
+                    
+                elif action == 'wave':
+                    k_x = float(params.get('k_x', 1.0))
+                    k_y = float(params.get('k_y', 1.0))
+                    
+                    steering = QuantumSteering(device)
+                    new_psi = steering.inject(self.state.psi, 'plane_wave', k_x=k_x, k_y=k_y)
+                    
+                else:
+                    logging.warning(f"⚠️ Herramienta no soportada: {action}")
+                    return False
+        
+                if new_psi is not None:
+                    # 1. Actualizar estado denso
+                    self.state.psi = new_psi
+                    
+                    # 2. Re-sincronizar con motor nativo (Heavy operation)
+                    if self.native_engine is not None:
+                        logging.info("🔄 Re-sincronizando motor nativo tras aplicar herramienta...")
+                        self.native_engine.clear()
+                        self._initialize_native_state_from_dense(self.state.psi)
+                    
+                    # Invalidar caché
+                    self.last_delta_psi = None
+                    return True
+                    
+            except Exception as e:
+                logging.error(f"❌ Error aplicando herramienta {action}: {e}", exc_info=True)
+                return False
