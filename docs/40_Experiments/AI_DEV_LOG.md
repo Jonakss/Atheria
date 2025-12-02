@@ -160,3 +160,6 @@
   - **Epoch Detector Fix**: Resolved tensor shape mismatch (`(C, H, W)` vs `(H, W, C)`) in `EpochDetector` for `PolarEngine` and `HarmonicEngine`.
   - **Quantum Tools**: Verified integration of `IonQCollapse` and `QuantumSteering` with `NativeEngineWrapper` via `apply_tool`.
   - **Verification**: Verified fix with `reproduce_crash.py` on CUDA (64x64 and 512x512).
+- **[[logs/2025-12-02_fix_polar_viz_error|2025-12-02 - Fix: Polar Engine Visualization Error]]**:
+  - **Issue**: `TypeError: 'QuantumStatePolar' object is not subscriptable` in `calculate_poincare_coords` and `calculate_phase_attractor`.
+  - **Fix**: Updated `src/pipelines/viz/advanced.py` to handle `QuantumStatePolar` objects (via `.to_cartesian()` or `.squeeze()`) and correctly permute Channels-First tensors `(C, H, W)` to `(H, W, C)` expected by visualization functions.

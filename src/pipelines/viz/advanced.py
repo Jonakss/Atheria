@@ -30,6 +30,26 @@ def calculate_poincare_coords(psi: torch.Tensor) -> List[List[float]]:
     global _poincare_cache
     
     try:
+        # Manejar QuantumStatePolar u objetos similares
+        if hasattr(psi, 'to_cartesian'):
+            real, imag = psi.to_cartesian()
+            psi = torch.complex(real, imag)
+        elif hasattr(psi, 'squeeze'):
+            # Si es un objeto custom con squeeze (como QuantumStatePolar), obtener tensor
+            # Pero cuidado, si es un Tensor de PyTorch, squeeze hace otra cosa.
+            # Verificamos si NO es un tensor de PyTorch antes de llamar a métodos custom
+            if not isinstance(psi, torch.Tensor):
+                psi = psi.squeeze()
+
+        # Manejar dimensiones (C, H, W) -> (H, W, C)
+        # PolarEngine y HarmonicEngine usan (C, H, W)
+        if psi.ndim == 3 and psi.shape[0] < psi.shape[1] and psi.shape[1] == psi.shape[2]:
+             psi = psi.permute(1, 2, 0)
+        elif psi.ndim == 4: # (B, C, H, W)
+             psi = psi[0] # Tomar primer elemento del batch
+             if psi.shape[0] < psi.shape[1] and psi.shape[1] == psi.shape[2]:
+                 psi = psi.permute(1, 2, 0)
+
         # OPTIMIZACIÓN: Usar caché y submuestreo para mejorar rendimiento
         # Crear hash simple del estado para detectar cambios
         psi_sample = psi[::max(1, psi.shape[0]//32), ::max(1, psi.shape[1]//32), :]  # Submuestreo para hash
@@ -101,6 +121,21 @@ def calculate_phase_attractor(psi: torch.Tensor) -> Optional[Dict]:
     Returns:
         Dict con datos del phase attractor o None si psi no tiene suficientes canales
     """
+    # Manejar QuantumStatePolar u objetos similares
+    if hasattr(psi, 'to_cartesian'):
+        real, imag = psi.to_cartesian()
+        psi = torch.complex(real, imag)
+    elif hasattr(psi, 'squeeze') and not isinstance(psi, torch.Tensor):
+        psi = psi.squeeze()
+
+    # Manejar dimensiones (C, H, W) -> (H, W, C)
+    if psi.ndim == 3 and psi.shape[0] < psi.shape[1] and psi.shape[1] == psi.shape[2]:
+            psi = psi.permute(1, 2, 0)
+    elif psi.ndim == 4: # (B, C, H, W)
+            psi = psi[0]
+            if psi.shape[0] < psi.shape[1] and psi.shape[1] == psi.shape[2]:
+                psi = psi.permute(1, 2, 0)
+
     if psi.shape[-1] < 2:
         return None
     
