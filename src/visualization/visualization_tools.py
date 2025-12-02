@@ -13,14 +13,46 @@ def get_complex_parts(psi_tensor):
     imag_parts = psi_tensor[..., d_state:]
     return real_parts, imag_parts
 
-def get_density_map(psi) -> np.ndarray:
+def get_density_map(psi, absolute_scale=True) -> np.ndarray:
     """Calcula el mapa de densidad (norma al cuadrado) de un estado psi."""
     import torch
     if psi is None: return np.zeros((256, 256))
-    real, imag = get_complex_parts(psi.cpu())
-    if real is None: return np.zeros((psi.shape[1], psi.shape[2]))
-    density = torch.sum(real**2 + imag**2, dim=-1)
-    return density.squeeze(0).numpy()
+
+    # Manejar QuantumStatePolar u objetos similares si se pasa directamente
+    if hasattr(psi, 'magnitude'):
+         density = psi.magnitude.squeeze()**2
+    else:
+        real, imag = get_complex_parts(psi.cpu())
+        if real is None: return np.zeros((psi.shape[1], psi.shape[2]))
+        density = torch.sum(real**2 + imag**2, dim=-1)
+
+    density = density.squeeze()
+    if density.ndim == 3: # Handle batch if present
+         density = density[0]
+
+    if absolute_scale:
+        # ESCALA FIJA: Asumimos que la energía máxima "interesante" es 1.0
+        # Esto hace que el ruido (0.001) se vea negro, y la materia (0.9) se vea brillante.
+        norm_density = torch.clamp(density, 0, 1.0)
+    else:
+        # ESCALA RELATIVA (La vieja, que causa el ruido)
+        mi, ma = density.min(), density.max()
+        norm_density = (density - mi) / (ma - mi + 1e-8)
+
+    # Mapear a 0-255 si es necesario, pero originalmente devolvía float (density).
+    # IMPORTANTE: El código original devolvía `density.squeeze(0).numpy()` que eran FLOATS.
+    # El usuario sugirió: `return (norm_density * 255).cpu().numpy().astype(np.uint8)`
+    # Si cambio el tipo de retorno de float a uint8, debo asegurarme que los consumidores lo esperen.
+    # Usualmente los mapas se normalizan en el frontend o en pipeline_viz.
+    # Pero `get_density_map` aquí parece ser una utilidad standalone.
+    # Si el usuario explícitamente dió el código con el return uint8, lo respetaré.
+    # PERO, `get_change_map` devuelve floats? No, `magnitude.squeeze(0).numpy()` -> floats.
+    # `get_phase_map` devuelve uint8.
+
+    # Voy a mantener el return como numpy float array si absolute_scale es False (para compatibilidad tal vez?)
+    # O mejor, sigo la instrucción del usuario al pie de la letra para esta función.
+
+    return (norm_density * 255).cpu().numpy().astype(np.uint8)
 
 def get_change_map(psi, prev_psi) -> np.ndarray:
     """Calcula la magnitud del cambio entre dos estados psi."""
@@ -36,6 +68,7 @@ def get_phase_map(psi):
     """
     Visualiza la fase del estado cuántico.
     """
+    import torch
     # Calcular el ángulo (fase) y convertirlo a un array de floats
     phase = torch.angle(psi[0]).cpu().numpy()
     
