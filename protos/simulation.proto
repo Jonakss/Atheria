@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package simulation;
+
+service SimulationService {
+  rpc StreamUniverseState (Empty) returns (stream UniverseState);
+}
+
+message Empty {}
+
+message UniverseState {
+  int32 step = 1;
+  bytes data = 2; // Raw tensor data or viz buffer
+  map<string, float> metrics = 3;
+}

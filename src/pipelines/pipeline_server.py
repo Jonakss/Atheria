@@ -14,6 +14,7 @@ from pathlib import Path
 from ..services.simulation_service import SimulationService
 from ..services.data_processing_service import DataProcessingService
 from ..services.websocket_service import WebSocketService
+from ..services.grpc_service import GRPCService
 from .. import config as global_cfg
 from ..utils import save_experiment_config
 from ..model_loader import MODEL_MAP
@@ -30,16 +31,23 @@ class ServiceManager:
         # Colas de comunicación
         self.state_queue = asyncio.Queue(maxsize=2) # Buffer pequeño para evitar latencia
         self.broadcast_queue = asyncio.Queue(maxsize=10)
+        self.grpc_queue = asyncio.Queue(maxsize=5) # Cola para gRPC
         
         # Inicializar servicios
         self.simulation_service = SimulationService(self.state_queue)
-        self.data_processing_service = DataProcessingService(self.state_queue, self.broadcast_queue)
+        self.data_processing_service = DataProcessingService(
+            self.state_queue,
+            self.broadcast_queue,
+            grpc_queue=self.grpc_queue
+        )
         self.websocket_service = WebSocketService(self.broadcast_queue)
+        self.grpc_service = GRPCService(self.grpc_queue, port=50051)
         
         self.services = [
             self.simulation_service,
             self.data_processing_service,
-            self.websocket_service
+            self.websocket_service,
+            self.grpc_service
         ]
         
     async def start_all(self):
@@ -64,7 +72,13 @@ async def websocket_handler(request):
 
 async def on_startup(app):
     """Callback de inicio de aiohttp."""
-    await service_manager.start_all()
+    logging.info("🚀 pipeline_server: on_startup llamado. Iniciando ServiceManager...")
+    try:
+        await service_manager.start_all()
+        logging.info("✅ ServiceManager iniciado correctamente.")
+    except Exception as e:
+        logging.error(f"❌ Error iniciando ServiceManager: {e}", exc_info=True)
+        # No re-lanzamos para permitir que el servidor intente seguir, pero esto es grave.
 
 async def on_cleanup(app):
     """Callback de cierre de aiohttp."""
