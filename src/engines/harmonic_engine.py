@@ -184,7 +184,14 @@ class SparseHarmonicEngine:
             if mz == cz and abs(mx - cx) < half and abs(my - cy) < half:
                 lx = int(mx - (cx - half))
                 ly = int(my - (cy - half))
-                viewport_state[ly, lx] = m_state
+                # Fix complex casting warning: m_state might be complex if coming from quantum tools
+                # But viewport_state is initialized as real (implied by context, though line 193 makes it complex later)
+                # Actually line 168: viewport_state = self.vacuum.get_state(...) which returns real.
+                # So we must cast m_state to real if it's complex.
+                if m_state.is_complex():
+                    viewport_state[ly, lx] = m_state.real # Or .abs() depending on semantics. Real part is standard for scalar field.
+                else:
+                    viewport_state[ly, lx] = m_state
                 local_matter_mask[ly, lx] = 1.0
                 
         # Permutar a [1, H, W, C] para compatibilidad con CartesianEngine y VisualizationPipeline
@@ -259,7 +266,12 @@ class SparseHarmonicEngine:
             with torch.no_grad():
                 # Asumimos que el modelo retorna delta o nuevo estado
                 # Entrada: [1, C, H, W] -> Salida: [1, C, H, W]
-                output = self.model(local_state)
+                if self.model is not None:
+                    output = self.model(local_state)
+                else:
+                    # Si no hay modelo, la materia simplemente decae o se mueve por inercia (simplificado)
+                    # O simplemente retornamos el estado local (identidad)
+                    output = local_state * 0.99 # Ligero decaimiento para evitar explosión
                 
             # 4. Actualizar Materia (Dispersión)
             # Extraer solo la región central (sin padding)

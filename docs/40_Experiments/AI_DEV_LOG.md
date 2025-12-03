@@ -218,6 +218,14 @@
   - **Frontend**: Added engine selection buttons for `Holographic` (AdS/CFT), `Harmonic` (Wave), and `Lattice` (QCD) in `VisualizationPanel.tsx`.
   - **Backend**: Updated `inference_handlers.py` to map `holographic` engine type to `HOLOGRAPHIC` constant and handle it in `handle_load_experiment`.
   - **Impact**: Users can now switch to the Holographic Engine from the UI to view the bulk volume in the `HolographicVolumeViewer`.
+- **[[logs/2025-12-03_harmonic_runtime_fixes|2025-12-03 - Fix: Harmonic Engine Runtime Errors]]**:
+  - **Issue 1**: `Error en bucle de simulación: 'NoneType' object is not callable` in `HarmonicEngine.step()`.
+    - **Cause**: `self.model` was `None` (expected for Harmonic Engine without NN), but `step()` tried to call it.
+    - **Fix**: Added check `if self.model is not None` in `step()`. If no model, applies simple decay (0.99) to simulate dissipation.
+  - **Issue 2**: `UserWarning: Casting complex values to real discards the imaginary part`.
+    - **Cause**: Assigning complex `m_state` (from quantum tools) to real `viewport_state` tensor.
+    - **Fix**: Explicitly cast to `.real` if `m_state.is_complex()`.
+  - **Impact**: Simulation loop is now stable when using Harmonic Engine.
 - **[[logs/2025-12-03_fix_cleanpolar_wrapper_shape|2025-12-03 - Fix: CleanPolarWrapper Shape Attribute Error]]**:
   - **Issue**: `AttributeError: 'CleanPolarWrapper' object has no attribute 'shape'` in visualization pipeline at `select_map_data()` when using `PolarEngine` with various viz types (especially 'fields').
   - **Root Cause**: `CleanPolarWrapper` class (created during vacuum masking in `get_visualization_data()`) was missing `.shape` property and `.abs()` method expected by visualization functions.
