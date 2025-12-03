@@ -1,6 +1,7 @@
 import { AlertCircle, ChevronRight, Microscope, Zap } from 'lucide-react';
 import React from 'react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
+import { ScientificMetrics } from './ScientificMetrics';
 
 interface PhysicsSectionProps {
   // Section doesn't handle collapse, parent does
@@ -14,8 +15,13 @@ export const PhysicsSection: React.FC<PhysicsSectionProps> = () => {
 
   return (
     <div className="p-4 space-y-6">
-      {/* Sección: Inyección (Génesis) */}
+      {/* Métricas Científicas (Full Display) */}
       <div className="space-y-3">
+        <ScientificMetrics compact={false} />
+      </div>
+
+      {/* Sección: Inyección (Génesis) */}
+      <div className="space-y-3 pt-4 border-t border-white/5">
         <div className="flex items-center gap-2 text-gray-200 text-xs font-bold uppercase tracking-wider mb-2">
           <Zap size={12} className="text-yellow-500" /> Inyección de Energía
         </div>
