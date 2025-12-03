@@ -27,24 +27,31 @@ class CleanPolarWrapper:
     def __init__(self, mag, phase, device=None):
         self.magnitude = mag
         self.phase = phase
-        self.device = device
+        self._device = device
+
+    @property
+    def shape(self):
+        """Return shape compatible with tensor expectations."""
+        # magnitude is (H, W), so we return (H, W, 1) to indicate single channel
+        h, w = self.magnitude.shape
+        return (h, w, 1)
+    
+    @property
+    def device(self):
+        """Return device of underlying tensors."""
+        if self._device is not None:
+            return self._device
+        return self.magnitude.device if hasattr(self.magnitude, 'device') else torch.device('cpu')
 
     def to_cartesian(self):
         real = self.magnitude * torch.cos(self.phase)
         imag = self.magnitude * torch.sin(self.phase)
         return real, imag
-
-class CleanPolarWrapper:
-    """Wrapper para estado polar con máscara de vacío aplicada."""
-    def __init__(self, mag, phase, device=None):
-        self.magnitude = mag
-        self.phase = phase
-        self.device = device
-
-    def to_cartesian(self):
-        real = self.magnitude * torch.cos(self.phase)
-        imag = self.magnitude * torch.sin(self.phase)
-        return real, imag
+    
+    def abs(self):
+        """Return magnitude for compatibility with tensor operations."""
+        # Return as (H, W, 1) to match expected tensor format
+        return self.magnitude.unsqueeze(-1)
 
 def get_visualization_data(psi, viz_type: str, delta_psi: torch.Tensor = None, motor=None, downsample_factor: int = 1):
     """

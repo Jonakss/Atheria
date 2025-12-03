@@ -203,3 +203,9 @@
   - **Cause**: Off-by-one error in `get_viewport_tensor()` at line 155-156. Using `torch.arange(cx - half, cx + half)` produces `half * 2` elements (e.g., 24) instead of the expected `size_xy` elements (e.g., 25) because `torch.arange` is exclusive of the end value.
   - **Fix**: Changed coordinate range to `torch.arange(cx - half, cx + half + 1)` to generate exactly `size_xy` elements, fixing the tensor reshape operation.
   - **Impact**: Quantum tools (`collapse`, `vortex`, `wave`) now work correctly with `HarmonicEngine`.
+- **[[logs/2025-12-03_fix_cleanpolar_wrapper_shape|2025-12-03 - Fix: CleanPolarWrapper Shape Attribute Error]]**:
+  - **Issue**: `AttributeError: 'CleanPolarWrapper' object has no attribute 'shape'` in visualization pipeline at `select_map_data()` when using `PolarEngine` with various viz types (especially 'fields').
+  - **Root Cause**: `CleanPolarWrapper` class (created during vacuum masking in `get_visualization_data()`) was missing `.shape` property and `.abs()` method expected by visualization functions.
+  - **Fix**: Added `@property shape` returning `(H, W, 1)` tuple, `@property device` for device management, and `.abs()` method returning magnitude as `(H, W, 1)` tensor. Removed duplicate class definition.
+  - **Verification**: Tested with `python3 -c "..."` confirming correct shape, device, and abs() behavior.
+  - **Impact**: All visualization types now work correctly with `PolarEngine` (density, phase, fields, etc.).
