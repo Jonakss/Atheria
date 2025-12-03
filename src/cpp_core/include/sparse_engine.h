@@ -128,7 +128,7 @@ private:
     // Almacenamiento
     SparseMap matter_map_;
     HarmonicVacuum vacuum_;
-    TensorPool pool_; // Memory pool for tensors
+    ThreadLocalTensorPool pool_; // Memory pool for tensors (thread-local)
     OctreeIndex octree_;
     
     // Estado de simulación

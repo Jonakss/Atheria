@@ -4,6 +4,7 @@ from .engines.qca_engine import CartesianEngine
 from .engines.qca_engine_polar import PolarEngine
 from .engines.lattice_engine import LatticeEngine
 from .engines.harmonic_engine import SparseHarmonicEngine
+from .engines.holographic_engine import HolographicEngine
 from .engines.compute_backend import LocalBackend, MockQuantumBackend, ComputeBackend
 
 def get_motor(config, device, model: nn.Module = None):
@@ -90,6 +91,10 @@ def get_motor(config, device, model: nn.Module = None):
         if model is None:
             logging.warning("Harmonic Engine requires a model for matter interaction, but None provided. Proceeding with caution.")
         return SparseHarmonicEngine(model, d_state, backend.get_device(), grid_size)
+        
+    elif engine_type == 'HOLOGRAPHIC':
+        logging.info("🔮 Initializing Holographic Engine (AdS/CFT Projection)")
+        return HolographicEngine(model, grid_size, d_state, backend.get_device(), cfg=config)
         
     else: # CARTESIAN or default
         if engine_type != 'CARTESIAN':

@@ -261,6 +261,22 @@
 
 ---
 
+## 🟣 EXPERIMENTAL - Nuevos Conceptos
+
+### 17. Exploración del Principio Holográfico
+**Prioridad:** 🟣 **EXPERIMENTAL**
+**Estado:** 💡 **CONCEPTO**
+
+**Requisito:**
+- Investigar implementación de `HolographicEngine` (Física 2D -> 3D)
+- Prototipar `HolographicViewer` para visualizar la frontera y el bulk
+- Experimentar con "Ley M" en el borde del caos usando codificación holográfica
+
+**Referencias:**
+- [[HOLOGRAPHIC_PRINCIPLE]]
+
+---
+
 ## 📊 RESUMEN POR PRIORIDAD
 
 ### 🔴 CRÍTICO (Implementar Inmediatamente)

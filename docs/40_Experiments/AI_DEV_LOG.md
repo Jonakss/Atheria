@@ -176,3 +176,14 @@
     - **Native (C++)**: < 0.2 FPS (CPU).
     - **Analysis**: Native Engine is significantly slower due to massive overhead in `step_native` (batch construction, map access, small batch dispatch).
   - **Next Steps**: Optimization of memory management (pools) and batching strategy.
+- **[[logs/2025-12-03_thread_local_tensor_pool|2025-12-03 - Optimization: Thread-Local Tensor Pools]]**:
+  - **Feature**: Implemented `ThreadLocalTensorPool` in `src/cpp_core/include/tensor_pool.h`.
+  - **Goal**: Remove mutex contention in `TensorPool` during OpenMP parallel execution.
+  - **Implementation**: Replaced single `std::stack` with `std::vector<std::stack>` (one per thread) and removed `std::mutex`.
+  - **Result**: Functional correctness verified. Performance impact on CPU (16x16 grid) is minimal, indicating bottleneck is elsewhere (batch overhead).
+  - **Next**: Focus on `build_batch_input` optimization.
+- **[[logs/2025-12-03_holographic_engine_implementation|2025-12-03 - Feature: Holographic Engine (AdS/CFT Projection)]]**:
+  - **Concept**: Implemented `HolographicEngine` based on the Holographic Principle. It evolves a 2D boundary state but provides a 3D bulk projection via Scale-Space renormalization.
+  - **Implementation**: Created `src/engines/holographic_engine.py` inheriting from `CartesianEngine`. Implemented `get_bulk_state()` using Gaussian blurring to simulate depth/scale.
+  - **Integration**: Registered `HOLOGRAPHIC` engine type in `src/motor_factory.py`.
+  - **Verification**: Verified initialization and projection logic (variance reduction with depth) via `tests/test_holographic_engine.py`.
