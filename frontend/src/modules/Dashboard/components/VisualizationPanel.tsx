@@ -168,15 +168,36 @@ export const VisualizationPanel: React.FC<VisualizationPanelProps> = ({
                 className="flex flex-col items-center justify-center p-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded text-xs text-gray-300 transition-all group"
                 onClick={() => sendCommand('inference', 'switch_engine', { engine: 'python' })}
               >
-                <span className="font-bold text-blue-400">Python</span>
-                <span className="text-[9px] text-gray-500">Flexible</span>
+                <span className="font-bold text-blue-400">Standard</span>
+                <span className="text-[9px] text-gray-500">Cartesian QCA</span>
               </button>
               <button 
                 className="flex flex-col items-center justify-center p-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded text-xs text-gray-300 transition-all group"
                 onClick={() => sendCommand('inference', 'switch_engine', { engine: 'native' })}
               >
-                <span className="font-bold text-orange-400">Nativo (C++)</span>
-                <span className="text-[9px] text-gray-500">Alto Rendimiento</span>
+                <span className="font-bold text-orange-400">Nativo</span>
+                <span className="text-[9px] text-gray-500">C++ High Perf</span>
+              </button>
+              <button 
+                className="flex flex-col items-center justify-center p-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded text-xs text-gray-300 transition-all group"
+                onClick={() => sendCommand('inference', 'switch_engine', { engine: 'holographic' })}
+              >
+                <span className="font-bold text-purple-400">Holographic</span>
+                <span className="text-[9px] text-gray-500">AdS/CFT Bulk</span>
+              </button>
+              <button 
+                className="flex flex-col items-center justify-center p-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded text-xs text-gray-300 transition-all group"
+                onClick={() => sendCommand('inference', 'switch_engine', { engine: 'harmonic' })}
+              >
+                <span className="font-bold text-cyan-400">Harmonic</span>
+                <span className="text-[9px] text-gray-500">Wave Interference</span>
+              </button>
+              <button 
+                className="flex flex-col items-center justify-center p-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded text-xs text-gray-300 transition-all group col-span-2"
+                onClick={() => sendCommand('inference', 'switch_engine', { engine: 'lattice' })}
+              >
+                <span className="font-bold text-green-400">Lattice Gauge</span>
+                <span className="text-[9px] text-gray-500">SU(3) QCD</span>
               </button>
             </div>
           </div>

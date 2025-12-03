@@ -630,7 +630,8 @@ async def handle_load_experiment(args):
                         'polar': 'POLAR',
                         'quantum': 'QUANTUM',
                         'harmonic': 'HARMONIC',
-                        'lattice': 'LATTICE'
+                        'lattice': 'LATTICE',
+                        'holographic': 'HOLOGRAPHIC'
                     }
                     if force_engine in engine_map:
                         global_cfg.ENGINE_TYPE = engine_map[force_engine]
@@ -650,6 +651,7 @@ async def handle_load_experiment(args):
                     elif global_cfg.ENGINE_TYPE == "LATTICE": engine_type_display = "Lattice (AdS/CFT)"
                     elif global_cfg.ENGINE_TYPE == "POLAR": engine_type_display = "Polar (Rotacional)"
                     elif global_cfg.ENGINE_TYPE == "QUANTUM": engine_type_display = "Quantum (Híbrido)"
+                    elif global_cfg.ENGINE_TYPE == "HOLOGRAPHIC": engine_type_display = "Holographic (AdS/CFT)"
                     
                     await send_notification(
                         ws,
@@ -672,6 +674,8 @@ async def handle_load_experiment(args):
                             exp_cfg.ENGINE_TYPE = 'POLAR'
                         elif force_engine == "quantum":
                             exp_cfg.ENGINE_TYPE = 'QUANTUM'
+                        elif force_engine == "holographic":
+                            exp_cfg.ENGINE_TYPE = 'HOLOGRAPHIC'
                         elif force_engine == "python": # Standard
                             exp_cfg.ENGINE_TYPE = 'CARTESIAN'
 
@@ -709,7 +713,7 @@ async def handle_load_experiment(args):
 
                 g_state["motor_is_native"] = False
                 g_state["motor_type"] = (
-                    force_engine if force_engine in ["harmonic", "lattice", "polar", "quantum"] else "python"
+                    force_engine if force_engine in ["harmonic", "lattice", "polar", "quantum", "holographic"] else "python"
                 )
 
             # Extraer paso inicial del nombre del archivo

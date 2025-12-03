@@ -214,6 +214,10 @@
   - **Cause**: Off-by-one error in `get_viewport_tensor()` at line 155-156. Using `torch.arange(cx - half, cx + half)` produces `half * 2` elements (e.g., 24) instead of the expected `size_xy` elements (e.g., 25) because `torch.arange` is exclusive of the end value.
   - **Fix**: Changed coordinate range to `torch.arange(cx - half, cx + half + 1)` to generate exactly `size_xy` elements, fixing the tensor reshape operation.
   - **Impact**: Quantum tools (`collapse`, `vortex`, `wave`) now work correctly with `HarmonicEngine`.
+- **[[logs/2025-12-03_holographic_ui_integration|2025-12-03 - Feature: Holographic Engine UI Integration]]**:
+  - **Frontend**: Added engine selection buttons for `Holographic` (AdS/CFT), `Harmonic` (Wave), and `Lattice` (QCD) in `VisualizationPanel.tsx`.
+  - **Backend**: Updated `inference_handlers.py` to map `holographic` engine type to `HOLOGRAPHIC` constant and handle it in `handle_load_experiment`.
+  - **Impact**: Users can now switch to the Holographic Engine from the UI to view the bulk volume in the `HolographicVolumeViewer`.
 - **[[logs/2025-12-03_fix_cleanpolar_wrapper_shape|2025-12-03 - Fix: CleanPolarWrapper Shape Attribute Error]]**:
   - **Issue**: `AttributeError: 'CleanPolarWrapper' object has no attribute 'shape'` in visualization pipeline at `select_map_data()` when using `PolarEngine` with various viz types (especially 'fields').
   - **Root Cause**: `CleanPolarWrapper` class (created during vacuum masking in `get_visualization_data()`) was missing `.shape` property and `.abs()` method expected by visualization functions.
