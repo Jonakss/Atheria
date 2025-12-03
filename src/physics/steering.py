@@ -25,19 +25,20 @@ class QuantumSteering:
         except Exception as e:
             logging.error(f"❌ Failed to init IonQBackend for Steering: {e}")
 
-    def generate_pattern(self, pattern_type, size=11):
+    def generate_pattern(self, pattern_type, size=11, **kwargs):
         """
         Genera un patrón cuántico usando un circuito específico en IonQ.
         
         Args:
-            pattern_type: 'vortex', 'soliton', 'superposition', 'entanglement'
+            pattern_type: 'vortex', 'soliton', 'superposition', 'entanglement', 'plane_wave'
             size: Tamaño del patrón (n_qubits). Default 11 (IonQ basic).
+            **kwargs: Parámetros extra (k_x, k_y, etc.)
             
         Returns:
             Tensor complejo 1D de tamaño [size]
         """
         if self.backend is None:
-            return self._mock_pattern(pattern_type, size)
+            return self._mock_pattern(pattern_type, size, **kwargs)
             
         try:
             from qiskit import QuantumCircuit
@@ -69,6 +70,16 @@ class QuantumSteering:
                 for i in range(0, size-1, 2):
                     qc.h(i)
                     qc.cx(i, i+1)
+            
+            elif pattern_type == 'plane_wave':
+                # Onda plana: Fase lineal.
+                # k normalizado a [0, 2pi]
+                k = kwargs.get('k', 1.0)
+                qc.h(range(size))
+                for i in range(size):
+                    # Phase = k * x
+                    angle = k * i 
+                    qc.rz(angle, i)
                     
             else: # Superposition (default)
                 qc.h(range(size))
@@ -100,6 +111,9 @@ class QuantumSteering:
             # Generar fase según patrón (ya que la medición la perdió)
             if pattern_type == 'vortex':
                 phases = torch.tensor([2 * np.pi * (i / size) for i in range(size)], device=self.device)
+            elif pattern_type == 'plane_wave':
+                k = kwargs.get('k', 1.0)
+                phases = torch.tensor([k * i for i in range(size)], device=self.device)
             else:
                 phases = torch.zeros(size, device=self.device)
                 
@@ -107,9 +121,9 @@ class QuantumSteering:
             
         except Exception as e:
             logging.error(f"❌ Steering Generation Failed: {e}")
-            return self._mock_pattern(pattern_type, size)
+            return self._mock_pattern(pattern_type, size, **kwargs)
 
-    def _mock_pattern(self, pattern_type, size):
+    def _mock_pattern(self, pattern_type, size, **kwargs):
         """Generador local de patrones."""
         x = torch.linspace(-1, 1, size, device=self.device)
         
@@ -124,21 +138,41 @@ class QuantumSteering:
             mag = torch.exp(-x**2 * 10)
             return torch.complex(mag, torch.zeros_like(mag))
             
+        elif pattern_type == 'plane_wave':
+            # Onda plana
+            k = kwargs.get('k', 5.0)
+            # x va de -1 a 1, mapeamos a espacio
+            phase = x * k
+            mag = torch.ones_like(x) * 0.5 # Amplitud uniforme
+            return torch.complex(mag * torch.cos(phase), mag * torch.sin(phase))
+            
         else:
             return torch.randn(size, dtype=torch.complex64, device=self.device)
 
-    def inject(self, state, pattern_type, x, y, radius=5):
+    def inject(self, state, pattern_type, x, y, radius=5, **kwargs):
         """
         Inyecta el patrón en el estado en la posición (x, y).
         """
         H, W = state.shape[1], state.shape[2]
         
-        # Generar patrón 1D
-        pattern_1d = self.generate_pattern(pattern_type, size=radius*2)
+        # Extraer params específicos
+        k_x = kwargs.get('k_x', 1.0)
+        k_y = kwargs.get('k_y', 1.0)
         
-        # Crear patrón 2D (producto exterior aproximado o rotación)
-        # Para simplificar: producto exterior de patrón consigo mismo
-        pattern_2d = torch.outer(pattern_1d, pattern_1d).unsqueeze(0).unsqueeze(-1) # [1, 2r, 2r, 1]
+        # Generar patrón 1D
+        # Para plane_wave 2D, necesitamos k_x y k_y. 
+        # generate_pattern es 1D.
+        # Aproximación: Wave X * Wave Y
+        
+        if pattern_type == 'plane_wave':
+            pat_x = self.generate_pattern(pattern_type, size=radius*2, k=k_x)
+            pat_y = self.generate_pattern(pattern_type, size=radius*2, k=k_y)
+            # Producto exterior: (Nx1) * (1xN) -> NxN
+            pattern_2d = torch.outer(pat_y, pat_x).unsqueeze(0).unsqueeze(-1) # [1, 2r, 2r, 1]
+        else:
+            pattern_1d = self.generate_pattern(pattern_type, size=radius*2, **kwargs)
+            pattern_2d = torch.outer(pattern_1d, pattern_1d).unsqueeze(0).unsqueeze(-1) # [1, 2r, 2r, 1]
+            
         pattern_2d = pattern_2d.repeat(1, 1, 1, state.shape[-1]) # Repetir canales
         
         # Coordenadas

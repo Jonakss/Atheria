@@ -167,6 +167,12 @@
   - **Spectrum Viz**: Fixed "single particle" appearance in spectral view by masking the DC component (zero frequency) which was dominating the dynamic range.
   - **Snapshot Fix**: Resolved `ValueError` when saving snapshots with `LatticeEngine` by adding a check for `get_dense_state` method in `snapshot_handlers.py`.
   - **Verification**: Verified spectrum improvement with `reproduce_spectrum.py` and confirmed snapshot handler logic via code analysis.
+- **[[logs/2025-12-03_fix_harmonic_tools|2025-12-03 - Fix: Quantum Tools Integration]]**:
+  - **HarmonicEngine**: Integrated `IonQCollapse` and `QuantumSteering` to support `collapse`, `vortex`, and `wave` tools.
+  - **CartesianEngine**: Fixed `wave` tool to use `QuantumSteering` correctly (added `plane_wave` support and fixed args).
+  - **NativeEngineWrapper**: Implemented `apply_tool` to support quantum tools via dense state manipulation.
+  - **QuantumSteering**: Added `plane_wave` pattern and `**kwargs` support.
+  - **Verification**: Verified all engines with `tests/test_all_tools.py`.
 - **[[logs/2025-12-03_native_engine_deadlock_fix_and_benchmark|2025-12-03 - Critical Fix: Native Engine Deadlock & Benchmark Results]]**:
   - **Deadlock Fix**: Resolved Native Engine hang during warmup/initialization.
     - **Cause**: Deadlock caused by calling `torch::set_num_threads(1)` inside an OpenMP parallel region (`#pragma omp parallel`) in `sparse_engine.cpp`.

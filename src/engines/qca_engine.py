@@ -735,8 +735,13 @@ class CartesianEngine:
                 k_x = float(params.get('k_x', 1.0))
                 k_y = float(params.get('k_y', 1.0))
                 
+                # Onda global: aplicar en todo el grid
+                # Usamos el centro del grid y un radio grande
+                cx, cy = self.grid_size // 2, self.grid_size // 2
+                radius = self.grid_size # Cubrir todo
+                
                 steering = QuantumSteering(device)
-                new_psi = steering.inject(self.state.psi, 'plane_wave', k_x=k_x, k_y=k_y)
+                new_psi = steering.inject(self.state.psi, 'plane_wave', x=cx, y=cy, radius=radius, k_x=k_x, k_y=k_y)
                 
             else:
                 logging.warning(f"⚠️ Herramienta no soportada: {action}")

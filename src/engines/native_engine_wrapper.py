@@ -1285,3 +1285,59 @@ class NativeEngineWrapper:
             except Exception as e:
                 logging.error(f"❌ Error aplicando herramienta {action}: {e}", exc_info=True)
                 return False
+    def apply_tool(self, action, params):
+        """
+        Aplica una herramienta cuántica al estado.
+        Nota: Esto requiere convertir a denso, aplicar, y reconvertir a disperso (costoso).
+        """
+        logging.info(f"🛠️ NativeEngineWrapper aplicando herramienta: {action} | Params: {params}")
+        
+        try:
+            # 1. Obtener estado denso actual
+            current_dense = self.get_dense_state()
+            
+            # 2. Aplicar herramienta (usando lógica de CartesianEngine/Physics)
+            from ..physics import IonQCollapse, QuantumSteering
+            device = self.device
+            new_psi = None
+            
+            if action == 'collapse':
+                intensity = float(params.get('intensity', 0.5))
+                center = None
+                if 'x' in params and 'y' in params:
+                    center = (int(params['y']), int(params['x']))
+                collapser = IonQCollapse(device)
+                new_psi = collapser.collapse(current_dense, region_center=center, intensity=intensity)
+                
+            elif action == 'vortex':
+                x = int(params.get('x', self.grid_size // 2))
+                y = int(params.get('y', self.grid_size // 2))
+                radius = int(params.get('radius', 5))
+                strength = float(params.get('strength', 1.0))
+                steering = QuantumSteering(device)
+                new_psi = steering.inject(current_dense, 'vortex', x=x, y=y, radius=radius, strength=strength)
+                
+            elif action == 'wave':
+                k_x = float(params.get('k_x', 1.0))
+                k_y = float(params.get('k_y', 1.0))
+                cx, cy = self.grid_size // 2, self.grid_size // 2
+                radius = self.grid_size
+                steering = QuantumSteering(device)
+                new_psi = steering.inject(current_dense, 'plane_wave', x=cx, y=cy, radius=radius, k_x=k_x, k_y=k_y)
+            
+            if new_psi is not None:
+                # 3. Actualizar estado
+                self.state.psi = new_psi
+                
+                # 4. Re-sincronizar motor nativo
+                # Limpiar y re-llenar
+                if self.native_engine is not None:
+                    self.native_engine.clear()
+                    self._initialize_native_state_from_dense(new_psi)
+                return True
+                
+            return False
+            
+        except Exception as e:
+            logging.error(f"❌ Error aplicando herramienta en NativeEngine: {e}", exc_info=True)
+            return False

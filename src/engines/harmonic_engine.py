@@ -82,6 +82,12 @@ class SparseHarmonicEngine:
         self.active_coords = set()
         self.step_count = 0
 
+        # Quantum Tools
+        from ..physics.quantum_collapse import IonQCollapse
+        from ..physics.steering import QuantumSteering
+        self.collider = IonQCollapse(device)
+        self.steering = QuantumSteering(device)
+
     def initialize_matter(self, mode='random', strength=1.0):
         """
         Inicializa la materia del universo.
@@ -307,45 +313,83 @@ class SparseHarmonicEngine:
         """
         Aplica una herramienta cuántica al universo armónico.
         """
-        import numpy as np # Import numpy locally if not already imported globally
         logging.info(f"🛠️ HarmonicEngine aplicando herramienta: {action} | Params: {params}")
         
-        if action == 'collapse':
-            # Interpretar colapso como inyección de materia en una región
-            intensity = float(params.get('intensity', 0.5))
-            center = None
-            if 'x' in params and 'y' in params:
-                center = (int(params['y']), int(params['x']))
+        try:
+            # 1. Preparar región local (Viewport centrado en la acción)
+            # Para simplificar, usamos un viewport de tamaño fijo alrededor del evento
+            # Si no hay coordenadas (global), usamos el centro del universo
             
-            # Generar materia aleatoria en la región
-            if center:
-                cy, cx = center
+            cx = int(params.get('x', 0))
+            cy = int(params.get('y', 0))
+            cz = 0 # Asumimos plano Z=0 para interacción UI
+            
+            # Tamaño de la región de efecto
+            radius = int(params.get('radius', 10))
+            if action == 'collapse':
+                # Collapse puede ser más grande
+                intensity = float(params.get('intensity', 0.5))
                 radius = int(self.grid_size * 0.1)
-                num_particles = int(intensity * 20)
+            
+            region_size = radius * 2 + 1
+            
+            # Obtener estado denso local
+            # [1, H, W, C] -> [1, region_size, region_size, d_state]
+            # get_viewport_tensor retorna [1, H, W, C]
+            local_tensor = self.get_viewport_tensor((cx, cy, cz), region_size, self.step_count * 0.1)
+            
+            # 2. Aplicar herramienta
+            new_local_tensor = None
+            
+            if action == 'collapse':
+                intensity = float(params.get('intensity', 0.5))
+                # IonQCollapse espera [1, H, W, C]
+                new_local_tensor = self.collider.collapse(local_tensor, region_center=(radius, radius), intensity=intensity)
                 
-                for _ in range(num_particles):
-                    # Aleatorio dentro del radio
-                    r = np.sqrt(np.random.random()) * radius
-                    theta = np.random.random() * 2 * np.pi
-                    
-                    px = int(cx + r * np.cos(theta))
-                    py = int(cy + r * np.sin(theta))
-                    pz = 0
-                    
-                    # Estado aleatorio
-                    state = torch.randn(self.d_state, dtype=torch.complex64, device=self.device)
-                    self.add_matter(px, py, pz, state)
-                    
-                logging.info(f"✨ Inyectadas {num_particles} partículas en ({cx}, {cy})")
-                return True
+            elif action in ['vortex', 'wave', 'soliton']:
+                # QuantumSteering espera [1, H, W, C]
+                pattern_type = action
+                if action == 'wave': pattern_type = 'superposition' # Map wave to superposition or custom
+                
+                # Steering inject
+                new_local_tensor = self.steering.inject(local_tensor, pattern_type, radius, radius, radius=radius//2)
+                
             else:
-                # Global injection?
+                logging.warning(f"⚠️ Herramienta no soportada: {action}")
                 return False
                 
-        elif action in ['vortex', 'wave']:
-            logging.warning(f"⚠️ Herramienta {action} no soportada aún en HarmonicEngine (requiere manipulación de campo de vacío).")
+            # 3. Actualizar Materia (Dispersión)
+            # Convertir el tensor denso modificado de vuelta a partículas
+            if new_local_tensor is not None:
+                # Extraer datos
+                # [1, H, W, C] -> [H, W, C]
+                data = new_local_tensor[0]
+                
+                # Iterar sobre el tensor local y actualizar self.matter
+                # Solo actualizamos si la energía es significativa (para mantener sparsity)
+                energy = data.abs().pow(2).sum(dim=-1)
+                threshold = 0.01
+                
+                indices = torch.nonzero(energy > threshold)
+                
+                # Offset para coordenadas globales
+                offset_x = cx - radius
+                offset_y = cy - radius
+                
+                count = 0
+                for idx in indices:
+                    ly, lx = idx[0].item(), idx[1].item()
+                    gx, gy = offset_x + lx, offset_y + ly
+                    
+                    state_vec = data[ly, lx]
+                    self.add_matter(gx, gy, cz, state_vec)
+                    count += 1
+                    
+                logging.info(f"✨ Tool '{action}' applied. Updated {count} particles in region.")
+                return True
+                
             return False
             
-        else:
-            logging.warning(f"⚠️ Herramienta no soportada: {action}")
+        except Exception as e:
+            logging.error(f"❌ Error applying tool '{action}': {e}", exc_info=True)
             return False
