@@ -34,6 +34,18 @@ class CleanPolarWrapper:
         imag = self.magnitude * torch.sin(self.phase)
         return real, imag
 
+class CleanPolarWrapper:
+    """Wrapper para estado polar con máscara de vacío aplicada."""
+    def __init__(self, mag, phase, device=None):
+        self.magnitude = mag
+        self.phase = phase
+        self.device = device
+
+    def to_cartesian(self):
+        real = self.magnitude * torch.cos(self.phase)
+        imag = self.magnitude * torch.sin(self.phase)
+        return real, imag
+
 def get_visualization_data(psi, viz_type: str, delta_psi: torch.Tensor = None, motor=None, downsample_factor: int = 1):
     """
     Genera datos de visualización a partir del estado cuántico psi.
@@ -69,21 +81,19 @@ def get_visualization_data(psi, viz_type: str, delta_psi: torch.Tensor = None, m
     # 2. MÁSCARA DE VACÍO (The Noise Filter)
     # Si la energía es menor al 5%, lo consideramos "Vacío Cuántico" y no lo dibujamos.
     # Esto limpia el gráfico 3D/Poincaré increíblemente.
+    vacuum_threshold = 0.05
 
     if is_polar:
         mag = psi.magnitude
-        mask = mag > VACUUM_THRESHOLD
+        mask = mag > vacuum_threshold
         # Create cleaned tensors
         clean_mag = mag * mask
         clean_pha = psi.phase * mask
-
-        # Replace psi with a wrapper containing the masked data.
-        # The rest of this function is compatible with the wrapper's interface (duck typing).
-        # This prevents modifying the original 'psi' object if it's referenced elsewhere.
+        # Replace psi with cleaned wrapper
         psi = CleanPolarWrapper(clean_mag, clean_pha, getattr(psi, 'device', None))
     elif isinstance(psi, torch.Tensor):
         magnitude = torch.norm(psi, dim=-1)
-        mask = magnitude > VACUUM_THRESHOLD
+        mask = magnitude > vacuum_threshold
         # Aplicar máscara (poner a cero lo que no es materia)
         psi = psi * mask.unsqueeze(-1)
 

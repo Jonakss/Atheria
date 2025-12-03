@@ -38,6 +38,19 @@ def get_density_map(psi, absolute_scale=True) -> np.ndarray:
         mi, ma = density.min(), density.max()
         norm_density = (density - mi) / (ma - mi + 1e-8)
 
+    # Mapear a 0-255 si es necesario, pero originalmente devolvía float (density).
+    # IMPORTANTE: El código original devolvía `density.squeeze(0).numpy()` que eran FLOATS.
+    # El usuario sugirió: `return (norm_density * 255).cpu().numpy().astype(np.uint8)`
+    # Si cambio el tipo de retorno de float a uint8, debo asegurarme que los consumidores lo esperen.
+    # Usualmente los mapas se normalizan en el frontend o en pipeline_viz.
+    # Pero `get_density_map` aquí parece ser una utilidad standalone.
+    # Si el usuario explícitamente dió el código con el return uint8, lo respetaré.
+    # PERO, `get_change_map` devuelve floats? No, `magnitude.squeeze(0).numpy()` -> floats.
+    # `get_phase_map` devuelve uint8.
+
+    # Voy a mantener el return como numpy float array si absolute_scale es False (para compatibilidad tal vez?)
+    # O mejor, sigo la instrucción del usuario al pie de la letra para esta función.
+
     return (norm_density * 255).cpu().numpy().astype(np.uint8)
 
 def get_change_map(psi, prev_psi) -> np.ndarray:
@@ -53,6 +66,7 @@ def get_phase_map(psi):
     """
     Visualiza la fase del estado cuántico.
     """
+    import torch
     # Calcular el ángulo (fase) y convertirlo a un array de floats
     phase = torch.angle(psi[0]).cpu().numpy()
     
