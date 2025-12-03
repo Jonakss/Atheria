@@ -2,6 +2,7 @@ import { AlertCircle, ChevronRight, Microscope, Zap } from 'lucide-react';
 import React from 'react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { ScientificMetrics } from './ScientificMetrics';
+import { QuantumToolbox } from '../../../components/QuantumToolbox';
 
 interface PhysicsSectionProps {
   // Section doesn't handle collapse, parent does
@@ -50,6 +51,9 @@ export const PhysicsSection: React.FC<PhysicsSectionProps> = () => {
           </button>
         </div>
       </div>
+
+      {/* Quantum Toolbox */}
+      <QuantumToolbox />
 
       {/* Mensaje de Alerta (Contextual) - Si hay logs de error */}
       {recentLogs.some(log => typeof log === 'string' && log.toLowerCase().includes('error')) && (

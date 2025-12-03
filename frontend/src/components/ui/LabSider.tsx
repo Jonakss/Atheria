@@ -7,7 +7,6 @@ import { modelOptions } from '../../utils/vizOptions';
 import { ExperimentInfo } from '../experiments/ExperimentInfo';
 import { ExperimentManager } from '../experiments/ExperimentManager';
 import { TransferLearningWizard } from '../experiments/TransferLearningWizard';
-import { QuantumToolbox } from '../QuantumToolbox';
 import { CheckpointManager } from '../training/CheckpointManager';
 import { TrainingCanvas } from '../training/TrainingCanvas';
 
@@ -454,11 +453,6 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
                                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">GESTIÓN</div>
                                 <ExperimentManager />
                                 <CheckpointManager />
-                            </div>
-
-                            {/* Quantum Toolbox */}
-                            <div className="pt-3 border-t border-white/5">
-                                <QuantumToolbox />
                             </div>
                         </div>
                     )}
