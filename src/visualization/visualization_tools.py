@@ -2,10 +2,10 @@
 import numpy as np
 from io import BytesIO
 import base64
+import torch
 
 def get_complex_parts(psi_tensor):
     """Divide un tensor complejo (real, imag) en dos tensores."""
-    import torch
     if psi_tensor is None or psi_tensor.shape[-1] % 2 != 0:
         return None, None
     d_state = psi_tensor.shape[-1] // 2
@@ -15,13 +15,6 @@ def get_complex_parts(psi_tensor):
 
 def get_density_map(psi, absolute_scale=True) -> np.ndarray:
     """Calcula el mapa de densidad (norma al cuadrado) de un estado psi."""
-import torch
-import numpy as np
-...
-def get_density_map(psi, absolute_scale=True) -> np.ndarray:
-    """Calcula el mapa de densidad (norma al cuadrado) de un estado psi."""
-    if psi is None: return np.zeros((256, 256))
-...
     if psi is None: return np.zeros((256, 256))
 
     # Manejar QuantumStatePolar u objetos similares si se pasa directamente
@@ -37,7 +30,7 @@ def get_density_map(psi, absolute_scale=True) -> np.ndarray:
          density = density[0]
 
     if absolute_scale:
-        # ESCALA FIJA: Asumimos que la energía máxima "interesante" es 1.0
+        # ESCALA FIJA: Asumimos que la energía máxima "interesante" es 1.0 (o lo que sea físico)
         # Esto hace que el ruido (0.001) se vea negro, y la materia (0.9) se vea brillante.
         norm_density = torch.clamp(density, 0, 1.0)
     else:
@@ -62,7 +55,6 @@ def get_density_map(psi, absolute_scale=True) -> np.ndarray:
 
 def get_change_map(psi, prev_psi) -> np.ndarray:
     """Calcula la magnitud del cambio entre dos estados psi."""
-    import torch
     if psi is None or prev_psi is None: return np.zeros((256, 256))
     change = psi.cpu() - prev_psi.cpu()
     real, imag = get_complex_parts(change)

@@ -12,15 +12,16 @@ def test_phase_space_structure():
     
     assert "points" in result
     assert "centroids" in result
-    assert "explained_variance" in result
+    assert "metrics" in result
+    assert "explained_variance" in result["metrics"]
     
     # Verificar tipos
     assert isinstance(result["points"], list)
     assert isinstance(result["centroids"], list)
-    assert isinstance(result["explained_variance"], list)
+    assert isinstance(result["metrics"]["explained_variance"], list)
     
     # Verificar dimensiones de explained_variance
-    assert len(result["explained_variance"]) == 3
+    assert len(result["metrics"]["explained_variance"]) == 3
 
 def test_phase_space_content():
     """Verifica que los datos tengan sentido."""
@@ -36,18 +37,15 @@ def test_phase_space_content():
     result = get_phase_space_data(psi, n_clusters=2)
     
     points = result["points"]
-    # Cada punto tiene 6 valores: x, y, z, cluster, orig_x, orig_y
-    assert len(points) % 6 == 0
-    num_points = len(points) // 6
     
-    # Deberíamos tener puntos (debido al stride, puede ser menos que 32*32)
+    # Cada punto es un diccionario, así que el len(points) es directamente el número de puntos
+    num_points = len(points)
     assert num_points > 0
     
     # Verificar que hay al menos 2 clusters (o 1 si K-Means falla en separar, pero pedimos 2)
     clusters = set()
-    for i in range(num_points):
-        cluster_id = points[i*6 + 3]
-        clusters.add(cluster_id)
+    for point in points:
+        clusters.add(point["cluster"])
         
     # Nota: K-Means no garantiza encontrar 2 clusters si los datos son muy simples o colineales,
     # pero con este input ortogonal debería funcionar.

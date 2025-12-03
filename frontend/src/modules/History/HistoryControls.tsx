@@ -515,25 +515,32 @@ export const HistoryControls: React.FC<HistoryControlsProps> = ({ mode = 'full' 
   const { min_step, max_step } = historyRange;
 
   return (
-    <div className={`flex flex-col gap-2 relative z-30 ${mode === 'compact' ? 'w-fit' : 'w-full'}`}>
-      <div className={`flex items-center ${mode === 'compact' ? 'gap-4' : 'justify-between'}`}>
-        <SimulationControls
-          isPlaying={isPlaying}
-          controlsEnabled={controlsEnabled}
-          onPlayPause={handlePlayPause}
-          onReset={handleReset}
-          onSaveSnapshot={handleSaveSnapshot}
-          onUpdateConfig={handleUpdateConfig}
-        />
-        <StatusIndicators
-          fps={fps}
-          particleCount={particleCount}
-          liveFeedEnabled={liveFeedEnabled}
-          controlsEnabled={controlsEnabled}
-          onToggleLiveFeed={handleToggleLiveFeed}
-          onSetInterval={handleSetInterval}
-          currentStep={currentStep}
-        />
+    <div className={`flex flex-col gap-3 relative z-30 ${mode === 'compact' ? 'w-fit' : 'w-full'}`}>
+      {/* Container flex para desktop, columna para móvil si es necesario */}
+      <div className={`flex flex-col md:flex-row items-start md:items-center ${mode === 'compact' ? 'gap-4' : 'justify-between gap-2'}`}>
+        <div className="w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0">
+            <SimulationControls
+                isPlaying={isPlaying}
+                controlsEnabled={controlsEnabled}
+                onPlayPause={handlePlayPause}
+                onReset={handleReset}
+                onSaveSnapshot={handleSaveSnapshot}
+                onUpdateConfig={handleUpdateConfig}
+            />
+        </div>
+        <div className="w-full md:w-auto overflow-x-auto no-scrollbar pt-1 md:pt-0 border-t border-white/5 md:border-t-0">
+          <div className="flex items-center justify-between md:justify-start gap-4 min-w-max w-full">
+            <StatusIndicators
+                fps={fps}
+                particleCount={particleCount}
+                liveFeedEnabled={liveFeedEnabled}
+                controlsEnabled={controlsEnabled}
+                onToggleLiveFeed={handleToggleLiveFeed}
+                onSetInterval={handleSetInterval}
+                currentStep={currentStep}
+            />
+          </div>
+        </div>
       </div>
       {mode === 'full' && (
         <HistoryTimeline

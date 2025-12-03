@@ -19,6 +19,20 @@ from .advanced import (
 )
 from .phase_space import get_phase_space_data
 
+# Threshold for quantum vacuum noise. Energy below this level is masked out.
+VACUUM_THRESHOLD = 0.05
+
+class CleanPolarWrapper:
+    """Wrapper para estado polar con máscara de vacío aplicada."""
+    def __init__(self, mag, phase, device=None):
+        self.magnitude = mag
+        self.phase = phase
+        self.device = device
+
+    def to_cartesian(self):
+        real = self.magnitude * torch.cos(self.phase)
+        imag = self.magnitude * torch.sin(self.phase)
+        return real, imag
 
 class CleanPolarWrapper:
     """Wrapper para estado polar con máscara de vacío aplicada."""
@@ -119,7 +133,16 @@ def get_visualization_data(psi, viz_type: str, delta_psi: torch.Tensor = None, m
          # Reshape logic if needed
          pass
 
-    map_data = normalize_map_data(map_data)
+    # Aplicar normalización absoluta para tipos de visualización físicos
+    min_val, max_val = None, None
+    if viz_type == 'density':
+        # Densidad es energía |psi|^2. Mínimo físico 0, Máximo teórico 1.0
+        min_val, max_val = 0.0, 1.0
+    elif viz_type in ['phase', 'phase_hsv']:
+        # Fase normalizada va de 0 a 1
+        min_val, max_val = 0.0, 1.0
+
+    map_data = normalize_map_data(map_data, min_val=min_val, max_val=max_val)
     
     result = {
         "map_data": map_data,

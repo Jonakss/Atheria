@@ -42,11 +42,14 @@ export const RightDrawer: React.FC<RightDrawerProps> = ({
   return (
     <aside 
       className={`${
-        collapsed ? 'w-12' : 'w-80'
-      } border-l border-white/5 bg-dark-950/80 backdrop-blur-md flex flex-col z-40 shrink-0 transition-all duration-300 ease-in-out overflow-hidden`}
+        collapsed
+            ? 'w-12 relative hidden md:flex'
+            : 'fixed inset-0 z-50 w-full md:relative md:w-80'
+      } border-l border-white/5 bg-dark-950/80 backdrop-blur-md flex flex-col shrink-0 transition-all duration-300 ease-in-out overflow-hidden`}
       style={{ 
-        minWidth: collapsed ? '3rem' : '20rem', 
-        maxWidth: collapsed ? '3rem' : '20rem' 
+        // Solo aplicar restricciones de ancho en desktop
+        minWidth: collapsed ? '3rem' : undefined,
+        // maxWidth: collapsed ? '3rem' : undefined // Remover maxWidth para permitir w-full en mobile
       }}
     >
       {/* Header with collapse button */}
