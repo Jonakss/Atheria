@@ -64,7 +64,7 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
         });
       }
     }
-  }, [show3DView, engineType, supports3D]);
+  }, [show3DView, engineType, supports3D, sendCommand]);
 
   return (
     <aside className={`${collapsed ? 'w-10' : 'w-72'} border-l border-white/5 bg-dark-950/80 backdrop-blur-md flex flex-col z-40 shrink-0 flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden`} style={{ minWidth: collapsed ? '2.5rem' : '18rem', maxWidth: collapsed ? '2.5rem' : '18rem' }}>
