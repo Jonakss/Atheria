@@ -188,6 +188,11 @@
   - **Implementation**: Replaced single `std::stack` with `std::vector<std::stack>` (one per thread) and removed `std::mutex`.
   - **Result**: Functional correctness verified. Performance impact on CPU (16x16 grid) is minimal, indicating bottleneck is elsewhere (batch overhead).
   - **Next**: Focus on `build_batch_input` optimization.
+- **[[logs/2025-12-03_holographic_volume_viewer|2025-12-03 - Feature: Holographic Volume Viewer]]**:
+  - **Frontend**: Created `HolographicVolumeViewer.tsx` component for rendering 3D volumetric data using Three.js point clouds.
+  - **Backend**: Added `handle_get_bulk_volume` handler to serve bulk volume data from `HolographicEngine.get_bulk_state()`.
+  - **Integration**: Handler registered in `HANDLERS` dict for WebSocket communication.
+  - **Visualization**: Depth-based color gradient (Blue=Boundary, Red=Deep Bulk) to visualize Scale-Space renormalization.
 - **[[logs/2025-12-03_holographic_engine_implementation|2025-12-03 - Feature: Holographic Engine (AdS/CFT Projection)]]**:
   - **Concept**: Implemented `HolographicEngine` based on the Holographic Principle. It evolves a 2D boundary state but provides a 3D bulk projection via Scale-Space renormalization.
   - **Implementation**: Created `src/engines/holographic_engine.py` inheriting from `CartesianEngine`. Implemented `get_bulk_state()` using Gaussian blurring to simulate depth/scale.

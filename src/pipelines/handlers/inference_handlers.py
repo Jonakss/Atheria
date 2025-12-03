@@ -430,6 +430,73 @@ async def handle_load_experiment(args):
     device = global_cfg.DEVICE
     device_str = str(device).split(":")[0]
 
+    # Assuming there was a handle_apply_quantum_tool function ending here,
+    # the new function should be inserted before the next logical block of handle_load_experiment.
+    # The provided snippet implies this is the correct insertion point.
+
+async def handle_get_bulk_volume(args):
+    """
+    Obtiene los datos volumétricos 3D (bulk) del HolographicEngine.
+    Solo funciona si el motor actual es un HolographicEngine.
+    """
+    ws_id = args.get("ws_id")
+    ws = g_state["websockets"].get(ws_id)
+    
+    motor = g_state.get("motor")
+    if not motor:
+        if ws:
+            await send_notification(ws, "⚠️ No hay motor cargado", "warning")
+        return
+    
+    # Verificar que el motor sea HolographicEngine
+    from ...engines.holographic_engine import HolographicEngine
+    if not isinstance(motor, HolographicEngine):
+        if ws:
+            await send_notification(
+                ws, 
+                f"⚠️ El motor actual ({type(motor).__name__}) no es HolographicEngine", 
+                "warning"
+            )
+        return
+    
+    try:
+        # Obtener bulk state del motor
+        bulk_volume = motor.get_bulk_state()
+        
+        if bulk_volume is None:
+            if ws:
+                await send_notification(ws, "⚠️ No se pudo obtener volumen bulk", "warning")
+            return
+        
+        # Convertir a CPU y lista para JSON
+        if bulk_volume.is_cuda:
+            bulk_volume = bulk_volume.cpu()
+        
+        # Shape: [1, D, H, W]
+        depth = bulk_volume.shape[1]
+        height = bulk_volume.shape[2]
+        width = bulk_volume.shape[3]
+        
+        # Flatten to 1D array [D * H * W]
+        volume_data = bulk_volume.squeeze(0).flatten().tolist()
+        
+        payload = {
+            "volume_data": volume_data,
+            "depth": depth,
+            "height": height,
+            "width": width,
+            "step": g_state.get("simulation_step", 0)
+        }
+        
+        if ws:
+            await send_to_websocket(ws, {"type": "bulk_volume_data", "payload": payload})
+            logging.info(f"📦 Datos volumétricos enviados: {depth}x{height}x{width}")
+    
+    except Exception as e:
+        logging.error(f"❌ Error obteniendo volumen bulk: {e}", exc_info=True)
+        if ws:
+            await send_notification(ws, f"❌ Error: {str(e)}", "error")
+
     try:
         logging.info(f"Intentando cargar el experimento '{exp_name}'...")
         if ws:
@@ -1222,4 +1289,5 @@ HANDLERS = {
     "set_viz": handle_set_viz,
     "set_roi_mode": handle_set_roi_mode,
     "tool_action": handle_tool_action,
+    "get_bulk_volume": handle_get_bulk_volume,
 }
