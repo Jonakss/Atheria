@@ -20,6 +20,7 @@ related: [[30_Components/00_COMPONENTS_MOC]], [[40_Experiments/00_EXPERIMENTS_MO
 - [[ATHERIA_4_MASTER_BRIEF]] - Visión general, objetivos y filosofía del proyecto
 - [[ATHERIA_GLOSSARY]] - Terminología completa y definiciones
 - [[THEORETICAL_FRAMEWORK]] - Fundamentación física (AdS/CFT, Holografía)
+- [[20_Concepts/QUTIP_INTEGRATION_STRATEGY]] - Estrategia de integración de QuTiP para verificación
 
 ---
 
