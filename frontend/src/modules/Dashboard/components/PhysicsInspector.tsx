@@ -1,5 +1,6 @@
-import { AlertCircle, ChevronLeft, ChevronRight, Microscope, Zap } from 'lucide-react';
-import React, { useState } from 'react';
+import { AlertCircle, ChevronLeft, ChevronRight, Cube, Microscope, Zap } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { HolographicVolumeViewer } from '../../../components/visualization/HolographicVolumeViewer';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 
 interface PhysicsInspectorProps {
@@ -11,9 +12,19 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
   isCollapsed = false, 
   onToggleCollapse
 }) => {
-  const { sendCommand, allLogs } = useWebSocket();
+  const { sendCommand, allLogs, lastMessage, compileStatus } = useWebSocket();
+  
   // Internal state fallback if prop not provided
   const [internalCollapsed, setInternalCollapsed] = useState(false);
+  
+  // Holographic 3D View state
+  const [show3DView, setShow3DView] = useState(false);
+  const [volumeData, setVolumeData] = useState<{
+    data: number[];
+    depth: number;
+    height: number;
+    width: number;
+  }>({ data: [], depth: 0, height: 0, width: 0 });
   
   // Usar prop externo si está disponible, sino usar estado interno
   const collapsed = onToggleCollapse !== undefined ? isCollapsed : internalCollapsed;
@@ -21,6 +32,39 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
 
   // Filtrar logs recientes (últimos 2)
   const recentLogs = allLogs?.slice(-2) || [];
+  
+  // Detectar si el motor soporta visualización 3D
+  const engineType = compileStatus?.engine_type || '';
+  const supports3D = ['HOLOGRAPHIC', 'CARTESIAN', 'POLAR', 'HARMONIC', 'LATTICE'].includes(engineType.toUpperCase());
+
+  // Escuchar mensajes de volumen 3D
+  useEffect(() => {
+    if (lastMessage?.type === 'bulk_volume_data' || 
+        lastMessage?.type === 'holographic_projection_data') {
+      setVolumeData({
+        data: lastMessage.payload.volume_data,
+        depth: lastMessage.payload.depth,
+        height: lastMessage.payload.height,
+        width: lastMessage.payload.width
+      });
+    }
+  }, [lastMessage]);
+
+  // Solicitar datos 3D cuando se activa la vista
+  useEffect(() => {
+    if (show3DView && supports3D) {
+      if (engineType.toUpperCase() === 'HOLOGRAPHIC') {
+        // HolographicEngine: usar bulk físico
+        sendCommand('inference', 'get_bulk_volume', {});
+      } else {
+        // Otros motores: usar proyección genérica
+        sendCommand('inference', 'get_holographic_projection', { 
+          depth: 8,
+          use_phase: false 
+        });
+      }
+    }
+  }, [show3DView, engineType, supports3D]);
 
   return (
     <aside className={`${collapsed ? 'w-10' : 'w-72'} border-l border-white/5 bg-dark-950/80 backdrop-blur-md flex flex-col z-40 shrink-0 flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden`} style={{ minWidth: collapsed ? '2.5rem' : '18rem', maxWidth: collapsed ? '2.5rem' : '18rem' }}>
@@ -40,6 +84,47 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
 
       {!collapsed && (
       <div className="flex-1 overflow-y-auto p-4 space-y-6" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+        
+        {/* Vista Holográfica 3D */}
+        {supports3D && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-gray-200 text-xs font-bold uppercase tracking-wider">
+                <Cube size={12} className="text-purple-400" /> Vista 3D
+              </div>
+              <button
+                onClick={() => setShow3DView(!show3DView)}
+                className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${
+                  show3DView 
+                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
+                    : 'bg-white/5 text-gray-500 border border-white/10 hover:bg-white/10'
+                }`}
+              >
+                {show3DView ? 'Ocultar' : 'Mostrar'}
+              </button>
+            </div>
+            
+            {show3DView && volumeData.data.length > 0 && (
+              <div className="bg-black/50 rounded border border-white/10 overflow-hidden">
+                <HolographicVolumeViewer
+                  volumeData={volumeData.data}
+                  depth={volumeData.depth}
+                  width={volumeData.width}
+                  height={volumeData.height}
+                  threshold={0.01}
+                />
+                <div className="px-2 py-1 bg-dark-900/50 border-t border-white/10">
+                  <p className="text-[9px] text-gray-500">
+                    {engineType.toUpperCase() === 'HOLOGRAPHIC' 
+                      ? '🔮 Bulk Físico (AdS/CFT)' 
+                      : '🔮 Proyección Holográfica (Scale-Space)'}
+                    {' • '}{volumeData.depth}×{volumeData.height}×{volumeData.width}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         
         {/* Sección: Inyección (Génesis) */}
         <div className="space-y-3">
@@ -91,3 +176,4 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
     </aside>
   );
 };
+
