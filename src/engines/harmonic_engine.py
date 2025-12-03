@@ -152,12 +152,15 @@ class SparseHarmonicEngine:
         half = size_xy // 2
         
         # 1. Generar coordenadas del viewport
-        # IMPORTANTE: Para obtener exactamente size_xy elementos:
-        # - Si size_xy es PAR (ej: 10): half=5, arange(cx-5, cx+5) = 10 elementos ✓
-        # - Si size_xy es IMPAR (ej: 11): half=5, arange(cx-5, cx+6) = 11 elementos ✓
-        end_offset = 1 if size_xy % 2 == 1 else 0
-        xs = torch.arange(cx - half, cx + half + end_offset, device=self.device)
-        ys = torch.arange(cy - half, cy + half + end_offset, device=self.device)
+        # Usamos lógica robusta: start + size para garantizar el tamaño exacto
+        start_x = cx - half
+        start_y = cy - half
+        
+        # Logging para depuración de tamaños (temporal)
+        # logging.debug(f"HarmonicEngine Viewport: size={size_xy}, half={half}, start_x={start_x}")
+        
+        xs = torch.arange(start_x, start_x + size_xy, device=self.device)
+        ys = torch.arange(start_y, start_y + size_xy, device=self.device)
         grid_x, grid_y = torch.meshgrid(xs, ys, indexing='xy')
         
         # Aplanar para batch processing

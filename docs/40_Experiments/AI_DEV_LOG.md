@@ -194,10 +194,16 @@
     - `handle_get_bulk_volume`: Serves physical bulk from `HolographicEngine.get_bulk_state()` (only for HOLOGRAPHIC engine).
     - `handle_get_holographic_projection`: Generic Scale-Space projection for ALL 2D engines (Cartesian, Polar, Harmonic, Lattice).
   - **Generic Projection**: Created `src/pipelines/viz/holographic_projection.py` implementing AdS/CFT-inspired technique.
-  - **UI Integration**: Integrated into `PhysicsInspector.tsx` with auto-detection and toggle button.
-  - **Auto-Detection**: Shows "Vista 3D" button only for compatible engines, automatically uses appropriate backend handler.
-  - **Bug Fix**: Corrected `HarmonicEngine.get_viewport_tensor` size calculation (removed +1 causing 129×129 instead of 128×128).
-  - **Visualization**: Depth-based color gradient (Blue=Boundary/UV, Red=Deep Bulk/IR) to visualize renormalization scale.
+  - **UI Integration- **Frontend Integration**:
+    - `PhysicsInspector.tsx`: Added "Vista 3D" toggle.
+    - Auto-detection of `supports3D` engines.
+    - Logic to request `get_bulk_volume` (Holographic) vs `get_holographic_projection` (Others).
+- **Bug Fixes**:
+    - `HarmonicEngine`: Fixed `get_viewport_tensor` to use robust `arange(start, start + size)` logic, resolving shape mismatch errors for odd sizes (e.g., 21x21).
+    - `Frontend Build`: Fixed `WebSocketContext` type errors (`lastMessage`, `engine_type`) and replaced missing `Cube` icon with `Box`. Verified `npm run build` passes.
+- **Visualization**:
+    - Implemented `HolographicVolumeViewer` with Three.js.
+    - Supports point cloud rendering with color mapping (magnitude/phase).=Boundary/UV, Red=Deep Bulk/IR) to visualize renormalization scale.
 - **[[logs/2025-12-03_holographic_engine_implementation|2025-12-03 - Feature: Holographic Engine (AdS/CFT Projection)]]**:
   - **Concept**: Implemented `HolographicEngine` based on the Holographic Principle. It evolves a 2D boundary state but provides a 3D bulk projection via Scale-Space renormalization.
   - **Implementation**: Created `src/engines/holographic_engine.py` inheriting from `CartesianEngine`. Implemented `get_bulk_state()` using Gaussian blurring to simulate depth/scale.
