@@ -126,7 +126,7 @@ def get_visualization_data(psi, viz_type: str, delta_psi: torch.Tensor = None, m
     # Aplicar normalización absoluta para tipos de visualización físicos
     min_val, max_val = None, None
     if viz_type == 'density':
-        # Densidad es energía |psi|^2. Mínimo físico 0, Máximo teórico ~1.0
+        # Densidad es energía |psi|^2. Mínimo físico 0, Máximo teórico 1.0
         min_val, max_val = 0.0, 1.0
     elif viz_type in ['phase', 'phase_hsv']:
         # Fase normalizada va de 0 a 1
