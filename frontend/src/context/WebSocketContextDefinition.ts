@@ -98,6 +98,7 @@ export interface CompileStatus {
   native_version?: string; // Versión del motor C++ (SemVer)
   wrapper_version?: string; // Versión del wrapper Python (SemVer)
   python_version?: string; // Versión del motor Python (SemVer)
+  engine_type?: string; // Tipo de motor (CARTESIAN, POLAR, HARMONIC, HOLOGRAPHIC, etc.)
 }
 
 export interface WebSocketContextType {
@@ -128,6 +129,7 @@ export interface WebSocketContextType {
   activeExperiment: string | null;
   setActiveExperiment: (name: string | null) => void;
   ws: WebSocket | null; // Exponer WebSocket para escuchar mensajes personalizados
+  lastMessage: any | null; // Último mensaje recibido por WebSocket
   snapshotCount: number; // Contador de snapshots capturados
   trainingSnapshots: TrainingSnapshot[]; // Snapshots de entrenamiento
   trainingCheckpoints: TrainingCheckpoint[]; // Checkpoints de entrenamiento

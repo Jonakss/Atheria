@@ -1,4 +1,4 @@
-import { AlertCircle, ChevronLeft, ChevronRight, Cube, Microscope, Zap } from 'lucide-react';
+import { AlertCircle, Box, ChevronLeft, ChevronRight, Microscope, Zap } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { HolographicVolumeViewer } from '../../../components/visualization/HolographicVolumeViewer';
 import { useWebSocket } from '../../../hooks/useWebSocket';
@@ -90,7 +90,7 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-gray-200 text-xs font-bold uppercase tracking-wider">
-                <Cube size={12} className="text-purple-400" /> Vista 3D
+                <Box size={12} className="text-purple-400" /> Vista 3D
               </div>
               <button
                 onClick={() => setShow3DView(!show3DView)}

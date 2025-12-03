@@ -109,6 +109,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     const [analysisType, setAnalysisType] = useState<'universe_atlas' | 'cell_chemistry' | null>(null);
     const [compileStatus, setCompileStatus] = useState<CompileStatus | null>(null);
     const [roiInfo, setRoiInfo] = useState<any>(null); // Estado de ROI
+    const [lastMessage, setLastMessage] = useState<any | null>(null); // Último mensaje recibido
     // Usar una referencia para acceder al valor actual de activeExperiment en callbacks
     const activeExperimentRef = useRef<string | null>(null);
     
@@ -303,6 +304,9 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                     message.type !== 'simulation_log') {
                     console.debug("Mensaje recibido:", message.type);
                 }
+                
+                // Actualizar lastMessage para que los componentes puedan reaccionar
+                setLastMessage(message);
                 
                 const { type, payload } = message;
                 switch (type) {
@@ -694,6 +698,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         activeExperiment,
         setActiveExperiment,
         ws: ws.current, // Exponer WebSocket para mensajes personalizados
+        lastMessage, // Último mensaje recibido
         snapshotCount,
         trainingSnapshots,
         trainingCheckpoints,
