@@ -3,7 +3,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ColorScaleLegend } from '../../../components/ui/ColorScaleLegend';
 import { LabSider } from '../../../components/ui/LabSider';
 import { PanZoomCanvas } from '../../../components/ui/PanZoomCanvas';
-import { TimelineViewer } from '../../../components/ui/TimelineViewer';
 import HolographicViewer from '../../../components/visualization/HolographicViewer';
 import HolographicViewer2 from '../../../components/visualization/HolographicViewer2';
 import { useWebSocket } from '../../../hooks/useWebSocket';
