@@ -127,7 +127,7 @@ int64_t Engine::step_native() {
     #pragma omp parallel
     {
         // Evitar que LibTorch lance su propio pool de threads dentro de OpenMP
-        torch::set_num_threads(1);
+        // torch::set_num_threads(1); // CAUSES DEADLOCK
 
         // Thread-local storage
         std::vector<Coord3D> local_batch_coords;

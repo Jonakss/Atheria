@@ -192,17 +192,6 @@
 ### Tareas Pendientes Críticas
 
 1.  **Fase 2 (Motor Nativo) - ALTA PRIORIDAD:**
-    -   ✅ Integración real de Octree para consultas espaciales en C++
-    -   ✅ Memory Pools implementados
-    -   ✅ Tuning de Paralelismo (OpenMP configurado)
-    -   🔴 **BLOCKER CRÍTICO:** Native Engine se cuelga durante inicialización
-        - ✅ Implementado GIL release en bindings C++ (`py::gil_scoped_release`)
-        - ✅ Agregados yields periódicos en benchmark
-        - ❌ **Problema persiste** - hang ocurre antes de primer output (probablemente en init/JIT export)
-        - 📝 Documentado en `logs/2025-12-01_native_freeze_debugging.md`
-        - **Próximos pasos sugeridos:**
-          - Agregar logging verbose en `NativeEngineWrapper.__init__`
-          - Probar con grid pequeño (32x32)
           - Testear C++ directamente sin wrapper Python
     -   ⏸️ Benchmark completo Python vs C++ (bloqueado hasta resolver freeze)
         - **Baseline documentado:** Python Engine ~60 FPS (CPU, 128x128 grid)

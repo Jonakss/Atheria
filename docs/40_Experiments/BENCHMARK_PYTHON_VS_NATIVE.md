@@ -158,7 +158,12 @@ El script genera un reporte en Markdown con:
 
 ## 🚨 Estado Actual
 
-**Estado:** ⏳ Benchmark creado, pendiente de ejecución con experimento válido
+**Estado:** ⚠️ Ejecutado (2025-12-03). Deadlock resuelto, pero rendimiento insatisfactorio.
+**Resultados Preliminares (CPU, 32x32):**
+- **Python**: ~10.8 FPS
+- **Native**: < 0.2 FPS (Extremadamente lento)
+- **Causa**: Overhead masivo en bucle `step_native` (construcción de batches y acceso a mapa).
+- **Acción Requerida**: Optimización profunda del motor C++ para estados densos.
 
 ### Estado Actual del Benchmark
 

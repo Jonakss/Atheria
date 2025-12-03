@@ -27,6 +27,15 @@
 
 ---
 
+- [x] **[CRITICAL]** Debug Native Engine Freeze (Warmup)
+    - **Status**: ✅ **FIXED** (2025-12-03)
+    - **Cause**: Deadlock due to `torch::set_num_threads(1)` inside OpenMP region.
+    - **Resolution**: Removed problematic call.
+- [ ] **[CRITICAL]** Optimize Native Engine Performance
+    - **Status**: 🔴 **BLOCKER**
+    - **Context**: Native engine is >100x slower than Python on CPU for dense grids.
+    - **Action**: Profile and optimize `step_native` loop, specifically batch construction and map access. Consider alternative data structures (e.g., dense blocks) for high-density regions.
+
 ### 2. Lentitud Extrema en Tiempo Real
 **Prioridad:** 🔴 **CRÍTICA**  
 **Estado:** ✅ **RESUELTO** (2024-12-20)

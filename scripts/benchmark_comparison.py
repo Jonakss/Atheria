@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, os.getcwd())
 
 # Import correctly
-from src.engines.qca_engine import Aetheria_Motor
+from src.engines.qca_engine import CartesianEngine
 from src.engines.native_engine_wrapper import NativeEngineWrapper
 
 class MockModel(nn.Module):
@@ -26,7 +26,7 @@ class MockModel(nn.Module):
 def benchmark_engine(engine_type, name, steps=500, warmup=50):
     print(f"\n--- Benchmarking {name} ---")
     
-    grid_size = 128
+    grid_size = 32
     d_state = 64  # 128 channels
     device = torch.device("cpu")
     
@@ -51,7 +51,7 @@ def benchmark_engine(engine_type, name, steps=500, warmup=50):
         # Python engine
         model = MockModel(channels=d_state*2)
         # Aetheria_Motor init: model, grid_size, d_state, device (object)
-        engine = Aetheria_Motor(model, grid_size, d_state, device)
+        engine = CartesianEngine(model, grid_size, d_state, device)
         pass
 
     # State is initialized in __init__ for both engines
@@ -104,12 +104,12 @@ def main():
     results = []
     
     # Benchmark Python Engine
-    res_py = benchmark_engine("python", "Python Engine (PyTorch)", steps=100, warmup=10)
+    res_py = benchmark_engine("python", "Python Engine (PyTorch)", steps=50, warmup=10)
     if res_py:
         results.append(res_py)
         
     # Benchmark Native Engine (reduced steps for faster completion)
-    res_cpp = benchmark_engine("native", "Native Engine (C++)", steps=200, warmup=20)
+    res_cpp = benchmark_engine("native", "Native Engine (C++)", steps=10, warmup=5)
     if res_cpp:
         results.append(res_cpp)
         

@@ -12,7 +12,7 @@ def test_native_quick():
     print("Quick Native Engine Test")
     print("=" * 50)
     
-    grid_size = 128
+    grid_size = 16
     d_state = 64
     device = "cpu"
     

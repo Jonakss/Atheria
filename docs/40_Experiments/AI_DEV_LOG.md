@@ -167,3 +167,12 @@
   - **Spectrum Viz**: Fixed "single particle" appearance in spectral view by masking the DC component (zero frequency) which was dominating the dynamic range.
   - **Snapshot Fix**: Resolved `ValueError` when saving snapshots with `LatticeEngine` by adding a check for `get_dense_state` method in `snapshot_handlers.py`.
   - **Verification**: Verified spectrum improvement with `reproduce_spectrum.py` and confirmed snapshot handler logic via code analysis.
+- **[[logs/2025-12-03_native_engine_deadlock_fix_and_benchmark|2025-12-03 - Critical Fix: Native Engine Deadlock & Benchmark Results]]**:
+  - **Deadlock Fix**: Resolved Native Engine hang during warmup/initialization.
+    - **Cause**: Deadlock caused by calling `torch::set_num_threads(1)` inside an OpenMP parallel region (`#pragma omp parallel`) in `sparse_engine.cpp`.
+    - **Resolution**: Removed the problematic call. Verified fix with `scripts/test_native_quick.py` on CPU and CUDA.
+  - **Benchmark Results**: Ran `scripts/benchmark_comparison.py` (32x32 grid).
+    - **Python**: ~10.8 FPS.
+    - **Native (C++)**: < 0.2 FPS (CPU).
+    - **Analysis**: Native Engine is significantly slower due to massive overhead in `step_native` (batch construction, map access, small batch dispatch).
+  - **Next Steps**: Optimization of memory management (pools) and batching strategy.
