@@ -1273,6 +1273,65 @@ async def handle_get_bulk_volume(args):
         if ws:
             await send_notification(ws, f"❌ Error: {str(e)}", "error")
 
+
+async def handle_get_holographic_projection(args):
+    """
+    Proyecta el estado 2D actual a un volumen 3D usando proyección holográfica.
+    Funciona con CUALQUIER motor 2D (Cartesian, Polar, Harmonic, Lattice).
+    """
+    ws_id = args.get("ws_id")
+    ws = g_state["websockets"].get(ws_id)
+    
+    motor = g_state.get("motor")
+    if not motor:
+        if ws:
+            await send_notification(ws, "⚠️ No hay motor cargado", "warning")
+        return
+    
+    depth = args.get("depth", 8)
+    use_phase = args.get("use_phase", False)
+    
+    try:
+        from ...pipelines.viz.holographic_projection import visualize_as_hologram
+        
+        # Proyectar estado 2D -> 3D
+        volume = visualize_as_hologram(motor, depth=depth, use_phase=use_phase)
+        
+        if volume is None:
+            if ws:
+                await send_notification(ws, "⚠️ No se pudo generar proyección holográfica", "warning")
+            return
+        
+        # Convertir a CPU y lista para JSON
+        if volume.is_cuda:
+            volume = volume.cpu()
+        
+        # Shape: [1, D, H, W]
+        depth_dim = volume.shape[1]
+        height = volume.shape[2]
+        width = volume.shape[3]
+        
+        # Flatten to 1D array [D * H * W]
+        volume_data = volume.squeeze(0).flatten().tolist()
+        
+        payload = {
+            "volume_data": volume_data,
+            "depth": depth_dim,
+            "height": height,
+            "width": width,
+            "step": g_state.get("simulation_step", 0),
+            "projection_type": "phase" if use_phase else "magnitude"
+        }
+        
+        if ws:
+            await send_to_websocket(ws, {"type": "holographic_projection_data", "payload": payload})
+            logging.info(f"🔮 Proyección holográfica enviada: {depth_dim}x{height}x{width} ({payload['projection_type']})")
+    
+    except Exception as e:
+        logging.error(f"❌ Error generando proyección holográfica: {e}", exc_info=True)
+        if ws:
+            await send_notification(ws, f"❌ Error: {str(e)}", "error")
+
 HANDLERS = {
     "play": handle_play,
     "pause": handle_pause,
@@ -1287,4 +1346,5 @@ HANDLERS = {
     "set_roi_mode": handle_set_roi_mode,
     "tool_action": handle_tool_action,
     "get_bulk_volume": handle_get_bulk_volume,
+    "get_holographic_projection": handle_get_holographic_projection,
 }
