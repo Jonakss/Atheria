@@ -3,7 +3,7 @@ id: holographic_principle
 tipo: concepto_fisico
 tags: [holographic-principle, black-holes, information-theory, 't-hooft, susskind, universe-2d]
 relacionado: [[AdS_CFT_Correspondence], [The_Holographic_Viewer], [3D_STATE_SPACE_CONCEPT]]
-fecha_ingreso: 2025-12-03
+fuente: [Maldacena_1999, Susskind_1995]
 fuente: [Maldacena_1999, Suskind_1995]
 ---
 
