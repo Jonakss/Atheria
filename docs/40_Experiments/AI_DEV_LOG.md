@@ -198,3 +198,8 @@
   - **Implementation**: Created `src/engines/holographic_engine.py` inheriting from `CartesianEngine`. Implemented `get_bulk_state()` using Gaussian blurring to simulate depth/scale.
   - **Integration**: Registered `HOLOGRAPHIC` engine type in `src/motor_factory.py`.
   - **Verification**: Verified initialization and projection logic (variance reduction with depth) via `tests/test_holographic_engine.py`.
+- **[[logs/2025-12-03_harmonic_viewport_fix|2025-12-03 - Fix: Harmonic Engine Viewport Tensor Shape Mismatch]]**:
+  - **Issue**: `RuntimeError: shape '[25, 25, 8]' is invalid for input of size 4608` when applying quantum tools to `HarmonicEngine`.
+  - **Cause**: Off-by-one error in `get_viewport_tensor()` at line 155-156. Using `torch.arange(cx - half, cx + half)` produces `half * 2` elements (e.g., 24) instead of the expected `size_xy` elements (e.g., 25) because `torch.arange` is exclusive of the end value.
+  - **Fix**: Changed coordinate range to `torch.arange(cx - half, cx + half + 1)` to generate exactly `size_xy` elements, fixing the tensor reshape operation.
+  - **Impact**: Quantum tools (`collapse`, `vortex`, `wave`) now work correctly with `HarmonicEngine`.
