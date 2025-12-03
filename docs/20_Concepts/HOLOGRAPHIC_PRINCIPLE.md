@@ -11,7 +11,7 @@ fuente: [Maldacena_1999, Suskind_1995]
 
 ## Resumen Ejecutivo
 El **Principio Holográfico** es una hipótesis fundamental en física teórica que sugiere que toda la información contenida en un volumen de espacio puede ser descrita completamente por una teoría que reside en la frontera (límite) de esa región. En términos cosmológicos, esto implica que **nuestro universo tridimensional podría ser una "proyección" o "sombra" de información codificada en una superficie bidimensional distante**.
-
+En **Atheria**, este principio no es solo teoría, es la **arquitectura base**:
 En **Aetheria**, este principio no es solo teoría, es la **arquitectura base**:
 1.  **La Realidad (Bulk):** Lo que visualizamos como 3D (el universo simulado).
 2.  **El Código (Boundary):** La grilla 2D (QCA) donde reside realmente la información y el cómputo.
