@@ -23,6 +23,7 @@ const ENGINE_OPTIONS = [
     { value: "POLAR", label: "🌀 Polar (Rotational)" },
     { value: "HARMONIC", label: "🌊 Harmonic (Wave)" },
     { value: "LATTICE", label: "🕸️ Lattice (AdS/CFT)" },
+    { value: "HOLOGRAPHIC", label: "🔮 Holographic (AdS/CFT Projection)" },
     { value: "QUANTUM", label: "⚛️ Quantum (Legacy/Hybrid)" }, // Mantener por compatibilidad si es necesario
 ];
 
@@ -41,6 +42,7 @@ const COMPATIBILITY_MAP: Record<string, string[]> = {
     "POLAR": ["PYTHON", "GPU"], // Asumiendo Polar requiere GPU o Python por ahora
     "HARMONIC": ["PYTHON", "CPP"], // Sparse implementations
     "LATTICE": ["PYTHON"], // Muy experimental
+    "HOLOGRAPHIC": ["PYTHON"], // Scale-Space projection
     "QUANTUM": ["PYTHON", "QPU"],
 };
 
@@ -295,6 +297,7 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
                                         <option value="quantum">⚛️ Quantum (Hybrid)</option>
                                         <option value="harmonic">🌊 Harmonic (Sparse)</option>
                                         <option value="lattice">🕸️ Lattice (AdS/CFT)</option>
+                                        <option value="holographic">🔮 Holographic (Bulk Projection)</option>
                                         <option value="native">⚡ Nativo C++ (Experimental)</option>
                                     </select>
                                 </div>
