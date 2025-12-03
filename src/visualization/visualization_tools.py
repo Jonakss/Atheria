@@ -30,7 +30,7 @@ def get_density_map(psi, absolute_scale=True) -> np.ndarray:
          density = density[0]
 
     if absolute_scale:
-        # ESCALA FIJA: Asumimos que la energía máxima "interesante" es 1.0
+        # ESCALA FIJA: Asumimos que la energía máxima "interesante" es 1.0 (o lo que sea físico)
         # Esto hace que el ruido (0.001) se vea negro, y la materia (0.9) se vea brillante.
         norm_density = torch.clamp(density, 0, 1.0)
     else:
