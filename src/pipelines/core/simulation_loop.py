@@ -385,8 +385,11 @@ async def simulation_loop():
                                     need_dense_state = True # Fallback a camino lento
                             
                             # SLOW PATH: Obtener estado denso y procesar en Python
-                            # Se ejecuta si no es nativo, o si necesitamos psi (epoch, viz avanzada, error en fast path)
-                            if psi is None and (not motor_is_native or need_dense_state):
+                            # Se ejecuta SOLO si:
+                            # 1. FAST PATH no generó viz_data (viz_data is None)
+                            # 2. Y necesitamos el estado psi (psi is None)
+                            # 3. Y (no es motor nativo O necesitamos estado denso para epoch/viz avanzada)
+                            if viz_data is None and psi is None and (not motor_is_native or need_dense_state):
                                 # Para motor nativo: usar get_dense_state() con ROI y verificación de pausa
                                 if motor_is_native and hasattr(motor, 'get_dense_state'):
                                     # Obtener ROI si está habilitada
