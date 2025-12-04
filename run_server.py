@@ -23,8 +23,12 @@ try:
     sys.path.insert(0, project_root)
 
     # Ahora que el path está configurado, podemos importar nuestros módulos de forma segura.
-    from src.pipelines import pipeline_server
-    log.info("Módulo 'src.pipelines.pipeline_server' importado exitosamente.")
+    try:
+        from src.pipelines import pipeline_server
+        log.info("Módulo 'src.pipelines.pipeline_server' importado exitosamente.")
+    except Exception as e:
+        log.error(f"Error importando pipeline_server: {e}", exc_info=True)
+        raise e
 
 except ImportError as e:
     log.error("="*60)
@@ -71,6 +75,8 @@ if __name__ == "__main__":
                        help='Puerto del servidor (por defecto: desde config)')
     parser.add_argument('--host', type=str, default=None,
                        help='Host del servidor (por defecto: desde config)')
+    parser.add_argument('--autostart', action='store_true',
+                       help='Inicia automáticamente una simulación dummy para pruebas')
     args = parser.parse_args()
     
     # Configurar variable de entorno según --no-frontend
@@ -92,6 +98,59 @@ if __name__ == "__main__":
     main_loop = None
     shutdown_in_progress = False
     
+    # --- Auto-start Simulation Task (Temporary/Dev) ---
+    async def autostart_simulation_task():
+        """Initializes a dummy motor and starts simulation if requested."""
+        if not getattr(args, 'autostart', False):
+            return
+
+        try:
+            log.info("⚡ Autostart: Esperando a que el sistema se estabilice...")
+            await asyncio.sleep(5)
+
+            from src.server.server_state import g_state
+            from src.config import DEVICE
+            from src.motor_factory import get_motor
+            import torch.nn as nn
+
+            if g_state.get('motor'):
+                log.info("⚡ Autostart: Motor ya existe, solo reanudando.")
+                g_state['is_paused'] = False
+                return
+
+            log.info("⚡ Autostart: Inicializando motor dummy para pruebas...")
+
+            # Create a minimal dummy model
+            class DummyModel(nn.Module):
+                def forward(self, x):
+                    return x # Identity
+
+            dummy_model = DummyModel().to(DEVICE)
+            dummy_config = {
+                'ENGINE_TYPE': 'CARTESIAN',
+                'GRID_SIZE': 64,
+                'D_STATE': 8
+            }
+
+            motor = get_motor(dummy_config, DEVICE, dummy_model)
+
+            # Initialize state using state object, not motor
+            # CartesianEngine has a 'state' attribute which is QuantumState
+            if hasattr(motor, 'state') and hasattr(motor.state, '_initialize_state'):
+                 # Re-initialize the psi within the state
+                 motor.state.psi = motor.state._initialize_state(mode='random')
+
+            # Update global state
+            g_state['motor'] = motor
+            g_state['is_paused'] = False
+            g_state['viz_type'] = 'density'
+            g_state['simulation_step'] = 0
+
+            log.info("⚡ Autostart: Simulación iniciada automáticamente.")
+
+        except Exception as e:
+            log.error(f"❌ Error en autostart: {e}", exc_info=True)
+
     # Configurar handler de señales para guardar estado antes de cerrar
     def signal_handler(signum, frame):
         global shutdown_in_progress
@@ -137,6 +196,11 @@ if __name__ == "__main__":
         try:
             # Pasar configuración de frontend al servidor
             serve_frontend = not args.no_frontend
+
+            # Crear tarea de autostart si corresponde
+            if args.autostart:
+                asyncio.create_task(autostart_simulation_task())
+
             await pipeline_server.main(shutdown_event, serve_frontend=serve_frontend)
         except asyncio.CancelledError:
             log.info("Tareas canceladas durante shutdown.")

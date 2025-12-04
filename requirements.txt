@@ -39,3 +39,11 @@ qiskit-aer>=0.13.0
 qiskit-ionq>=0.5.0
 pennylane>=0.35.0
 pennylane-lightning>=0.35.0
+
+pennylane-lightning>=0.35.0
+
+# gRPC
+grpcio>=1.50.0
+grpcio-tools>=1.50.0
+grpcio>=1.50.0
+grpcio-tools>=1.50.0

@@ -16,10 +16,11 @@ class DataProcessingService(BaseService):
     Consume estados de la simulación, genera visualizaciones y comprime datos.
     """
     
-    def __init__(self, state_queue: asyncio.Queue, broadcast_queue: asyncio.Queue):
+    def __init__(self, state_queue: asyncio.Queue, broadcast_queue: asyncio.Queue, grpc_queue: Optional[asyncio.Queue] = None):
         super().__init__("DataProcessing")
         self.state_queue = state_queue
         self.broadcast_queue = broadcast_queue
+        self.grpc_queue = grpc_queue
         self.viz_pipeline = VisualizationPipeline()
         self.epoch_detector = EpochDetector()
         
@@ -126,7 +127,22 @@ class DataProcessingService(BaseService):
                     'epoch': current_epoch,
                     'epoch_metrics': epoch_metrics
                 }
-                
+
+                # 5b. Enviar a cola gRPC (si existe)
+                # Esto se hace ANTES del buffering/broadcast para menor latencia
+                if self.grpc_queue:
+                    # Clonamos payload básico para no interferir con el resto
+                    # Nota: Si el cliente gRPC es lento, la cola se llenará y lanzará QueueFull.
+                    # No bloqueamos aquí.
+                    if not self.grpc_queue.full():
+                        try:
+                            self.grpc_queue.put_nowait({
+                                'type': 'simulation_frame',
+                                'payload': final_payload
+                            })
+                        except asyncio.QueueFull:
+                            pass # Drop frame for gRPC if full
+
                 # 6. Enviar a cola de broadcast o Cache Buffering
                 from src.config import CACHE_BUFFERING_ENABLED, CACHE_STREAM_KEY, CACHE_STREAM_MAX_LEN
                 # from src.server.server_state import g_state  <-- REMOVED: Redundant and causes UnboundLocalError
