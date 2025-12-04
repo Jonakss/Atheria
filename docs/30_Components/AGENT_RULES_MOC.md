@@ -1,6 +1,6 @@
 # 🗺️ MOC de Reglas de Agentes de IA
 
-**Última actualización:** 2025-11-26
+**Última actualización:** 2025-12-04
 
 ## 1. Propósito
 
@@ -31,9 +31,10 @@ A continuación se listan todos los agentes de IA aprobados para trabajar en est
 | Agente | Archivo de Definición | Archivo de Mandamientos Principal | Rol Principal |
 | :--- | :--- | :--- | :--- |
 | 🤖 **Gemini CLI** | [[AGENT_GEMINI_CLI]] | `.gemini/GEMINI.md` | Desarrollo interactivo en terminal |
+| 🌌 **Antigravity** | [[AGENT_ANTIGRAVITY]] | `.gemini/GEMINI.md` (shared) | Desarrollo en VS Code, tareas complejas |
 | 🚀 **Google Jules** | `Próximamente` | `N/A` | Tareas asíncronas a gran escala |
 | 👁️ **Cursor** | `Próximamente` | `N/A` | Asistencia en el editor de código |
 | ⚡ **Lightning AI** | `Próximamente` | `N/A` | Gestión de infraestructura de entrenamiento |
-| 🌌 **Antigravity** | `Próximamente` | `N/A` | Análisis de código y dependencias |
 
 *(Esta tabla debe ser actualizada por cualquier agente al que se le notifique de un nuevo colega o de su propia incorporación).*
+
