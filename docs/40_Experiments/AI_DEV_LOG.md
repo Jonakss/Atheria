@@ -250,3 +250,30 @@
   - **PolarEngine**: Implemented `apply_tool` support for `collapse`, `vortex`, and `wave` tools.
   - **NativeEngineWrapper**: Optimized state synchronization using `torch.nonzero()` to avoid full grid iteration in Python.
   - **Cleanup**: Removed build artifacts (`Makefile`, `cmake_install.cmake`, etc.) and added missing experiment logs.
+- **Fecha:** 2025-12-04
+- **Experimento:** [[EXP_004_IONQ_ENGINE_SIMULATIONS]]
+- **Objetivo:** Implementar y validar scripts de simulación cuántica para los 5 motores de Atheria en IonQ/Qiskit.
+- **Cambios:**
+    - Creados 5 scripts en `scripts/` para Time, Harmonic, Lattice, Sparse y Polar engines.
+    - Implementada lógica de fallback robusta a `AerSimulator` (local) ante falta de API Key o errores de conexión.
+    - Instaladas dependencias `qiskit-ionq` y `qiskit-aer`.
+- **Resultados:**
+    - Todos los scripts se ejecutaron exitosamente en **IonQ Simulator**.
+    - **Lattice:** Confirmada preservación de simetría de gauge.
+    - **Sparse:** Simulación de disipación exitosa (~75.5% supervivencia).
+    - **Time:** Evolución con mayor dispersión que en local, reflejando ruido simulado.
+- **Estado:** ✅ Completado (IonQ Simulator).
+
+## 2025-12-04: EXP-005: Hybrid Harmonic UNet Fast Forward
+- **Objetivo:** Demostrar un pipeline híbrido que combine QFT (IonQ/Aer) con una UNet clásica para "Fast Forward" temporal.
+- **Implementación:**
+    - Script: `scripts/experiment_harmonic_fastforward.py`.
+    - Pipeline: `Quantum QFT` -> `Neural Evolution (UNet)` -> `Quantum IQFT`.
+    - **QFT:** Simulación de vector de estado (para entrada densa a UNet).
+    - **UNet:** Modelo `UNetUnitary` (mock) procesando el espectro en frecuencia.
+    - **IQFT:** Ejecución en simulador (Aer fallback por restricción de gate `reset` en IonQ).
+- **Resultados:**
+    - Ejecución exitosa del flujo completo end-to-end.
+    - Integración correcta entre tensores de PyTorch y estados cuánticos de Qiskit.
+    - Demostración de viabilidad técnica para arquitecturas híbridas Neural-Quantum.
+- **Estado:** ✅ Completado (Prototipo Funcional).
