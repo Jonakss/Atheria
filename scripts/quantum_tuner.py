@@ -16,17 +16,22 @@ from src import config as cfg
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class QuantumTuner:
-    def __init__(self, model=None, grid_size=32, d_state=4, device=None, max_iter=20):
+    def __init__(self, model=None, grid_size=32, d_state=4, device=None, max_iter=20, backend='local_aer'):
         self.grid_size = grid_size
         self.d_state = d_state
         self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.max_iter = max_iter
+        self.backend_name = backend
         
         # Load model (injected or loaded from config)
         if model:
             self.model = model
         else:
             self.model = self._load_model()
+
+        # Initialize Backend
+        from src.engines.backend_factory import BackendFactory
+        self.compute_backend = BackendFactory.get_backend(self.backend_name)
         
     def _load_model(self):
         # Try to load latest experiment model
@@ -59,7 +64,7 @@ class QuantumTuner:
         # 1. Generate Variational State
         try:
             psi_init = QuantumState.create_variational_state(
-                self.grid_size, self.d_state, self.device, params, strength=0.5
+                self.grid_size, self.d_state, self.device, params, strength=0.5, backend_name=self.backend_name
             )
         except Exception as e:
             logging.error(f"Generation failed: {e}")
@@ -102,7 +107,7 @@ class QuantumTuner:
         return -score # Minimize negative score
 
     def tune(self):
-        logging.info("🎛️ Starting Quantum Tuner (SPSA)...")
+        logging.info(f"🎛️ Starting Quantum Tuner (SPSA) on {self.backend_name}...")
 
         # SPSA Parameters
         n_params = 11 # One per qubit
@@ -144,58 +149,6 @@ class QuantumTuner:
         logging.info(f"   🏆 Best Score: {-best_score:.4f}")
         logging.info(f"   Best Params: {best_theta.tolist()}")
 
-        # Save results
-        results = {
-            "best_score": -best_score,
-            "best_params": best_theta.tolist(),
-            "timestamp": datetime.now().isoformat()
-        }
-        with open("best_quantum_params.json", "w") as f:
-            json.dump(results, f, indent=2)
-
-    def tune(self):
-        logging.info("🎛️ Starting Quantum Tuner (SPSA)...")
-        
-        # SPSA Parameters
-        n_params = 11 # One per qubit
-        theta = np.random.rand(n_params) * 2 * np.pi # Initial random angles
-        
-        alpha = 0.602
-        gamma = 0.101
-        a = 0.16
-        c = 0.1
-        A = self.max_iter * 0.1
-        
-        best_score = float('inf')
-        best_theta = theta.copy()
-        
-        for k in range(self.max_iter):
-            ak = a / (k + 1 + A)**alpha
-            ck = c / (k + 1)**gamma
-            
-            delta = np.sign(np.random.rand(n_params) - 0.5)
-            
-            theta_plus = theta + ck * delta
-            theta_minus = theta - ck * delta
-            
-            y_plus = self.objective_function(theta_plus)
-            y_minus = self.objective_function(theta_minus)
-            
-            grad = (y_plus - y_minus) / (2 * ck * delta)
-            
-            theta = theta - ak * grad
-            
-            # Keep track of best
-            current_score = (y_plus + y_minus) / 2
-            if current_score < best_score:
-                best_score = current_score
-                best_theta = theta.copy()
-                logging.info(f"   🌟 New Best Score: {-best_score:.4f} at iter {k}")
-                
-        logging.info("✅ Tuning Complete.")
-        logging.info(f"   🏆 Best Score: {-best_score:.4f}")
-        logging.info(f"   Best Params: {best_theta.tolist()}")
-        
         # Save results
         results = {
             "best_score": -best_score,
@@ -206,5 +159,11 @@ class QuantumTuner:
             json.dump(results, f, indent=2)
             
 if __name__ == "__main__":
-    tuner = QuantumTuner(max_iter=5) # Short run for testing
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--backend", type=str, default="local_aer", help="Backend to use (ionq_simulator, ibm_brisbane, local_aer, etc.)")
+    parser.add_argument("--iter", type=int, default=5, help="Number of iterations")
+    args = parser.parse_args()
+
+    tuner = QuantumTuner(max_iter=args.iter, backend=args.backend)
     tuner.tune()
