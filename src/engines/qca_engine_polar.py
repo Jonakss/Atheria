@@ -90,6 +90,66 @@ class PolarEngine(nn.Module):
         # Permute to [B, H, W, C] for consistency with other engines
         return torch.complex(real, imag).permute(0, 2, 3, 1)
 
+    def get_visualization_data(self, viz_type: str = "density"):
+        """
+        Retorna datos de visualización para shaders.
+        
+        Args:
+            viz_type: Tipo de visualización ("density", "phase", "energy", "magnitude")
+            
+        Returns:
+            Tensor [H, W] con los valores calculados.
+        """
+        mag = self.state.psi.magnitude  # [1, C, H, W]
+        phase = self.state.psi.phase    # [1, C, H, W]
+        
+        # Reducir canales si múltiples (promediar)
+        if mag.shape[1] > 1:
+            mag = mag.mean(dim=1, keepdim=True)
+            phase = phase.mean(dim=1, keepdim=True)
+        
+        if viz_type == "density" or viz_type == "magnitude":
+            # Densidad = magnitud^2
+            density = (mag ** 2).squeeze()  # [H, W]
+            return density
+            
+        elif viz_type == "phase":
+            # Fase normalizada a [0, 1] para visualización
+            phase_norm = (phase / (2 * 3.14159) + 0.5) % 1.0
+            return phase_norm.squeeze()  # [H, W]
+            
+        elif viz_type == "energy":
+            # Energía = magnitud^2 (equivalente a densidad)
+            energy = (mag ** 2).squeeze()
+            return energy
+            
+        elif viz_type == "gradient":
+            # Gradiente de la magnitud
+            density = mag.squeeze(0).squeeze(0)  # [H, W]
+            gy = torch.diff(density, dim=0, prepend=density[:1, :])
+            gx = torch.diff(density, dim=1, prepend=density[:, :1])
+            gradient = torch.sqrt(gx**2 + gy**2)
+            return gradient
+            
+        elif viz_type == "real":
+            real = mag * torch.cos(phase)
+            return real.squeeze()
+            
+        elif viz_type == "imag":
+            imag = mag * torch.sin(phase)
+            return imag.squeeze()
+            
+        elif viz_type == "fields":
+            # Retornar ambos campos (Real e Imag) como tensor [H, W, 2]
+            real = mag * torch.cos(phase)
+            imag = mag * torch.sin(phase)
+            fields = torch.stack([real.squeeze(), imag.squeeze()], dim=-1)  # [H, W, 2]
+            return fields
+            
+        else:
+            logging.warning(f"⚠️ Tipo de visualización '{viz_type}' no soportado. Usando density.")
+            return (mag ** 2).squeeze()
+
     def apply_tool(self, action, params):
         """
         Aplica una herramienta cuántica al estado polar.
@@ -143,6 +203,19 @@ class PolarEngine(nn.Module):
 
     def get_model_for_params(self):
         return self.model
+
+    def compile_model(self):
+        """
+        Compila el modelo para optimización.
+        """
+        if not self.is_compiled and self.model is not None:
+            try:
+                import torch._dynamo
+                self.model = torch.compile(self.model)
+                self.is_compiled = True
+                logging.info("✅ PolarEngine: Modelo compilado con torch.compile()")
+            except Exception as e:
+                logging.warning(f"⚠️ PolarEngine: No se pudo compilar el modelo: {e}")
 
     def get_initial_state(self, batch_size=1):
         # Retorna estado inicial aleatorio [B, C, H, W]
