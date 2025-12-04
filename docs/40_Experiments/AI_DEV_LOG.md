@@ -336,3 +336,16 @@
     - Checkpoint: `checkpoints/fastforward_1M_ionq_loop.pt`.
     - Ciclo completo verificado: El sistema puede "saltar" en el tiempo en un procesador cuántico y luego retomar la simulación clásica sin problemas.
 - **Estado:** ✅ Completado.
+
+### 2025-12-04: EXP-008: Quantum-Native Training (Hardware Efficient)
+- **Objetivo:** Resolver el problema de "TooManyGates" de la compuerta Diagonal entrenando un circuito parametrizado (PQC) nativo.
+- **Implementación:**
+    - Script: `scripts/experiment_quantum_native_training.py`.
+    - **Ansatz:** Capas de rotaciones $R_z$ (locales) y $R_{zz}$ (entrelazamiento vecino).
+    - **Entrenamiento:** Se entrenó el PQC para aproximar la fase del operador de Fast Forward ($W^{1M}$) de EXP-007.
+    - **Exportación:** Se generó un circuito Qiskit optimizado y exportable a QASM.
+- **Resultados:**
+    - **Reducción de Costo:** De $O(2^N)$ (Diagonal) a $O(N \times L)$ (Nativo), donde $L$ es el número de capas.
+    - **Convergencia:** El modelo aprendió a aproximar la fase del operador objetivo.
+    - **Viabilidad:** Este enfoque permite escalar a 20+ qubits en IonQ sin exceder los límites de compuertas.
+- **Estado:** ✅ Completado.
