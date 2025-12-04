@@ -4,6 +4,34 @@ import pennylane as qml
 import numpy as np
 import os
 
+def _initialize_device(dev_name, n_qubits, shots=1024):
+    """
+    Helper function to initialize a PennyLane device.
+    Handles IonQ API key verification and fallback to default.qubit.
+    """
+    if "ionq" in dev_name:
+        api_key = os.getenv("IONQ_API_KEY")
+        if not api_key:
+            print("⚠️ IONQ_API_KEY not found. Falling back to default.qubit")
+            return qml.device("default.qubit", wires=n_qubits)
+
+        try:
+            # 'ionq.simulator' or 'ionq.qpu'
+            # If dev_name is just 'ionq', default to simulator
+            device_target = "ionq.simulator" if dev_name == "ionq" else dev_name
+            print(f"🔌 Initializing IonQ Device: {device_target}")
+            return qml.device(device_target, wires=n_qubits, shots=shots, api_key=api_key)
+        except Exception as e:
+            print(f"❌ Error initializing IonQ device: {e}. Falling back to default.qubit")
+            return qml.device("default.qubit", wires=n_qubits)
+    else:
+        # We use 'lightning.qubit' for fast C++ simulation if available
+        try:
+            return qml.device(dev_name, wires=n_qubits)
+        except:
+            print(f"Device {dev_name} not found, falling back to default.qubit")
+            return qml.device("default.qubit", wires=n_qubits)
+
 class QuantumKernel(nn.Module):
     """
     A Quantum Convolutional Layer (Quantum Kernel).
@@ -21,30 +49,8 @@ class QuantumKernel(nn.Module):
         self.n_layers = n_layers
         self.kernel_size = 3
 
-        # Define the device
-        # Check if we want to use IonQ
-        if "ionq" in dev_name:
-            api_key = os.getenv("IONQ_API_KEY")
-            if not api_key:
-                print("⚠️ IONQ_API_KEY not found. Falling back to default.qubit")
-                self.dev = qml.device("default.qubit", wires=n_qubits)
-            else:
-                try:
-                    # 'ionq.simulator' or 'ionq.qpu'
-                    # If dev_name is just 'ionq', default to simulator
-                    device_target = "ionq.simulator" if dev_name == "ionq" else dev_name
-                    print(f"🔌 Initializing IonQ Device: {device_target}")
-                    self.dev = qml.device(device_target, wires=n_qubits, shots=1024, api_key=api_key)
-                except Exception as e:
-                    print(f"❌ Error initializing IonQ device: {e}. Falling back to default.qubit")
-                    self.dev = qml.device("default.qubit", wires=n_qubits)
-        else:
-            # We use 'lightning.qubit' for fast C++ simulation if available
-            try:
-                self.dev = qml.device(dev_name, wires=n_qubits)
-            except:
-                print(f"Device {dev_name} not found, falling back to default.qubit")
-                self.dev = qml.device("default.qubit", wires=n_qubits)
+        # Initialize Device
+        self.dev = _initialize_device(dev_name, n_qubits)
 
         # Define the QNode
         @qml.qnode(self.dev, interface="torch")
@@ -118,18 +124,8 @@ class QuantumCell(nn.Module):
     def __init__(self, n_qubits=4, n_layers=2, dev_name="default.qubit"):
         super().__init__()
 
-        if "ionq" in dev_name:
-            api_key = os.getenv("IONQ_API_KEY")
-            if not api_key:
-                 self.dev = qml.device("default.qubit", wires=n_qubits)
-            else:
-                 try:
-                    device_target = "ionq.simulator" if dev_name == "ionq" else dev_name
-                    self.dev = qml.device(device_target, wires=n_qubits, shots=1024, api_key=api_key)
-                 except:
-                    self.dev = qml.device("default.qubit", wires=n_qubits)
-        else:
-            self.dev = qml.device(dev_name, wires=n_qubits)
+        # Initialize Device
+        self.dev = _initialize_device(dev_name, n_qubits)
 
         @qml.qnode(self.dev, interface="torch")
         def circuit(inputs, weights):

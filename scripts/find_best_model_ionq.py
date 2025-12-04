@@ -3,7 +3,6 @@ import sys
 import torch
 import numpy as np
 import logging
-import random
 
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -56,10 +55,10 @@ def main():
     # Define the 'Superposition' of Models
     # These represent different hyperparameters we want to test
     universes = [
-        {"layers": 1, "learning_rate": 0.01},
-        {"layers": 2, "learning_rate": 0.05},
-        {"layers": 3, "learning_rate": 0.10},
-        {"layers": 1, "learning_rate": 0.001} # Conservative universe
+        {"layers": 1},
+        {"layers": 2},
+        {"layers": 3},
+        {"layers": 1} # Conservative universe
     ]
 
     results = []
@@ -73,6 +72,11 @@ def main():
             print(f"✅ Universe #{i}: Entropy = {res['entropy']:.4f}")
         except Exception as e:
             print(f"❌ Universe #{i} collapsed: {e}")
+
+    # Check for empty results
+    if not results:
+        print("\n❌ All universes failed to evaluate. No best model found.")
+        return
 
     # Find the 'Best' Model
     # Criteria: Maximum Entropy (Maximum Complexity/Interest)
