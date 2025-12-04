@@ -163,8 +163,8 @@ def main():
     logging.info(f"   Target Grid: {grid_size}x{grid_size}")
     
     # 2. Inicializar Modelo Cuántico Nativo
-    # Usamos 3 capas para dar suficiente expresividad
-    model = QuantumNativeConv2d(grid_size=grid_size, n_layers=3, device=device)
+    # Usamos 10 capas para dar suficiente expresividad (3 era muy poco para W^1M)
+    model = QuantumNativeConv2d(grid_size=grid_size, n_layers=10, device=device)
     optimizer = optim.Adam(model.parameters(), lr=0.01)
     
     # 3. Loop de Entrenamiento
@@ -221,12 +221,41 @@ def main():
         except:
             qasm_str = "QASM export failed"
 
+    # 5. Validación / Inferencia
+    logging.info("🧪 Ejecutando Validación de Inferencia...")
+    
+    # Generar un estado de prueba aleatorio (en frecuencia)
+    test_input = torch.randn(1, 1, grid_size, grid_size, dtype=torch.cfloat, device=device)
+    test_input = test_input / test_input.norm()
+    
+    # Ground Truth (Aplicar Target Phases)
+    # Target phases es [1, 1, H, W]
+    ground_truth = test_input * target_phases
+    
+    # PQC Prediction
+    with torch.no_grad():
+        pqc_output = model.forward_pqc(test_input)
+        
+    # Calcular Fidelidad (Overlap)
+    # Fidelity = |<psi_target | psi_pqc>|^2
+    # Aplanar
+    gt_flat = ground_truth.flatten()
+    pqc_flat = pqc_output.flatten()
+    
+    overlap = torch.abs(torch.vdot(gt_flat, pqc_flat))**2
+    logging.info(f"🌟 Fidelidad del Estado Final: {overlap.item():.6f}")
+    
+    # Guardar resultados de validación
     torch.save({
         'model_state_dict': model.state_dict(),
         'circuit_qasm': qasm_str,
-        'losses': losses
+        'losses': losses,
+        'validation_fidelity': overlap.item(),
+        'test_input_sample': test_input.cpu(),
+        'pqc_output_sample': pqc_output.cpu(),
+        'target_output_sample': ground_truth.cpu()
     }, "checkpoints/quantum_native_model.pt")
-    logging.info("💾 Modelo guardado en checkpoints/quantum_native_model.pt")
+    logging.info("💾 Modelo y resultados guardados en checkpoints/quantum_native_model.pt")
 
 if __name__ == "__main__":
     main()
