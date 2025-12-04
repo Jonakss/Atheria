@@ -366,3 +366,13 @@
     - **Job ID:** `019aeae2-9fd2-70d4-a72c-515f9682cc1f` (Ejecutado en `ionq_simulator`).
     - Estado: Enviado y completado exitosamente.
 - **Estado:** ✅ Completado (Éxito Rotundo).
+
+### 2025-12-04: Ejecución Multi-Plataforma (IonQ + IBM)
+- **Objetivo:** Validar circuitos en hardware cuántico real.
+- **Resultados:**
+    - **IonQ Simulator:** Job `019aeaf3-...` - Estado `|0000⟩` 85%.
+    - **IBM Fez (Real):** Job `d4ouqhft3pms7395ki80` - Estado `|0000⟩` **90.6%**.
+- **Tiempo Ejecución IBM:** 5 segundos.
+- **Conclusión:** El circuito variacional funciona correctamente en hardware real de ambas plataformas.
+- **Scripts:** `scripts/run_ibm_now.py`, `scripts/run_json_circuit_ionq.py`.
+- **Estado:** ✅ Completado.
