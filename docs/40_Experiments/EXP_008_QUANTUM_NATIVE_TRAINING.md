@@ -45,14 +45,38 @@ A pesar de la ventaja en eficiencia, el modelo alcanzó una fidelidad baja:
 - **Fidelidad Final:** $\approx 0.01$ (1%)
 - **Interpretación:** El ansatz lineal de vecinos más cercanos ($R_{zz}$ lineal) no tiene suficiente "conectividad" o expresividad para capturar la estructura de fase altamente no-local y "aleatoria" que generó la UNet clásica. El operador objetivo es demasiado complejo (alta entropía de fase) para ser comprimido en un circuito tan simple.
 
-## 4. Discusión
-El experimento confirma que el enfoque "Nativo" resuelve el problema de ingeniería (profundidad del circuito), permitiendo correr modelos en grids grandes (20+ qubits) en hardware actual. Sin embargo, traslada el problema a la **arquitectura del modelo**:
-- Un ansatz simple no basta para imitar una red neuronal clásica profunda.
-- **Solución Futura:** En lugar de intentar que el PQC imite a la UNet clásica (Distillation), deberíamos **entrenar el PQC desde cero** en la tarea física original (End-to-End). De esta forma, la IA aprenderá una solución que *sí* quepa en el ansatz disponible, en lugar de forzar una solución clásica compleja en un molde cuántico simple.
+### 3.3. Visualización de Resultados
+![Resultados EXP-008](/home/jonathan.correa/Projects/Atheria/docs/40_Experiments/images/exp008_results.png)
+*Fig 1. Curva de pérdida (izquierda), histograma de fases (centro) y correlación de fases (derecha). Se observa que aunque la pérdida baja, la correlación no es una diagonal perfecta, indicando falta de expresividad.*
+
+## 4. Discusión y Alternativas de Operadores
+El usuario planteó la pregunta: *¿Qué otros operadores podemos usar además de este ansatz simple?*
+
+El modelo actual (`QuantumNativeConv2d`) usó un ansatz "Hardware Efficient" muy básico (Topología Lineal, solo $R_z$ y $R_{zz}$). La baja fidelidad indica que necesitamos arquitecturas más ricas. Las alternativas para futuros experimentos incluyen:
+
+1.  **Strongly Entangling Layers:**
+    - Conectividad "todos con todos" o patrones circulares complejos.
+    - Compuertas de rotación general $U3(\theta, \phi, \lambda)$ en lugar de solo $R_z$.
+    - Mayor expresividad, costo de compuertas moderado ($O(N^2)$ o $O(N)$ según topología).
+
+2.  **EfficientSU2 (Full Rotation):**
+    - Capas de rotaciones $R_y$ y $R_z$ intercaladas con CNOTs.
+    - Permite explorar toda la esfera de Bloch para cada qubit.
+    - Estándar en la industria (Qiskit Circuit Library).
+
+3.  **Data Re-uploading (Quantum MLP):**
+    - Codificar la entrada $x$ repetidamente en varias capas, intercaladas con pesos entrenables.
+    - Teóricamente puede aproximar cualquier función (Teorema de Aproximación Universal Cuántico).
+
+4.  **Hybrid Tensor Networks (MPS/TTN):**
+    - Estructuras jerárquicas (tipo árbol) que capturan correlaciones de largo alcance mejor que una cadena lineal.
+
+**Conclusión:** El problema no es el método "Nativo", sino que el ansatz elegido fue demasiado "tacaño" en recursos. Para capturar la complejidad de la UNet, necesitamos un ansatz con mayor **Capacidad de Entrelazamiento**.
 
 ## 5. Conclusión
-El entrenamiento cuántico nativo es viable y necesario para escalar. Hemos generado circuitos QASM válidos y eficientes. El siguiente paso lógico no es aumentar capas (lo que reintroduce ruido), sino cambiar la estrategia de entrenamiento a "Quantum-First", donde el hardware define las restricciones desde el inicio del aprendizaje.
+El entrenamiento cuántico nativo es viable y necesario para escalar. Hemos generado circuitos QASM válidos y eficientes. El siguiente paso lógico es aumentar la complejidad del Ansatz (pasar de Linear-Rzz a StronglyEntangling o EfficientSU2) para mejorar la fidelidad.
 
 ## 6. Artefactos
 - **Modelo:** `checkpoints/quantum_native_model.pt`
 - **Script:** `scripts/experiment_quantum_native_training.py`
+- **Plot:** `docs/40_Experiments/images/exp008_results.png`
