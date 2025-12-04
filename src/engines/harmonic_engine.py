@@ -29,6 +29,15 @@ class HarmonicVacuum:
         # phases: Fase inicial aleatoria.
         self.phases = torch.rand(d_state, complexity, device=device) * 2 * math.pi
 
+    def regenerate(self):
+        """
+        Regenera los parámetros del vacío (k, w, phi) para crear un nuevo "universo".
+        Esto cambia el patrón de interferencia de fondo.
+        """
+        self.k_vecs = torch.randn(self.d_state, self.complexity, 3, device=self.device) * 0.3
+        self.omegas = torch.randn(self.d_state, self.complexity, device=self.device) * 0.1
+        self.phases = torch.rand(self.d_state, self.complexity, device=self.device) * 2 * math.pi
+
     def get_state(self, coords_tensor, t):
         """
         Calcula el estado del vacío en un conjunto de coordenadas (x,y,z) al tiempo t.
@@ -65,6 +74,11 @@ class HarmonicVacuum:
         # El vacío debe ser débil (0.05) para no eclipsar a la materia real (1.0)
         return field_val * 0.05
 
+class DummyState:
+    """Clase ligera para envolver el estado denso."""
+    def __init__(self, psi):
+        self.psi = psi
+
 class SparseHarmonicEngine:
     """
     Motor de Inferencia Masiva.
@@ -83,11 +97,77 @@ class SparseHarmonicEngine:
         self.active_coords = set()
         self.step_count = 0
 
+        # Cache para optimización de visualización
+        self._cached_state_obj = None
+        self._cache_step = -1
+        self._cache_valid = False
+
         # Quantum Tools
         from ..physics.quantum_collapse import IonQCollapse
         from ..physics.steering import QuantumSteering
         self.collider = IonQCollapse(device)
         self.steering = QuantumSteering(device)
+
+    @property
+    def state(self):
+        """
+        Interfaz dummy para compatibilidad con handlers.
+        Retorna un objeto con atributo .psi que contiene el estado denso, cacheado si es posible.
+        """
+        # Verificar si el caché es válido para el paso actual
+        if self._cache_valid and self._cached_state_obj is not None and self._cache_step == self.step_count:
+            return self._cached_state_obj
+
+        # Generar estado denso on-demand
+        psi_dense = self.get_viewport_tensor((0, 0, 0), self.grid_size, self.step_count * 0.1)
+        self._cached_state_obj = DummyState(psi_dense)
+        self._cache_step = self.step_count
+        self._cache_valid = True
+
+        return self._cached_state_obj
+
+    @state.setter
+    def state(self, new_state):
+        """
+        Setter mágico: Cuando el servidor asigna motor.state = QuantumState(...),
+        interceptamos para reiniciar el motor Armónico correctamente.
+        """
+        logging.info("🌌 HarmonicEngine: Intercepting state reset. Regenerating universe...")
+
+        # 1. Regenerar el Vacío (Nuevas leyes de la física para este universo)
+        self.vacuum.regenerate()
+
+        # 2. Resetear contadores
+        self.step_count = 0
+        self.matter = {}
+        self.active_coords = set()
+
+        # Invalidar caché
+        self._cache_valid = False
+
+        # 3. Inyectar materia del nuevo estado
+        if hasattr(new_state, 'psi') and new_state.psi is not None:
+            self._ingest_dense_state(new_state.psi)
+
+    def _ingest_dense_state(self, psi_tensor, strength=1.0):
+        """Convierte un tensor denso [1, H, W, C] en partículas dispersas."""
+        # Invalidar caché al cambiar materia
+        self._cache_valid = False
+
+        psi = psi_tensor[0]
+        density = psi.abs().pow(2).sum(dim=-1) # [H, W]
+
+        # Umbral dinámico
+        threshold = density.mean() + density.std()
+
+        indices = torch.nonzero(density > threshold)
+        count = 0
+        for idx in indices:
+            y, x = idx[0].item(), idx[1].item()
+            state_vec = psi[y, x] * strength
+            self.add_matter(x, y, 0, state_vec)
+            count += 1
+        logging.info(f"✨ Harmonic Reset: {count} particles initialized from new state.")
 
     def initialize_matter(self, mode='random', strength=1.0):
         """
@@ -105,26 +185,7 @@ class SparseHarmonicEngine:
         # Si el modo es ionq o complex_noise, qs.psi tendrá datos
         # Convertimos ese estado denso a partículas en el HarmonicEngine
         if qs.psi is not None:
-            # Extraer energía para decidir dónde poner partículas
-            # qs.psi es [1, H, W, d_state]
-            psi = qs.psi[0]
-            density = psi.abs().pow(2).sum(dim=-1) # [H, W]
-            
-            # Umbral para crear materia
-            # En modo ionq/noise, queremos que surjan partículas en los picos
-            threshold = density.mean() + density.std()
-            
-            indices = torch.nonzero(density > threshold)
-            
-            count = 0
-            for idx in indices:
-                y, x = idx[0].item(), idx[1].item()
-                # Tomamos el estado del tensor y lo inyectamos como materia
-                state_vec = psi[y, x] * strength
-                self.add_matter(x, y, 0, state_vec) # Z=0 por defecto
-                count += 1
-                
-            logging.info(f"✨ Quantum Genesis: {count} particles created from {mode} distribution.")
+            self._ingest_dense_state(qs.psi, strength)
         else:
             logging.warning("⚠️ QuantumState returned None. No matter initialized.")
 
@@ -142,6 +203,8 @@ class SparseHarmonicEngine:
         """Inyecta materia real en el universo."""
         self.matter[(x,y,z)] = state.to(self.device)
         self.active_coords.add((x,y,z))
+        # Invalidar caché
+        self._cache_valid = False
 
     def get_viewport_tensor(self, center, size_xy, t):
         """
@@ -202,6 +265,9 @@ class SparseHarmonicEngine:
 
     def step(self):
         self.step_count += 1
+        # El cambio de step_count ya invalida el cache por chequeo de _cache_step,
+        # pero para ser explícitos y consistentes:
+        self._cache_valid = False
         
         # 1. Identificar Chunks Activos (agrupar coordenadas en bloques de 16x16x16)
         CHUNK_SIZE = 16
@@ -411,6 +477,9 @@ class SparseHarmonicEngine:
         """
         Aplica una herramienta cuántica al universo armónico.
         """
+        # Invalidar caché al aplicar herramienta
+        self._cache_valid = False
+
         logging.info(f"🛠️ HarmonicEngine aplicando herramienta: {action} | Params: {params}")
         
         try:
