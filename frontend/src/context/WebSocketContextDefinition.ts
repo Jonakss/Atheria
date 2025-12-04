@@ -46,6 +46,17 @@ export interface SimData {
   roi_info?: any;
 }
 
+export interface QuantumStatus {
+  status: 'idle' | 'submitted' | 'queued' | 'running' | 'completed' | 'error';
+  job_id?: string;
+  data?: any;
+  metadata?: {
+    quantum_execution_time?: string;
+    fidelity?: number;
+  };
+  message?: string;
+}
+
 export interface TrainingProgress {
   current_episode: number;
   total_episodes: number;
@@ -141,6 +152,7 @@ export interface WebSocketContextType {
   setLiveFeedEnabled: (enabled: boolean) => void; // Función para cambiar live feed
   setStepsInterval: (interval: number) => void; // Función para cambiar el intervalo de pasos
   roiInfo: any; // Información de ROI actual
+  quantumStatus: QuantumStatus | null; // Estado de ejecución cuántica
 }
 
 export const WebSocketContext = createContext<WebSocketContextType | undefined>(
