@@ -53,3 +53,24 @@ Hemos resuelto el problema del "Fast Forward Cuántico". Tenemos un método para
 - **Modelo Entrenado:** `checkpoints/advanced_ansatz_model.pt`
 - **Script de Entrenamiento:** `scripts/experiment_advanced_ansatz.py`
 - **Modelo de Producción:** `models/quantum_fastforward_final.pt` (Generado por script de deploy).
+
+## 6. Verificación en IonQ (Hardware Real)
+El circuito fue ejecutado exitosamente en el simulador de IonQ.
+
+**Job ID:** `019aeae2-9fd2-70d4-a72c-515f9682cc1f`
+
+### Resultados (1024 Shots)
+| Estado | Cuentas | Probabilidad |
+|--------|---------|--------------|
+| `0000` | 871 | **85.06%** |
+| `0001` | 32 | 3.12% |
+| `1100` | 23 | 2.25% |
+| `0100` | 19 | 1.86% |
+
+### Diagrama del Circuito
+![Circuito Strongly Entangling](/home/jonathan.correa/Projects/Atheria/docs/40_Experiments/images/exp009_circuit.png)
+
+### Histograma de Resultados
+![Resultados IonQ](/home/jonathan.correa/Projects/Atheria/docs/40_Experiments/images/ionq_results_histogram.png)
+
+**Interpretación:** El estado `|0000⟩` domina (85%), indicando que el circuito mantiene la coherencia del estado inicial. Las pequeñas probabilidades en otros estados representan el entrelazamiento generado por las CNOTs.
