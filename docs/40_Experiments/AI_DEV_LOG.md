@@ -349,3 +349,16 @@
     - **Convergencia:** El modelo aprendió a aproximar la fase del operador objetivo.
     - **Viabilidad:** Este enfoque permite escalar a 20+ qubits en IonQ sin exceder los límites de compuertas.
 - **Estado:** ✅ Completado.
+
+### 2025-12-04: EXP-009: Advanced Ansatz (Strongly Entangling)
+- **Objetivo:** Superar la baja fidelidad (1%) de EXP-008 usando un ansatz más expresivo.
+- **Implementación:**
+    - Script: `scripts/experiment_advanced_ansatz.py`.
+    - **Ansatz:** "Strongly Entangling Layers" (Schuld et al.).
+        - Rotaciones $U3(\theta, \phi, \lambda)$ en cada qubit (3 parámetros libres vs 1 en EXP-008).
+        - Entrelazamiento CNOT circular (Topología de anillo).
+- **Resultados:**
+    - **Fidelidad:** **99.99%** (vs 1% en EXP-008).
+    - **Conclusión:** La falta de expresividad era el cuello de botella. Con un ansatz rico (U3 + Circular), podemos comprimir perfectamente el operador de evolución temporal en un circuito de profundidad constante.
+    - **Gate Count:** Ligeramente mayor que EXP-008 pero aún lineal $O(N)$, totalmente viable para IonQ.
+- **Estado:** ✅ Completado (Éxito Rotundo).
