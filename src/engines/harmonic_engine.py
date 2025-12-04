@@ -74,6 +74,11 @@ class HarmonicVacuum:
         # El vacío debe ser débil (0.05) para no eclipsar a la materia real (1.0)
         return field_val * 0.05
 
+class DummyState:
+    """Clase ligera para envolver el estado denso."""
+    def __init__(self, psi):
+        self.psi = psi
+
 class SparseHarmonicEngine:
     """
     Motor de Inferencia Masiva.
@@ -92,6 +97,11 @@ class SparseHarmonicEngine:
         self.active_coords = set()
         self.step_count = 0
 
+        # Cache para optimización de visualización
+        self._cached_state_obj = None
+        self._cache_step = -1
+        self._cache_valid = False
+
         # Quantum Tools
         from ..physics.quantum_collapse import IonQCollapse
         from ..physics.steering import QuantumSteering
@@ -102,15 +112,19 @@ class SparseHarmonicEngine:
     def state(self):
         """
         Interfaz dummy para compatibilidad con handlers.
-        Retorna un objeto con atributo .psi que contiene el estado denso.
+        Retorna un objeto con atributo .psi que contiene el estado denso, cacheado si es posible.
         """
-        class DummyState:
-            def __init__(self, psi):
-                self.psi = psi
+        # Verificar si el caché es válido para el paso actual
+        if self._cache_valid and self._cached_state_obj is not None and self._cache_step == self.step_count:
+            return self._cached_state_obj
 
         # Generar estado denso on-demand
         psi_dense = self.get_viewport_tensor((0, 0, 0), self.grid_size, self.step_count * 0.1)
-        return DummyState(psi_dense)
+        self._cached_state_obj = DummyState(psi_dense)
+        self._cache_step = self.step_count
+        self._cache_valid = True
+
+        return self._cached_state_obj
 
     @state.setter
     def state(self, new_state):
@@ -128,12 +142,18 @@ class SparseHarmonicEngine:
         self.matter = {}
         self.active_coords = set()
 
+        # Invalidar caché
+        self._cache_valid = False
+
         # 3. Inyectar materia del nuevo estado
         if hasattr(new_state, 'psi') and new_state.psi is not None:
             self._ingest_dense_state(new_state.psi)
 
     def _ingest_dense_state(self, psi_tensor, strength=1.0):
         """Convierte un tensor denso [1, H, W, C] en partículas dispersas."""
+        # Invalidar caché al cambiar materia
+        self._cache_valid = False
+
         psi = psi_tensor[0]
         density = psi.abs().pow(2).sum(dim=-1) # [H, W]
 
@@ -183,6 +203,8 @@ class SparseHarmonicEngine:
         """Inyecta materia real en el universo."""
         self.matter[(x,y,z)] = state.to(self.device)
         self.active_coords.add((x,y,z))
+        # Invalidar caché
+        self._cache_valid = False
 
     def get_viewport_tensor(self, center, size_xy, t):
         """
@@ -243,6 +265,9 @@ class SparseHarmonicEngine:
 
     def step(self):
         self.step_count += 1
+        # El cambio de step_count ya invalida el cache por chequeo de _cache_step,
+        # pero para ser explícitos y consistentes:
+        self._cache_valid = False
         
         # 1. Identificar Chunks Activos (agrupar coordenadas en bloques de 16x16x16)
         CHUNK_SIZE = 16
@@ -391,6 +416,9 @@ class SparseHarmonicEngine:
         """
         Aplica una herramienta cuántica al universo armónico.
         """
+        # Invalidar caché al aplicar herramienta
+        self._cache_valid = False
+
         logging.info(f"🛠️ HarmonicEngine aplicando herramienta: {action} | Params: {params}")
         
         try:
