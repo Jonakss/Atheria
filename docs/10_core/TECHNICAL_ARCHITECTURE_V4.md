@@ -15,7 +15,9 @@ src/
 │   └── qca_engine.py       # Motor Denso (Laboratorio/Entrenamiento)
 ├── models/            # Cerebros (PyTorch)
 │   ├── unet_unitary.py     # Arquitectura Principal
-│   └── snn_unet.py         # Arquitectura Spiking
+│   ├── snn_unet.py         # Arquitectura Spiking
+│   └── layers/             # Capas Personalizadas
+│       └── holographic.py  # (Prototipo) Capa Convolucional Cuántica
 ├── physics/           # Reglas y Entorno
 │   ├── noise.py            # Inyector de Ruido IonQ
 │   └── genesis.py          # Semillas iniciales (Big Bang)

@@ -20,6 +20,7 @@ related: [[10_core/00_CORE_MOC]], [[40_Experiments/00_EXPERIMENTS_MOC]]
 - [[Models]] - Arquitecturas de modelos disponibles
 - [[APR_MODELS]] - Application Performance Repository (APR) para modelos
 - [[UNET]] - Documentación específica de UNet
+- [[HOLOGRAPHIC_LAYER]] - Capa Neuronal Holográfica (Quantum Conv2d)
 - [[ARCHITECTURE_V3]] - Sistema V3 completo
 
 ---
