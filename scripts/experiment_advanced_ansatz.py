@@ -269,9 +269,9 @@ def main():
     device = torch.device('cpu') # CPU es más rápido para bucles pequeños de tensores complejos custom
     
     # 1. Cargar Target
-    checkpoint_path = "checkpoints/quantum_native_model.pt" # Usamos el mismo target que EXP-008
+    checkpoint_path = "output/checkpoints/quantum_native_model.pt" # Usamos el mismo target que EXP-008
     # O mejor, cargamos el target original de EXP-007
-    cp_path_007 = "checkpoints/fastforward_1M.pt"
+    cp_path_007 = "output/checkpoints/fastforward_1M.pt"
     
     if os.path.exists(cp_path_007):
         cp = torch.load(cp_path_007, map_location=device)
@@ -340,7 +340,7 @@ def main():
         'circuit_qasm': qasm_str,
         'losses': losses,
         'final_fidelity': 1.0 - losses[-1]
-    }, "checkpoints/advanced_ansatz_model.pt")
+    }, "output/checkpoints/advanced_ansatz_model.pt")
 
 if __name__ == "__main__":
     main()

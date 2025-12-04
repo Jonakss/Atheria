@@ -20,7 +20,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     # 1. Cargar Checkpoint Entrenado
-    checkpoint_path = "output/UNET_UNITARIA-D8-H32-G64-LR1e-4/checkpoints/UNetUnitary_G64_Eps130_1762992979_FINAL.pth"
+    checkpoint_path = "output/UNET_UNITARIA-D8-H32-G64-LR1e-4/output/checkpoints/UNetUnitary_G64_Eps130_1762992979_FINAL.pth"
     
     if not os.path.exists(checkpoint_path):
         logging.error(f"❌ Checkpoint no encontrado: {checkpoint_path}")
@@ -130,7 +130,7 @@ def main():
     final_state_spatial = holo_layer(initial_state_spatial)
     
     # 6. Guardar Checkpoint
-    save_path = "checkpoints/fastforward_1M.pt"
+    save_path = "output/checkpoints/fastforward_1M.pt"
     os.makedirs("checkpoints", exist_ok=True)
     
     torch.save({

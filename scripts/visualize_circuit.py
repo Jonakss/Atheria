@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from scripts.experiment_advanced_ansatz import StronglyEntanglingConv2d
 
 def main():
-    model_path = "models/quantum_fastforward_final.pt"
+    model_path = "output/models/quantum_fastforward_final.pt"
     output_dir = "docs/40_Experiments/images"
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, "exp009_circuit.png")

@@ -146,7 +146,7 @@ def main():
     
     # 1. Cargar Target (Operador Fast Forward de EXP-007)
     # Si no existe, lo generamos sintéticamente para la demo.
-    checkpoint_path = "checkpoints/fastforward_1M.pt"
+    checkpoint_path = "output/checkpoints/fastforward_1M.pt"
     if os.path.exists(checkpoint_path):
         logging.info(f"📂 Cargando target desde {checkpoint_path}")
         cp = torch.load(checkpoint_path, map_location=device)
@@ -254,8 +254,8 @@ def main():
         'test_input_sample': test_input.cpu(),
         'pqc_output_sample': pqc_output.cpu(),
         'target_output_sample': ground_truth.cpu()
-    }, "checkpoints/quantum_native_model.pt")
-    logging.info("💾 Modelo y resultados guardados en checkpoints/quantum_native_model.pt")
+    }, "output/checkpoints/quantum_native_model.pt")
+    logging.info("💾 Modelo y resultados guardados en output/checkpoints/quantum_native_model.pt")
 
 if __name__ == "__main__":
     main()

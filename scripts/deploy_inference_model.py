@@ -15,7 +15,7 @@ def main():
     logging.info("🚀 Iniciando Despliegue de Modelo Cuántico...")
     
     # Paths
-    checkpoint_path = "checkpoints/advanced_ansatz_model.pt"
+    checkpoint_path = "output/checkpoints/advanced_ansatz_model.pt"
     output_dir = "models"
     output_path = os.path.join(output_dir, "quantum_fastforward_final.pt")
     

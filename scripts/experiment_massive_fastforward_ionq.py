@@ -23,7 +23,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     # 1. Cargar Checkpoint y Extraer Operador (Igual que antes)
-    checkpoint_path = "output/UNET_UNITARIA-D8-H32-G64-LR1e-4/checkpoints/UNetUnitary_G64_Eps130_1762992979_FINAL.pth"
+    checkpoint_path = "output/UNET_UNITARIA-D8-H32-G64-LR1e-4/output/checkpoints/UNetUnitary_G64_Eps130_1762992979_FINAL.pth"
     
     if not os.path.exists(checkpoint_path):
         logging.error(f"❌ Checkpoint no encontrado: {checkpoint_path}")
@@ -170,7 +170,7 @@ def main():
             'reconstructed_state': reconstructed_image,
             'continued_state': cont_output,
             'description': 'IonQ Massive Fast Forward + Continuity Loop'
-        }, "checkpoints/fastforward_1M_ionq_loop.pt")
+        }, "output/checkpoints/fastforward_1M_ionq_loop.pt")
         logging.info("💾 Checkpoint de ciclo guardado.")
         
     except Exception as e:

@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from scripts.experiment_quantum_native_training import QuantumNativeConv2d
 
 def main():
-    checkpoint_path = "checkpoints/quantum_native_model.pt"
+    checkpoint_path = "output/checkpoints/quantum_native_model.pt"
     if not os.path.exists(checkpoint_path):
         print("Checkpoint not found")
         return

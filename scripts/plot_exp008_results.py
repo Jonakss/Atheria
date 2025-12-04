@@ -8,7 +8,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def main():
-    checkpoint_path = "checkpoints/quantum_native_model.pt"
+    checkpoint_path = "output/checkpoints/quantum_native_model.pt"
     output_dir = "docs/40_Experiments/images"
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, "exp008_results.png")

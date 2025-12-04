@@ -18,7 +18,7 @@ def main():
     logging.info("🚀 Iniciando Verificación de Inferencia en IonQ...")
     
     # 1. Cargar Modelo Entrenado
-    model_path = "models/quantum_fastforward_final.pt"
+    model_path = "output/models/quantum_fastforward_final.pt"
     if not os.path.exists(model_path):
         logging.error(f"❌ Modelo no encontrado: {model_path}")
         return
