@@ -772,44 +772,46 @@ async def handle_load_experiment(args):
             except Exception as e:
                 logging.debug(f"No se pudo mostrar info de grid scaling: {e}")
 
-            # OPTIMIZACIÓN: Activar ROI automáticamente para grids grandes (>256) para evitar saturar el navegador
-            # MODIFICACIÓN: Solo si NO se ha desactivado explícitamente (por ahora desactivamos auto-ROI para respetar "See All")
-            # El usuario puede activarlo manualmente si lo desea.
+            # OPTIMIZACIÓN: Activar ROI automáticamente para grids masivos (>2048) para evitar saturar el navegador y la red
             inference_grid_size = g_state.get(
                 "inference_grid_size", global_cfg.GRID_SIZE_INFERENCE
             )
             
-            # Comentado para permitir "See All" por defecto si el usuario lo prefiere
-            # if inference_grid_size > 256:
-            #     roi_manager = g_state.get("roi_manager")
-            #     if not roi_manager:
-            #         from ...managers.roi_manager import ROIManager
-            # 
-            #         roi_manager = ROIManager(grid_size=inference_grid_size)
-            #         g_state["roi_manager"] = roi_manager
-            #     else:
-            #         roi_manager.grid_size = inference_grid_size
-            # 
-            #     # Configurar ROI centrado de 256x256
-            #     roi_size = 256
-            #     roi_x = max(0, (inference_grid_size - roi_size) // 2)
-            #     roi_y = max(0, (inference_grid_size - roi_size) // 2)
-            # 
-            #     success = roi_manager.set_roi(roi_x, roi_y, roi_size, roi_size)
-            #     if success:
-            #         roi_msg = f"🔍 ROI automático activado: ventana {roi_size}x{roi_size} centrada (grid {inference_grid_size}x{inference_grid_size} es muy grande)"
-            #         logging.info(roi_msg)
-            #         if ws:
-            #             await send_notification(ws, roi_msg, "info")
-            # 
-            #         # Broadcast ROI status
-            #         await broadcast(
-            #             {
-            #                 "type": "roi_status_update",
-            #                 "payload": roi_manager.get_roi_info(),
-            #             }
-            #         )
-            #         )
+            # Massive Grid Threshold
+            MASSIVE_THRESHOLD = 2048
+
+            if inference_grid_size >= MASSIVE_THRESHOLD:
+                roi_manager = g_state.get("roi_manager")
+                if not roi_manager:
+                    from ...managers.roi_manager import ROIManager
+
+                    roi_manager = ROIManager(grid_size=inference_grid_size)
+                    g_state["roi_manager"] = roi_manager
+                else:
+                    roi_manager.grid_size = inference_grid_size
+
+                # Configurar ROI centrado (512x512 para tener buena vista pero performante)
+                roi_size = 512
+                if roi_size > inference_grid_size:
+                    roi_size = inference_grid_size
+
+                roi_x = max(0, (inference_grid_size - roi_size) // 2)
+                roi_y = max(0, (inference_grid_size - roi_size) // 2)
+
+                success = roi_manager.set_roi(roi_x, roi_y, roi_size, roi_size)
+                if success:
+                    roi_msg = f"🔍 MODO MASIVO: ROI automático activado ({roi_size}x{roi_size}) para grid {inference_grid_size}x{inference_grid_size}."
+                    logging.info(roi_msg)
+                    if ws:
+                        await send_notification(ws, roi_msg, "info")
+
+                    # Broadcast ROI status
+                    await broadcast(
+                        {
+                            "type": "roi_status_update",
+                            "payload": roi_manager.get_roi_info(),
+                        }
+                    )
 
             # Notificar éxito
             msg = f"✅ Experimento '{exp_name}' cargado exitosamente ({'Nativo' if use_native else 'Python'})."
