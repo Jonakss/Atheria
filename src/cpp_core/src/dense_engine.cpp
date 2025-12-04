@@ -13,7 +13,7 @@ DenseEngine::DenseEngine(int64_t grid_size, int64_t d_state, const std::string& 
     // Inicializar estado con ceros (complex64)
     // [1, C, H, W] format for PyTorch models (Channels First)
     state_ = torch::zeros({1, d_state, grid_size, grid_size}, 
-                          torch::TensorOptions().dtype(torch::kComplex64).device(device_));
+                          torch::TensorOptions().dtype(torch::kComplexFloat).device(device_));
 }
 
 void DenseEngine::ensure_device() {
@@ -42,9 +42,12 @@ int64_t DenseEngine::step() {
     try {
         // Preparar input para el modelo
         // El modelo espera [1, 2*C, H, W] (concatenado real+imag)
-        auto real = state_.real();
-        auto imag = state_.imag();
-        auto input = torch::cat({real, imag}, 1); // Concatenar en canales
+        auto real = torch::real(state_);
+        auto imag = torch::imag(state_);
+        
+        // Fix for torch::cat: Explicitly create vector
+        std::vector<torch::Tensor> tensors = {real, imag};
+        auto input = torch::cat(tensors, 1); // Concatenar en canales
         
         // Ejecutar modelo
         std::vector<torch::jit::IValue> inputs;

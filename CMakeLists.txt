@@ -190,7 +190,7 @@ if(TORCH_FOUND)
             # Enlazar bibliotecas necesarias de PyTorch
             # torch_python contiene los bindings de PyBind11 para tensores
             target_link_libraries(atheria_core PRIVATE 
-                torch_python
+                "${TORCH_LIB_DIR}/libtorch_python.so"
                 torch 
                 torch_cpu 
                 c10
