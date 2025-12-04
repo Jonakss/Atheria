@@ -59,6 +59,17 @@ Donde $D^N$ es simplemente potenciar los elementos de la diagonal (fases), lo cu
 - **Ventaja Cuántica:** La complejidad temporal pasa de $O(N)$ (clásico) a $O(1)$ (cuántico, una vez diagonalizado), con el costo fijo de QFT/IQFT ($O(\log^2 M)$).
 - **Limitaciones Actuales:** El tamaño del grid en hardware real está limitado por la fidelidad y el tamaño del payload de la API para compuertas arbitrarias.
 
+### Hallazgo Crítico: La Barrera de la Diagonal
+Durante la ejecución en IonQ, descubrimos que implementar una compuerta `Diagonal` arbitraria (que representa nuestros pesos $W_{freq}$) tiene un costo exponencial en compuertas estándar (CNOTs).
+- **10 Qubits (32x32):** Funciona (~1k CNOTs).
+- **16 Qubits (256x256):** Falla (`TooManyGates`). Requiere $2^{16} = 65,536$ fases, lo que se descompone en una cantidad inmanejable de compuertas físicas.
+
+**Solución Propuesta (EXP-008):**
+En lugar de aprender una matriz arbitraria y tratar de descomponerla, debemos usar **Entrenamiento Cuántico Nativo**.
+- Definir un circuito parametrizado (PQC) con profundidad fija $O(N)$ o $O(N \log N)$.
+- Entrenar los ángulos de rotación de este circuito directamente.
+- Esto garantiza que el operador resultante sea siempre eficiente de ejecutar en hardware.
+
 ## 6. Próximos Pasos
-- Entrenar la UNet directamente para que aprenda pesos que sean eficientes de implementar en hardware (ej: parametrizados por pocas compuertas de rotación en lugar de una diagonal arbitraria).
+- **EXP-008:** Entrenar una `QuantumNativeConv2d` (basada en compuertas $R_z$ y $R_{zz}$) para aproximar el operador de Fast Forward, reduciendo el costo de $O(2^N)$ a $O(poly(N))$.
 - Probar en QPU real (Harmony/Aria) con un grid pequeño (4x4 o 8x8).

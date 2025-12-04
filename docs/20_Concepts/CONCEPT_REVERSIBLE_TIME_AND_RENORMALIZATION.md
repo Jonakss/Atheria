@@ -25,6 +25,23 @@ Atheria no es el universo real. Es un **Sistema Cuántico Cerrado (Closed Quantu
 
 Por lo tanto, en Atheria, **el viaje en el tiempo es físicamente posible**.
 
+### La Dualidad: Sistema Cerrado vs. Abierto
+
+Sin embargo, Atheria es flexible. Podemos configurar el sistema en dos modos fundamentales:
+
+#### 1. Modo Cerrado (God Mode / Reversible)
+
+- **Física:** Evolución Unitaria pura ($U$).
+- **Características:** Energía constante, Entropía constante (o oscilante).
+- **Capacidad:** Reversibilidad perfecta. Podemos ir al Big Bang y volver.
+
+#### 2. Modo Abierto (Realism / Irreversible)
+
+- **Física:** Sistema + Entorno (Baño Térmico). Evolución vía Operadores de Kraus o Ecuación Maestra de Lindblad.
+- **Mecanismo:** Parte de la información del sistema "se fuga" a qubits auxiliares (el entorno) que luego son descartados (trace-out).
+- **Consecuencia:** La entropía del sistema aumenta. La "flecha del tiempo" emerge.
+- **Lección:** Para revertir este sistema, tendríamos que "recapturar" esos qubits del entorno. Esto demuestra gráficamente por qué en la realidad no podemos viajar al pasado: no porque sea matemáticamente imposible, sino porque la información se ha dispersado demasiado.
+
 ---
 
 ## 2. La Regla Maestra: Evolución Unitaria
