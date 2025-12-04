@@ -246,3 +246,7 @@
   - **Status**: Code implemented, compiled, and **VERIFIED**.
   - **Verification**: Passed `tests/verify_native_dense.py` (Init, State Persistence, Step).
   - **Fixes**: Resolved `torch::cat` initializer list error, `torch::kComplex64` availability, and `libtorch_python.so` linking issues.
+- **[[logs/2025-12-04_cleanup_and_optimizations|2025-12-04 - Optimization: Polar Tools & Native Wrapper]]**:
+  - **PolarEngine**: Implemented `apply_tool` support for `collapse`, `vortex`, and `wave` tools.
+  - **NativeEngineWrapper**: Optimized state synchronization using `torch.nonzero()` to avoid full grid iteration in Python.
+  - **Cleanup**: Removed build artifacts (`Makefile`, `cmake_install.cmake`, etc.) and added missing experiment logs.

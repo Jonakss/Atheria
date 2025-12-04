@@ -78,6 +78,69 @@ class PolarEngine(nn.Module):
             self.state.psi.magnitude = new_psi.abs()
             self.state.psi.phase = new_psi.angle()
         
+    def get_dense_state(self, roi=None, check_pause_callback=None):
+        """
+        Retorna el estado denso para visualización.
+        """
+        # Construir tensor complejo desde estado interno
+        mag = self.state.psi.magnitude
+        phase = self.state.psi.phase
+        real = mag * torch.cos(phase)
+        imag = mag * torch.sin(phase)
+        # Permute to [B, H, W, C] for consistency with other engines
+        return torch.complex(real, imag).permute(0, 2, 3, 1)
+
+    def apply_tool(self, action, params):
+        """
+        Aplica una herramienta cuántica al estado polar.
+        """
+        logging.info(f"🛠️ PolarEngine aplicando herramienta: {action} | Params: {params}")
+        
+        try:
+            # 1. Obtener estado denso actual
+            current_dense = self.get_dense_state()
+            
+            # 2. Aplicar herramienta (usando lógica compartida)
+            from ..physics import IonQCollapse, QuantumSteering
+            device = self.device
+            new_psi = None
+            
+            if action == 'collapse':
+                intensity = float(params.get('intensity', 0.5))
+                center = None
+                if 'x' in params and 'y' in params:
+                    center = (int(params['y']), int(params['x']))
+                collapser = IonQCollapse(device)
+                new_psi = collapser.collapse(current_dense, region_center=center, intensity=intensity)
+                
+            elif action == 'vortex':
+                x = int(params.get('x', self.grid_size // 2))
+                y = int(params.get('y', self.grid_size // 2))
+                radius = int(params.get('radius', 5))
+                strength = float(params.get('strength', 1.0))
+                steering = QuantumSteering(device)
+                new_psi = steering.inject(current_dense, 'vortex', x=x, y=y, radius=radius, strength=strength)
+                
+            elif action == 'wave':
+                k_x = float(params.get('k_x', 1.0))
+                k_y = float(params.get('k_y', 1.0))
+                cx, cy = self.grid_size // 2, self.grid_size // 2
+                radius = self.grid_size
+                steering = QuantumSteering(device)
+                new_psi = steering.inject(current_dense, 'plane_wave', x=cx, y=cy, radius=radius, k_x=k_x, k_y=k_y)
+            
+            if new_psi is not None:
+                # 3. Actualizar estado interno (Polar)
+                self.state.psi.magnitude = new_psi.abs()
+                self.state.psi.phase = new_psi.angle()
+                return True
+                
+            return False
+            
+        except Exception as e:
+            logging.error(f"❌ Error aplicando herramienta en PolarEngine: {e}", exc_info=True)
+            return False
+
     def get_model_for_params(self):
         return self.model
 

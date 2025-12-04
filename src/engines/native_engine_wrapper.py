@@ -465,47 +465,57 @@ class NativeEngineWrapper:
             verified_count = 0
             
             # Log initial progress
-            logging.info(f"⚡ Iniciando transferencia de partículas al motor nativo (Grid: {grid_size}x{grid_size}, Thresh: {thresh:.2e})")
+            logging.info(f"⚡ Sincronizando estado con motor nativo (Grid: {grid_size}x{grid_size}, Thresh: {thresh:.2e})")
             
-            for y in range(0, grid_size, sample_step):
-                # Yield GIL every row to allow main thread (asyncio) to process heartbeats
-                # This prevents "freezes" during heavy loops in threads
-                if y % 10 == 0:
+            # OPTIMIZACIÓN: Usar torch.nonzero() para encontrar índices activos
+            # Esto evita iterar sobre todo el grid en Python (muy lento)
+            
+            # Calcular densidad por celda [H, W]
+            cell_densities = psi_abs_sq[0].sum(dim=-1) # Sumar canales
+            
+            # Encontrar índices donde densidad > thresh
+            active_indices = torch.nonzero(cell_densities > thresh) # [N, 2] (y, x)
+            
+            total_active = len(active_indices)
+            logging.info(f"   📍 Células activas encontradas: {total_active}")
+            
+            # Iterar solo sobre índices activos
+            for i, idx in enumerate(active_indices):
+                y, x = idx[0].item(), idx[1].item()
+                
+                # Yield GIL periodically
+                if i % 1000 == 0:
                     time.sleep(0)
-                    
-                for x in range(0, grid_size, sample_step):
-                    # Obtener estado en esta posición
-                    cell_state = dense_psi[0, y, x, :]  # [d_state]
-                    cell_density = psi_abs_sq[0, y, x, :].sum().item()
+                
+                # Obtener estado
+                cell_state = dense_psi[0, y, x, :]
+                
+                try:
+                    # Verificar que cell_state no es cero
+                    cell_state_abs_max = cell_state.abs().max().item()
+                    if cell_state_abs_max < 1e-10:
+                        continue
 
-                    # Solo agregar partícula si tiene densidad significativa
-                    if cell_density > thresh:
-                        try:
-                            # CRÍTICO: Verificar que cell_state no es cero antes de agregar
-                            cell_state_abs_max = cell_state.abs().max().item()
-                            if cell_state_abs_max < 1e-10:
-                                continue
+                    coord = atheria_core.Coord3D(x, y, 0)
+                    # Asegurar que el tensor está en el dispositivo correcto
+                    if cell_state.device != self.device:
+                        cell_state = cell_state.to(self.device)
 
-                            coord = atheria_core.Coord3D(x, y, 0)
-                            # Asegurar que el tensor está en el dispositivo correcto
-                            if cell_state.device != self.device:
-                                cell_state = cell_state.to(self.device)
+                    self.native_engine.add_particle(coord, cell_state)
+                    count += 1
 
-                            self.native_engine.add_particle(coord, cell_state)
-                            count += 1
-
-                            # VERIFICACIÓN INMEDIATA (muestreo): Verificar 1 de cada 100 para no impactar rendimiento
-                            if count % 100 == 0 or count < 5:
-                                check_state = self.native_engine.get_state_at(coord)
-                                if check_state is not None:
-                                    verified_count += 1
-                        except Exception as e:
-                            logging.warning(
-                                f"⚠️ Error agregando partícula en ({x}, {y}): {e}"
-                            )
+                    # VERIFICACIÓN INMEDIATA (muestreo): Verificar 1 de cada 1000
+                    if count % 1000 == 0 or count < 5:
+                        check_state = self.native_engine.get_state_at(coord)
+                        if check_state is not None:
+                            verified_count += 1
+                except Exception as e:
+                    logging.warning(
+                        f"⚠️ Error agregando partícula en ({x}, {y}): {e}"
+                    )
 
             elapsed = time.time() - start_time
-            logging.info(f"⚡ Transferencia completada: {count} partículas en {elapsed:.2f}s")
+            logging.info(f"⚡ Sincronización completada: {count} partículas en {elapsed:.2f}s")
             
             if count > 0 and verified_count == 0 and count < 5:
                 logging.warning(
@@ -1091,7 +1101,7 @@ class NativeEngineWrapper:
 
             # Fallback solo si regenerate_initial_state falla
             logging.info(
-                f"🛠️ Fallback: Agregando {num_particles} partículas aleatorias al motor nativo..."
+                f"🛠️ Fallback: Generando {num_particles} partículas de emergencia en el motor nativo..."
             )
 
             # Generar partículas aleatorias en el grid
@@ -1113,7 +1123,7 @@ class NativeEngineWrapper:
                 self.native_engine.add_particle(coord, initial_state)
 
             logging.info(
-                f"✅ {min(num_particles, 100)} partículas aleatorias agregadas al motor nativo (fallback)"
+                f"✅ {min(num_particles, 100)} partículas de emergencia agregadas (fallback)"
             )
 
             # Marcar estado denso como stale
