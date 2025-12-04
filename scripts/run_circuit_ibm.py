@@ -25,7 +25,7 @@ def build_model_circuit():
     import torch
     from scripts.experiment_advanced_ansatz import StronglyEntanglingConv2d
     
-    model_path = "output/output/models/quantum_fastforward_final.pt"
+    model_path = "output/models/quantum_fastforward_final.pt"
     if not os.path.exists(model_path):
         logging.error(f"❌ Modelo no encontrado: {model_path}")
         return None
