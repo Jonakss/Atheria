@@ -4,6 +4,7 @@ import logging
 
 from ...server.server_state import g_state, broadcast, send_notification, send_to_websocket, optimize_frame_payload
 from ..viz import get_visualization_data
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -515,7 +516,6 @@ async def handle_quantum_fast_forward(args):
     })
 
     # Simular tiempo de cola y procesamiento
-    import random
 
     # 2. Notificar estado: Running
     await asyncio.sleep(1.5) # Simular latencia de red/cola

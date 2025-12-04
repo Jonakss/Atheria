@@ -9,7 +9,8 @@ import {
     SimData,
     TrainingProgress,
     TrainingSnapshot,
-    WebSocketContext
+    WebSocketContext,
+    QuantumStatus
 } from './WebSocketContextDefinition';
 
 /**

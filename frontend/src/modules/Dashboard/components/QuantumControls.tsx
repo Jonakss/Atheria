@@ -11,16 +11,16 @@ interface QuantumControlsProps {
   onClose: () => void;
 }
 
+// Static backend list to avoid unnecessary complexity if no API endpoint exists
+const availableBackends = [
+    { value: 'ionq_simulator', label: 'IonQ Simulator (29 Qubits)' },
+    { value: 'ionq_aria', label: 'IonQ Aria (25 Qubits)' },
+    { value: 'local_mock', label: 'Local Mock (Debug)' }
+];
+
 export const QuantumControls: React.FC<QuantumControlsProps> = ({ isOpen, onClose }) => {
   const { sendCommand, quantumStatus } = useWebSocket();
   const [selectedBackend, setSelectedBackend] = useState<string>('ionq_simulator');
-
-  // Static backend list to avoid unnecessary complexity if no API endpoint exists
-  const availableBackends = [
-      { value: 'ionq_simulator', label: 'IonQ Simulator (29 Qubits)' },
-      { value: 'ionq_aria', label: 'IonQ Aria (25 Qubits)' },
-      { value: 'local_mock', label: 'Local Mock (Debug)' }
-  ];
 
   const handleQuantumJump = () => {
     sendCommand('simulation', 'quantum_fast_forward', {
@@ -93,7 +93,7 @@ export const QuantumControls: React.FC<QuantumControlsProps> = ({ isOpen, onClos
             <div className={`p-4 rounded-lg border ${isCompleted ? 'bg-emerald-950/10 border-emerald-500/20' : 'bg-blue-950/10 border-blue-500/20'}`}>
                 <div className="flex justify-between items-center mb-3">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Execution Status</span>
-                    <Badge variant={isCompleted ? 'success' : 'info'}>
+                    <Badge color={isCompleted ? 'green' : 'blue'} variant="filled">
                         {quantumStatus?.status?.toUpperCase()}
                     </Badge>
                 </div>
