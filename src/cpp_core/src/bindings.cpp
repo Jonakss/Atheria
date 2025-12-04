@@ -10,6 +10,7 @@
 #include <pybind11/numpy.h>
 #include "../include/sparse_map.h"
 #include "../include/sparse_engine.h"
+#include "../include/dense_engine.h"
 #include "../include/version.h"
 #include <omp.h>
 
@@ -171,5 +172,17 @@ PYBIND11_MODULE(atheria_core, m) {
         .def("query_radius", &Engine::query_radius,
              "Consulta partículas dentro de un radio (caja) usando el Octree",
              py::arg("center"), py::arg("radius"));
+
+    // Binding for DenseEngine
+    py::class_<DenseEngine>(m, "DenseEngine")
+        .def(py::init<int64_t, int64_t, std::string>(),
+             py::arg("grid_size"), py::arg("d_state"), py::arg("device") = "cpu")
+        .def("step", &DenseEngine::step,
+             py::call_guard<py::gil_scoped_release>())
+        .def("get_state", &DenseEngine::get_state)
+        .def("set_state", &DenseEngine::set_state)
+        .def("load_model", &DenseEngine::load_model)
+        .def("apply_tool", &DenseEngine::apply_tool)
+        .def("get_step_count", &DenseEngine::get_step_count);
 #endif
 }
