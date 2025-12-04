@@ -1,5 +1,6 @@
 // frontend/src/components/PanZoomCanvas.tsx
 import { Settings, ZoomOut } from 'lucide-react';
+import debounce from 'lodash.debounce';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePanZoom } from '../../hooks/usePanZoom';
 import { useWebSocket } from '../../hooks/useWebSocket';
@@ -11,6 +12,7 @@ import { Switch } from '../../modules/Dashboard/components/Switch';
 import { Text } from '../../modules/Dashboard/components/Text';
 import { isWebGLAvailable } from '../../utils/shaderVisualization';
 import { CanvasOverlays, OverlayConfig, OverlayControls } from './CanvasOverlays';
+import { Minimap } from './Minimap';
 import { ShaderCanvas } from './ShaderCanvas';
 
 function getColor(value: number) {
@@ -164,6 +166,36 @@ export function PanZoomCanvas({ historyFrame, theaterMode = false }: PanZoomCanv
     const ROIUpdateThrottle = 300; // Throttle: mínimo tiempo entre actualizaciones (300ms)
     const ROIDebounceDelay = 500; // Debounce: esperar 500ms después de la última interacción antes de actualizar
     
+    // Handler para mover ROI desde Minimap (Debounced)
+    // Usamos useMemo para crear la función debounced una sola vez y mantener su identidad
+    const debouncedSetROI = useMemo(() =>
+        debounce((x: number, y: number, width: number, height: number, sendCmd: any) => {
+            sendCmd('simulation', 'set_roi', {
+                enabled: true,
+                x,
+                y,
+                width,
+                height
+            });
+        }, 100), // 100ms debounce
+    []);
+
+    // Cleanup del debounce al desmontar
+    useEffect(() => {
+        return () => {
+            debouncedSetROI.cancel();
+        };
+    }, [debouncedSetROI]);
+
+    const handleROIChange = useCallback((x: number, y: number) => {
+        if (simData?.roi_info?.enabled) {
+             const width = simData.roi_info.width;
+             const height = simData.roi_info.height;
+             // Llamar a la versión debounced
+             debouncedSetROI(x, y, width, height, sendCommand);
+        }
+    }, [simData?.roi_info, sendCommand, debouncedSetROI]);
+
     // Estado para tooltip de información del punto
     const [tooltipData, setTooltipData] = useState<{
         x: number;
@@ -1213,6 +1245,19 @@ export function PanZoomCanvas({ historyFrame, theaterMode = false }: PanZoomCanv
                         <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
                         Modo Toroidal: Bordes Conectados
                     </div>
+                </div>
+            )}
+
+            {/* MINIMAP (Bottom Left, above indicator if present) */}
+            {simData?.roi_info?.enabled && (
+                <div className="absolute bottom-4 left-4 z-30">
+                    <Minimap
+                        totalWidth={actualGridWidth}
+                        totalHeight={actualGridHeight}
+                        roi={simData.roi_info}
+                        onROIChange={handleROIChange}
+                        className="opacity-80 hover:opacity-100 transition-opacity"
+                    />
                 </div>
             )}
         </div>
