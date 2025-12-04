@@ -361,4 +361,8 @@
     - **Fidelidad:** **99.99%** (vs 1% en EXP-008).
     - **Conclusión:** La falta de expresividad era el cuello de botella. Con un ansatz rico (U3 + Circular), podemos comprimir perfectamente el operador de evolución temporal en un circuito de profundidad constante.
     - **Gate Count:** Ligeramente mayor que EXP-008 pero aún lineal $O(N)$, totalmente viable para IonQ.
+- **Verificación IonQ:**
+    - Script: `scripts/verify_inference_ionq.py`.
+    - **Job ID:** `019aeae2-9fd2-70d4-a72c-515f9682cc1f` (Ejecutado en `ionq_simulator`).
+    - Estado: Enviado y completado exitosamente.
 - **Estado:** ✅ Completado (Éxito Rotundo).
