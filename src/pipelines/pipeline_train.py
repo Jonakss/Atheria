@@ -8,6 +8,7 @@ from .. import config as global_cfg
 from ..model_loader import instantiate_model, load_model
 from ..engines.qca_engine import CartesianEngine
 from ..trainers import QC_Trainer_v3, QC_Trainer_v4
+from ..trainers.losses import get_loss_function
 from ..utils import get_latest_checkpoint, load_experiment_config
 
 def run_training_pipeline(exp_cfg: SimpleNamespace, checkpoint_path: str | None = None):
@@ -115,6 +116,15 @@ def run_training_pipeline(exp_cfg: SimpleNamespace, checkpoint_path: str | None 
             'engine_type': getattr(exp_cfg, 'ENGINE_TYPE', None)
         }
         
+        # Inject custom loss function if specified in config
+        if hasattr(exp_cfg, 'LOSS_FUNCTION'):
+            try:
+                loss_name = getattr(exp_cfg, 'LOSS_FUNCTION')
+                logging.info(f"Usando función de pérdida personalizada: {loss_name}")
+                trainer_kwargs['loss_fn'] = get_loss_function(loss_name)
+            except ValueError as e:
+                logging.warning(f"Error al cargar función de pérdida personalizada: {e}. Usando default.")
+
         # Si ya creamos el modelo (checkpoint o transfer), pasarlo
         if 'ley_M' in locals() and ley_M is not None:
             trainer_kwargs['model'] = ley_M
@@ -258,21 +268,19 @@ def _run_v4_training_loop(trainer: QC_Trainer_v4, exp_cfg: SimpleNamespace):
                 # Log cada 10 episodios
                 if episode % 10 == 0:
                     best_marker = " ⭐ BEST" if is_best else ""
-                    logging.info(
+
+                    # Construir string de métricas dinámicamente
+                    metrics_str = " | ".join([f"{k.capitalize()}: {v:.6f}" for k, v in metrics.items()])
+
+                    log_msg = (
                         f"Episodio {episode}/{total_episodes} | "
                         f"Loss: {loss:.6f} | "
-                        f"Survival: {survival:.6f} | Symmetry: {symmetry:.6f} | "
-                        f"Complexity: {metrics.get('complexity', 0):.6f} | "
+                        f"{metrics_str} | "
                         f"Combined: {combined_metric:.6f}{best_marker}"
                     )
-                    print(
-                        f"Episodio {episode}/{total_episodes} | "
-                        f"Loss: {loss:.6f} | "
-                        f"Survival: {survival:.6f} | Symmetry: {symmetry:.6f} | "
-                        f"Complexity: {metrics.get('complexity', 0):.6f} | "
-                        f"Combined: {combined_metric:.6f}{best_marker}",
-                        flush=True
-                    )
+
+                    logging.info(log_msg)
+                    print(log_msg, flush=True)
                 
                 # Guardar checkpoint periódicamente
                 if (episode + 1) % save_every == 0:

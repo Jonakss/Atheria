@@ -22,6 +22,7 @@ from ..physics.noise import QuantumNoiseInjector
 from .. import config as global_cfg
 from ..utils.experiment_logger import ExperimentLogger
 from src.cache import cache
+from .losses import LOSS_REGISTRY, evolutionary_loss, LossFunction
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -36,7 +37,8 @@ class QC_Trainer_v4:
     """
     def __init__(self, experiment_name, model_class=None, model_params=None, device=None, 
                  lr=1e-4, grid_size=64, qca_steps=100, gamma_decay=0.01, model=None,
-                 max_checkpoints_to_keep=5, max_noise=0.05, engine_type=None):
+                 max_checkpoints_to_keep=5, max_noise=0.05, engine_type=None,
+                 loss_fn: Optional[LossFunction] = None):
         """
         Inicializa QC_Trainer_v4.
         
@@ -53,6 +55,7 @@ class QC_Trainer_v4:
             max_checkpoints_to_keep: Número máximo de mejores checkpoints a retener (por defecto 5)
             max_noise: Nivel máximo de ruido a inyectar (default 0.05)
             engine_type: Tipo de motor de física (opcional, por defecto usa global_cfg)
+            loss_fn: Función de pérdida personalizada (opcional). Si es None, usa evolutionary_loss.
         """
         self.motor: 'CartesianEngine' = None # Type hint for IDE support
         self.experiment_name = experiment_name
@@ -63,6 +66,9 @@ class QC_Trainer_v4:
         self.max_checkpoints_to_keep = max_checkpoints_to_keep
         self.max_noise = max_noise
         
+        # Estrategia de Loss Modular
+        self.loss_fn = loss_fn if loss_fn is not None else evolutionary_loss
+
         # 1. Motor de Física (Ley M)
         # Si se proporciona un modelo ya instanciado, usarlo; sino, crear uno nuevo
         from src.motor_factory import get_motor
@@ -161,44 +167,6 @@ class QC_Trainer_v4:
             except Exception as e:
                 logging.warning(f"No se pudo inicializar Tensorboard: {e}")
 
-    def loss_function_evolutionary(self, psi_history, psi_initial):
-        """
-        Calcula qué tan "viva" está la simulación.
-        Retorna: Loss total + Diccionario de métricas
-        """
-        psi_final = psi_history[-1]
-        
-        # A. Supervivencia (Energy Retention)
-        # Queremos que la energía se mantenga a pesar del Gamma Decay y el Ruido.
-        # No forzamos a que sea idéntica (permitimos metabolismo), pero penalizamos la muerte (0) o explosión (inf).
-        final_energy = torch.sum(psi_final.abs().pow(2))
-        initial_energy = torch.sum(psi_initial.abs().pow(2))
-        target_energy = initial_energy * 0.8 # Permitimos un 20% de disipación natural
-        loss_survival = torch.abs(final_energy - target_energy) / (initial_energy + 1e-6)
-        
-        # B. Simetría Local (IonQ Hypothesis)
-        # Rotamos el estado 90 grados. Si es una partícula estable, debería parecerse a sí misma.
-        # Esto fomenta la creación de "átomos" geométricos.
-        psi_rot = torch.rot90(psi_final, 1, [1, 2]) # Rotar en ejes H, W
-        loss_symmetry = torch.mean((psi_final.abs() - psi_rot.abs())**2)
-        
-        # C. Complejidad (Entropía Espacial)
-        # Evitar el truco fácil de "llenar todo de ceros" o "llenar todo de unos".
-        # Queremos islas de materia. Usamos la desviación estándar espacial.
-        # Queremos MAXIMIZAR la complejidad -> MINIMIZAR el negativo.
-        spatial_variance = torch.std(psi_final.abs().sum(dim=-1))
-        loss_complexity = -torch.log(spatial_variance + 1e-6)
-
-        # Ponderación de la Evolución (Ajustar según fase)
-        total_loss = (10.0 * loss_survival) + (5.0 * loss_symmetry) + (1.0 * loss_complexity)
-        
-        metrics = {
-            "survival": loss_survival.item(),
-            "symmetry": loss_symmetry.item(),
-            "complexity": loss_complexity.item()
-        }
-        return total_loss, metrics
-
     def train_episode(self, episode_num):
         if self.model_operator:
             self.model_operator.train()
@@ -263,7 +231,8 @@ class QC_Trainer_v4:
                 psi_history.append(psi)
             
             # Calcular pérdida evolutiva (dentro de autocast)
-            loss, metrics = self.loss_function_evolutionary(psi_history, psi_initial)
+            # Usamos la función de pérdida inyectada (estrategia modular)
+            loss, metrics = self.loss_fn(psi_history, psi_initial)
         
         # OPTIMIZACIÓN DE MEMORIA: Limpiar psi_history después de calcular pérdida
         # Los tensores ya no se necesitan y pueden ocupar mucha memoria
