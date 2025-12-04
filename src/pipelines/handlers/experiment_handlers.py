@@ -295,6 +295,68 @@ async def handle_refresh_experiments(args):
         logging.error(f"Error al refrescar lista de experimentos: {e}", exc_info=True)
 
 
+async def handle_list_quantum_models(args):
+    """Lista modelos cuánticos disponibles (checkpoints de Fast Forward)."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    
+    try:
+        import torch
+        
+        models = []
+        
+        # Buscar en output/checkpoints y output/models
+        search_paths = [
+            os.path.join(global_cfg.OUTPUT_DIR, "checkpoints"),
+            os.path.join(global_cfg.OUTPUT_DIR, "models"),
+        ]
+        
+        for search_dir in search_paths:
+            if not os.path.exists(search_dir):
+                continue
+                
+            for f in os.listdir(search_dir):
+                if f.endswith('.pt'):
+                    full_path = os.path.join(search_dir, f)
+                    try:
+                        stat = os.stat(full_path)
+                        
+                        # Intentar cargar metadata del modelo
+                        metadata = {}
+                        try:
+                            cp = torch.load(full_path, map_location='cpu')
+                            if 'config' in cp:
+                                metadata = cp['config']
+                            if 'metadata' in cp:
+                                metadata.update(cp['metadata'])
+                            if 'final_fidelity' in cp:
+                                metadata['fidelity'] = cp['final_fidelity']
+                        except:
+                            pass
+                        
+                        models.append({
+                            "name": f,
+                            "path": full_path,
+                            "size": stat.st_size,
+                            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                            "metadata": metadata
+                        })
+                    except Exception as e:
+                        logging.warning(f"Error procesando modelo {f}: {e}")
+        
+        # Ordenar por fecha de modificación
+        models.sort(key=lambda x: x['modified'], reverse=True)
+        
+        if ws:
+            await send_to_websocket(ws, "quantum_models_list", {"models": models})
+        
+        logging.info(f"Listados {len(models)} modelos cuánticos")
+        
+    except Exception as e:
+        logging.error(f"Error listando modelos cuánticos: {e}", exc_info=True)
+        if ws:
+            await send_notification(ws, f"Error: {str(e)}", "error")
+
+
 # Diccionario de handlers para esta categoría
 HANDLERS = {
     "create": handle_create_experiment,
@@ -304,6 +366,7 @@ HANDLERS = {
     "list_checkpoints": handle_list_checkpoints,
     "delete_checkpoint": handle_delete_checkpoint,
     "cleanup_checkpoints": handle_cleanup_checkpoints,
-    "refresh_experiments": handle_refresh_experiments,  # También usado en system
+    "refresh_experiments": handle_refresh_experiments,
+    "list_quantum_models": handle_list_quantum_models,
 }
 
