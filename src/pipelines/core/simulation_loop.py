@@ -348,11 +348,15 @@ async def simulation_loop():
                             psi = None
                             viz_data = None
                             
-                            # FAST PATH: Visualización Nativa (C++)
-                            # Evita la costosa conversión sparse->dense en Python
-                            if motor_is_native and hasattr(motor, 'get_visualization_data') and not need_dense_state:
+                            # FAST PATH: Visualización directa del Motor
+                            # Usa get_visualization_data del motor si está disponible
+                            # Esto funciona para TODOS los motores que lo implementen:
+                            # - NativeEngineWrapper (C++)
+                            # - PolarEngine, HarmonicEngine, LatticeEngine (Python optimizado)
+                            motor_has_viz = hasattr(motor, 'get_visualization_data')
+                            if motor_has_viz and not need_dense_state:
                                 try:
-                                    # Llamada directa a C++ (retorna tensor [H, W])
+                                    # Llamada directa al método del motor (retorna tensor [H, W])
                                     viz_tensor = await asyncio.get_event_loop().run_in_executor(
                                         None,
                                         lambda: motor.get_visualization_data(viz_type)
@@ -377,7 +381,7 @@ async def simulation_loop():
                                         # Si es 'phase', normalizar si es necesario (el frontend espera radianes o [0,1])
                                         # C++ devuelve radianes [-pi, pi] o valor crudo
                                 except Exception as e:
-                                    logging.error(f"❌ Error en visualización nativa rápida: {e}. Cayendo a fallback.")
+                                    logging.error(f"❌ Error en visualización directa (motor.get_visualization_data): {e}. Cayendo a fallback.")
                                     need_dense_state = True # Fallback a camino lento
                             
                             # SLOW PATH: Obtener estado denso y procesar en Python
