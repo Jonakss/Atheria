@@ -346,6 +346,67 @@ class SparseHarmonicEngine:
         """
         self.step()
 
+    def get_visualization_data(self, viz_type: str = "density"):
+        """
+        Retorna datos de visualización para shaders.
+        
+        Args:
+            viz_type: Tipo de visualización ("density", "phase", "energy", etc.)
+            
+        Returns:
+            Tensor [H, W] con los valores calculados.
+        """
+        # Obtener estado denso del viewport
+        # [1, H, W, C] complex
+        psi = self.get_dense_state()
+        
+        if psi is None:
+            return torch.zeros(self.grid_size, self.grid_size, device=self.device)
+        
+        # Reducir canales si múltiples (promediar)
+        # psi is [1, H, W, C]
+        psi = psi[0]  # [H, W, C]
+        
+        if viz_type == "density" or viz_type == "magnitude":
+            # Densidad = suma de magnitudes al cuadrado sobre canales
+            density = psi.abs().pow(2).sum(dim=-1)  # [H, W]
+            return density
+            
+        elif viz_type == "phase":
+            # Fase del campo agregado (primer canal o promedio)
+            phase = torch.angle(psi[..., 0] if psi.shape[-1] > 0 else psi.sum(dim=-1))
+            # Normalizar a [0, 1]
+            phase_norm = (phase / (2 * 3.14159) + 0.5) % 1.0
+            return phase_norm
+            
+        elif viz_type == "energy":
+            # Igual a density
+            return psi.abs().pow(2).sum(dim=-1)
+            
+        elif viz_type == "gradient":
+            # Gradiente de la densidad
+            density = psi.abs().pow(2).sum(dim=-1)
+            gy = torch.diff(density, dim=0, prepend=density[:1, :])
+            gx = torch.diff(density, dim=1, prepend=density[:, :1])
+            gradient = torch.sqrt(gx**2 + gy**2)
+            return gradient
+            
+        elif viz_type == "real":
+            return psi.real.sum(dim=-1)
+            
+        elif viz_type == "imag":
+            return psi.imag.sum(dim=-1)
+            
+        elif viz_type == "fields":
+            # Retornar ambos campos [H, W, 2]
+            real = psi.real.sum(dim=-1)
+            imag = psi.imag.sum(dim=-1)
+            return torch.stack([real, imag], dim=-1)
+            
+        else:
+            logging.warning(f"⚠️ Tipo de visualización '{viz_type}' no soportado. Usando density.")
+            return psi.abs().pow(2).sum(dim=-1)
+
     def apply_tool(self, action, params):
         """
         Aplica una herramienta cuántica al universo armónico.
