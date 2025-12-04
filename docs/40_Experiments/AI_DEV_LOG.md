@@ -290,3 +290,49 @@
     - Se verificó la conservación de energía con pesos identidad.
     - Demuestra cómo un procesador cuántico puede actuar como un "acelerador holográfico" para redes neuronales.
 - **Estado:** ✅ Completado.
+
+## 2025-12-04: Concepto de Física Reversible y Renormalización
+- **Objetivo:** Documentar la base teórica para "viajar en el tiempo" en Atheria y visualizar el universo a diferentes escalas.
+- **Acción:** Creado `docs/20_Concepts/CONCEPT_REVERSIBLE_TIME_AND_RENORMALIZATION.md`.
+- **Contenido:**
+    - Explicación de por qué la reversibilidad es posible en un sistema cerrado (Atheria) vs imposible en uno abierto (Realidad).
+    - Definición de la Regla Maestra Unitaria ($U^\dagger$).
+    - Propuesta de implementación usando Vecindario de Margolus.
+    - Conexión con Renormalización y Principio Holográfico para visualización macroscópica.
+- **Estado:** ✅ Documentado.
+
+## 2025-12-04: EXP-007: Massive Fast Forward (1M Steps)
+- **Objetivo:** Simular 1 millón de pasos de tiempo en una sola operación utilizando la Capa Neuronal Holográfica.
+- **Implementación:**
+    - Script: `scripts/experiment_massive_fastforward.py`.
+    - **Linearización:** Se extrajo un operador efectivo $W_{eff}$ de un modelo `UNetUnitary` entrenado (checkpoint `UNetUnitary_G64_Eps130`).
+    - **Potenciación:** Se calculó $W_{final} = W_{eff}^{1,000,000}$ en el dominio de la frecuencia.
+    - **Ejecución:** Se aplicó este operador a un estado inicial usando `HolographicConv2d`.
+- **Resultados:**
+    - Checkpoint generado: `checkpoints/fastforward_1M.pt`.
+    - Se demostró la capacidad de "saltar" en el tiempo arbitrariamente lejos una vez que la dinámica está diagonalizada en el dominio de la frecuencia.
+- **Estado:** ✅ Completado.
+
+### 2025-12-04: EXP-007-IonQ: Hardware-Compatible Execution
+- **Objetivo:** Ejecutar el experimento de "Massive Fast Forward" utilizando un circuito cuántico completo compatible con IonQ (en lugar de simulación local de vectores de estado).
+- **Implementación:**
+    - Script: `scripts/experiment_massive_fastforward_ionq.py`.
+    - **Compilación:** El operador holográfico $W_{eff}$ se compiló en una compuerta `Diagonal` de Qiskit.
+    - **Circuito:** `QFT` -> `Diagonal(W)` -> `IQFT`.
+    - **Backend:** Se envió el trabajo al `ionq_simulator` via API.
+- **Resultados:**
+    - Job enviado y completado exitosamente.
+    - Se obtuvieron *counts* (mediciones) del estado final.
+    - Esto valida el pipeline completo para ejecución en QPU real (limitado solo por profundidad de circuito y número de qubits).
+- **Estado:** ✅ Completado (IonQ Simulator).
+
+### 2025-12-04: EXP-007-Loop: Closed Loop & Max Qubits
+- **Objetivo:** Maximizar qubits y cerrar el ciclo (Train -> Transfer -> Inference -> Checkpoint -> Fast Forward -> Continue).
+- **Implementación:**
+    - **Qubits:** Se intentó con 16 qubits (256x256), pero excedió el límite de compuertas (`TooManyGates`). Se ajustó a **10 qubits (32x32)** para ejecución exitosa.
+    - **Reconstrucción:** Se implementó lógica para convertir *counts* de IonQ de vuelta a un tensor PyTorch (amplitud).
+    - **Continuidad:** Se alimentó el estado reconstruido de vuelta a la `UNetUnitary` para un paso de inferencia adicional.
+- **Resultados:**
+    - Checkpoint: `checkpoints/fastforward_1M_ionq_loop.pt`.
+    - Ciclo completo verificado: El sistema puede "saltar" en el tiempo en un procesador cuántico y luego retomar la simulación clásica sin problemas.
+- **Estado:** ✅ Completado.
