@@ -29,6 +29,15 @@ class HarmonicVacuum:
         # phases: Fase inicial aleatoria.
         self.phases = torch.rand(d_state, complexity, device=device) * 2 * math.pi
 
+    def regenerate(self):
+        """
+        Regenera los parámetros del vacío (k, w, phi) para crear un nuevo "universo".
+        Esto cambia el patrón de interferencia de fondo.
+        """
+        self.k_vecs = torch.randn(self.d_state, self.complexity, 3, device=self.device) * 0.3
+        self.omegas = torch.randn(self.d_state, self.complexity, device=self.device) * 0.1
+        self.phases = torch.rand(self.d_state, self.complexity, device=self.device) * 2 * math.pi
+
     def get_state(self, coords_tensor, t):
         """
         Calcula el estado del vacío en un conjunto de coordenadas (x,y,z) al tiempo t.
@@ -89,6 +98,57 @@ class SparseHarmonicEngine:
         self.collider = IonQCollapse(device)
         self.steering = QuantumSteering(device)
 
+    @property
+    def state(self):
+        """
+        Interfaz dummy para compatibilidad con handlers.
+        Retorna un objeto con atributo .psi que contiene el estado denso.
+        """
+        class DummyState:
+            def __init__(self, psi):
+                self.psi = psi
+
+        # Generar estado denso on-demand
+        psi_dense = self.get_viewport_tensor((0, 0, 0), self.grid_size, self.step_count * 0.1)
+        return DummyState(psi_dense)
+
+    @state.setter
+    def state(self, new_state):
+        """
+        Setter mágico: Cuando el servidor asigna motor.state = QuantumState(...),
+        interceptamos para reiniciar el motor Armónico correctamente.
+        """
+        logging.info("🌌 HarmonicEngine: Intercepting state reset. Regenerating universe...")
+
+        # 1. Regenerar el Vacío (Nuevas leyes de la física para este universo)
+        self.vacuum.regenerate()
+
+        # 2. Resetear contadores
+        self.step_count = 0
+        self.matter = {}
+        self.active_coords = set()
+
+        # 3. Inyectar materia del nuevo estado
+        if hasattr(new_state, 'psi') and new_state.psi is not None:
+            self._ingest_dense_state(new_state.psi)
+
+    def _ingest_dense_state(self, psi_tensor, strength=1.0):
+        """Convierte un tensor denso [1, H, W, C] en partículas dispersas."""
+        psi = psi_tensor[0]
+        density = psi.abs().pow(2).sum(dim=-1) # [H, W]
+
+        # Umbral dinámico
+        threshold = density.mean() + density.std()
+
+        indices = torch.nonzero(density > threshold)
+        count = 0
+        for idx in indices:
+            y, x = idx[0].item(), idx[1].item()
+            state_vec = psi[y, x] * strength
+            self.add_matter(x, y, 0, state_vec)
+            count += 1
+        logging.info(f"✨ Harmonic Reset: {count} particles initialized from new state.")
+
     def initialize_matter(self, mode='random', strength=1.0):
         """
         Inicializa la materia del universo.
@@ -105,26 +165,7 @@ class SparseHarmonicEngine:
         # Si el modo es ionq o complex_noise, qs.psi tendrá datos
         # Convertimos ese estado denso a partículas en el HarmonicEngine
         if qs.psi is not None:
-            # Extraer energía para decidir dónde poner partículas
-            # qs.psi es [1, H, W, d_state]
-            psi = qs.psi[0]
-            density = psi.abs().pow(2).sum(dim=-1) # [H, W]
-            
-            # Umbral para crear materia
-            # En modo ionq/noise, queremos que surjan partículas en los picos
-            threshold = density.mean() + density.std()
-            
-            indices = torch.nonzero(density > threshold)
-            
-            count = 0
-            for idx in indices:
-                y, x = idx[0].item(), idx[1].item()
-                # Tomamos el estado del tensor y lo inyectamos como materia
-                state_vec = psi[y, x] * strength
-                self.add_matter(x, y, 0, state_vec) # Z=0 por defecto
-                count += 1
-                
-            logging.info(f"✨ Quantum Genesis: {count} particles created from {mode} distribution.")
+            self._ingest_dense_state(qs.psi, strength)
         else:
             logging.warning("⚠️ QuantumState returned None. No matter initialized.")
 
