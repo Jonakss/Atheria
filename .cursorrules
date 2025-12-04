@@ -117,6 +117,15 @@ Eres un Ingeniero de Física Digital y Experto en IA trabajando en el proyecto A
     - **Backend:** Verifica imports y sintaxis Python.
     - **Tests:** Los tests se encuentran en la carpeta `tests/`. Ejecútalos con `pytest` o `python tests/test_nombre.py`.
 
+12. **Gestión de Múltiples Agentes (Meta-Regla) - CRÍTICO:**
+    - **OBLIGATORIO:** Este proyecto utiliza múltiples agentes de IA. La fuente de verdad sobre qué agentes existen y dónde residen sus reglas es `docs/30_Components/AGENT_RULES_MOC.md`.
+    - Al recibir una instrucción para "agregar a los mandamientos" o "actualizar tus reglas", DEBES consultar primero el `[[AGENT_RULES_MOC]]` para identificar el `Archivo de Mandamientos Principal` correcto para tu identidad y modificarlo.
+    - Si se menciona un nuevo agente que no está en el MOC, DEBES:
+      1.  Actualizar `[[AGENT_RULES_MOC]]` para incluir el nuevo agente en la tabla.
+      2.  Crear un nuevo archivo de definición para él (ej: `AGENT_NUEVO.md`) en `docs/30_Components/` usando la plantilla `[[AGENT_TEMPLATE]]`.
+      3.  Preguntar al usuario la ubicación de su archivo de mandamientos si no es obvia.
+      4.  Enlazar los nuevos documentos en los MOCs correspondientes.
+
 ## 🧰 TOOLKIT DE AGENTE (COMANDOS)
 
 **IMPORTANTE:** Tienes permiso para ejecutar macro-comandos definidos en `docs/99_Templates/AGENT_TOOLKIT.md`.
