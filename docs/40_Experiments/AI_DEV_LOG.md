@@ -277,3 +277,16 @@
     - Integración correcta entre tensores de PyTorch y estados cuánticos de Qiskit.
     - Demostración de viabilidad técnica para arquitecturas híbridas Neural-Quantum.
 - **Estado:** ✅ Completado (Prototipo Funcional).
+
+## 2025-12-04: EXP-006: Holographic Neural Layer
+- **Objetivo:** Simular una capa de red neuronal (Convolución) donde los pesos actúan como una máscara holográfica en el dominio de la frecuencia, utilizando QFT.
+- **Implementación:**
+    - Script: `scripts/experiment_holographic_layer.py`.
+    - Clase: `HolographicConv2d(nn.Module)`.
+    - **Mecánica:** $y = \text{IQFT}(\text{QFT}(x) \cdot W_{freq})$.
+    - **Backend:** Qiskit (AerSimulator/IonQ) para las transformadas de Fourier.
+- **Resultados:**
+    - La capa funciona correctamente como un módulo de PyTorch.
+    - Se verificó la conservación de energía con pesos identidad.
+    - Demuestra cómo un procesador cuántico puede actuar como un "acelerador holográfico" para redes neuronales.
+- **Estado:** ✅ Completado.
