@@ -232,3 +232,15 @@
   - **Fix**: Added `@property shape` returning `(H, W, 1)` tuple, `@property device` for device management, and `.abs()` method returning magnitude as `(H, W, 1)` tensor. Removed duplicate class definition.
   - **Verification**: Tested with `python3 -c "..."` confirming correct shape, device, and abs() behavior.
   - **Impact**: All visualization types now work correctly with `PolarEngine` (density, phase, fields, etc.).
+- **[[logs/2025-12-04_harmonic_optimization_and_training_fixes|2025-12-04 - Fix: Harmonic Engine Optimization & Training Bugs]]**:
+  - **HarmonicEngine Optimization**: Implemented spatial hashing in `step()` to reduce complexity from $O(N \times M)$ to $O(1)$ per chunk. Fixed 0.1 FPS drop.
+  - **Complex Casting Fix**: Resolved "Casting complex values to real" warning in `HarmonicEngine` by ensuring `local_state` is complex if matter is complex.
+  - **Training Fixes**:
+    - `QC_Trainer_v4`: Added `self.batch_size = 1` initialization to fix `AttributeError`.
+    - `SparseHarmonicEngine`: Added `self.operator = self.model` alias for compatibility with trainer.
+  - **Verification**: Confirmed successful training loop execution.
+- **[[logs/2025-12-04_native_dense_engine_implementation|2025-12-04 - Feature: Native Dense Engine (Phase 1)]]**:
+  - **Plan**: Created `native_implementation_plan.md` outlining strategy for Cartesian, Polar, and Lattice native ports.
+  - **Infrastructure**: Refactored `CMakeLists.txt` for multi-engine support. Created `BaseEngine` interface.
+  - **Implementation**: Implemented `DenseEngine` (C++) for standard tensor-based simulations. Exposed via Pybind11.
+  - **Status**: Code implemented, pending compilation and verification.

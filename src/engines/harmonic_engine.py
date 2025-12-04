@@ -72,6 +72,7 @@ class SparseHarmonicEngine:
     """
     def __init__(self, model, d_state, device='cpu', grid_size=256):
         self.model = model
+        self.operator = model # Alias for compatibility with Trainer
         self.d_state = d_state
         self.device = device
         self.grid_size = grid_size
@@ -249,18 +250,35 @@ class SparseHarmonicEngine:
             local_state = local_state.view(1, grid_size, grid_size, self.d_state)
             local_state = local_state.permute(0, 3, 1, 2) # [1, C, H, W]
             
-            # Superponer Materia Existente
-            # (Optimización: Solo iterar sobre materia conocida en este rango)
-            # Por ahora iteramos todo (lento, pero funcional para prototipo)
-            # TODO: Usar Spatial Hash para búsqueda rápida
-            for (mx, my, mz), m_state in self.matter.items():
-                if mz == base_z and \
-                   base_x - PADDING <= mx < base_x + CHUNK_SIZE + PADDING and \
-                   base_y - PADDING <= my < base_y + CHUNK_SIZE + PADDING:
+            # 2.5. Optimización: Spatial Hash para búsqueda rápida de materia
+            # En lugar de iterar sobre self.matter.items() (lento), buscamos solo en el chunk
+            # Asumimos que self.matter está indexado por (x,y,z)
+            
+            # Iterar sobre el rango del chunk (incluyendo padding)
+            # Esto es más rápido si la materia es dispersa pero el chunk es pequeño (20x20)
+            # Si el chunk está muy lleno, iterar sobre active_coords y filtrar es mejor
+            # Pero dado que active_coords es global, iterar el grid local es O(ChunkSize) constante
+            
+            # Mejor enfoque híbrido: Iterar sobre active_coords SOLO si están en este chunk
+            # Para eso necesitamos un índice espacial. Lo construimos al vuelo o lo mantenemos.
+            # Dado que self.matter es un dict, podemos consultar coordenadas directamente.
+            
+            # Iterar sobre todas las coordenadas del grid local y ver si hay materia
+            # Esto es 20x20 = 400 lookups en dict, muy rápido.
+            for ly in range(grid_size):
+                for lx in range(grid_size):
+                    gx = base_x - PADDING + lx
+                    gy = base_y - PADDING + ly
+                    gz = base_z
                     
-                    lx = int(mx - (base_x - PADDING))
-                    ly = int(my - (base_y - PADDING))
-                    local_state[0, :, ly, lx] = m_state
+                    if (gx, gy, gz) in self.matter:
+                        m_state = self.matter[(gx, gy, gz)]
+                        
+                        # Fix complex casting: Ensure local_state is complex if m_state is complex
+                        if m_state.is_complex() and not local_state.is_complex():
+                            local_state = local_state.to(torch.complex64)
+                            
+                        local_state[0, :, ly, lx] = m_state
             
             # 3. Inferencia
             with torch.no_grad():

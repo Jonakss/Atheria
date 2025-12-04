@@ -62,6 +62,7 @@ class QC_Trainer_v4:
         self.gamma_decay = gamma_decay
         self.max_checkpoints_to_keep = max_checkpoints_to_keep
         self.max_noise = max_noise
+        self.batch_size = 1 # Default batch size for simulation
         
         # 1. Motor de Física (Ley M)
         # Si se proporciona un modelo ya instanciado, usarlo; sino, crear uno nuevo
