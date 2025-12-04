@@ -232,7 +232,17 @@ class QC_Trainer_v4:
             
             # Calcular pérdida evolutiva (dentro de autocast)
             # Usamos la función de pérdida inyectada (estrategia modular)
-            loss, metrics = self.loss_fn(psi_history, psi_initial)
+            # Pasamos kwargs adicionales si están definidos en model_params o config
+            loss_kwargs = {}
+            if self.motor.cfg:
+                # Extraer parámetros relevantes de configuración
+                if hasattr(self.motor.cfg, 'LOSS_PARAMS'):
+                    loss_kwargs.update(self.motor.cfg.LOSS_PARAMS)
+                # También buscar en el nivel superior si es un dict
+                elif isinstance(self.motor.cfg, dict) and 'LOSS_PARAMS' in self.motor.cfg:
+                    loss_kwargs.update(self.motor.cfg['LOSS_PARAMS'])
+
+            loss, metrics = self.loss_fn(psi_history, psi_initial, **loss_kwargs)
         
         # OPTIMIZACIÓN DE MEMORIA: Limpiar psi_history después de calcular pérdida
         # Los tensores ya no se necesitan y pueden ocupar mucha memoria

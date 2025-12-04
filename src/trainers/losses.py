@@ -2,26 +2,38 @@ import torch
 from typing import List, Tuple, Dict, Any, Callable
 
 # Type alias for Loss Function
-# Args: psi_history (List[Tensor]), psi_initial (Tensor)
+# Args: psi_history (List[Tensor]), psi_initial (Tensor), **kwargs (Configurable params)
 # Returns: (Total Loss Tensor, Metrics Dict)
-LossFunction = Callable[[List[torch.Tensor], torch.Tensor], Tuple[torch.Tensor, Dict[str, float]]]
+LossFunction = Callable[..., Tuple[torch.Tensor, Dict[str, float]]]
 
-def evolutionary_loss(psi_history: List[torch.Tensor], psi_initial: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, float]]:
+def evolutionary_loss(psi_history: List[torch.Tensor], psi_initial: torch.Tensor, **kwargs) -> Tuple[torch.Tensor, Dict[str, float]]:
     """
     Standard Evolutionary Loss for Aetheria.
     Calculates how "alive" the simulation is based on:
     1. Survival (Energy Retention)
     2. Symmetry (Local Structure)
     3. Complexity (Spatial Entropy)
+
+    Configurable kwargs:
+    - target_energy_retention: Target energy relative to initial (default: 0.8)
+    - w_survival: Weight for survival loss (default: 10.0)
+    - w_symmetry: Weight for symmetry loss (default: 5.0)
+    - w_complexity: Weight for complexity loss (default: 1.0)
     """
     psi_final = psi_history[-1]
+
+    # Config parameters
+    target_retention = kwargs.get('target_energy_retention', 0.8)
+    w_survival = kwargs.get('w_survival', 10.0)
+    w_symmetry = kwargs.get('w_symmetry', 5.0)
+    w_complexity = kwargs.get('w_complexity', 1.0)
 
     # A. Supervivencia (Energy Retention)
     # Queremos que la energía se mantenga a pesar del Gamma Decay y el Ruido.
     # No forzamos a que sea idéntica (permitimos metabolismo), pero penalizamos la muerte (0) o explosión (inf).
     final_energy = torch.sum(psi_final.abs().pow(2))
     initial_energy = torch.sum(psi_initial.abs().pow(2))
-    target_energy = initial_energy * 0.8 # Permitimos un 20% de disipación natural
+    target_energy = initial_energy * target_retention # Permitimos disipación natural configurable
     loss_survival = torch.abs(final_energy - target_energy) / (initial_energy + 1e-6)
 
     # B. Simetría Local (IonQ Hypothesis)
@@ -38,7 +50,7 @@ def evolutionary_loss(psi_history: List[torch.Tensor], psi_initial: torch.Tensor
     loss_complexity = -torch.log(spatial_variance + 1e-6)
 
     # Ponderación de la Evolución (Ajustar según fase)
-    total_loss = (10.0 * loss_survival) + (5.0 * loss_symmetry) + (1.0 * loss_complexity)
+    total_loss = (w_survival * loss_survival) + (w_symmetry * loss_symmetry) + (w_complexity * loss_complexity)
 
     metrics = {
         "survival": loss_survival.item(),
@@ -47,7 +59,7 @@ def evolutionary_loss(psi_history: List[torch.Tensor], psi_initial: torch.Tensor
     }
     return total_loss, metrics
 
-def mse_energy_loss(psi_history: List[torch.Tensor], psi_initial: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, float]]:
+def mse_energy_loss(psi_history: List[torch.Tensor], psi_initial: torch.Tensor, **kwargs) -> Tuple[torch.Tensor, Dict[str, float]]:
     """
     Simple MSE Loss on Total Energy.
     Forces the system to strictly conserve energy (unitary evolution proxy).
@@ -67,14 +79,20 @@ def mse_energy_loss(psi_history: List[torch.Tensor], psi_initial: torch.Tensor) 
 
     return loss, metrics
 
-def structure_loss(psi_history: List[torch.Tensor], psi_initial: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, float]]:
+def structure_loss(psi_history: List[torch.Tensor], psi_initial: torch.Tensor, **kwargs) -> Tuple[torch.Tensor, Dict[str, float]]:
     """
     Structure Loss.
     Encourages the formation of distinct structures by penalizing diffuse states.
     Uses L1 norm sparsity (assuming sparse particles) combined with total variation.
+
+    Configurable kwargs:
+    - tv_weight: Weight for Total Variation loss (default: 0.1)
     """
     psi_final = psi_history[-1]
     mag = psi_final.abs()
+
+    # Config parameters
+    tv_weight = kwargs.get('tv_weight', 0.1)
 
     # 1. Sparsity (L1 norm) - we want most space to be empty
     loss_sparsity = torch.mean(mag)
@@ -85,7 +103,7 @@ def structure_loss(psi_history: List[torch.Tensor], psi_initial: torch.Tensor) -
     diff_w = torch.abs(mag[:, 1:, :] - mag[:, :-1, :])
     loss_tv = torch.mean(diff_h) + torch.mean(diff_w)
 
-    total_loss = loss_sparsity + (0.1 * loss_tv)
+    total_loss = loss_sparsity + (tv_weight * loss_tv)
 
     metrics = {
         "sparsity": loss_sparsity.item(),
