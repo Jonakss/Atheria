@@ -6,9 +6,19 @@ interface MinimapProps {
     roi: { x: number; y: number; width: number; height: number } | null;
     onROIChange: (x: number, y: number) => void;
     className?: string;
+    width?: number;
+    height?: number;
 }
 
-export function Minimap({ totalWidth, totalHeight, roi, onROIChange, className = '' }: MinimapProps) {
+export function Minimap({
+    totalWidth,
+    totalHeight,
+    roi,
+    onROIChange,
+    className = '',
+    width = 150,
+    height = 150
+}: MinimapProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDragging, setIsDragging] = useState(false);
 
@@ -111,8 +121,8 @@ export function Minimap({ totalWidth, totalHeight, roi, onROIChange, className =
             </div>
             <canvas
                 ref={canvasRef}
-                width={150}
-                height={150}
+                width={width}
+                height={height}
                 className="cursor-crosshair block"
                 onMouseDown={onMouseDown}
                 onMouseMove={onMouseMove}

@@ -10,8 +10,6 @@ import logging
 import time
 import argparse
 import grpc
-import sys
-import json
 from protos import simulation_pb2, simulation_pb2_grpc
 
 # Configure logging
