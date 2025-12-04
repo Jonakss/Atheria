@@ -109,6 +109,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
     const [analysisType, setAnalysisType] = useState<'universe_atlas' | 'cell_chemistry' | null>(null);
     const [compileStatus, setCompileStatus] = useState<CompileStatus | null>(null);
     const [roiInfo, setRoiInfo] = useState<any>(null); // Estado de ROI
+    const [quantumStatus, setQuantumStatus] = useState<any | null>(null); // Estado de Quantum Fast Forward
     const [lastMessage, setLastMessage] = useState<any | null>(null); // Último mensaje recibido
     // Usar una referencia para acceder al valor actual de activeExperiment en callbacks
     const activeExperimentRef = useRef<string | null>(null);
@@ -621,6 +622,10 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         }
                         setRoiInfo(payload);
                         break;
+                    case 'quantum_status':
+                        // Actualización de estado Quantum Fast Forward
+                        setQuantumStatus(payload);
+                        break;
                 }
             } catch (error) {
                 console.error("Error procesando mensaje:", error);
@@ -710,6 +715,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
         setLiveFeedEnabled, // Función para cambiar live feed
         setStepsInterval, // Función para cambiar el intervalo de pasos
         roiInfo, // Información de ROI actual
+        quantumStatus, // Estado de ejecución cuántica
     };
 
     return (

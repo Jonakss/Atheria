@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { GlassPanel } from './GlassPanel';
 
@@ -39,12 +40,12 @@ export const Modal: React.FC<ModalProps> = ({
     }
   };
 
-  return (
+  const modalContent = (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
       onClick={handleOverlayClick}
     >
-      <GlassPanel className={`w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col overflow-hidden`}>
+      <GlassPanel className={`w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col overflow-hidden shadow-2xl shadow-indigo-500/10 border border-white/10`}>
         {/* Header */}
         {title && (
           <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
@@ -68,5 +69,12 @@ export const Modal: React.FC<ModalProps> = ({
       </GlassPanel>
     </div>
   );
+
+  // Use Portal to escape parent z-indices or transforms (essential for Modals inside transformed Drawers)
+  if (typeof document !== 'undefined') {
+      return createPortal(modalContent, document.body);
+  }
+
+  return modalContent;
 };
 

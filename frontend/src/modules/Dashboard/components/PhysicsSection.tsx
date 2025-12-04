@@ -1,8 +1,9 @@
-import { AlertCircle, ChevronRight, Microscope, Zap } from 'lucide-react';
-import React from 'react';
+import { AlertCircle, ChevronRight, Microscope, Zap, Clock } from 'lucide-react';
+import React, { useState } from 'react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { ScientificMetrics } from './ScientificMetrics';
 import { QuantumToolbox } from '../../../components/QuantumToolbox';
+import { QuantumControls } from './QuantumControls';
 
 interface PhysicsSectionProps {
   // Section doesn't handle collapse, parent does
@@ -10,12 +11,25 @@ interface PhysicsSectionProps {
 
 export const PhysicsSection: React.FC<PhysicsSectionProps> = () => {
   const { sendCommand, allLogs } = useWebSocket();
+  const [showQuantumControls, setShowQuantumControls] = useState(false);
 
   // Filtrar logs recientes (últimos 2)
   const recentLogs = allLogs?.slice(-2) || [];
 
+  const handleOpenQuantum = () => {
+    setShowQuantumControls(true);
+  };
+
   return (
     <div className="p-4 space-y-6">
+      {/* Quantum Controls Modal */}
+      <QuantumControls
+        isOpen={showQuantumControls}
+        onClose={() => {
+            setShowQuantumControls(false);
+        }}
+      />
+
       {/* Métricas Científicas (Full Display) */}
       <div className="space-y-3">
         <ScientificMetrics compact={false} />
@@ -54,6 +68,20 @@ export const PhysicsSection: React.FC<PhysicsSectionProps> = () => {
 
       {/* Quantum Toolbox */}
       <QuantumToolbox />
+
+      {/* Quantum Time Warp Trigger */}
+      <div className="pt-2 border-t border-white/5">
+         <button
+            onClick={handleOpenQuantum}
+            className="w-full flex items-center justify-between px-3 py-2 bg-indigo-900/20 hover:bg-indigo-900/40 border border-indigo-500/20 rounded text-xs text-indigo-300 transition-all group"
+         >
+            <div className="flex items-center gap-2">
+                <Clock size={12} className="text-indigo-400" />
+                <span className="font-bold">Quantum Fast Forward</span>
+            </div>
+            <ChevronRight size={12} className="text-indigo-500 group-hover:translate-x-0.5 transition-transform" />
+         </button>
+      </div>
 
       {/* Mensaje de Alerta (Contextual) - Si hay logs de error */}
       {recentLogs.some(log => typeof log === 'string' && log.toLowerCase().includes('error')) && (
