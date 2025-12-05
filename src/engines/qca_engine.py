@@ -658,6 +658,23 @@ class CartesianEngine:
         norm = torch.sqrt(torch.sum(psi_complex.abs().pow(2), dim=-1, keepdim=True))
         return psi_complex / (norm + 1e-9)
 
+    def get_dense_state(self, roi=None, check_pause_callback=None):
+        """
+        Retorna el estado denso para visualización.
+        
+        Compatible con EngineProtocol.
+        
+        Args:
+            roi: Región de interés opcional (no implementado, retorna todo)
+            check_pause_callback: Callback de pausa (no necesario para Python)
+            
+        Returns:
+            Tensor complejo [B, H, W, C] o el psi directamente
+        """
+        if self.state is None or self.state.psi is None:
+            return None
+        return self.state.psi
+
     def laplacian_2d_psi(self, psi):
         psi_permuted = psi.permute(0, 3, 1, 2)
         d_state = psi_permuted.shape[1]

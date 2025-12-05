@@ -260,8 +260,12 @@ class LatticeEngine:
         Retorna el estado denso para visualización.
         Convierte la densidad de acción/energía a un tensor complejo compatible.
         """
-        # Obtener densidad de energía [H, W]
-        energy = self.get_visualization_data("density")
+        # Obtener densidad de energía - retorna dict con 'data'
+        viz_dict = self.get_visualization_data("density")
+        energy_np = viz_dict['data']
+        
+        # Convertir a tensor
+        energy = torch.tensor(energy_np, device=self.device, dtype=torch.float32)
         
         # Reshape a [1, H, W, 1]
         energy = energy.unsqueeze(0).unsqueeze(-1)

@@ -122,6 +122,50 @@ def test_harmonic_engine():
         logger.error(f"❌ HarmonicEngine TEST FAILED: {e}", exc_info=True)
         return False
 
+def test_lattice_engine():
+    """Test LatticeEngine (no usa modelo, Lattice Gauge Theory)"""
+    logger.info("=" * 60)
+    logger.info("🧪 TEST: LatticeEngine (SU3 Gauge Theory)")
+    logger.info("=" * 60)
+    
+    try:
+        from src.engines.lattice_engine import LatticeEngine
+        
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        grid_size = 32
+        d_state = 9  # SU(3) tiene 3x3 = 9 componentes
+        
+        # Crear engine (no usa modelo)
+        engine = LatticeEngine(grid_size, d_state, device)
+        logger.info(f"✅ Engine creado: {type(engine).__name__}")
+        
+        # Test step (Metropolis-Hastings)
+        logger.info("🔄 Testing step...")
+        engine.step()
+        logger.info("✅ step OK")
+        
+        # Test evolve_internal_state
+        logger.info("🔄 Testing evolve_internal_state...")
+        engine.evolve_internal_state()
+        logger.info("✅ evolve_internal_state OK")
+        
+        # Test get_dense_state
+        logger.info("🔄 Testing get_dense_state...")
+        dense = engine.get_dense_state()
+        logger.info(f"✅ get_dense_state OK - shape: {dense.shape}")
+        
+        # Test get_visualization_data
+        logger.info("🔄 Testing get_visualization_data...")
+        viz_data = engine.get_visualization_data("density")
+        logger.info(f"✅ get_visualization_data OK - min: {viz_data['min']}, max: {viz_data['max']}")
+        
+        logger.info("🎉 LatticeEngine TEST PASSED!")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ LatticeEngine TEST FAILED: {e}", exc_info=True)
+        return False
+
 def test_cartesian_engine():
     """Test UNet Unitary con CartesianEngine (baseline)"""
     logger.info("=" * 60)
@@ -184,6 +228,9 @@ def main():
     
     # Test Harmonic
     results["HarmonicEngine"] = test_harmonic_engine()
+    
+    # Test Lattice
+    results["LatticeEngine"] = test_lattice_engine()
     
     # Resumen
     logger.info("\n" + "=" * 70)
