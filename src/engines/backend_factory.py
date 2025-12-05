@@ -22,7 +22,11 @@ class BackendFactory:
         Returns:
             ComputeBackend instance.
         """
-        logging.info(f"🏭 Requesting backend: {backend_name}")
+        if backend_name.startswith('ionq'):
+            target = backend_name  # Default to backend_name
+            if backend_name == 'ionq':  # Specific case for generic 'ionq'
+                target = 'ionq_simulator'
+            return IonQBackend(backend_name=target)
 
         if backend_name.startswith('ionq'):
             # IonQ Backends
