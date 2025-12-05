@@ -73,7 +73,7 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-gray-200 text-xs font-bold uppercase tracking-wider mb-2">
           <Eye size={12} className="text-blue-500" /> Modos de Vista
-        </div>
+            <Tooltip key={mode.vizType} label={<div className="max-w-[200px] text-center"><p className="font-bold mb-1">{mode.label}</p><p className="text-gray-400 leading-tight">{mode.desc}</p></div>}>
         <div className="grid grid-cols-3 gap-2">
           {VIZ_MODES.map((mode) => (
             <Tooltip key={mode.id} label={<div className="max-w-[200px] text-center"><p className="font-bold mb-1">{mode.label}</p><p className="text-gray-400 leading-tight">{mode.desc}</p></div>}>
