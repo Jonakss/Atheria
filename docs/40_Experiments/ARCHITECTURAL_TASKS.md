@@ -64,9 +64,55 @@ El selector de motores en el frontend necesita actualizarse para reflejar correc
 
 ---
 
-## 🟡 PRIORIDAD MEDIA - Análisis y Visualización
+### 4. 🔴 CRÍTICO - Estandarización de Interfaces de Engines
 
-### 4. Agregar Análisis UMAP y t-SNE
+**Problema Identificado (2025-12-05):**  
+Los engines tienen interfaces **inconsistentes**, lo que dificulta el desarrollo modular:
+
+| Método | Cartesian | Polar | Harmonic | Lattice |
+|--------|-----------|-------|----------|---------|
+| `evolve_internal_state()` | ✅ | ✅ | ✅ | ✅ |
+| `evolve_step()` | ✅ | ✅ | ✅ | ✅ |
+| `get_dense_state()` | ❌ FALTA | ✅ | ✅ | ✅ |
+| `get_visualization_data()` | ✅ | ✅ | ✅ | ✅ |
+| `apply_tool()` | ✅ | ✅ | ✅ | ✅ |
+| `state` property | ✅ | ✅ | ✅ | ✅ |
+
+**Propuesta de Refactoring:**
+1. Crear `EngineProtocol` (ABC o Protocol) con métodos obligatorios
+2. Todos los engines deben implementar esta interfaz
+3. Estandarizar formato de entrada/salida del modelo
+4. Facilitar transición a Native Engine
+
+**Archivos Afectados:**
+- `src/engines/qca_engine.py` - Agregar `get_dense_state()`
+- `src/engines/base_engine.py` - NUEVO: Protocol/ABC de engine
+- Todos los engines deben heredar/implementar
+
+**Tareas:**
+- [ ] Crear `src/engines/base_engine.py` con `EngineProtocol`
+- [ ] Agregar `get_dense_state()` a CartesianEngine
+- [ ] Verificar que todos los engines implementen el protocolo
+- [ ] Documentar interfaz estándar en docs/
+
+---
+
+### 5. Preparación para Native Engine de Alta Velocidad
+
+**Contexto:**  
+El Native Engine (C++) está implementado pero necesita estandarización para funcionar modularmente con los otros engines.
+
+**Funciones a facilitar para Native:**
+- `evolve_step()` - ya existe en C++
+- `get_dense_state()` - conversión sparse→dense
+- `get_visualization_data()` - llamar a get_dense_state + normalizar
+- `apply_tool()` - routing a herramientas
+
+**Tareas:**
+- [ ] Verificar que `NativeEngineWrapper` implemente `EngineProtocol`
+- [ ] Optimizar conversión sparse→dense para visualización
+- [ ] Benchmark Native vs Python con interfaces estandarizadas
+- [ ] Documentar cómo agregar nuevas funciones nativas
 
 **Contexto:**  
 Análisis de reducción de dimensionalidad para visualizar el espacio de estados del campo cuántico.
