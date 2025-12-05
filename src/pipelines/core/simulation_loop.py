@@ -356,27 +356,41 @@ async def simulation_loop():
                             motor_has_viz = hasattr(motor, 'get_visualization_data')
                             if motor_has_viz and not need_dense_state:
                                 try:
-                                    # Llamada directa al método del motor (retorna tensor [H, W])
-                                    viz_tensor = await asyncio.get_event_loop().run_in_executor(
+                                    # Llamada directa al método del motor (retorna dict con 'data')
+                                    viz_result = await asyncio.get_event_loop().run_in_executor(
                                         None,
                                         lambda: motor.get_visualization_data(viz_type)
                                     )
                                     
-                                    if viz_tensor is not None:
-                                        # Convertir a lista para JSON (rápido en CPU)
-                                        if viz_tensor.is_cuda:
-                                            viz_tensor = viz_tensor.cpu()
+                                    if viz_result is not None:
+                                        # COMPATIBILIDAD: El resultado puede ser dict (nuevo formato) o tensor (legacy)
+                                        if isinstance(viz_result, dict):
+                                            # Nuevo formato: dict con 'data' como numpy array
+                                            map_data_raw = viz_result.get('data')
+                                            if map_data_raw is not None:
+                                                # Convertir numpy a lista para JSON
+                                                if hasattr(map_data_raw, 'tolist'):
+                                                    map_data = map_data_raw.tolist()
+                                                else:
+                                                    map_data = map_data_raw
+                                            else:
+                                                map_data = None
+                                        else:
+                                            # Legacy: tensor directo
+                                            viz_tensor = viz_result
+                                            if viz_tensor.is_cuda:
+                                                viz_tensor = viz_tensor.cpu()
+                                            map_data = viz_tensor.tolist()
                                         
-                                        map_data = viz_tensor.tolist()
-                                        
-                                        # Construir objeto viz_data mínimo
-                                        viz_data = {
-                                            "map_data": map_data,
-                                            "hist_data": {}, # Histograma no disponible en fast path
-                                            "poincare_coords": [],
-                                            "phase_attractor": None,
-                                            "flow_data": None
-                                        }
+                                        if map_data is not None:
+                                            # Construir objeto viz_data mínimo
+                                            viz_data = {
+                                                "map_data": map_data,
+                                                "hist_data": {}, # Histograma no disponible en fast path
+                                                "poincare_coords": [],
+                                                "phase_attractor": None,
+                                                "flow_data": None
+                                            }
                                         
                                         # Si es 'phase', normalizar si es necesario (el frontend espera radianes o [0,1])
                                         # C++ devuelve radianes [-pi, pi] o valor crudo
