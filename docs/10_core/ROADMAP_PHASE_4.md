@@ -58,11 +58,14 @@ $$S_A = \frac{\text{Area}(\gamma_A)}{4G_N}$$
 | `HolographicEngine` | ✅ Implementado | AdS/CFT projection, `get_bulk_state()` |
 | `PolarEngine` | ✅ Implementado | Coordenadas polares, `QuantumStatePolar` |
 
-### B. Visualizador Holográfico 2.0 ✅
+### B. Visualización 3D / Bulk ✅
 
-- **Disco de Poincaré:** ✅ Mapeo Cuadrado → Disco en `HolographicViewer`.
+> [!NOTE]
+> El `HolographicViewer` es una **capa de visualización** disponible para **todos los engines**, no exclusiva de `HolographicEngine`. Permite proyectar cualquier estado cuántico 2D en un espacio 3D (bulk) usando el mapeo de Poincaré.
+
+- **Disco de Poincaré:** ✅ Mapeo Cuadrado → Disco disponible para todos los engines.
 - **Shaders WebGL:** ✅ `poincare.frag` con renderizado GPU.
-- **HolographicVolumeViewer:** ✅ Three.js 3D visualization.
+- **HolographicVolumeViewer:** ✅ Three.js 3D visualization (funciona con cualquier engine).
 - **Tensores de Curvatura:** ⏳ Visualizar curvatura (energía) en el Bulk.
 - **Agujeros Negros:** ⏳ Identificar horizontes de eventos.
 
