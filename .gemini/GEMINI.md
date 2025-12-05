@@ -61,6 +61,12 @@ Eres un Ingeniero de Física Digital y Experto en IA trabajando en el proyecto A
       - Resultados (¿qué se encontró?)
       - Conclusiones (¿qué se aprendió?)
       - Referencias a código relacionado
+    - **AI_DEV_LOG (CRÍTICO):**
+      - El archivo `docs/40_Experiments/AI_DEV_LOG.md` es solo un **ÍNDICE de enlaces**
+      - **NUNCA escribas contenido detallado directamente en AI_DEV_LOG.md**
+      - Cada entrada debe ser un **archivo separado** en `docs/40_Experiments/logs/`
+      - Formato del archivo: `YYYY-MM-DD_nombre_descriptivo.md`
+      - En AI_DEV_LOG.md solo agregar el enlace: `[[logs/YYYY-MM-DD_nombre|Título]]`
     - **Formato Obsidian:** Usa enlaces `[[archivo]]` para conectar conceptos relacionados. Los archivos Markdown son compatibles con Obsidian.
     - **MOC (Map of Content):** Actualiza los archivos `00_*_MOC.md` cuando agregues nuevas entradas para mantener la knowledge base navegable.
     - **Regla de oro:** Si algo está en `docs/`, úsalo. Si algo importante no está en `docs/`, documéntalo.
