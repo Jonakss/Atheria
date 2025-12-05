@@ -1,6 +1,7 @@
-import { Activity, Box, Eye, Maximize, Microscope, Minimize, Zap } from 'lucide-react';
+import { Activity, Box, Eye, Globe, Layers, Maximize, Microscope, Minimize, Palette, Waves, Zap } from 'lucide-react';
 import React, { useState } from 'react';
 import { useWebSocket } from '../../../hooks/useWebSocket';
+import { Tooltip } from '../../../components/ui/common/Tooltip';
 
 interface VisualizationSectionProps {
   viewerVersion?: 'v1' | 'v2';
@@ -29,20 +30,31 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
   const [internalLayer, setInternalLayer] = useState(0);
   const activeLayer = onLayerChange ? selectedLayer : internalLayer;
 
-  const handleLayerChange = (layer: number) => {
+  const handleModeChange = (mode: any) => {
+    // Update local state (for UI highlighting)
     if (onLayerChange) {
-      onLayerChange(layer);
+      onLayerChange(mode.id);
     } else {
-      setInternalLayer(layer);
+      setInternalLayer(mode.id);
+    }
+
+    // Trigger backend visualization change
+    if (mode.vizType) {
+        setSelectedViz(mode.vizType);
+        sendCommand('inference', 'set_viz', { viz_type: mode.vizType });
     }
   };
 
   const VIZ_MODES = [
-    { id: 0, label: 'Densidad', desc: 'Amplitud |ψ|', icon: '📊', color: 'text-blue-400', border: 'border-blue-500/50' },
-    { id: 1, label: 'Fase', desc: 'Argumento φ', icon: '🌈', color: 'text-purple-400', border: 'border-purple-500/50' },
-    { id: 2, label: 'Energía', desc: 'Hamiltoniano', icon: '⚡', color: 'text-yellow-400', border: 'border-yellow-500/50' },
-    { id: 3, label: 'Flujo', desc: 'Corriente J', icon: '🌊', color: 'text-cyan-400', border: 'border-cyan-500/50' },
-    { id: 4, label: 'Chunks', desc: 'Meta-Estructura', icon: '🧩', color: 'text-green-400', border: 'border-green-500/50' }
+    { id: 0, vizType: 'density', label: 'Densidad', desc: 'Magnitud de la función de onda |ψ|². Muestra la probabilidad de presencia.', icon: <Activity size={18} />, color: 'text-blue-400', border: 'border-blue-500/50' },
+    { id: 1, vizType: 'phase', label: 'Fase', desc: 'Argumento complejo φ. Mapea la rotación cuántica a color (0-2π).', icon: <Box size={18} />, color: 'text-purple-400', border: 'border-purple-500/50' },
+    { id: 2, vizType: 'flow', label: 'Flujo', desc: 'Corriente de probabilidad J. Muestra la dirección del movimiento.', icon: <Waves size={18} />, color: 'text-cyan-400', border: 'border-cyan-500/50' },
+    { id: 3, vizType: 'spectral', label: 'Espectral', desc: 'Transformada de Fourier (FFT). Muestra la distribución de energía en frecuencia.', icon: <Zap size={18} />, color: 'text-yellow-400', border: 'border-yellow-500/50' },
+    { id: 4, vizType: 'fields', label: 'Campos', desc: 'Teoría de Campos. Visualización RGB de los canales (EM, Gravedad, Higgs).', icon: <Layers size={18} />, color: 'text-green-400', border: 'border-green-500/50' },
+    { id: 5, vizType: 'poincare', label: 'Poincaré', desc: 'Esfera de Bloch/Poincaré proyectada. Mapea la polarización del estado.', icon: <Globe size={18} />, color: 'text-indigo-400', border: 'border-indigo-500/50' },
+    { id: 6, vizType: 'phase_hsv', label: 'Fase HSV', desc: 'Mapeo HSV completo de amplitud (valor) y fase (hue).', icon: <Palette size={18} />, color: 'text-pink-400', border: 'border-pink-500/50' },
+    { id: 7, vizType: 'holographic', label: 'Holográfico', desc: 'Renderizado volumétrico 3D del bulk AdS.', icon: <Box size={18} />, color: 'text-teal-400', border: 'border-teal-500/50' },
+    { id: 8, vizType: 'poincare_3d', label: 'Poincaré 3D', desc: 'Visualización 3D de la esfera de Poincaré.', icon: <Globe size={18} />, color: 'text-rose-400', border: 'border-rose-500/50' },
   ];
 
   const handleGammaChange = (value: number) => {
@@ -60,30 +72,27 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
       {/* Visualization Modes */}
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-gray-200 text-xs font-bold uppercase tracking-wider mb-2">
-          <Activity size={12} className="text-blue-500" /> Modos de Vista
+          <Eye size={12} className="text-blue-500" /> Modos de Vista
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {VIZ_MODES.map((mode) => (
-            <button
-              key={mode.id}
-              onClick={() => handleLayerChange(mode.id)}
-              className={`flex flex-col p-2 rounded-lg border transition-all duration-200 ${
-                activeLayer === mode.id
-                  ? `bg-white/10 ${mode.border} shadow-lg`
-                  : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-lg">{mode.icon}</span>
-                {activeLayer === mode.id && <div className={`w-1.5 h-1.5 rounded-full ${mode.color.replace('text-', 'bg-')} shadow-[0_0_5px_currentColor]`} />}
-              </div>
-              <span className={`text-xs font-bold ${activeLayer === mode.id ? mode.color : 'text-gray-300'}`}>
-                {mode.label}
-              </span>
-              <span className="text-[9px] text-gray-500 font-mono leading-tight">
-                {mode.desc}
-              </span>
-            </button>
+            <Tooltip key={mode.id} label={<div className="max-w-[200px] text-center"><p className="font-bold mb-1">{mode.label}</p><p className="text-gray-400 leading-tight">{mode.desc}</p></div>}>
+                <button
+                onClick={() => handleModeChange(mode)}
+                className={`flex flex-col items-center justify-center p-3 rounded-lg border transition-all duration-200 h-20 ${
+                    (activeLayer === mode.id || selectedViz === mode.vizType)
+                    ? `bg-white/10 ${mode.border} shadow-lg`
+                    : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'
+                }`}
+                >
+                <div className={`mb-1 ${(activeLayer === mode.id || selectedViz === mode.vizType) ? mode.color : 'text-gray-400'}`}>
+                    {mode.icon}
+                </div>
+                <span className={`text-[10px] font-bold ${(activeLayer === mode.id || selectedViz === mode.vizType) ? mode.color : 'text-gray-400'}`}>
+                    {mode.label}
+                </span>
+                </button>
+            </Tooltip>
           ))}
         </div>
       </div>
@@ -241,33 +250,6 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
             v2.0 (AdS/CFT)
           </button>
         </div>
-      </div>
-
-      {/* Visualization Type Selector */}
-      <div className="space-y-3 pt-4 border-t border-white/5">
-        <div className="flex items-center gap-2 text-gray-200 text-xs font-bold uppercase tracking-wider mb-2">
-          <Eye size={12} className="text-cyan-500" /> Tipo de Visualización
-        </div>
-        
-        <select
-          value={selectedViz || 'density'}
-          onChange={(e) => {
-            const newViz = e.target.value;
-            setSelectedViz(newViz);
-            sendCommand('inference', 'set_viz', { viz_type: newViz });
-          }}
-          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded text-xs text-gray-300 focus:outline-none focus:border-cyan-500/50"
-        >
-          <option value="density">Densidad |ψ|²</option>
-          <option value="phase">Fase φ</option>
-          <option value="flow">Flujo (Quiver)</option>
-          <option value="spectral">Espectral (FFT)</option>
-          <option value="poincare">Poincaré 2D</option>
-          <option value="fields">Campos (Teoría de Campos)</option>
-          <option value="phase_hsv">Fase HSV</option>
-          <option value="holographic">Holographic 3D</option>
-          <option value="poincare_3d">Poincaré 3D</option>
-        </select>
       </div>
 
       {/* Holographic Viewer Controls (solo visible si está en modo 3D) */}
