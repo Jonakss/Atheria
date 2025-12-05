@@ -74,7 +74,21 @@ class PolarEngine(nn.Module):
             # 2. Evolucionar
             new_psi = self.evolve_step(current_psi)
             
-            # 3. Actualizar estado interno
+            # 3. Aplicar Gamma Decay (Término Lindbladian) - Igual que CartesianEngine
+            # dΨ/dt = -γ * Ψ (disipación hacia el vacío)
+            gamma_decay = 0.0
+            if self.cfg is not None:
+                if hasattr(self.cfg, 'GAMMA_DECAY'):
+                    gamma_decay = self.cfg.GAMMA_DECAY
+                elif isinstance(self.cfg, dict) and 'GAMMA_DECAY' in self.cfg:
+                    gamma_decay = self.cfg['GAMMA_DECAY']
+            
+            if gamma_decay > 0:
+                # Aplicar decaimiento exponencial
+                decay_factor = 1.0 - gamma_decay
+                new_psi = new_psi * decay_factor
+            
+            # 4. Actualizar estado interno
             self.state.psi.magnitude = new_psi.abs()
             self.state.psi.phase = new_psi.angle()
         
