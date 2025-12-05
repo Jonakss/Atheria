@@ -14,19 +14,20 @@ class BackendFactory:
 
         Args:
             backend_name: Identifier for the backend.
-                - 'ionq_simulator', 'ionq_aria', 'ionq_qpu': IonQBackend
-                - 'ibm_brisbane', 'ibm_kyoto', 'ibm_qpu': IBMBackend
-                - 'local_aer': LocalQuantumBackend
-                - 'local_mock': MockQuantumBackend
+                Supported values:
+                - 'ionq_simulator': IonQ Simulator
+                - 'ionq_aria': IonQ Aria QPU
+                - 'ionq_qpu': Generic IonQ QPU
+                - 'ibm_brisbane': IBM Brisbane QPU
+                - 'ibm_kyoto': IBM Kyoto QPU
+                - 'ibm_qpu': Generic IBM QPU (Least Busy)
+                - 'local_aer': Local Qiskit Aer Simulator
+                - 'local_mock': Local Mock Backend (Debug)
 
         Returns:
             ComputeBackend instance.
         """
-        if backend_name.startswith('ionq'):
-            target = backend_name  # Default to backend_name
-            if backend_name == 'ionq':  # Specific case for generic 'ionq'
-                target = 'ionq_simulator'
-            return IonQBackend(backend_name=target)
+        logging.info(f"🏭 Requesting backend: {backend_name}")
 
         if backend_name.startswith('ionq'):
             # IonQ Backends

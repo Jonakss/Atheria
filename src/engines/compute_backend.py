@@ -177,7 +177,8 @@ class IBMBackend(ComputeBackend):
                 # If channel is 'ibm_quantum', token is required.
                 try:
                     self.service = QiskitRuntimeService(channel="ibm_quantum", token=self.api_key)
-                except:
+                except Exception as e:
+                    logging.warning(f"⚠️ Failed to initialize QiskitRuntimeService with token: {e}. Attempting fallback.")
                     # Fallback if already saved on disk
                     self.service = QiskitRuntimeService(channel="ibm_quantum")
 

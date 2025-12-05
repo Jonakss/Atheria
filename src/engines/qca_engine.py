@@ -164,7 +164,6 @@ class QuantumState:
             if backend_name:
                 backend = BackendFactory.get_backend(backend_name)
             else:
-                 # Fallback/Default logic could be here
                  backend = BackendFactory.get_backend('local_aer')
 
             n_qubits = 11
