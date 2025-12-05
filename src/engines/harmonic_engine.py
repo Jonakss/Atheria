@@ -167,7 +167,7 @@ class SparseHarmonicEngine:
             state_vec = psi[y, x] * strength
             self.add_matter(x, y, 0, state_vec)
             count += 1
-        logging.info(f"✨ Harmonic Reset: {count} particles initialized from new state.")
+        logging.info(f"✨ Harmonic Reset: {count} structures emerged from field evolution.")
 
     def initialize_matter(self, mode='random', strength=1.0):
         """
