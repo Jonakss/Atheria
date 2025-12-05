@@ -163,15 +163,53 @@ class LatticeEngine:
     def get_visualization_data(self, viz_type="density"):
         """
         Retorna datos para visualización.
+        
+        Args:
+            viz_type: Tipo de visualización
+                - 'density': Densidad de energía (1 - 1/N Re Tr P)
+                - 'phase': Fase de las plaquetas
+                
+        Returns:
+            dict con 'data' (array 2D) y 'metadata'
         """
-        if viz_type == "density":
-            # Energy Density = 1 - 1/N Re Tr P
-            U_p = self._compute_plaquettes(self.links)
-            trace = torch.diagonal(U_p, dim1=-2, dim2=-1).sum(-1)
-            energy = 1.0 - (1.0 / self.N) * trace.real
-            return energy.squeeze(0) # [H, W]
+        try:
+            if viz_type == "density":
+                # Energy Density = 1 - 1/N Re Tr P
+                U_p = self._compute_plaquettes(self.links)
+                trace = torch.diagonal(U_p, dim1=-2, dim2=-1).sum(-1)
+                energy = 1.0 - (1.0 / self.N) * trace.real
+                data = energy.squeeze(0)  # [H, W]
+                
+            elif viz_type == "phase":
+                # Fase de la traza de plaquetas
+                U_p = self._compute_plaquettes(self.links)
+                trace = torch.diagonal(U_p, dim1=-2, dim2=-1).sum(-1)
+                phase = torch.angle(trace)
+                data = phase.squeeze(0)  # [H, W]
+                
+            else:
+                # Default: density
+                U_p = self._compute_plaquettes(self.links)
+                trace = torch.diagonal(U_p, dim1=-2, dim2=-1).sum(-1)
+                energy = 1.0 - (1.0 / self.N) * trace.real
+                data = energy.squeeze(0)
             
-        return None
+            # Convertir a numpy
+            data_np = data.cpu().numpy().astype(np.float32)
+            
+            return {
+                "data": data_np,
+                "type": viz_type,
+                "shape": list(data_np.shape),
+                "min": float(data_np.min()),
+                "max": float(data_np.max()),
+                "engine": "LatticeEngine"
+            }
+            
+        except Exception as e:
+            logging.error(f"Error en get_visualization_data: {e}")
+            return {"data": None, "type": viz_type, "error": str(e)}
+
 
     def compile_model(self):
         """

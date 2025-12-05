@@ -98,57 +98,62 @@ class PolarEngine(nn.Module):
             viz_type: Tipo de visualización ("density", "phase", "energy", "magnitude")
             
         Returns:
-            Tensor [H, W] con los valores calculados.
+            dict con 'data' (array 2D) y 'metadata'
         """
-        mag = self.state.psi.magnitude  # [1, C, H, W]
-        phase = self.state.psi.phase    # [1, C, H, W]
+        import numpy as np
         
-        # Reducir canales si múltiples (promediar)
-        if mag.shape[1] > 1:
-            mag = mag.mean(dim=1, keepdim=True)
-            phase = phase.mean(dim=1, keepdim=True)
-        
-        if viz_type == "density" or viz_type == "magnitude":
-            # Densidad = magnitud^2
-            density = (mag ** 2).squeeze()  # [H, W]
-            return density
+        try:
+            mag = self.state.psi.magnitude  # [1, C, H, W]
+            phase = self.state.psi.phase    # [1, C, H, W]
             
-        elif viz_type == "phase":
-            # Fase normalizada a [0, 1] para visualización
-            phase_norm = (phase / (2 * 3.14159) + 0.5) % 1.0
-            return phase_norm.squeeze()  # [H, W]
+            # Reducir canales si múltiples (promediar)
+            if mag.shape[1] > 1:
+                mag = mag.mean(dim=1, keepdim=True)
+                phase = phase.mean(dim=1, keepdim=True)
             
-        elif viz_type == "energy":
-            # Energía = magnitud^2 (equivalente a densidad)
-            energy = (mag ** 2).squeeze()
-            return energy
+            if viz_type == "density" or viz_type == "magnitude":
+                data = (mag ** 2).squeeze()  # [H, W]
+                
+            elif viz_type == "phase":
+                phase_norm = (phase / (2 * 3.14159) + 0.5) % 1.0
+                data = phase_norm.squeeze()  # [H, W]
+                
+            elif viz_type == "energy":
+                data = (mag ** 2).squeeze()
+                
+            elif viz_type == "gradient":
+                density = mag.squeeze(0).squeeze(0)  # [H, W]
+                gy = torch.diff(density, dim=0, prepend=density[:1, :])
+                gx = torch.diff(density, dim=1, prepend=density[:, :1])
+                data = torch.sqrt(gx**2 + gy**2)
+                
+            elif viz_type == "real":
+                real = mag * torch.cos(phase)
+                data = real.squeeze()
+                
+            elif viz_type == "imag":
+                imag = mag * torch.sin(phase)
+                data = imag.squeeze()
+                
+            else:
+                logging.warning(f"⚠️ Tipo de visualización '{viz_type}' no soportado. Usando density.")
+                data = (mag ** 2).squeeze()
             
-        elif viz_type == "gradient":
-            # Gradiente de la magnitud
-            density = mag.squeeze(0).squeeze(0)  # [H, W]
-            gy = torch.diff(density, dim=0, prepend=density[:1, :])
-            gx = torch.diff(density, dim=1, prepend=density[:, :1])
-            gradient = torch.sqrt(gx**2 + gy**2)
-            return gradient
+            # Convertir a numpy
+            data_np = data.cpu().numpy().astype(np.float32)
             
-        elif viz_type == "real":
-            real = mag * torch.cos(phase)
-            return real.squeeze()
+            return {
+                "data": data_np,
+                "type": viz_type,
+                "shape": list(data_np.shape),
+                "min": float(data_np.min()),
+                "max": float(data_np.max()),
+                "engine": "PolarEngine"
+            }
             
-        elif viz_type == "imag":
-            imag = mag * torch.sin(phase)
-            return imag.squeeze()
-            
-        elif viz_type == "fields":
-            # Retornar ambos campos (Real e Imag) como tensor [H, W, 2]
-            real = mag * torch.cos(phase)
-            imag = mag * torch.sin(phase)
-            fields = torch.stack([real.squeeze(), imag.squeeze()], dim=-1)  # [H, W, 2]
-            return fields
-            
-        else:
-            logging.warning(f"⚠️ Tipo de visualización '{viz_type}' no soportado. Usando density.")
-            return (mag ** 2).squeeze()
+        except Exception as e:
+            logging.error(f"Error en get_visualization_data: {e}")
+            return {"data": None, "type": viz_type, "error": str(e)}
 
     def apply_tool(self, action, params):
         """
