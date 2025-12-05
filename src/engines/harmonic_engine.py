@@ -363,7 +363,8 @@ class SparseHarmonicEngine:
             
             # Thresholding para persistencia
             # Si la energía > umbral, guardamos la partícula
-            energy = center_output.pow(2).sum(dim=0) # [16, 16]
+            # NOTA: center_output puede ser complejo, usar .abs() para obtener magnitud
+            energy = center_output.abs().pow(2).sum(dim=0) # [16, 16] - ahora es real
             active_indices = torch.nonzero(energy > 0.01) # Umbral de existencia
             
             for idx in active_indices:
