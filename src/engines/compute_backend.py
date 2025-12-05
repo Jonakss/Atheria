@@ -5,6 +5,13 @@ import numpy as np
 from typing import Any, Dict, Optional, Union
 import os
 
+# Cargar variables de .env si existe
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv no instalado, usar variables de entorno del sistema
+
 class ComputeBackend(abc.ABC):
     """
     Abstract base class for compute backends.
