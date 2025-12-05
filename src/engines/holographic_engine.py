@@ -111,3 +111,41 @@ class HolographicEngine(CartesianEngine):
         """
         # TODO: Implementar cálculo de entropía basado en la geometría del bulk
         pass
+
+    def get_visualization_data(self, viz_type: str = "density"):
+        """
+        Retorna datos para visualización frontend.
+        
+        Extiende CartesianEngine para incluir visualización del bulk 3D.
+        
+        Args:
+            viz_type: Tipo de visualización
+                - Todos los tipos de CartesianEngine (density, phase, energy, etc.)
+                - 'bulk': Volumen 3D proyectado
+                
+        Returns:
+            dict con 'data' y 'metadata'
+        """
+        # Para 'bulk', usar proyección holográfica
+        if viz_type == "bulk":
+            bulk_volume = self.get_bulk_state()
+            if bulk_volume is None:
+                return {"data": None, "type": viz_type, "error": "No bulk state"}
+                
+            # Convertir a numpy
+            data_np = bulk_volume.cpu().numpy().astype(np.float32)
+            
+            return {
+                "data": data_np,
+                "type": viz_type,
+                "shape": list(data_np.shape),
+                "min": float(data_np.min()),
+                "max": float(data_np.max()),
+                "engine": "HolographicEngine",
+                "bulk_depth": self.bulk_depth
+            }
+        
+        # Para otros tipos, delegar a CartesianEngine
+        result = super().get_visualization_data(viz_type)
+        result["engine"] = "HolographicEngine"
+        return result

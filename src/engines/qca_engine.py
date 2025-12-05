@@ -761,3 +761,79 @@ class CartesianEngine:
         except Exception as e:
             logging.error(f"❌ Error aplicando herramienta {action}: {e}", exc_info=True)
             return False
+
+    def get_visualization_data(self, viz_type: str = "density"):
+        """
+        Retorna datos para visualización frontend.
+        
+        Args:
+            viz_type: Tipo de visualización 
+                - 'density': Magnitud/probabilidad |ψ|²
+                - 'phase': Fase del campo cuántico
+                - 'energy': Energía local
+                - 'gradient': Gradiente de densidad
+                - 'real': Parte real
+                - 'imag': Parte imaginaria
+                
+        Returns:
+            dict con 'data' (array 2D) y 'metadata'
+        """
+        if self.state.psi is None:
+            return {"data": None, "type": viz_type, "error": "No state"}
+        
+        try:
+            psi = self.state.psi  # [1, H, W, d_state]
+            
+            if viz_type == "density":
+                # |ψ|² sumado sobre canales
+                data = torch.sum(psi.abs().pow(2), dim=-1)[0]  # [H, W]
+                
+            elif viz_type == "phase":
+                # Fase del primer canal (o promedio)
+                phase = torch.angle(psi[..., 0])  # [1, H, W]
+                data = phase[0]  # [H, W]
+                
+            elif viz_type == "energy":
+                # Energía local (|∇ψ|² aproximado usando laplaciano)
+                if self.last_delta_psi is not None:
+                    data = torch.sum(self.last_delta_psi.abs().pow(2), dim=-1)[0]
+                else:
+                    data = torch.sum(psi.abs().pow(2), dim=-1)[0]
+                    
+            elif viz_type == "gradient":
+                # Gradiente de densidad
+                density = torch.sum(psi.abs().pow(2), dim=-1)  # [1, H, W]
+                grad_x = torch.diff(density, dim=2)
+                grad_y = torch.diff(density, dim=1)
+                # Pad para mantener tamaño
+                grad_x = torch.nn.functional.pad(grad_x, (0, 1, 0, 0))
+                grad_y = torch.nn.functional.pad(grad_y, (0, 0, 0, 1))
+                data = torch.sqrt(grad_x**2 + grad_y**2)[0]  # [H, W]
+                
+            elif viz_type == "real":
+                # Parte real promediada sobre canales
+                data = psi.real.mean(dim=-1)[0]  # [H, W]
+                
+            elif viz_type == "imag":
+                # Parte imaginaria promediada
+                data = psi.imag.mean(dim=-1)[0]  # [H, W]
+                
+            else:
+                # Default: density
+                data = torch.sum(psi.abs().pow(2), dim=-1)[0]
+            
+            # Convertir a numpy
+            data_np = data.cpu().numpy().astype(np.float32)
+            
+            return {
+                "data": data_np,
+                "type": viz_type,
+                "shape": list(data_np.shape),
+                "min": float(data_np.min()),
+                "max": float(data_np.max()),
+                "engine": "CartesianEngine"
+            }
+            
+        except Exception as e:
+            logging.error(f"Error en get_visualization_data: {e}")
+            return {"data": None, "type": viz_type, "error": str(e)}
