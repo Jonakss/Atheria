@@ -943,7 +943,9 @@ async def handle_reset(args):
 
                 if viz_data and isinstance(viz_data, dict):
                     map_data = viz_data.get("map_data", [])
-                    if map_data:
+                    # Check properly for numpy arrays and lists
+                    has_data = map_data is not None and (hasattr(map_data, '__len__') and len(map_data) > 0)
+                    if has_data:
                         frame_payload = {
                             "step": 0,
                             "timestamp": asyncio.get_event_loop().time(),
