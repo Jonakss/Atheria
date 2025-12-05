@@ -145,12 +145,23 @@ class SparseHarmonicEngine:
         # Invalidar caché
         self._cache_valid = False
 
-        # 3. Inyectar materia del nuevo estado
-        if hasattr(new_state, 'psi') and new_state.psi is not None:
-            self._ingest_dense_state(new_state.psi)
+        # FILOSOFÍA DE EMERGENCIA:
+        # NO inyectamos partículas aquí. Las estructuras deben EMERGER
+        # naturalmente de la evolución del campo (Vacío Armónico + Modelo).
+        # El step() usa threshold-based detection para que nuevas estructuras
+        # aparezcan orgánicamente cuando la evolución las crea.
+        # 
+        # El estado inicial es el Vacío Armónico puro.
+        # La materia emergerá de la interferencia de ondas + decisiones del modelo.
+        logging.info("🌌 HarmonicEngine: Reset complete. Structures will emerge from field evolution.")
 
     def _ingest_dense_state(self, psi_tensor, strength=1.0):
-        """Convierte un tensor denso [1, H, W, C] en partículas dispersas."""
+        """
+        DEPRECATED: Solo para uso con herramientas de usuario (Quantum Genesis).
+        
+        El flujo normal NO usa este método - las estructuras EMERGEN durante step().
+        Convierte un tensor denso [1, H, W, C] en partículas dispersas.
+        """
         # Invalidar caché al cambiar materia
         self._cache_valid = False
 
@@ -200,7 +211,11 @@ class SparseHarmonicEngine:
         return self.get_viewport_tensor((0, 0, 0), self.grid_size, self.step_count * 0.1)
 
     def add_matter(self, x, y, z, state):
-        """Inyecta materia real en el universo."""
+        """
+        NOTA: Solo para uso con herramientas de usuario (Collapse, Vortex, etc.).
+        
+        El flujo normal NO usa este método - las estructuras EMERGEN durante step().
+        """
         self.matter[(x,y,z)] = state.to(self.device)
         self.active_coords.add((x,y,z))
         # Invalidar caché
