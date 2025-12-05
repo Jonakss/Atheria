@@ -15,6 +15,10 @@ interface QuantumControlsProps {
 const availableBackends = [
     { value: 'ionq_simulator', label: 'IonQ Simulator (29 Qubits)' },
     { value: 'ionq_aria', label: 'IonQ Aria (25 Qubits)' },
+    { value: 'ibm_brisbane', label: 'IBM Brisbane (127 Qubits)' },
+    { value: 'ibm_kyoto', label: 'IBM Kyoto (127 Qubits)' },
+    { value: 'ibm_qpu', label: 'IBM Generic QPU (Least Busy)' },
+    { value: 'local_aer', label: 'Local Aer Simulator (CPU)' },
     { value: 'local_mock', label: 'Local Mock (Debug)' }
 ];
 

@@ -144,23 +144,28 @@ class QuantumState:
             return self._initialize_state(mode='complex_noise', complex_noise_strength=strength)
     
     @staticmethod
-    def create_variational_state(grid_size, d_state, device, params, strength=0.1):
+    def create_variational_state(grid_size, d_state, device, params, strength=0.1, backend_name=None):
         """
-        Generates a state using a Variational Quantum Circuit (VQC) on IonQ.
+        Generates a state using a Variational Quantum Circuit (VQC).
         Used by Quantum Tuner to optimize initialization.
         
         Args:
             params (list): List of rotation angles [theta_0, theta_1, ...]
+            backend_name (str): Name of backend to use (optional, defaults to config or local_aer if failed)
         """
         import logging
-        from .compute_backend import IonQBackend
-        from .. import config as cfg
+        from .backend_factory import BackendFactory
         from qiskit import QuantumCircuit
         
         logging.info(f"⚛️ Variational Genesis: Params={params[:3]}...")
         
         try:
-            backend = IonQBackend(api_key=cfg.IONQ_API_KEY, backend_name=cfg.IONQ_BACKEND_NAME)
+            # Determine backend
+            if backend_name:
+                backend = BackendFactory.get_backend(backend_name)
+            else:
+                 backend = BackendFactory.get_backend('local_aer')
+
             n_qubits = 11
             qc = QuantumCircuit(n_qubits)
             
@@ -181,7 +186,7 @@ class QuantumState:
             # Execute
             counts = backend.execute('run_circuit', qc, shots=1024)
             
-            # Process to Tensor (Same as _get_ionq_state)
+            # Process to Tensor
             bit_stream = []
             for bitstring, count in counts.items():
                 bits = [1.0 if c == '1' else -1.0 for c in bitstring]
