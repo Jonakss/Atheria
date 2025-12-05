@@ -1,4 +1,4 @@
-# 🧊 Roadmap Fase 4: Universo Volumétrico (3D Core)
+# 🧊 Roadmap Fase 5: Universo Volumétrico (3D Core)
 
 **Objetivo:** Evolucionar la simulación de una superficie 2D a un volumen 3D completo ("El Tanque"), implementando tensores 5D y convoluciones volumétricas.
 

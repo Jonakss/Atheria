@@ -2,22 +2,33 @@
 
 **Objetivo:** Escalar la simulación de miles a millones de partículas activas eliminando el overhead del intérprete de Python.
 
-**Estado General:** 🟡 **~70% Completado** - Motor funcional, optimizaciones pendientes (Actualizado: 2025-11-26)
+**Estado General:** 🟡 **~85% Completado** - Motor funcional, optimizaciones pendientes (Actualizado: 2025-12-05)
 
 ---
 
-## 1. Estrategia de Implementación
+## 1. Estrategia de Implementación: Arquitectura Dual (Python + Nativo)
 
-Utilizaremos un enfoque Híbrido Embebido usando PyBind11.
+> [!IMPORTANT]
+> **Aclaración:** La visión es que **TODOS los engines** puedan tener versiones Python y Nativas (C++). 
+> No existe un solo "NativeEngine" - cada motor (Cartesian, Harmonic, Lattice, Polar, Holographic) 
+> debería poder correr en Python para desarrollo/debugging, o en C++ para producción/rendimiento.
 
-Python: Orquestación, Servidor Web, Entrenamiento (PyTorch), Visualización.
+### Enfoque Híbrido Embebido (PyBind11)
 
-C++: Estructuras de datos espaciales (Sparse Octree), Bucle principal de física, Gestión de memoria.
+- **Python:** Orquestación, Servidor Web, Entrenamiento (PyTorch), Visualización, Desarrollo rápido
+- **C++:** Estructuras de datos espaciales (Sparse Octree), Bucle principal de física, Gestión de memoria
 
-## 2. Componentes del Núcleo C++ (src/cpp_core)
+### Tabla de Implementación por Motor
 
-### A. SparseMap (El Universo) ✅
-**Estado:** Completado
+| Motor | Python | Nativo (C++) | Estado |
+|-------|--------|--------------|--------|
+| CartesianEngine | ✅ | ⏳ Parcial | Wrapper disponible |
+| SparseHarmonicEngine | ✅ | ⏳ Parcial | SparseMap C++ listo |
+| LatticeEngine | ✅ | ⏳ Pendiente | Solo Python |
+| PolarEngine | ✅ | ⏳ Pendiente | Solo Python |
+| HolographicEngine | ✅ | ⏳ Pendiente | Solo Python |
+
+**Wrapper existente:** `NativeEngineWrapper` en `src/engines/native_engine_wrapper.py` envuelve la lógica C++ y expone la misma interfaz que los engines Python.
 
 - Reemplazo del diccionario de Python
 - Estructura: `std::unordered_map<Coord3D, QuantumState>`

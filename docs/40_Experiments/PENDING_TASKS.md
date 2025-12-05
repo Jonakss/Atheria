@@ -1,6 +1,6 @@
 # 📋 Tareas Pendientes - Atheria 4
 
-**Última actualización:** 2024-11-21  
+**Última actualización:** 2025-12-05  
 **Estado General:** 🟢 **Críticos resueltos, solo funcionalidades opcionales pendientes**
 
 ---
@@ -85,7 +85,7 @@
 
 ### 4. Visualizaciones en Shaders (GPU)
 **Prioridad:** 🟡 **ALTA**  
-**Estado:** ⏳ **EN VERIFICACIÓN** (2025-11-22)
+**Estado:** ✅ **COMPLETADO** (2025-12-04)
 
 **Requisito:**
 - Cuando GPU está disponible, usar shaders para visualizaciones
@@ -93,9 +93,9 @@
 - Liberar CPU para simulación
 
 **Implementación:**
-- Usar Three.js shaders o WebGL para procesamiento
-- Procesar visualización directamente en GPU
-- Solo transferir datos necesarios a CPU
+- ✅ Shaders WebGL para visualizaciones (density, phase, real, imag)
+- ✅ `get_visualization_data()` en todos los engines
+- ✅ Poincaré shader y HSV phase rendering
 
 ---
 
@@ -167,15 +167,15 @@
 
 ### 9. Sistema de Historial/Buffer Completo
 **Prioridad:** 🟢 **MEDIA**  
-**Estado:** Parcialmente implementado
+**Estado:** ✅ **COMPLETADO** (2025-11-26)
 
-**Requisito:**
-- Navegación temporal (rewind/replay)
-- Buffer completo de estados
-- Navegación con teclado/UI
+**Implementación:**
+- ✅ Buffer circular en memoria (1000 frames)
+- ✅ Navegación temporal (rewind/replay)
+- ✅ Restauración completa de estado cuántico
+- ✅ Controles de timeline en frontend
 
-**Estado Actual:**
-- `simulation_history` existe pero no está completamente integrado
+**Referencia:** [[ROADMAP_PHASE_3#Sistema de historial/buffer completo]]
 
 ---
 
@@ -285,10 +285,10 @@
 
 ### 🟡 ALTO (Implementar Pronto)
 ~~3. Mostrar "Paso Actual" como "Total - Actual"~~ ✅ **RESUELTO**
-4. Visualizaciones en Shaders (GPU) - ⏳ **EN ROADMAP** (Phase 2 - Opcional)
-~~5. Apagar Servidor desde UI~~ ✅ **IMPLEMENTADO** (2024-11-20)
+~~4. Visualizaciones en Shaders (GPU)~~ ✅ **COMPLETADO** (2025-12-04)
+~~5. Apagar Servidor desde UI~~ ✅ **IMPLEMENTADO** (2025-11-20)
 ~~6. Migración Automática de Estado~~ ✅ **IMPLEMENTADO**
-~~9. Sistema de Historial/Buffer Completo~~ ✅ **IMPLEMENTADO** (2024-11-21)
+~~9. Sistema de Historial/Buffer Completo~~ ✅ **COMPLETADO** (2025-11-26)
 
 ### 🟢 MEDIO/BAJO (Implementar Después)
 7-16. Resto de tareas
