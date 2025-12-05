@@ -1,4 +1,4 @@
-# ⚡ Roadmap Fase 2: Motor Nativo (C++ Core)
+# ⚡ Roadmap Fase 2: Modo Nativo (C++/CUDA Runtime)
 
 **Objetivo:** Escalar la simulación de miles a millones de partículas activas eliminando el overhead del intérprete de Python.
 
@@ -6,27 +6,49 @@
 
 ---
 
-## 1. Estrategia de Implementación: Arquitectura Dual (Python + Nativo)
+## 1. Estrategia de Implementación: Modos de Ejecución
 
 > [!IMPORTANT]
-> **Aclaración:** La visión es que **TODOS los engines** puedan tener versiones Python y Nativas (C++). 
-> No existe un solo "NativeEngine" - cada motor (Cartesian, Harmonic, Lattice, Polar, Holographic) 
-> debería poder correr en Python para desarrollo/debugging, o en C++ para producción/rendimiento.
+> **"Nativo" NO es un engine separado - es un MODO DE EJECUCIÓN.**
+> 
+> Los engines reales son: **Lattice**, **Holographic**, **Cartesian**, **Polar**, **Harmonic**, etc.
+> Cada engine puede correr en dos modos:
+> - **Python:** Desarrollo rápido, debugging, nube, cuando C++/CUDA no funciona
+> - **Nativo (C++/CUDA):** Producción, máximo rendimiento
+
+### ¿Cuándo usar cada modo?
+
+| Modo | Cuándo Usar |
+|------|-------------|
+| **Python** | Desarrollo, pruebas rápidas, entornos cloud, fallback cuando C++/CUDA falla |
+| **Nativo** | Producción, simulaciones largas, cuando se necesita máximo rendimiento |
 
 ### Enfoque Híbrido Embebido (PyBind11)
 
 - **Python:** Orquestación, Servidor Web, Entrenamiento (PyTorch), Visualización, Desarrollo rápido
 - **C++:** Estructuras de datos espaciales (Sparse Octree), Bucle principal de física, Gestión de memoria
 
-### Tabla de Implementación por Motor
+### Tabla de Implementación por Engine
 
-| Motor | Python | Nativo (C++) | Estado |
-|-------|--------|--------------|--------|
-| CartesianEngine | ✅ | ⏳ Parcial | Wrapper disponible |
-| SparseHarmonicEngine | ✅ | ⏳ Parcial | SparseMap C++ listo |
+| Engine | Modo Python | Modo Nativo (C++) | Estado |
+|--------|-------------|-------------------|--------|
 | LatticeEngine | ✅ | ⏳ Pendiente | Solo Python |
-| PolarEngine | ✅ | ⏳ Pendiente | Solo Python |
 | HolographicEngine | ✅ | ⏳ Pendiente | Solo Python |
+| CartesianEngine | ✅ | ⏳ Parcial | Wrapper disponible |
+| PolarEngine | ✅ | ⏳ Pendiente | Solo Python |
+| SparseHarmonicEngine | ✅ | ⏳ Parcial | SparseMap C++ listo |
+
+### Requisitos de Interfaz (TODOS los engines)
+
+> [!WARNING]
+> **Todos los engines DEBEN implementar `get_visualization_data()`** para que el frontend pueda mostrar visualizaciones consistentes.
+
+```python
+def get_visualization_data(self, viz_type: str = "density") -> dict:
+    """Retorna datos para visualización frontend."""
+    # viz_types: density, phase, energy, gradient, real, imag, fields
+    ...
+```
 
 **Wrapper existente:** `NativeEngineWrapper` en `src/engines/native_engine_wrapper.py` envuelve la lógica C++ y expone la misma interfaz que los engines Python.
 
