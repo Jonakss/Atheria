@@ -17,6 +17,11 @@
 
 ## 📋 Índice de Entradas
 
+### 2025-12-05
+
+- [[logs/2025-12-05_frontend_dependency_fix|Fix: Frontend Dependency & GlassPanel]]: Resolución de alias `@`, componentes faltantes y error TS.
+- [[logs/2025-12-05_umap_integration|Feature: UMAP Analysis Integration]]: Backend (StateAnalyzer threaded) + Frontend (Canvas Visualization) para análisis en tiempo real.
+
 ### 2025-12-04
 
 - [[logs/2025-12-04_ibm_quantum_execution|Ejecución Multi-Plataforma (IonQ + IBM)]]: Validación en hardware cuántico real. IBM Fez: **90.6%** fidelidad, IonQ: 85%.

@@ -12,6 +12,11 @@ const packageJson = JSON.parse(
 export default defineConfig({
   plugins: [react()],
   base: "/Atheria/", // Base path para GitHub Pages
+  resolve: {
+    alias: {
+      "@": join(__dirname, "./src"),
+    },
+  },
   define: {
     "import.meta.env.APP_VERSION": JSON.stringify(packageJson.version),
   },
