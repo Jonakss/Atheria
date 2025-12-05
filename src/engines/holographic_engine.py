@@ -135,12 +135,20 @@ class HolographicEngine(CartesianEngine):
             # Convertir a numpy
             data_np = bulk_volume.cpu().numpy().astype(np.float32)
             
+            # NORMALIZACIÓN: Los shaders esperan datos en [0, 1]
+            min_val = float(data_np.min())
+            max_val = float(data_np.max())
+            if max_val > min_val and abs(max_val - min_val) > 1e-10:
+                data_np = (data_np - min_val) / (max_val - min_val)
+            else:
+                data_np = np.full_like(data_np, 0.5)
+            
             return {
                 "data": data_np,
                 "type": viz_type,
                 "shape": list(data_np.shape),
-                "min": float(data_np.min()),
-                "max": float(data_np.max()),
+                "min": 0.0,  # Ya normalizado
+                "max": 1.0,  # Ya normalizado
                 "engine": "HolographicEngine",
                 "bulk_depth": self.bulk_depth
             }
