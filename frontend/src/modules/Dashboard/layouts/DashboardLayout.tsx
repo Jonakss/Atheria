@@ -3,7 +3,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ColorScaleLegend } from '../../../components/ui/ColorScaleLegend';
 import { LabSider } from '../../../components/ui/LabSider';
 import { PanZoomCanvas } from '../../../components/ui/PanZoomCanvas';
-import HolographicViewer from '../../../components/visualization/HolographicViewer';
 import HolographicViewer2 from '../../../components/visualization/HolographicViewer2';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import PhaseSpaceViewer from '../../PhaseSpaceViewer/PhaseSpaceViewer';
@@ -40,7 +39,6 @@ export const DashboardLayout: React.FC = () => {
   // Initialize collapsed by default for better mobile UX and cleaner desktop start
   const [rightDrawerCollapsed, setRightDrawerCollapsed] = useState(true);
   const [activeDrawerTab, setActiveDrawerTab] = useState<'visualization' | 'physics'>('visualization');
-  const [viewerVersion, setViewerVersion] = useState<'v1' | 'v2'>('v1');
 
   // Inicializar estado responsivo y listener
   useEffect(() => {
@@ -128,22 +126,14 @@ export const DashboardLayout: React.FC = () => {
           return (
             <div className="absolute inset-0 z-0 bg-gradient-deep-space overflow-hidden">
               {flatMapData.length > 0 && gridWidth > 0 && gridHeight > 0 ? (
-                viewerVersion === 'v1' ? (
-                  <HolographicViewer 
-                    data={flatMapData}
-                    width={gridWidth}
-                    height={gridHeight}
-                    vizType={selectedViz}
-                    threshold={0.01}
-                  />
-                ) : (
-                    width={gridWidth}
-                    height={gridHeight}
-                    vizType={selectedViz}
-                    threshold={0.01}
-                    channels={flatMapData.length === gridWidth * gridHeight * 3 ? 3 : 1}
-                  />
-                )
+                <HolographicViewer2 
+                  data={flatMapData}
+                  width={gridWidth}
+                  height={gridHeight}
+                  vizType={selectedViz}
+                  threshold={0.01}
+                  channels={flatMapData.length === gridWidth * gridHeight * 3 ? 3 : 1}
+                />
               ) : (
                 <div className="flex items-center justify-center h-full text-dark-300 text-sm">
                   Esperando datos de simulación...
@@ -286,8 +276,6 @@ export const DashboardLayout: React.FC = () => {
         >
           {activeDrawerTab === 'visualization' ? (
             <VisualizationSection
-              viewerVersion={viewerVersion}
-              onViewerVersionChange={setViewerVersion}
               selectedLayer={selectedLayer}
               onLayerChange={setSelectedLayer}
               theaterMode={theaterMode}
