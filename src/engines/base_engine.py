@@ -213,7 +213,7 @@ def verify_engine_protocol(engine: Any, raise_on_error: bool = True) -> Dict[str
         raise_on_error: Si True, lanza error si faltan métodos
     
     Returns:
-        Dict con el estado de cada método requerido
+        tuple (results_dict, missing_list)
     """
     required_methods = [
         'evolve_internal_state',
@@ -250,4 +250,5 @@ def verify_engine_protocol(engine: Any, raise_on_error: bool = True) -> Dict[str
             f"Faltan: {', '.join(missing)}"
         )
     
-    return results
+    
+    return results, missing

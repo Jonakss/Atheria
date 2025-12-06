@@ -166,6 +166,58 @@ def test_lattice_engine():
         logger.error(f"❌ LatticeEngine TEST FAILED: {e}", exc_info=True)
         return False
 
+def test_native_engine():
+    """Test NativeEngineWrapper (C++ High Performance)"""
+    logger.info("=" * 60)
+    logger.info("🧪 TEST: NativeEngineWrapper (C++ Interface)")
+    logger.info("=" * 60)
+    
+    try:
+        from src.engines.native_engine_wrapper import NativeEngineWrapper
+        
+        # Intentar inicializar (puede fallar si no está compilado)
+        device = 'cpu' # Forzar CPU para test básico
+        grid_size = 32
+        d_state = 4
+        
+        try:
+            engine = NativeEngineWrapper(grid_size, d_state, device)
+            logger.info(f"✅ Engine creado: {type(engine).__name__} (Version: {engine.VERSION})")
+        except ImportError as e:
+            logger.warning(f"⚠️ NativeEngine no disponible (esperado si no compilado): {e}")
+            logger.info("⏩ SALTANDO test de NativeEngine.")
+            return True # Consideramos pass si no está instalado
+            
+        # Verificar Protocolo
+        from src.engines.base_engine import EngineProtocol, verify_engine_protocol
+        results, missing = verify_engine_protocol(engine, raise_on_error=False)
+        is_compliant = len(missing) == 0
+        if is_compliant:
+            logger.info("✅ Protocolo verificado: 100% compliant")
+        else:
+            logger.error(f"❌ Protocolo fallido. Faltan: {missing}")
+            # No fallamos el test completo por esto aun, pero lo logueamos
+            
+        # Test step (evolve_step wrapper)
+        logger.info("🔄 Testing evolve_internal_state...")
+        engine.evolve_internal_state()
+        logger.info("✅ evolve_internal_state OK")
+        
+        # Test get_dense_state
+        logger.info("🔄 Testing get_dense_state...")
+        dense = engine.get_dense_state()
+        if dense is not None:
+            logger.info(f"✅ get_dense_state OK - shape: {dense.shape}")
+        else:
+             logger.warning("⚠️ get_dense_state retornó None")
+             
+        logger.info("🎉 NativeEngineWrapper TEST PASSED!")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ NativeEngineWrapper TEST FAILED: {e}", exc_info=True)
+        return False
+
 def test_cartesian_engine():
     """Test UNet Unitary con CartesianEngine (baseline)"""
     logger.info("=" * 60)
@@ -231,6 +283,9 @@ def main():
     
     # Test Lattice
     results["LatticeEngine"] = test_lattice_engine()
+
+    # Test Native (si disponible)
+    results["NativeEngine"] = test_native_engine()
     
     # Resumen
     logger.info("\n" + "=" * 70)

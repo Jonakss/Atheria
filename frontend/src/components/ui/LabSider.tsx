@@ -10,6 +10,8 @@ import { TransferLearningWizard } from '../experiments/TransferLearningWizard';
 import { CheckpointManager } from '../training/CheckpointManager';
 import { TrainingCanvas } from '../training/TrainingCanvas';
 
+import { AnalysisPanel } from '../analysis/AnalysisPanel';
+
 type LabSection = 'inference' | 'training' | 'analysis';
 
 interface LabSiderProps {
@@ -19,37 +21,33 @@ interface LabSiderProps {
 
 // Nuevas constantes para Arquitectura Separada
 const ENGINE_OPTIONS = [
-    { value: "CARTESIAN", label: "🌊 Cartesian (Standard QCA)" },
-    { value: "POLAR", label: "🌀 Polar (Rotational)" },
-    { value: "HARMONIC", label: "🌊 Harmonic (Wave)" },
-    { value: "LATTICE", label: "🕸️ Lattice (AdS/CFT)" },
-    { value: "HOLOGRAPHIC", label: "🔮 Holographic (AdS/CFT Projection)" },
-    { value: "QUANTUM", label: "⚛️ Quantum (Legacy/Hybrid)" }, // Mantener por compatibilidad si es necesario
+    { value: "CARTESIAN", label: "🌊 Cartesian (Standard Wave)" },
+    { value: "POLAR", label: "🌀 Polar (Rotational Field)" },
+    { value: "HARMONIC", label: "🌪️ Harmonic (Emergent Structure)" },
+    { value: "LATTICE", label: "🕸️ Lattice (Gauge Theory)" },
+    { value: "HOLOGRAPHIC", label: "🔮 Holographic (Viz Mode)" }, // Marcado como Viz Mode
 ];
 
 const BACKEND_OPTIONS = [
-    { value: "PYTHON", label: "🐍 Python (CPU/Legacy)" },
-    { value: "CPP", label: "⚡ CPP (Native/Fast)" },
-    { value: "GPU", label: "🎮 GPU (CUDA)" },
-    { value: "TPU", label: "☁️ TPU (Cloud)" },
-    { value: "QPU", label: "🔮 QPU (Quantum)" },
+    { value: "PYTHON", label: "🐍 Python (Standard)" },
+    { value: "CPP", label: "⚡ Native C++ (High Performance)" },
+    { value: "GPU", label: "🎮 GPU (PyTorch Native)" },
 ];
 
 // Mapa de Compatibilidad (Motor -> Backends Soportados)
 // Si no está listado, se asume soporte experimental/limitado
 const COMPATIBILITY_MAP: Record<string, string[]> = {
-    "CARTESIAN": ["PYTHON", "CPP", "GPU"],
-    "POLAR": ["PYTHON", "GPU"], // Asumiendo Polar requiere GPU o Python por ahora
-    "HARMONIC": ["PYTHON", "CPP"], // Sparse implementations
-    "LATTICE": ["PYTHON"], // Muy experimental
-    "HOLOGRAPHIC": ["PYTHON"], // Scale-Space projection
-    "QUANTUM": ["PYTHON", "QPU"],
+    "CARTESIAN": ["PYTHON", "CPP", "GPU"], // CPP soportado via NativeEngineWrapper
+    "POLAR": ["PYTHON", "GPU"], // Solo Python/GPU
+    "HARMONIC": ["PYTHON", "GPU"], 
+    "LATTICE": ["PYTHON", "GPU"], 
+    "HOLOGRAPHIC": ["PYTHON", "GPU"], 
 };
 
 export function LabSider({ activeSection, onClose }: LabSiderProps) {
     const { 
         sendCommand, experimentsData, trainingStatus, trainingProgress,
-        inferenceStatus, connectionStatus,
+        inferenceStatus, connectionStatus, simData,
         activeExperiment, setActiveExperiment, compileStatus
     } = useWebSocket();
     
@@ -910,6 +908,33 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
                 opened={transferWizardOpened}
                 onClose={() => setTransferWizardOpened(false)}
             />
+            {activeSection === 'analysis' && (
+                <div className="space-y-4">
+                     <GlassPanel title="State Space Analysis">
+                        <div className="p-2 flex flex-col items-center">
+                            <AnalysisPanel 
+                                data={simData?.analysis_data || []} 
+                                width={280} 
+                                height={280} 
+                                className="w-full"
+                            />
+                            <div className="mt-4 text-xs text-slate-400 text-justify">
+                                Real-time UMAP projection of the 
+                                high-dimensional state space (d={dState}). 
+                                Clusters indicate distinct dynamic regimes.
+                            </div>
+                        </div>
+                    </GlassPanel>
+                    
+                    <GlassPanel title="Analysis Controls">
+                        <div className="space-y-2 p-2">
+                             <div className="text-xs text-slate-500">
+                                Feature extraction is running in background.
+                             </div>
+                        </div>
+                    </GlassPanel>
+                </div>
+            )}
         </div>
     );
 }

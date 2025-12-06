@@ -3,12 +3,13 @@ import torch.nn as nn
 import logging
 
 class PolarEngine(nn.Module):
-    def __init__(self, model, grid_size, d_state=1, device='cpu'):
+    def __init__(self, model, grid_size, d_state=1, device='cpu', cfg=None):
         super().__init__()
         self.model = model
         self.grid_size = grid_size
         self.d_state = d_state
         self.device = device
+        self.cfg = cfg
         self.model.to(device)
         
         # Initialize state

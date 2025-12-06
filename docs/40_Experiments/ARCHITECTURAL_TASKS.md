@@ -114,6 +114,8 @@ El Native Engine (C++) está implementado pero necesita estandarización para fu
 - [ ] Benchmark Native vs Python con interfaces estandarizadas
 - [ ] Documentar cómo agregar nuevas funciones nativas
 
+### 6. Análisis UMAP y t-SNE (Visualización del Espacio de Estados)
+
 **Contexto:**  
 Análisis de reducción de dimensionalidad para visualizar el espacio de estados del campo cuántico.
 
@@ -130,6 +132,23 @@ Análisis de reducción de dimensionalidad para visualizar el espacio de estados
 - [ ] Crear módulo `src/pipelines/analysis/dimensionality.py`
 - [ ] Integrar en frontend como panel de análisis
 - [ ] Permitir samplear estados durante simulación para análisis
+
+---
+
+### 7. Refactorización PennyLane / Quantum Kernel
+
+**Problema:**
+`PennyLane` estaba ubicado incorrectamente en `src/engines/`. No es un motor de simulación, sino un **modelo** (como UNet) que define la "Ley M".
+
+**Estado (2025-12-05):**
+- ✅ Movido `src/engines/qca_engine_pennylane.py` → `src/models/quantum_kernel.py`
+- El archivo es actualmente un **STUB**.
+
+**Tareas:**
+- [ ] Instalar dependencias: `pennylane`, `pennylane-qiskit`
+- [ ] Implementar circuito variacional real en `QuantumKernel`
+- [ ] Conectar `QuantumKernel` con engines existentes (Cartesian/Polar)
+- [ ] Implementar entrenamiento híbrido (backprop por circuito cuántico)
 
 ---
 

@@ -9,6 +9,7 @@ from ..server.server_state import g_state
 from ..server.data_compression import optimize_frame_payload
 from ..pipelines.visualization_pipeline import VisualizationPipeline
 from ..analysis.epoch_detector import EpochDetector
+from ..analysis.dimensionality import StateAnalyzer
 
 class DataProcessingService(BaseService):
     """
@@ -23,13 +24,16 @@ class DataProcessingService(BaseService):
         self.grpc_queue = grpc_queue
         self.viz_pipeline = VisualizationPipeline()
         self.epoch_detector = EpochDetector()
+        self.state_analyzer = StateAnalyzer()
         
     async def _start_impl(self):
         """Inicia el bucle de procesamiento."""
+        self.state_analyzer.start()
         self._task = asyncio.create_task(self._processing_loop())
         
     async def _stop_impl(self):
         """Detiene el bucle de procesamiento."""
+        self.state_analyzer.stop()
         pass
         
     async def _processing_loop(self):
@@ -96,6 +100,11 @@ class DataProcessingService(BaseService):
                 # Actualizar estado global
                 g_state['current_epoch'] = current_epoch
                 g_state['epoch_metrics'] = epoch_metrics
+
+                # --- UMAP ANALYSIS ---
+                # Alimentar analizador (no bloqueante)
+                self.state_analyzer.add_state(psi, step=step)
+                analysis_data = self.state_analyzer.get_latest_data()
                 
                 # 4. Generar visualización (Heavy Operation)
                 # Offload to thread pool
@@ -127,6 +136,9 @@ class DataProcessingService(BaseService):
                     'epoch': current_epoch,
                     'epoch_metrics': epoch_metrics
                 }
+
+                if analysis_data:
+                    final_payload['analysis_data'] = analysis_data
 
                 # 5b. Enviar a cola gRPC (si existe)
                 # Esto se hace ANTES del buffering/broadcast para menor latencia

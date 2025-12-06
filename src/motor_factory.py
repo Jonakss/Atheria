@@ -71,7 +71,7 @@ def get_motor(config, device, model: nn.Module = None):
         logging.info("🌀 Initializing Polar Engine (Rotational/Stability optimized)")
         # Check if model is compatible with Polar engine if possible
         # For now, we assume the user knows what they are doing or the model is generic enough
-        return PolarEngine(model, grid_size, d_state=d_state, device=backend.get_device())
+        return PolarEngine(model, grid_size, d_state=d_state, device=backend.get_device(), cfg=config)
         
     elif engine_type == 'QUANTUM':
         logging.info("⚛️ Initializing Quantum Hybrid Engine")
@@ -90,7 +90,7 @@ def get_motor(config, device, model: nn.Module = None):
         logging.info("🎵 Initializing Harmonic Engine (Wave Interference)")
         if model is None:
             logging.warning("Harmonic Engine requires a model for matter interaction, but None provided. Proceeding with caution.")
-        return SparseHarmonicEngine(model, d_state, backend.get_device(), grid_size)
+        return SparseHarmonicEngine(model, d_state, backend.get_device(), grid_size, cfg=config)
         
     elif engine_type == 'HOLOGRAPHIC':
         logging.info("🔮 Initializing Holographic Engine (AdS/CFT Projection)")

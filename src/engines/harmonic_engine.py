@@ -84,11 +84,12 @@ class SparseHarmonicEngine:
     Motor de Inferencia Masiva.
     Combina Materia Real (almacenada en diccionario) con Vacío Armónico (calculado).
     """
-    def __init__(self, model, d_state, device='cpu', grid_size=256):
+    def __init__(self, model, d_state, device='cpu', grid_size=256, cfg=None):
         self.model = model
         self.operator = model # Alias for compatibility with Trainer
         self.d_state = d_state
         self.device = device
+        self.cfg = cfg
         self.grid_size = grid_size
         self.vacuum = HarmonicVacuum(d_state, device)
         

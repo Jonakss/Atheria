@@ -9,6 +9,7 @@ interface HolographicViewerProps {
     height: number;
     threshold?: number; // Umbral para no renderizar vacío
     vizType?: string; // Tipo de visualización (ej: 'poincare')
+    channels?: number; // Número de canales (1 para mono, 3 para RGB)
 }
 
 export const HolographicViewer2: React.FC<HolographicViewerProps> = ({ 
@@ -17,7 +18,8 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
     width, 
     height,
     threshold = 0.05,
-    vizType = 'holographic'
+    vizType = 'holographic',
+    channels = 1
 }) => {
     const mountRef = useRef<HTMLDivElement>(null);
     const sceneRef = useRef<THREE.Scene | null>(null);
@@ -123,16 +125,37 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
         const indices: number[] = [];
         const magnitudes: number[] = [];
         const phases: number[] = [];
+        const colors: number[] = []; // RGB [r, g, b, r, g, b...]
 
         // Llenar buffers
         for (let i = 0; i < particleCount; i++) {
-            const magnitude = data[i];
+            let magnitude = 0;
+            let r = 0, g = 0, b = 0;
+
+            if (channels === 3) {
+                 // Estructura plana: [r,g,b, r,g,b ...]
+                 const idx = i * 3;
+                 if (idx + 2 < data.length) {
+                     r = data[idx];
+                     g = data[idx + 1];
+                     b = data[idx + 2];
+                     
+                     // Magnitude for positioning can be luminance or max
+                     magnitude = (r + g + b) / 3.0; 
+                 }
+            } else {
+                 magnitude = data[i];
+            }
             
             // Optimización: Skip puntos con muy poca energía
             if (magnitude > threshold) {
                 indices.push(i);
                 magnitudes.push(magnitude);
                 phases.push(phaseData ? phaseData[i] : 0);
+                
+                if (channels === 3) {
+                    colors.push(r, g, b);
+                }
             }
         }
 
@@ -143,6 +166,10 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
         geometry.setAttribute('particleIndex', new THREE.Float32BufferAttribute(indices, 1));
         geometry.setAttribute('magnitude', new THREE.Float32BufferAttribute(magnitudes, 1));
         geometry.setAttribute('phase', new THREE.Float32BufferAttribute(phases, 1));
+        
+        if (channels === 3) {
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        }
         
         // Dummy position attribute needed for Three.js to render count correctly?
         // Actually, drawRange or explicit count in geometry is needed if no position.
@@ -156,7 +183,8 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
             uHeight: { value: height },
             uTime: { value: 0 },
             uIsPoincare: { value: vizType === 'poincare' || vizType === 'poincare_3d' },
-            uScale: { value: 100.0 } // Radio del disco
+            uScale: { value: 100.0 }, // Radio del disco
+            uUseColorAttribute: { value: channels === 3 }
         };
 
         // Vertex Shader: Proyección Hiperbólica
@@ -164,11 +192,13 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
             attribute float particleIndex;
             attribute float magnitude;
             attribute float phase;
+            attribute vec3 color; // Optional RGB
             
             uniform float uWidth;
             uniform float uHeight;
             uniform float uScale;
             uniform bool uIsPoincare;
+            uniform bool uUseColorAttribute;
             
             varying vec3 vColor;
             varying float vAlpha;
@@ -210,17 +240,22 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
                 vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
                 gl_Position = projectionMatrix * mvPosition;
 
-                // 4. Color basado en Fase (o Magnitud si no hay fase)
-                // HSL: Hue = Phase, Sat = 1.0, Light = ajustado para evitar blanco
-                float hue = (phase + 3.14159) / (2.0 * 3.14159);
-                vec3 color = hsl2rgb(vec3(hue, 1.0, 0.2 + magnitude * 0.2)); // Reducido para evitar blanco
-                
-                // Si no hay fase (phase == 0 para todos), usar gradiente azul-cian
-                if (phase == 0.0) {
-                     color = hsl2rgb(vec3(0.6 - magnitude * 0.2, 1.0, 0.15 + magnitude * 0.25)); // Azules más oscuros
+                // 4. Color basado en Fase (o Magnitud si no hay fase), o atributo Color directo
+                if (uUseColorAttribute) {
+                    vColor = color;
+                } else {
+                    // HSL: Hue = Phase, Sat = 1.0, Light = ajustado para evitar blanco
+                    float hue = (phase + 3.14159) / (2.0 * 3.14159);
+                    vec3 hslColor = hsl2rgb(vec3(hue, 1.0, 0.2 + magnitude * 0.2)); 
+                    
+                    // Si no hay fase (phase == 0 para todos), usar gradiente azul-cian
+                    if (phase == 0.0) {
+                         hslColor = hsl2rgb(vec3(0.6 - magnitude * 0.2, 1.0, 0.15 + magnitude * 0.25)); 
+                    }
+                    vColor = hslColor;
                 }
                 
-                vColor = color;
+                vColor = vColor; // Just passthrough
                 
                 // 5. Size Attenuation
                 gl_PointSize = max(2.0, magnitude * 10.0) * (300.0 / -mvPosition.z);
@@ -257,7 +292,7 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
         sceneRef.current.add(points);
         pointsRef.current = points;
 
-    }, [data, phaseData, width, height, threshold, vizType]);
+    }, [data, phaseData, width, height, threshold, vizType, channels]);
 
     return (
         <div className="relative w-full h-full">

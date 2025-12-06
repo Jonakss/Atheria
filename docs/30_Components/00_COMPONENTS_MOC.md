@@ -54,6 +54,7 @@ related: [[10_core/00_CORE_MOC]], [[40_Experiments/00_EXPERIMENTS_MOC]]
 - [[FIELD_VISUALIZATIONS]] - Visualizaciones de campos cuánticos (Métricas Bar)
 - [[FRONTEND_IMPROVEMENTS]] - Mejoras del frontend
 - [[UNIVERSE_ATLAS_ANALYSIS]] - Análisis Atlas del Universo (visualización de grafos con t-SNE)
+- [[UMAP_ANALYSIS|Análisis de Espacio de Estados (UMAP)]]
 - [[PHASE_SPACE_VIEWER]] - Visualización de Espacio de Fase (PCA/UMAP)
 
 ---

@@ -44,10 +44,11 @@ export interface SimData {
     value: number[][];
   };
   roi_info?: any;
+  analysis_data?: Array<{ x: number; y: number; step: number }>;
 }
 
 export interface QuantumStatus {
-  status: 'idle' | 'submitted' | 'queued' | 'running' | 'completed' | 'error';
+  status: "idle" | "submitted" | "queued" | "running" | "completed" | "error";
   job_id?: string;
   data?: any;
   metadata?: {

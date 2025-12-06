@@ -159,7 +159,9 @@ def export_model_to_jit(
         raise
 
 
-class NativeEngineWrapper:
+from ..engines.base_engine import EngineProtocol
+
+class NativeEngineWrapper(EngineProtocol):
     """
     Wrapper que envuelve atheria_core.Engine para mantener compatibilidad
     con el código existente que usa CartesianEngine.
@@ -370,7 +372,8 @@ class NativeEngineWrapper:
 
         # Estado cuántico para compatibilidad (denso)
         # El motor nativo usa formato disperso, pero necesitamos denso para visualización
-        self.state = QuantumState(
+        # Usamos una variable temporal porque self._state_storage es ahora una propiedad dinámica
+        temp_initial_state = QuantumState(
             grid_size,
             d_state,
             device,
@@ -378,10 +381,11 @@ class NativeEngineWrapper:
             base_state=base_state,
             base_grid_size=base_grid_size,
         )
+        self._state_storage = temp_initial_state
 
         # CRÍTICO: Convertir estado denso inicial al formato disperso del motor nativo
         # Esto genera las partículas iniciales desde el estado denso (ley M respetada)
-        self._initialize_native_state_from_dense(self.state.psi)
+        self._initialize_native_state_from_dense(temp_initial_state.psi)
 
         # Configuración
         self.grid_size = grid_size
@@ -665,6 +669,48 @@ class NativeEngineWrapper:
                 )
         return success
 
+
+
+    def evolve_step(self, current_psi):
+        """
+        Wrapper para compatibilidad con EngineProtocol.
+        ADVERTENCIA: Menos eficiente que evolve_internal_state porque requiere round-trip.
+        """
+        # Si current_psi es diferente de nuestro estado interno, tendríamos que reinicializar
+        # Por ahora asumimos que se usa para flujo paso a paso
+        self.evolve_internal_state()
+        return self.get_dense_state()
+
+    @property
+    def state(self):
+        """
+        Propiedad state compatible con EngineProtocol.
+        Retorna un objeto con atributo .psi
+        """
+        # Usamos un objeto simple que expone .psi haciendo la llamada a get_dense_state()
+        # Esto es un truco para mantener compatibilidad sin duplicar memoria constantemente
+        class StateProxy:
+            def __init__(self, wrapper):
+                self._wrapper = wrapper
+            
+            @property
+            def psi(self):
+                return self._wrapper.get_dense_state(check_pause_callback=lambda: False)
+            
+            @psi.setter
+            def psi(self, value):
+                # Al setear psi, reinicializamos el motor nativo
+                self._wrapper.native_engine.clear()
+                self._wrapper._initialize_native_state_from_dense(value)
+                
+        return StateProxy(self)
+
+    def get_initial_state(self, batch_size: int = 1):
+        """Genera un estado inicial usando la configuración actual."""
+        # Delegar a la regeneración interna
+        self.regenerate_initial_state()
+        return self.get_dense_state()
+
     def evolve_internal_state(self, step=None):
         """Evoluciona el estado interno usando el motor nativo."""
         with self._lock:
@@ -704,14 +750,14 @@ class NativeEngineWrapper:
                 roi is None and self._last_conversion_roi is not None
             )
 
-            if self._dense_state_stale or self.state.psi is None or roi_changed:
+            if self._dense_state_stale or self._state_storage.psi is None or roi_changed:
                 self._update_dense_state_from_sparse(
                     roi=roi, check_pause_callback=check_pause_callback
                 )
                 self._dense_state_stale = False
                 self._last_conversion_roi = roi
 
-            return self.state.psi
+            return self._state_storage.psi
 
     def _update_dense_state_from_sparse(self, roi=None, check_pause_callback=None):
         """
@@ -731,8 +777,8 @@ class NativeEngineWrapper:
                                  Debe retornar True si está pausado.
         """
         # Inicializar grid denso si no existe
-        if self.state.psi is None:
-            self.state.psi = torch.zeros(
+        if self._state_storage.psi is None:
+            self._state_storage.psi = torch.zeros(
                 1,
                 self.grid_size,
                 self.grid_size,
@@ -923,7 +969,7 @@ class NativeEngineWrapper:
                                 0 <= coord.x < self.grid_size
                                 and 0 <= coord.y < self.grid_size
                             ):
-                                self.state.psi[0, coord.y, coord.x] = state_tensor
+                                self._state_storage.psi[0, coord.y, coord.x] = state_tensor
 
                             total_processed += 1
                         else:
@@ -944,8 +990,8 @@ class NativeEngineWrapper:
                 f"❌ Error convirtiendo estado disperso a denso: {e}", exc_info=True
             )
             # En caso de error, mantener grid actual o inicializar vacío
-            if self.state.psi is None:
-                self.state.psi = torch.zeros(
+            if self._state_storage.psi is None:
+                self._state_storage.psi = torch.zeros(
                     1,
                     self.grid_size,
                     self.grid_size,
@@ -1050,7 +1096,7 @@ class NativeEngineWrapper:
                 )
 
         # Regenerar estado cuántico denso según INITIAL_STATE_MODE_INFERENCE
-        self.state = QuantumState(
+        self._state_storage = QuantumState(
             self.grid_size,
             self.d_state,
             self.device,
@@ -1061,7 +1107,7 @@ class NativeEngineWrapper:
 
         # CRÍTICO: Convertir estado denso inicial al formato disperso del motor nativo
         # Esto genera las partículas desde el estado denso (ley M respetada)
-        self._initialize_native_state_from_dense(self.state.psi)
+        self._initialize_native_state_from_dense(self._state_storage.psi)
 
         # Marcar estado denso como stale para forzar reconversión si se necesita
         self._dense_state_stale = True
@@ -1128,8 +1174,8 @@ class NativeEngineWrapper:
 
             # Marcar estado denso como stale
             self._dense_state_stale = True
-            if self.state and self.state.psi is not None:
-                self.state.psi = None
+            if self._state_storage and self._state_storage.psi is not None:
+                self._state_storage.psi = None
 
     def cleanup(self):
         """
@@ -1139,14 +1185,14 @@ class NativeEngineWrapper:
         try:
             # Limpiar estado denso primero
             try:
-                if hasattr(self, "state") and self.state is not None:
-                    if hasattr(self.state, "psi") and self.state.psi is not None:
+                if hasattr(self, "state") and self._state_storage is not None:
+                    if hasattr(self._state_storage, "psi") and self._state_storage.psi is not None:
                         try:
-                            self.state.psi = None
+                            self._state_storage.psi = None
                         except Exception as psi_error:
                             logging.debug(f"Error limpiando state.psi: {psi_error}")
                     try:
-                        self.state = None
+                        self._state_storage = None
                     except Exception as state_error:
                         logging.debug(f"Error limpiando state: {state_error}")
             except Exception as state_cleanup_error:
@@ -1223,7 +1269,7 @@ class NativeEngineWrapper:
         Asegura que state.psi esté disponible (para compatibilidad).
         Internamente usa lazy conversion.
         """
-        if self.state.psi is None or self._dense_state_stale:
+        if self._state_storage.psi is None or self._dense_state_stale:
             self.get_dense_state(check_pause_callback=lambda: False)
         # Si no está compilado, devolver el operador directamente
         return self.operator
@@ -1237,7 +1283,7 @@ class NativeEngineWrapper:
             # Asegurar que tenemos estado denso actualizado
             self.get_dense_state()
             
-            if self.state.psi is None:
+            if self._state_storage.psi is None:
                 return False
                 
             logging.info(f"🛠️ NativeEngineWrapper aplicando herramienta: {action} | Params: {params}")
@@ -1256,7 +1302,7 @@ class NativeEngineWrapper:
                         center = (int(params['y']), int(params['x']))
                         
                     collapser = IonQCollapse(device)
-                    new_psi = collapser.collapse(self.state.psi, region_center=center, intensity=intensity)
+                    new_psi = collapser.collapse(self._state_storage.psi, region_center=center, intensity=intensity)
                     
                 elif action == 'vortex':
                     x = int(params.get('x', self.grid_size // 2))
@@ -1265,14 +1311,14 @@ class NativeEngineWrapper:
                     strength = float(params.get('strength', 1.0))
                     
                     steering = QuantumSteering(device)
-                    new_psi = steering.inject(self.state.psi, 'vortex', x=x, y=y, radius=radius, strength=strength)
+                    new_psi = steering.inject(self._state_storage.psi, 'vortex', x=x, y=y, radius=radius, strength=strength)
                     
                 elif action == 'wave':
                     k_x = float(params.get('k_x', 1.0))
                     k_y = float(params.get('k_y', 1.0))
                     
                     steering = QuantumSteering(device)
-                    new_psi = steering.inject(self.state.psi, 'plane_wave', k_x=k_x, k_y=k_y)
+                    new_psi = steering.inject(self._state_storage.psi, 'plane_wave', k_x=k_x, k_y=k_y)
                     
                 else:
                     logging.warning(f"⚠️ Herramienta no soportada: {action}")
@@ -1280,13 +1326,13 @@ class NativeEngineWrapper:
         
                 if new_psi is not None:
                     # 1. Actualizar estado denso
-                    self.state.psi = new_psi
+                    self._state_storage.psi = new_psi
                     
                     # 2. Re-sincronizar con motor nativo (Heavy operation)
                     if self.native_engine is not None:
                         logging.info("🔄 Re-sincronizando motor nativo tras aplicar herramienta...")
                         self.native_engine.clear()
-                        self._initialize_native_state_from_dense(self.state.psi)
+                        self._initialize_native_state_from_dense(self._state_storage.psi)
                     
                     # Invalidar caché
                     self.last_delta_psi = None
@@ -1295,59 +1341,4 @@ class NativeEngineWrapper:
             except Exception as e:
                 logging.error(f"❌ Error aplicando herramienta {action}: {e}", exc_info=True)
                 return False
-    def apply_tool(self, action, params):
-        """
-        Aplica una herramienta cuántica al estado.
-        Nota: Esto requiere convertir a denso, aplicar, y reconvertir a disperso (costoso).
-        """
-        logging.info(f"🛠️ NativeEngineWrapper aplicando herramienta: {action} | Params: {params}")
-        
-        try:
-            # 1. Obtener estado denso actual
-            current_dense = self.get_dense_state()
-            
-            # 2. Aplicar herramienta (usando lógica de CartesianEngine/Physics)
-            from ..physics import IonQCollapse, QuantumSteering
-            device = self.device
-            new_psi = None
-            
-            if action == 'collapse':
-                intensity = float(params.get('intensity', 0.5))
-                center = None
-                if 'x' in params and 'y' in params:
-                    center = (int(params['y']), int(params['x']))
-                collapser = IonQCollapse(device)
-                new_psi = collapser.collapse(current_dense, region_center=center, intensity=intensity)
-                
-            elif action == 'vortex':
-                x = int(params.get('x', self.grid_size // 2))
-                y = int(params.get('y', self.grid_size // 2))
-                radius = int(params.get('radius', 5))
-                strength = float(params.get('strength', 1.0))
-                steering = QuantumSteering(device)
-                new_psi = steering.inject(current_dense, 'vortex', x=x, y=y, radius=radius, strength=strength)
-                
-            elif action == 'wave':
-                k_x = float(params.get('k_x', 1.0))
-                k_y = float(params.get('k_y', 1.0))
-                cx, cy = self.grid_size // 2, self.grid_size // 2
-                radius = self.grid_size
-                steering = QuantumSteering(device)
-                new_psi = steering.inject(current_dense, 'plane_wave', x=cx, y=cy, radius=radius, k_x=k_x, k_y=k_y)
-            
-            if new_psi is not None:
-                # 3. Actualizar estado
-                self.state.psi = new_psi
-                
-                # 4. Re-sincronizar motor nativo
-                # Limpiar y re-llenar
-                if self.native_engine is not None:
-                    self.native_engine.clear()
-                    self._initialize_native_state_from_dense(new_psi)
-                return True
-                
-            return False
-            
-        except Exception as e:
-            logging.error(f"❌ Error aplicando herramienta en NativeEngine: {e}", exc_info=True)
-            return False
+

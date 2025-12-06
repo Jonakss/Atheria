@@ -99,10 +99,14 @@ export const DashboardLayout: React.FC = () => {
       if (Array.isArray(row)) {
         for (let x = 0; x < row.length; x++) {
           const val = row[x];
-          if (typeof val === 'number' && !isNaN(val)) {
-            flat.push(val);
+          // Handle scalar or array (RGB)
+          if (Array.isArray(val)) {
+             // 3 channels [r, g, b]
+             flat.push(...val);
+          } else if (typeof val === 'number' && !isNaN(val)) {
+             flat.push(val);
           } else {
-            flat.push(0);
+             flat.push(0);
           }
         }
       }
@@ -133,12 +137,11 @@ export const DashboardLayout: React.FC = () => {
                     threshold={0.01}
                   />
                 ) : (
-                  <HolographicViewer2 
-                    data={flatMapData}
                     width={gridWidth}
                     height={gridHeight}
                     vizType={selectedViz}
                     threshold={0.01}
+                    channels={flatMapData.length === gridWidth * gridHeight * 3 ? 3 : 1}
                   />
                 )
               ) : (

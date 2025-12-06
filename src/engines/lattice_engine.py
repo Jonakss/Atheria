@@ -187,24 +187,60 @@ class LatticeEngine:
                 phase = torch.angle(trace)
                 data = phase.squeeze(0)  # [H, W]
                 
+            elif viz_type == "holographic":
+                # Holographic View: RGB Mapping from SU(3) components
+                # We use the diagonal of the Plaquette matrix (3 complex numbers)
+                # This gives us 3 distinct fields to map to R, G, B
+                U_p = self._compute_plaquettes(self.links) # [B, H, W, 3, 3]
+                
+                # Extract diagonal elements [B, H, W, 3]
+                diag = torch.diagonal(U_p, dim1=-2, dim2=-1)
+                
+                # Map to real values (Magnitude or Real part)
+                # Phase could also be interesting, but let's use Real part (Energy-like)
+                # Normalized around 1.0 (Identity)
+                # Re(u_ii) ~ 1.0 - epsilon
+                # We want deviation from identity to be visible
+                
+                # Use absolute deviation from 1.0 as signal?
+                # Or simply the values themselves shifted
+                
+                # Approach: Real part of diagonal. 
+                # Ideally close to 1.0. Lower values mean excitation.
+                data = diag.real.squeeze(0) # [H, W, 3]
+                
+                # Normalize specifically for color
+                # Create contrast: (1 - val) * gain
+                data = 1.0 - data
+                
             else:
                 # Default: density
                 U_p = self._compute_plaquettes(self.links)
                 trace = torch.diagonal(U_p, dim1=-2, dim2=-1).sum(-1)
                 energy = 1.0 - (1.0 / self.N) * trace.real
-                data = energy.squeeze(0)
+                data = energy.squeeze(0) # [H, W]
             
             # Convertir a numpy
             data_np = data.cpu().numpy().astype(np.float32)
             
             # NORMALIZACIÓN: Los shaders esperan datos en [0, 1]
-            min_val = float(data_np.min())
-            max_val = float(data_np.max())
-            if max_val > min_val and abs(max_val - min_val) > 1e-10:
-                data_np = (data_np - min_val) / (max_val - min_val)
+            if viz_type == "holographic":
+                 # Normalize per channel or global?
+                 # Global normalization preserves color balance
+                 min_val = float(data_np.min())
+                 max_val = float(data_np.max())
+                 if max_val > min_val and abs(max_val - min_val) > 1e-10:
+                     data_np = (data_np - min_val) / (max_val - min_val)
+                 else:
+                     data_np = np.zeros_like(data_np) # Black background if no excitation
             else:
-                # Si todos los valores son iguales, usar 0.5 (gris medio)
-                data_np = np.full_like(data_np, 0.5)
+                min_val = float(data_np.min())
+                max_val = float(data_np.max())
+                if max_val > min_val and abs(max_val - min_val) > 1e-10:
+                    data_np = (data_np - min_val) / (max_val - min_val)
+                else:
+                    # Si todos los valores son iguales, usar 0.5 (gris medio)
+                    data_np = np.full_like(data_np, 0.5)
             
             return {
                 "data": data_np,
@@ -212,7 +248,8 @@ class LatticeEngine:
                 "shape": list(data_np.shape),
                 "min": 0.0,  # Ya normalizado
                 "max": 1.0,  # Ya normalizado
-                "engine": "LatticeEngine"
+                "engine": "LatticeEngine",
+                "channels": 3 if viz_type == "holographic" else 1
             }
             
         except Exception as e:
