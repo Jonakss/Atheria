@@ -109,6 +109,10 @@ class SparseHarmonicEngine:
         self.collider = IonQCollapse(device)
         self.steering = QuantumSteering(device)
 
+        # Gateway Process: Click-Out Mechanism
+        self.click_out_enabled = False
+        self.click_out_chance = 0.01
+
     @property
     def state(self):
         """
@@ -394,7 +398,45 @@ class SparseHarmonicEngine:
         self.matter = next_matter
         self.active_coords = next_active_coords
         
+        # 3. Gateway Process: Click-Out Mechanism
+        if self.click_out_enabled:
+            self._apply_click_out()
+
         return len(self.matter)
+
+    def _apply_click_out(self):
+        """
+        Simulates Gateway Click-Out in Harmonic Engine.
+        Non-local exchange of matter states between active particles.
+        """
+        if np.random.random() > self.click_out_chance:
+             return
+             
+        if len(self.active_coords) < 2:
+            return
+
+        # Convert set to list for random choice
+        coords = list(self.active_coords)
+        
+        # Choose random pairs
+        n_pairs = max(1, len(coords) // 20) # 5% of particles participate
+        
+        for _ in range(n_pairs):
+            idx_a = np.random.randint(0, len(coords))
+            idx_b = np.random.randint(0, len(coords))
+            
+            coord_a = coords[idx_a]
+            coord_b = coords[idx_b]
+            
+            if coord_a == coord_b: continue
+            
+            # Swap states (Teleportation / Tunneling)
+            if coord_a in self.matter and coord_b in self.matter:
+                state_a = self.matter[coord_a]
+                state_b = self.matter[coord_b]
+                
+                self.matter[coord_a] = state_b
+                self.matter[coord_b] = state_a
 
     def compile_model(self):
         """
@@ -554,6 +596,12 @@ class SparseHarmonicEngine:
                 # Steering inject
                 new_local_tensor = self.steering.inject(local_tensor, pattern_type, radius, radius, radius=radius//2)
                 
+            elif action == 'set_click_out':
+                self.click_out_enabled = bool(params.get('enabled', False))
+                self.click_out_chance = float(params.get('chance', 0.01))
+                logging.info(f"🌀 HarmonicEngine Click-Out: Enabled={self.click_out_enabled}, Chance={self.click_out_chance}")
+                return True
+
             else:
                 logging.warning(f"⚠️ Herramienta no soportada: {action}")
                 return False

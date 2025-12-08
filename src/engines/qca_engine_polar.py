@@ -19,6 +19,10 @@ class PolarEngine(nn.Module):
         self.last_delta_psi = None
         self.is_compiled = False
         
+        # Gateway Process: Click-Out Mechanism
+        self.click_out_enabled = False
+        self.click_out_chance = 0.01
+        
     def forward(self, x):
         # Placeholder forward pass
         return x
@@ -90,8 +94,45 @@ class PolarEngine(nn.Module):
                 new_psi = new_psi * decay_factor
             
             # 4. Actualizar estado interno
+            # 4. Actualizar estado interno
             self.state.psi.magnitude = new_psi.abs()
             self.state.psi.phase = new_psi.angle()
+            
+            # 5. Gateway Process: Click-Out Mechanism
+            if self.click_out_enabled:
+                self._apply_click_out()
+
+    def _apply_click_out(self):
+        """
+        Simulates Gateway Click-Out in Polar Engine.
+        Non-local exchange of magnitude/phase between random points.
+        """
+        import numpy as np
+        if np.random.random() > self.click_out_chance:
+             return
+
+        # Pick random pairs
+        n_pairs = int(self.grid_size * 0.5) # Scale with grid size
+        
+        # Random coordinates
+        src_y = torch.randint(0, self.grid_size, (n_pairs,), device=self.device)
+        src_x = torch.randint(0, self.grid_size, (n_pairs,), device=self.device)
+        dst_y = torch.randint(0, self.grid_size, (n_pairs,), device=self.device)
+        dst_x = torch.randint(0, self.grid_size, (n_pairs,), device=self.device)
+        
+        # Swap Magnitude
+        mag = self.state.psi.magnitude
+        src_mag = mag[..., src_y, src_x].clone()
+        dst_mag = mag[..., dst_y, dst_x].clone()
+        mag[..., src_y, src_x] = dst_mag
+        mag[..., dst_y, dst_x] = src_mag
+        
+        # Swap Phase (Coherence Teleportation)
+        phase = self.state.psi.phase
+        src_phase = phase[..., src_y, src_x].clone()
+        dst_phase = phase[..., dst_y, dst_x].clone()
+        phase[..., src_y, src_x] = dst_phase
+        phase[..., dst_y, dst_x] = src_phase
         
     def get_dense_state(self, roi=None, check_pause_callback=None):
         """
@@ -215,9 +256,16 @@ class PolarEngine(nn.Module):
                 k_y = float(params.get('k_y', 1.0))
                 cx, cy = self.grid_size // 2, self.grid_size // 2
                 radius = self.grid_size
+                radius = self.grid_size
                 steering = QuantumSteering(device)
                 new_psi = steering.inject(current_dense, 'plane_wave', x=cx, y=cy, radius=radius, k_x=k_x, k_y=k_y)
             
+            elif action == 'set_click_out':
+                self.click_out_enabled = bool(params.get('enabled', False))
+                self.click_out_chance = float(params.get('chance', 0.01))
+                logging.info(f"🌀 PolarEngine Click-Out: Enabled={self.click_out_enabled}, Chance={self.click_out_chance}")
+                return True
+
             if new_psi is not None:
                 # 3. Actualizar estado interno (Polar)
                 self.state.psi.magnitude = new_psi.abs()

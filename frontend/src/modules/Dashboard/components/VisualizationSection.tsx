@@ -1,20 +1,33 @@
 import { Activity, Box, Eye, Globe, Layers, Maximize, Minimize, Palette, Waves, Zap } from 'lucide-react';
 import React, { useState } from 'react';
-import { useWebSocket } from '../../../hooks/useWebSocket';
 import { Tooltip } from '../../../components/ui/common/Tooltip';
+import { useWebSocket } from '../../../hooks/useWebSocket';
 
 interface VisualizationSectionProps {
   selectedLayer?: number;
   onLayerChange?: (layer: number) => void;
   theaterMode?: boolean;
   onToggleTheaterMode?: (enabled: boolean) => void;
+  // Gateway Props
+  binaryMode?: boolean;
+  onToggleBinaryMode?: (enabled: boolean) => void;
+  binaryThreshold?: number;
+  onChangeBinaryThreshold?: (val: number) => void;
+  binaryColor?: string;
+  onChangeBinaryColor?: (val: string) => void;
 }
 
 export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
   selectedLayer = 0,
   onLayerChange,
   theaterMode = false,
-  onToggleTheaterMode
+  onToggleTheaterMode,
+  binaryMode = false,
+  onToggleBinaryMode,
+  binaryThreshold = 0.5,
+  onChangeBinaryThreshold,
+  binaryColor = '#FFFFFF',
+  onChangeBinaryColor
 }) => {
   const { sendCommand, selectedViz, setSelectedViz, roiInfo } = useWebSocket();
   const [gammaDecay, setGammaDecay] = useState(0.015);
@@ -51,6 +64,8 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
     { id: 6, vizType: 'phase_hsv', label: 'Fase HSV', desc: 'Mapeo HSV completo de amplitud (valor) y fase (hue).', icon: <Palette size={18} />, color: 'text-pink-400', border: 'border-pink-500/50' },
     { id: 7, vizType: 'holographic', label: 'Holográfico', desc: 'Renderizado volumétrico 3D del bulk AdS.', icon: <Box size={18} />, color: 'text-teal-400', border: 'border-teal-500/50' },
     { id: 8, vizType: 'poincare_3d', label: 'Poincaré 3D', desc: 'Visualización 3D de la esfera de Poincaré.', icon: <Globe size={18} />, color: 'text-rose-400', border: 'border-rose-500/50' },
+    { id: 9, vizType: 'real', label: 'Parte Real', desc: 'Visualiza la parte real de la Función de Onda.', icon: <Activity size={18} />, color: 'text-emerald-400', border: 'border-emerald-500/50' },
+    { id: 10, vizType: 'imag', label: 'Parte Imag', desc: 'Visualiza la parte imaginaria de la Función de Onda.', icon: <Activity size={18} />, color: 'text-fuchsia-400', border: 'border-fuchsia-500/50' },
   ];
 
   const handleGammaChange = (value: number) => {
@@ -61,6 +76,31 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
   const handleThermalNoiseChange = (value: number) => {
     setThermalNoise(value);
     // TODO: Implement backend support
+  };
+
+  // Gateway Phase 2: Click-Out State
+  const [clickOutEnabled, setClickOutEnabled] = useState(false);
+  const [clickOutChance, setClickOutChance] = useState(0.01);
+
+  const toggleClickOut = () => {
+      const newState = !clickOutEnabled;
+      setClickOutEnabled(newState);
+      sendCommand('inference', 'apply_tool', { 
+          action: 'set_click_out', 
+          enabled: newState, 
+          chance: clickOutChance 
+      });
+  };
+
+  const handleClickOutChanceChange = (value: number) => {
+      setClickOutChance(value);
+      if (clickOutEnabled) {
+          sendCommand('inference', 'apply_tool', { 
+              action: 'set_click_out', 
+              enabled: true, 
+              chance: value 
+          });
+      }
   };
 
   return (
@@ -216,6 +256,114 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
             <span className="text-[9px] text-gray-500">Alto Rendimiento</span>
           </button>
         </div>
+      </div>
+
+      {/* Gateway Process: Observer Control */}
+      <div className="space-y-3 pt-4 border-t border-white/5">
+        <div className="flex items-center gap-2 text-gray-200 text-xs font-bold uppercase tracking-wider mb-2">
+          <Eye size={12} className="text-purple-500" /> Control del Observador (Gateway)
+        </div>
+        
+        {/* Binary Mode Toggle */}
+        <button
+          onClick={() => onToggleBinaryMode?.(!binaryMode)}
+          className={`w-full flex items-center justify-between p-2 rounded border transition-all ${
+            binaryMode
+              ? 'bg-purple-500/20 border-purple-500/50 text-purple-200 shadow-[0_0_15px_rgba(168,85,247,0.3)]'
+              : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {binaryMode ? <Box size={14} /> : <Activity size={14} />}
+            <div className="flex flex-col items-start">
+               <span className="text-xs font-medium">
+                 {binaryMode ? 'Modo Binario (Materia)' : 'Modo Holográfico (Onda)'}
+               </span>
+               <span className="text-[9px] opacity-70">
+                 {binaryMode ? 'Colapso de Función de Onda' : 'Interferencia Continua'}
+               </span>
+            </div>
+          </div>
+          <div className={`w-2 h-2 rounded-full ${binaryMode ? 'bg-purple-400 animate-pulse' : 'bg-gray-600'}`} />
+        </button>
+
+        {/* Reality Threshold Slider - Only visible in Binary Mode */}
+        {binaryMode && (
+          <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-300">
+             <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-gray-400">Umbral de Realidad (Click-out)</span>
+                  <span className="text-[10px] font-mono text-purple-300">{binaryThreshold?.toFixed(2)}</span>
+             </div>
+             <input 
+                 type="range" 
+                 min="0" max="1" step="0.01"
+                 value={binaryThreshold}
+                 onChange={(e) => onChangeBinaryThreshold?.(parseFloat(e.target.value))}
+                 className="w-full accent-purple-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+             />
+             
+             {/* Add Color Picker */}
+             <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+                  <span className="text-[10px] text-gray-400">Color de Materia</span>
+                  <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-gray-500">{binaryColor}</span>
+                      <input 
+                         type="color" 
+                         value={binaryColor}
+                         onChange={(e) => onChangeBinaryColor?.(e.target.value)}
+                         className="w-6 h-6 rounded border-none cursor-pointer bg-transparent"
+                      />
+                  </div>
+             </div>
+            <p className="text-[9px] text-gray-500 italic mt-1">
+               &quot;La materia emerge cuando la energía supera el umbral del observador.&quot;
+            </p>
+          </div>
+        )}
+
+        {/* Click-Out Mechanism (Phase 2) */}
+        <div className="pt-2 mt-2 border-t border-white/5">
+            <button
+            onClick={toggleClickOut}
+            className={`w-full flex items-center justify-between p-2 rounded border transition-all ${
+                clickOutEnabled
+                ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-200'
+                : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+            }`}
+            >
+            <div className="flex items-center gap-2">
+                <Zap size={14} className={clickOutEnabled ? "text-cyan-400" : "text-gray-600"} />
+                <span className="text-xs font-medium">Mecánica Click-Out</span>
+            </div>
+            <div className={`w-2 h-2 rounded-full ${clickOutEnabled ? 'bg-cyan-400 animate-ping' : 'bg-gray-600'}`} />
+            </button>
+
+            {clickOutEnabled && (
+            <div className="space-y-1.5 mt-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                <div className="flex justify-between text-[10px]">
+                <span className="text-gray-400">Probabilidad de Túnel</span>
+                <span className="font-mono text-cyan-200 bg-cyan-900/40 px-1.5 rounded border border-cyan-500/30">{(clickOutChance * 100).toFixed(1)}%</span>
+                </div>
+                <input
+                type="range"
+                min="0.0"
+                max="0.1"
+                step="0.001"
+                value={clickOutChance}
+                onChange={(e) => handleClickOutChanceChange(parseFloat(e.target.value))}
+                className="w-full h-1 bg-gray-800 rounded-full appearance-none cursor-pointer slider-thumb"
+                style={{
+                    background: `linear-gradient(to right, rgb(6, 182, 212) 0%, rgb(6, 182, 212) ${(clickOutChance / 0.1) * 100}%, rgb(31, 41, 55) ${(clickOutChance / 0.1) * 100}%, rgb(31, 41, 55) 100%)`
+                }}
+                />
+                <p className="text-[9px] text-gray-500 italic mt-1">
+                 &quot;Resonancia no local a través del vacío.&quot;
+                </p>
+            </div>
+            )}
+        </div>
+        
+        {/* End Gateway Control */}
       </div>
 
       {/* Holographic Viewer Controls (solo visible si está en modo 3D) */}

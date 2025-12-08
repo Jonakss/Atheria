@@ -19,6 +19,10 @@
 
 ### 2025-12-07
 
+### 2025-12-08
+
+- [[logs/2025-12-08_training_snapshots_and_viz|Feature: Training Snapshots & Extended Viz]]: Implemented snapshot loading in training & Real/Imag visualizations.
+- [[logs/2025-12-08_native_engine_optimizations|Optimization: Native Engine Performance]]: OpenMP fixes, Vectorized Batching, In-place operations in C++.
 - [[logs/2025-12-07_bm25_rag_implementation|Feature: BM25 RAG for Knowledge Base]]: Sistema de búsqueda integrado en CLI (`atheria -q`).
 
 ### 2025-12-05

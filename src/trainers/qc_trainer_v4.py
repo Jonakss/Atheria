@@ -231,30 +231,17 @@ class QC_Trainer_v4:
             if len(psi_history) == 0 or not torch.equal(psi_history[-1], psi):
                 psi_history.append(psi)
             
-            # Calcular pérdida evolutiva (dentro de autocast)
-            # Usamos la función de pérdida inyectada (estrategia modular)
-            # Pasamos kwargs adicionales si están definidos en model_params o config
-            loss_kwargs = {}
-            if self.motor.cfg:
-                # Extraer parámetros relevantes de configuración
-                if hasattr(self.motor.cfg, 'LOSS_PARAMS'):
-                    loss_kwargs.update(self.motor.cfg.LOSS_PARAMS)
-                # También buscar en el nivel superior si es un dict
-                elif isinstance(self.motor.cfg, dict) and 'LOSS_PARAMS' in self.motor.cfg:
-                    loss_kwargs.update(self.motor.cfg['LOSS_PARAMS'])
-
+        # Calculate loss
             loss, metrics = self.loss_fn(psi_history, psi_initial, **loss_kwargs)
         
-        # OPTIMIZACIÓN DE MEMORIA: Limpiar psi_history después de calcular pérdida
-        # Los tensores ya no se necesitan y pueden ocupar mucha memoria
+        # Optimize memory usage
         del psi_history
         import gc
-        gc.collect()  # Forzar garbage collection para liberar memoria inmediatamente
+        gc.collect() 
         
-        # Retropropagación con Mixed Precision (AMP) y manejo de memoria CUDA
+        # Backprop (AMP or FP32)
         try:
             if self.use_amp and self.scaler:
-                # Backward pass con gradient scaling (AMP)
                 self.scaler.scale(loss).backward()
                 self.scaler.unscale_(self.optimizer)
                 if self.model_operator:
@@ -262,19 +249,17 @@ class QC_Trainer_v4:
                 self.scaler.step(self.optimizer)
                 self.scaler.update()
             else:
-                # Backward pass estándar (FP32)
-                # Backward pass estándar (FP32)
                 loss.backward()
                 if self.model_operator:
                     torch.nn.utils.clip_grad_norm_(self.model_operator.parameters(), 1.0)
                 self.optimizer.step()
-        except torch.cuda.OutOfMemoryError as e:
-            # Si hay error de memoria CUDA, limpiar caché y reintentar una vez
-            logging.warning(f"⚠️ CUDA Out of Memory durante entrenamiento episodio {episode_num}. Limpiando caché...")
+        except torch.cuda.OutOfMemoryError:
+            # Handle OOM
+            logging.warning(f"⚠️ CUDA Out of Memory during training episode {episode_num}. Clearing cache...")
             torch.cuda.empty_cache()
             gc.collect()
-            # Reintentar una vez después de limpiar
             try:
+                # Retry once
                 if self.use_amp and self.scaler:
                     self.scaler.scale(loss).backward()
                     self.scaler.unscale_(self.optimizer)
@@ -287,52 +272,38 @@ class QC_Trainer_v4:
                     if self.model_operator:
                         torch.nn.utils.clip_grad_norm_(self.model_operator.parameters(), 1.0)
                     self.optimizer.step()
-                logging.info("✅ Recuperado después de limpiar caché CUDA")
+                logging.info("✅ Recovered after clearing CUDA cache")
             except torch.cuda.OutOfMemoryError:
-                logging.error(f"❌ CUDA Out of Memory persistente en episodio {episode_num}. Deteniendo entrenamiento.")
+                logging.error(f"❌ Persistent CUDA Out of Memory in episode {episode_num}. Stopping training.")
                 raise
         
-        # Limpiar caché CUDA periódicamente (cada 10 episodios)
+        # Clear CUDA cache periodically
         if episode_num % 10 == 0 and torch.cuda.is_available():
             torch.cuda.empty_cache()
         
-        # Logging
-        if episode_num % 10 == 0:
-            if self.writer is not None:
-                self.writer.add_scalar('Loss/Total', loss.item(), episode_num)
-                self.writer.add_scalar('Metrics/Symmetry', metrics['symmetry'], episode_num)
-                self.writer.add_scalar('Metrics/Survival', metrics['survival'], episode_num)
-                self.writer.add_scalar('Environment/NoiseLevel', current_noise, episode_num)
+        # Tensorboard Logging
+        if episode_num % 10 == 0 and self.writer is not None:
+             self.writer.add_scalar('Loss/Total', loss.item(), episode_num)
+             self.writer.add_scalar('Metrics/Symmetry', metrics['symmetry'], episode_num)
+             self.writer.add_scalar('Metrics/Survival', metrics['survival'], episode_num)
+             self.writer.add_scalar('Environment/NoiseLevel', current_noise, episode_num)
             
-        return loss.item(), metrics
+        return loss.item(), metrics, psi.detach().cpu()
 
     def save_checkpoint(self, episode: int, current_metrics: Optional[Dict[str, float]] = None,
-                       current_loss: Optional[float] = None, is_best: bool = False):
+                       current_loss: Optional[float] = None, is_best: bool = False,
+                       state_snapshot: Optional[torch.Tensor] = None):
         """
         Guarda un checkpoint con sistema Smart Save.
-        
-        Implementa una política de retención que solo mantiene los N mejores checkpoints
-        y el último, borrando automáticamente los antiguos para optimizar el uso de disco.
-        
-        Args:
-            episode: Número de episodio
-            current_metrics: Diccionario con métricas actuales (survival, symmetry, complexity)
-            current_loss: Pérdida total actual
-            is_best: Si este checkpoint es el mejor hasta ahora
         """
-        # Valores por defecto si no se proporcionan
-        if current_metrics is None:
-            current_metrics = {}
-        if current_loss is None:
-            current_loss = 0.0
+        # ... (Same as before)
+        if current_metrics is None: current_metrics = {}
+        if current_loss is None: current_loss = 0.0
         
-        # Calcular métrica combinada para ordenar checkpoints
-        # Usamos la misma ponderación que en loss_function_evolutionary
         survival = current_metrics.get('survival', 0.0)
         symmetry = current_metrics.get('symmetry', 0.0)
-        combined_metric = (10.0 * survival) + (5.0 * symmetry)  # Menor es mejor
+        combined_metric = (10.0 * survival) + (5.0 * symmetry)
         
-        # Generar nombre de archivo
         if is_best:
             filename = "best_model.pth"
         else:
@@ -340,7 +311,6 @@ class QC_Trainer_v4:
         
         path = os.path.join(self.checkpoint_dir, filename)
         
-        # Guardar checkpoint
         checkpoint_data = {
             'episode': episode,
             'model_state_dict': self.model_operator.state_dict() if self.model_operator else None,
@@ -351,86 +321,82 @@ class QC_Trainer_v4:
             'combined_metric': combined_metric
         }
         torch.save(checkpoint_data, path)
-        
-        # Actualizar lista de mejores checkpoints
+
+        # Save Snapshot if provided
+        if state_snapshot is not None:
+            snap_filename = f"snapshot_ep{episode}.pt"
+            snap_path = os.path.join(self.checkpoint_dir, snap_filename)
+            torch.save(state_snapshot, snap_path)
+            # Also save as best snapshot if is_best
+            if is_best:
+                best_snap_path = os.path.join(self.checkpoint_dir, "best_snapshot.pt")
+                shutil.copy2(snap_path, best_snap_path)
+
+        # ... (Smart Save Logic)
         checkpoint_entry = {
             'path': path,
             'episode': episode,
             'metrics': current_metrics.copy(),
             'loss': current_loss,
-            'combined_metric': combined_metric
+            'combined_metric': combined_metric,
+            'snapshot_path': snap_path if state_snapshot is not None else None
         }
         
-        # Si es el mejor, añadirlo a la lista
         if is_best:
             self.best_checkpoints.append(checkpoint_entry)
-            
-            # Ordenar por métrica combinada (menor es mejor)
             self.best_checkpoints.sort(key=lambda x: x['combined_metric'])
-            
-            # Si excede el máximo, borrar los peores
             while len(self.best_checkpoints) > self.max_checkpoints_to_keep:
-                worst_checkpoint = self.best_checkpoints.pop(-1)  # El último (peor)
-                
-                # Solo borrar si no es "best_model.pth" (mantener siempre el mejor actual)
-                if os.path.basename(worst_checkpoint['path']) != "best_model.pth":
+                worst = self.best_checkpoints.pop(-1)
+                if os.path.basename(worst['path']) != "best_model.pth":
                     try:
-                        if os.path.exists(worst_checkpoint['path']):
-                            os.remove(worst_checkpoint['path'])
-                            logging.info(f"🗑️  Checkpoint eliminado (Smart Save): {os.path.basename(worst_checkpoint['path'])} - Episodio {worst_checkpoint['episode']}")
+                        if os.path.exists(worst['path']): os.remove(worst['path'])
+                        # Remove associated snapshot
+                        if worst.get('snapshot_path') and os.path.exists(worst['snapshot_path']):
+                            os.remove(worst['snapshot_path'])
+                        logging.info(f"🗑️ Checkpoint/Snapshot removed: {os.path.basename(worst['path'])}")
                     except Exception as e:
-                        logging.warning(f"Error al eliminar checkpoint antiguo: {e}")
-        
-        # OPTIMIZACIÓN DE DISCO: Limpiar checkpoints periódicos antiguos (no solo los mejores)
-        # Mantener solo los últimos N checkpoints periódicos además de los mejores
-        max_periodic_checkpoints = 10  # Mantener solo los últimos 10 checkpoints periódicos
+                        logging.warning(f"Error removing old checkpoint: {e}")
+
+        # ... (Periodic Cleanup Logic - Updated to remove snapshots too)
+        max_periodic_checkpoints = 10
         try:
-            # Obtener todos los checkpoints periódicos (no best_model.pth ni last_checkpoint.pth)
-            periodic_checkpoints = []
-            if os.path.exists(self.checkpoint_dir):
-                for filename in os.listdir(self.checkpoint_dir):
-                    if filename.endswith('.pth') and filename.startswith('checkpoint_ep'):
-                        filepath = os.path.join(self.checkpoint_dir, filename)
-                        try:
-                            # Obtener número de episodio del nombre
-                            ep_num = int(filename.replace('checkpoint_ep', '').replace('.pth', ''))
-                            periodic_checkpoints.append((ep_num, filepath))
-                        except:
-                            continue
-            
-            # Ordenar por episodio (más recientes primero)
-            periodic_checkpoints.sort(reverse=True)
-            
-            # Eliminar los más antiguos si exceden el límite
-            if len(periodic_checkpoints) > max_periodic_checkpoints:
-                to_remove = periodic_checkpoints[max_periodic_checkpoints:]
-                for ep_num, filepath in to_remove:
-                    try:
-                        # Verificar que no está en la lista de mejores
-                        is_best = any(cp['path'] == filepath for cp in self.best_checkpoints)
-                        if not is_best:
-                            os.remove(filepath)
-                            logging.info(f"🗑️  Checkpoint periódico antiguo eliminado: {os.path.basename(filepath)} - Episodio {ep_num}")
-                    except Exception as e:
-                        logging.warning(f"Error al eliminar checkpoint periódico antiguo: {e}")
+             periodic_files = []
+             if os.path.exists(self.checkpoint_dir):
+                 for f in os.listdir(self.checkpoint_dir):
+                     if f.endswith('.pth') and f.startswith('checkpoint_ep'):
+                         periodic_files.append(f)
+             
+             # Sort by episode
+             periodic_files.sort(key=lambda x: int(x.replace('checkpoint_ep', '').replace('.pth', '')), reverse=True)
+             
+             if len(periodic_files) > max_periodic_checkpoints:
+                 to_remove = periodic_files[max_periodic_checkpoints:]
+                 for f in to_remove:
+                     path_to_remove = os.path.join(self.checkpoint_dir, f)
+                     # Check if it's in best_checkpoints
+                     if not any(cp['path'] == path_to_remove for cp in self.best_checkpoints):
+                         if os.path.exists(path_to_remove): os.remove(path_to_remove)
+                         # Remove corresponding snapshot
+                         ep_str = f.replace('checkpoint_ep', '').replace('.pth', '')
+                         snap_f = f"snapshot_ep{ep_str}.pt"
+                         snap_p = os.path.join(self.checkpoint_dir, snap_f)
+                         if os.path.exists(snap_p): os.remove(snap_p)
+                         logging.info(f"🗑️ Periodic Checkpoint/Snapshot removed: {f}")
         except Exception as e:
-            logging.warning(f"Error limpiando checkpoints periódicos antiguos: {e}")
-        
-        # Registrar en el logger de documentación solo si es el mejor
+            logging.warning(f"Error cleaning periodic checkpoints: {e}")
+
         if is_best:
             self.doc_logger.log_result(
                 episodes=episode,
                 metrics=current_metrics,
                 loss=current_loss,
                 is_best=True,
-                checkpoint_path=path
+                checkpoint_path=path,
+                snapshot_path=snap_path if state_snapshot is not None else None
             )
-            
             logging.info(
                 f"✅ Checkpoint guardado (MEJOR): Episodio {episode} | "
-                f"Loss: {current_loss:.6f} | "
-                f"Survival: {survival:.6f} | Symmetry: {symmetry:.6f} | "
-                f"Combined: {combined_metric:.6f}"
+                f"Loss: {current_loss:.6f} | Combined: {combined_metric:.6f}"
             )
         else:
             # Checkpoint periódico normal

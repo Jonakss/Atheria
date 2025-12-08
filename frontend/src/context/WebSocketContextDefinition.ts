@@ -93,6 +93,7 @@ export interface TrainingCheckpoint {
     complexity?: number;
   };
   timestamp: number;
+  has_snapshot?: boolean;
 }
 
 export interface InferenceSnapshot {

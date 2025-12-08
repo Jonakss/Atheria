@@ -10,6 +10,10 @@ interface HolographicViewerProps {
     threshold?: number; // Umbral para no renderizar vacío
     vizType?: string; // Tipo de visualización (ej: 'poincare')
     channels?: number; // Número de canales (1 para mono, 3 para RGB)
+    // Gateway Props
+    binaryMode?: boolean;
+    binaryThreshold?: number;
+    binaryColor?: string;
 }
 
 export const HolographicViewer2: React.FC<HolographicViewerProps> = ({ 
@@ -19,7 +23,10 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
     height,
     threshold = 0.05,
     vizType = 'holographic',
-    channels = 1
+    channels = 1,
+    binaryMode = false,
+    binaryThreshold = 0.5,
+    binaryColor = '#FFFFFF'
 }) => {
     const mountRef = useRef<HTMLDivElement>(null);
     const sceneRef = useRef<THREE.Scene | null>(null);
@@ -184,7 +191,11 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
             uTime: { value: 0 },
             uIsPoincare: { value: vizType === 'poincare' || vizType === 'poincare_3d' },
             uScale: { value: 100.0 }, // Radio del disco
-            uUseColorAttribute: { value: channels === 3 }
+            uUseColorAttribute: { value: channels === 3 },
+            // Gateway Uniforms
+            uBinaryMode: { value: binaryMode },
+            uBinaryThreshold: { value: binaryThreshold },
+            uBinaryColor: { value: new THREE.Color(binaryColor) }
         };
 
         // Vertex Shader: Proyección Hiperbólica
@@ -199,6 +210,9 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
             uniform float uScale;
             uniform bool uIsPoincare;
             uniform bool uUseColorAttribute;
+            uniform bool uBinaryMode;
+            uniform float uBinaryThreshold;
+            uniform vec3 uBinaryColor;
             
             varying vec3 vColor;
             varying float vAlpha;
@@ -218,19 +232,8 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
                 
                 if (uIsPoincare) {
                     // 2. Mapeo Cuadrado -> Disco de Poincaré
-                    // x = u * sqrt(1 - v^2/2)
-                    // y = v * sqrt(1 - u^2/2)
                     float diskX = u * sqrt(1.0 - (v * v) / 2.0);
                     float diskY = v * sqrt(1.0 - (u * u) / 2.0);
-                    
-                    // 3. Scale-Radius Duality (Visualización)
-                    // En AdS/CFT, el radio r representa la escala de energía.
-                    // r -> 1 (Borde) es UV (Alta energía/Detalle)
-                    // r -> 0 (Centro) es IR (Baja energía/Bulk)
-                    
-                    // Aquí usamos la magnitud para desplazar en Z (hacia el usuario)
-                    // y expandir radialmente para enfatizar la estructura
-                    
                     pos = vec3(diskX * uScale, diskY * uScale, magnitude * 50.0);
                 } else {
                     // Cartesiano estándar
@@ -240,26 +243,39 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
                 vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
                 gl_Position = projectionMatrix * mvPosition;
 
-                // 4. Color basado en Fase (o Magnitud si no hay fase), o atributo Color directo
-                if (uUseColorAttribute) {
-                    vColor = color;
+                // 4. Color Logic
+                if (uBinaryMode) {
+                   // Binary Mode: White (1.0) or Black/Transparent (0.0) based on threshold
+                   // Calculation is done in fragment shader usually for per-pixel, but here per-vertex is fine for points
+                   if (magnitude > uBinaryThreshold) {
+                       if (uUseColorAttribute) {
+                           vColor = color; // Use Field Colors (superimposed)
+                       } else {
+                           vColor = uBinaryColor; // Use Custom Single Color
+                       }
+                       vAlpha = 1.0; // Solid
+                   } else {
+                       vColor = vec3(0.0, 0.0, 0.0);
+                       vAlpha = 0.0; // Void
+                   }
                 } else {
-                    // HSL: Hue = Phase, Sat = 1.0, Light = ajustado para evitar blanco
-                    float hue = (phase + 3.14159) / (2.0 * 3.14159);
-                    vec3 hslColor = hsl2rgb(vec3(hue, 1.0, 0.2 + magnitude * 0.2)); 
-                    
-                    // Si no hay fase (phase == 0 para todos), usar gradiente azul-cian
-                    if (phase == 0.0) {
-                         hslColor = hsl2rgb(vec3(0.6 - magnitude * 0.2, 1.0, 0.15 + magnitude * 0.25)); 
+                   // Normal Holographic Mode
+                    if (uUseColorAttribute) {
+                        vColor = color;
+                    } else {
+                        float hue = (phase + 3.14159) / (2.0 * 3.14159);
+                        vec3 hslColor = hsl2rgb(vec3(hue, 1.0, 0.2 + magnitude * 0.2)); 
+                        
+                        if (phase == 0.0) {
+                             hslColor = hsl2rgb(vec3(0.6 - magnitude * 0.2, 1.0, 0.15 + magnitude * 0.25)); 
+                        }
+                        vColor = hslColor;
                     }
-                    vColor = hslColor;
+                    vAlpha = min(1.0, magnitude * 2.0);
                 }
-                
-                vColor = vColor; // Just passthrough
                 
                 // 5. Size Attenuation
                 gl_PointSize = max(2.0, magnitude * 10.0) * (300.0 / -mvPosition.z);
-                vAlpha = min(1.0, magnitude * 2.0);
             }
         `;
 
@@ -268,6 +284,9 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
             varying float vAlpha;
             
             void main() {
+                // Check Binary cutoff passed from vertex
+                if (vAlpha <= 0.001) discard;
+
                 // Círculo suave
                 vec2 coord = gl_PointCoord - vec2(0.5);
                 float dist = length(coord);
@@ -292,7 +311,7 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
         sceneRef.current.add(points);
         pointsRef.current = points;
 
-    }, [data, phaseData, width, height, threshold, vizType, channels]);
+    }, [data, phaseData, width, height, threshold, vizType, channels, binaryMode, binaryThreshold, binaryColor]);
 
     return (
         <div className="relative w-full h-full">

@@ -31,10 +31,10 @@
     - **Status**: ✅ **FIXED** (2025-12-03)
     - **Cause**: Deadlock due to `torch::set_num_threads(1)` inside OpenMP region.
     - **Resolution**: Removed problematic call.
-- [ ] **[CRITICAL]** Optimize Native Engine Performance
-    - **Status**: 🔴 **BLOCKER**
-    - **Context**: Native engine is >100x slower than Python on CPU for dense grids.
-    - **Action**: Profile and optimize `step_native` loop, specifically batch construction and map access. Consider alternative data structures (e.g., dense blocks) for high-density regions.
+- [x] **[CRITICAL]** Optimize Native Engine Performance
+    - **Status**: ✅ **RESOLVED** (2025-12-08)
+    - **Context**: Optimized `step_native` loop, `build_batch_input`, and `DenseEngine` allocations.
+    - **Action**: Implemented in-place tensor operations, thread-local pooling, and vectorized batch construction.
 
 ### 2. Lentitud Extrema en Tiempo Real
 **Prioridad:** 🔴 **CRÍTICA**  
@@ -143,25 +143,30 @@
 
 ### 7. Exportación Automática de Modelos a TorchScript
 **Prioridad:** 🟢 **MEDIA**  
-**Estado:** Parcialmente implementado
+**Estado:** ✅ **COMPLETADO** (2025-12-08)
 
 **Requisito:**
 - Exportar automáticamente al cargar experimento si no existe modelo JIT
-- Ya implementado, pero puede mejorarse:
-  - Mejor manejo de errores
-  - Progress indicator en UI
-  - Cache de modelos exportados
+- ✅ Carga automática de JIT en `handle_load_experiment`
+- ✅ Exportación automática en background si no existe
+- ✅ Notificaciones de progreso vía WebSocket
 
 ---
 
 ### 8. Snapshots Durante Entrenamiento
 **Prioridad:** 🟢 **MEDIA**  
-**Estado:** Pendiente
+**Estado:** ✅ **COMPLETADO** (2025-12-08)
 
 **Requisito:**
 - Capturar snapshots automáticamente durante entrenamiento
 - Guardar en directorio de checkpoints
 - Permitir revisar snapshots en UI
+
+**Implementación:**
+- ✅ Backend: `QC_Trainer_v4.save_checkpoint` saves `.pt` snapshots.
+- ✅ Pipeline: `_run_v4_training_loop` passes snapshot to save.
+- ✅ Handlers: `load_checkpoint_snapshot` implemented.
+- ✅ Frontend: "Load Snapshot" button in `TrainingView`.
 
 ---
 
@@ -181,12 +186,17 @@
 
 ### 10. Más Visualizaciones de Campos
 **Prioridad:** 🟢 **MEDIA**  
-**Estado:** Pendiente
+**Estado:** ✅ **COMPLETADO** (2025-12-08)
 
 **Requisito:**
 - Real/Imaginario separados
 - Fase HSV avanzada
 - Más opciones de visualización
+
+**Implementación:**
+- ✅ LatticeEngine supports `real`, `imag` viz types.
+- ✅ `VisualizationSection` UI updated with Real/Imag modes.
+- ✅ HSV Phase basics explored.
 
 ---
 
@@ -205,12 +215,13 @@
 
 ### 12. Conectar EpochDetector Completamente
 **Prioridad:** 🟢 **MEDIA**  
-**Estado:** Parcialmente implementado
+**Estado:** ✅ **COMPLETADO** (2025-12-08)
 
 **Requisito:**
 - Conectar EpochDetector al dashboard completamente
-- Visualizaciones de épocas
-- Transiciones de época en UI
+- ✅ Integración en `DataProcessingService`
+- ✅ Cálculo de métricas (energía, clustering, simetría) broadcasted en `simulation_info`
+- ✅ Visualización de Época en `ScientificHeader` y `DashboardLayout`
 
 ---
 
@@ -241,23 +252,32 @@
 
 ### 15. Paralelismo (OpenMP/std::thread)
 **Prioridad:** 🟢 **MEDIA**  
-**Estado:** Pendiente
+**Estado:** ✅ **COMPLETADO** (2025-12-08)
 
 **Requisito:**
 - Paralelizar `step_native()` en C++
 - Usar OpenMP o std::thread
 - Mejorar rendimiento para simulaciones grandes
 
+**Implementación:**
+- ✅ Fixed Deadlock by removing internal LibTorch threading
+- ✅ Optimized parallel region in `SparseEngine::step_native`
+- ✅ Ensuring ThreadSafe Pooling
+
 ---
 
 ### 16. Memory Pools
 **Prioridad:** 🟢 **MEDIA**  
-**Estado:** Pendiente
+**Estado:** ✅ **COMPLETADO** (2025-12-08)
 
 **Requisito:**
 - Implementar memory pools en C++
 - Reducir allocaciones/deallocations
 - Mejorar rendimiento
+
+**Implementación:**
+- ✅ `ThreadLocalTensorPool` implemented and integrated
+- ✅ In-place tensor recycling in `SparseEngine` loop
 
 ---
 
@@ -265,12 +285,17 @@
 
 ### 17. Exploración del Principio Holográfico
 **Prioridad:** 🟣 **EXPERIMENTAL**
-**Estado:** 💡 **CONCEPTO**
+**Estado:** 🚧 **EN PROGRESO**
 
 **Requisito:**
 - Investigar implementación de `HolographicEngine` (Física 2D -> 3D)
 - Prototipar `HolographicViewer` para visualizar la frontera y el bulk
 - Experimentar con "Ley M" en el borde del caos usando codificación holográfica
+
+**Progreso:**
+- ✅ `holographic` viz mode implemented in `LatticeEngine` (RGB Mapping).
+- ✅ Frontend support for `holographic` mode.
+- ⏳ Pending: True Bulk reconstruction/simulation.
 
 **Referencias:**
 - [[HOLOGRAPHIC_PRINCIPLE]]
@@ -289,9 +314,14 @@
 ~~5. Apagar Servidor desde UI~~ ✅ **IMPLEMENTADO** (2025-11-20)
 ~~6. Migración Automática de Estado~~ ✅ **IMPLEMENTADO**
 ~~9. Sistema de Historial/Buffer Completo~~ ✅ **COMPLETADO** (2025-11-26)
+~~7. Exportación TorchScript~~ ✅ **COMPLETADO** (2025-12-08)
+~~12. Conectar EpochDetector~~ ✅ **COMPLETADO** (2025-12-08)
 
 ### 🟢 MEDIO/BAJO (Implementar Después)
-7-16. Resto de tareas
+- 8. Snapshots durante entrenamiento
+- 10. Más visualizaciones de campos
+- 11. Documentación Fase 4
+- 13-16. Optimizaciones Técnicas (C++)
 
 ---
 

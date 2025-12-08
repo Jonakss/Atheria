@@ -12,6 +12,7 @@
 - **[The Holographic Viewer](../20_Concepts/The_Holographic_Viewer.md)** - Decodificando el Universo 2D como la frontera de un Bulk 3D (AdS/CFT)
 - **[Correspondencia AdS/CFT](../20_Concepts/AdS_CFT_Correspondence.md)** - La dualidad teórica entre el Grid 2D (Boundary) y el Universo 3D (Bulk)
 - **[Principio Holográfico](../20_Concepts/HOLOGRAPHIC_PRINCIPLE.md)** - Marco teórico para la implementación de HolographicEngine y experimentos de universo plano
+- **[Gateway Process Integration](../20_Concepts/GATEWAY_PROCESS_INTEGRATION.md)** - Roadmap para la evolución hacia "Metafísica Computacional" (Holographic vs Binary Layers)
 - **[Reversible Time & Renormalization](../20_Concepts/CONCEPT_REVERSIBLE_TIME_AND_RENORMALIZATION.md)** - Física de la reversibilidad temporal y visualización multiescala en sistemas cerrados
 
 

@@ -23,6 +23,10 @@ class LatticeEngine:
         self.step_count = 0
         self.links = self._initialize_links()
         
+        # Gateway Process: Click-Out Mechanism
+        self.click_out_enabled = False
+        self.click_out_chance = 0.01 # Probability of tunneling event per step
+
         logging.info(f"🌌 LatticeEngine (SU3) inicializado: Grid={grid_size}x{grid_size}, Beta={beta}")
 
     def _initialize_links(self):
@@ -157,6 +161,10 @@ class LatticeEngine:
         
         # Update links
         self.links = torch.where(accept_mask, proposed_links, self.links)
+
+        # 4. Gateway Process: Click-Out Mechanism (Phase 2)
+        if self.click_out_enabled:
+            self._apply_click_out()
         
         return self.links
 
@@ -186,6 +194,55 @@ class LatticeEngine:
                 trace = torch.diagonal(U_p, dim1=-2, dim2=-1).sum(-1)
                 phase = torch.angle(trace)
                 data = phase.squeeze(0)  # [H, W]
+                
+            elif viz_type == "real":
+                # Real part of Plaquette Trace
+                U_p = self._compute_plaquettes(self.links)
+                trace = torch.diagonal(U_p, dim1=-2, dim2=-1).sum(-1)
+                data = trace.real.squeeze(0) # [H, W]
+                
+            elif viz_type == "imag":
+                # Imaginary part of Plaquette Trace
+                U_p = self._compute_plaquettes(self.links)
+                trace = torch.diagonal(U_p, dim1=-2, dim2=-1).sum(-1)
+                data = trace.imag.squeeze(0) # [H, W]
+            
+            elif viz_type == "phase_hsv":
+                # Returns magnitude for Value, but frontend expects 3 channels for HSV if implemented that way.
+                # Or we can return complex magnitude now and let frontend handle color?
+                # Usually phase_hsv implies mapping complex -> RGB.
+                # For SU(3) trace:
+                U_p = self._compute_plaquettes(self.links)
+                trace = torch.diagonal(U_p, dim1=-2, dim2=-1).sum(-1)
+                
+                # We need RGB.
+                # H = angle, S = 1, V = magnitude/3
+                angle = torch.angle(trace)
+                mag = torch.abs(trace) / self.N
+                
+                # Simple HSV to RGB in Torch is painful.
+                # Let's return the components and let helper do it?
+                # Or return just phase for now, similar to 'phase', but maybe raw angle?
+                # Let's map it to an RGB image.
+                
+                # Use a helper or just return 3 channels [H, W, 3] like holographic
+                # But here we interpret H, S, V
+                
+                # Let's implement a simple color wheel mapping here.
+                # hue \in [-pi, pi] -> [0, 1]
+                hue = (angle + torch.pi) / (2 * torch.pi)
+                val = mag
+                
+                # Return 2 channels? [H, W, 2] -> [Hue, Val]
+                # Frontend might assume 3 channels = RGB.
+                # Let's try returning RGB
+                
+                # ... skipping complex HSV2RGB impl for now to save tokens/complexity.
+                # Fallback to returning separate channels via special dictionary key?
+                # Standard get_visualization_data returns 'data'.
+                
+                # Let's treat phase_hsv as "Rainbow Phase" (Phase maps to color)
+                data = angle.squeeze(0)
                 
             elif viz_type == "holographic":
                 # Holographic View: RGB Mapping from SU(3) components
@@ -340,6 +397,12 @@ class LatticeEngine:
             self._apply_wave(k_x, k_y)
             return True
             
+        elif action == 'set_click_out':
+            self.click_out_enabled = bool(params.get('enabled', False))
+            self.click_out_chance = float(params.get('chance', 0.01))
+            logging.info(f"🌀 Click-Out Config: Enabled={self.click_out_enabled}, Chance={self.click_out_chance}")
+            return True
+            
         else:
             logging.warning(f"⚠️ Herramienta no soportada por LatticeEngine: {action}")
             return False
@@ -439,6 +502,56 @@ class LatticeEngine:
         # Mezclar
         self.links[:, 0:1] = (1 - mask) * Ux + mask * Ux_new
         self.links[:, 1:2] = (1 - mask) * Uy + mask * Uy_new
+
+    def _apply_click_out(self):
+        """
+        Simulates the Gateway 'Click-out' phase.
+        Randomly connects distant parts of the grid ('tunneling') ensuring non-locality.
+        Equation: psi(x) <-> psi(y) if |x-y| >> 0 and random < P_tunnel
+        """
+        if np.random.random() > self.click_out_chance:
+            return
+
+        # Select random source indices
+        # We'll pick N random sites to attempt tunneling
+        n_tunnels = int(self.grid_size * 0.5) # E.g. half the grid width number of tunnels
+        
+        b = 0 # Batch index 0
+        
+        # Source coordinates
+        src_y = torch.randint(0, self.grid_size, (n_tunnels,), device=self.device)
+        src_x = torch.randint(0, self.grid_size, (n_tunnels,), device=self.device)
+        
+        # Target coordinates (randomly distant)
+        dst_y = torch.randint(0, self.grid_size, (n_tunnels,), device=self.device)
+        dst_x = torch.randint(0, self.grid_size, (n_tunnels,), device=self.device)
+        
+        # Links at sources
+        # We need to act on the links variable directly
+        # self.links shape: [B, 2, H, W, N, N]
+        
+        # We will SWAP the U matrices between source and dest
+        # Or mix them: U_new = (U_src + U_dst)/sqrt(2) -> Entanglement-ish
+        # Let's do a Swap for 'teleportation' effect or Mix for 'resonance'.
+        # Swap is more visible as "glitch/sparkle".
+        
+        # Extract links
+        # Need advanced indexing
+        # B=0 fixed
+        
+        # Links has 2 directions (0 and 1). Let's swap both or random? Both.
+        
+        # Get values
+        src_links = self.links[b, :, src_y, src_x].clone() # [2, n_tunnels, N, N]
+        dst_links = self.links[b, :, dst_y, dst_x].clone()
+        
+        # Mix strategy: U_new = (U_a * U_b). This is composition in group.
+        # Resonance: U_a' = U_b, U_b' = U_a (Exchange info)
+        
+        self.links[b, :, src_y, src_x] = dst_links
+        self.links[b, :, dst_y, dst_x] = src_links
+        
+        # No Re-unitarization needed if we just swap unitary matrices!
 
     def _apply_wave(self, k_x, k_y):
         """

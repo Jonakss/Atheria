@@ -178,12 +178,18 @@ async def handle_list_checkpoints(args):
                     except:
                         pass
                 
+                # Check if associated snapshot exists
+                snapshot_filename = f"snapshot_ep{episode}.pt"
+                snapshot_path = os.path.join(checkpoint_dir, snapshot_filename)
+                has_snapshot = os.path.exists(snapshot_path)
+
                 checkpoints.append({
                     "filename": filename,
                     "episode": episode,
                     "size": stat.st_size,
                     "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                    "is_best": is_best
+                    "is_best": is_best,
+                    "has_snapshot": has_snapshot
                 })
             except Exception as e:
                 logging.warning(f"Error procesando checkpoint {checkpoint_file}: {e}")
@@ -197,165 +203,66 @@ async def handle_list_checkpoints(args):
         if ws: await send_notification(ws, f"Error al listar checkpoints: {str(e)}", "error")
 
 
-async def handle_cleanup_checkpoints(args):
-    """Limpia checkpoints antiguos de un experimento."""
-    ws = g_state['websockets'].get(args.get('ws_id'))
-    exp_name = args.get('EXPERIMENT_NAME')
-    
-    if not exp_name:
-        if ws: await send_notification(ws, "Nombre de experimento no proporcionado.", "error")
-        return
-        
-    try:
-        checkpoint_dir = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, exp_name)
-        if not os.path.exists(checkpoint_dir):
-            if ws: await send_notification(ws, f"Directorio de checkpoints no encontrado para {exp_name}", "warning")
-            return
-            
-        checkpoints = []
-        for f in os.listdir(checkpoint_dir):
-            if f.startswith("checkpoint_ep") and f.endswith(".pth"):
-                full_path = os.path.join(checkpoint_dir, f)
-                try:
-                    ep_num = int(f.replace("checkpoint_ep", "").replace(".pth", ""))
-                    checkpoints.append((ep_num, full_path))
-                except ValueError:
-                    continue
-        
-        checkpoints.sort(key=lambda x: x[0], reverse=True)
-        
-        best_checkpoint = None
-        best_path = os.path.join(checkpoint_dir, "best_checkpoint.pth")
-        if os.path.exists(best_path):
-            best_checkpoint = best_path
-        
-        max_keep = 5
-        deleted_count = 0
-        
-        if len(checkpoints) > max_keep:
-            to_delete = checkpoints[max_keep:]
-            
-            for ep, path in to_delete:
-                if path != best_checkpoint:
-                    try:
-                        os.remove(path)
-                        deleted_count += 1
-                        logging.info(f"Checkpoint eliminado: {path}")
-                    except Exception as e:
-                        logging.warning(f"Error eliminando {path}: {e}")
-        
-        msg = f"✅ Limpieza completada. {deleted_count} checkpoints eliminados."
-        if ws: await send_notification(ws, msg, "success")
-        await handle_list_checkpoints({'ws_id': args.get('ws_id'), 'EXPERIMENT_NAME': exp_name})
-        
-    except Exception as e:
-        logging.error(f"Error en limpieza de checkpoints: {e}", exc_info=True)
-        if ws: await send_notification(ws, f"Error al limpiar checkpoints: {str(e)}", "error")
-
-
-async def handle_delete_checkpoint(args):
-    """Elimina un checkpoint específico."""
+async def handle_load_checkpoint_snapshot(args):
+    """Carga el snapshot asociado a un checkpoint de entrenamiento."""
     ws = g_state['websockets'].get(args.get('ws_id'))
     exp_name = args.get("EXPERIMENT_NAME")
-    checkpoint_name = args.get("CHECKPOINT_NAME")
+    episode = args.get("EPISODE")
     
-    if not exp_name or not checkpoint_name:
-        if ws: await send_notification(ws, "Faltan parámetros requeridos.", "error")
+    if not exp_name or episode is None:
+        if ws: await send_notification(ws, "Faltan parámetros requeridos (EXPERIMENT_NAME, EPISODE).", "error")
         return
-    
+
     try:
-        checkpoint_path = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, exp_name, checkpoint_name)
+        motor = g_state.get('motor')
+        if not motor:
+             if ws: await send_notification(ws, "⚠️ No hay un motor activo.", "warning")
+             return
+
+        checkpoint_dir = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, exp_name)
+        snapshot_filename = f"snapshot_ep{episode}.pt"
+        snapshot_path = os.path.join(checkpoint_dir, snapshot_filename)
         
-        if not os.path.exists(checkpoint_path):
-            if ws: await send_notification(ws, f"Checkpoint '{checkpoint_name}' no encontrado.", "error")
+        if not os.path.exists(snapshot_path):
+            if ws: await send_notification(ws, f"❌ No se encontró snapshot para el episodio {episode}.", "error")
             return
-        
-        os.remove(checkpoint_path)
-        if ws: await send_notification(ws, f"✅ Checkpoint '{checkpoint_name}' eliminado.", "success")
-        
-        await handle_list_checkpoints({'ws_id': args.get('ws_id'), 'EXPERIMENT_NAME': exp_name})
-        
-    except Exception as e:
-        logging.error(f"Error al eliminar checkpoint: {e}", exc_info=True)
-        if ws: await send_notification(ws, f"Error al eliminar checkpoint: {str(e)}", "error")
 
+        # Pausar simulación
+        was_paused = g_state.get('is_paused', True)
+        if not was_paused:
+            g_state['is_paused'] = True
+            if ws: await send_notification(ws, "Pausando para cargar snapshot...", "info")
+            # Enviar actualización de estado
+            from ..core.status_helpers import build_inference_status_payload
+            await broadcast({"type": "inference_status_update", "payload": build_inference_status_payload("paused")})
 
-async def handle_refresh_experiments(args):
-    """Refresca la lista de experimentos."""
-    try:
-        experiments = get_experiment_list()
-        await broadcast({
-            "type": "experiments_updated",
-            "payload": {
-                "experiments": experiments
-            }
-        })
-        logging.info(f"Lista de experimentos actualizada y enviada a clientes ({len(experiments)} experimentos)")
-    except Exception as e:
-        logging.error(f"Error al refrescar lista de experimentos: {e}", exc_info=True)
-
-
-async def handle_list_quantum_models(args):
-    """Lista modelos cuánticos disponibles (checkpoints de Fast Forward)."""
-    ws = g_state['websockets'].get(args.get('ws_id'))
-    
-    try:
         import torch
+        # Cargar el tensor
+        psi = torch.load(snapshot_path, map_location=motor.device)
         
-        models = []
+        # Validar dimensión
+        # (Opcional: chequear si coincide con d_state del motor, pero confiamos por ahora)
         
-        # Buscar en output/checkpoints y output/models
-        search_paths = [
-            os.path.join(global_cfg.OUTPUT_DIR, "checkpoints"),
-            os.path.join(global_cfg.OUTPUT_DIR, "models"),
-        ]
+        # Inyectar en motor
+        if hasattr(motor, 'set_dense_state'):
+            motor.set_dense_state(psi)
+        elif hasattr(motor, 'state'):
+             motor.state.psi = psi
+        else:
+             raise NotImplementedError("El motor no soporta setear estado explícitamente.")
         
-        for search_dir in search_paths:
-            if not os.path.exists(search_dir):
-                continue
-                
-            for f in os.listdir(search_dir):
-                if f.endswith('.pt'):
-                    full_path = os.path.join(search_dir, f)
-                    try:
-                        stat = os.stat(full_path)
-                        
-                        # Intentar cargar metadata del modelo
-                        metadata = {}
-                        try:
-                            cp = torch.load(full_path, map_location='cpu')
-                            if 'config' in cp:
-                                metadata = cp['config']
-                            if 'metadata' in cp:
-                                metadata.update(cp['metadata'])
-                            if 'final_fidelity' in cp:
-                                metadata['fidelity'] = cp['final_fidelity']
-                        except:
-                            pass
-                        
-                        models.append({
-                            "name": f,
-                            "path": full_path,
-                            "size": stat.st_size,
-                            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                            "metadata": metadata
-                        })
-                    except Exception as e:
-                        logging.warning(f"Error procesando modelo {f}: {e}")
+        # Actualizar step
+        g_state['simulation_step'] = 0 # No sabemos el step real absoluto, o asumimos que es del episodio?
+        # En realidad snapshots de entrenamiento son de episodios.
+        # Podríamos usar steps = episode * qca_steps_per_episode si tuviéramos esa info.
         
-        # Ordenar por fecha de modificación
-        models.sort(key=lambda x: x['modified'], reverse=True)
-        
-        if ws:
-            await send_to_websocket(ws, "quantum_models_list", {"models": models})
-        
-        logging.info(f"Listados {len(models)} modelos cuánticos")
+        msg = f"✅ Snapshot de episodio {episode} cargado."
+        logging.info(msg)
+        if ws: await send_notification(ws, msg, "success")
         
     except Exception as e:
-        logging.error(f"Error listando modelos cuánticos: {e}", exc_info=True)
-        if ws:
-            await send_notification(ws, f"Error: {str(e)}", "error")
-
+        logging.error(f"Error cargando snapshot de entrenamiento: {e}", exc_info=True)
+        if ws: await send_notification(ws, f"Error cargando snapshot: {str(e)}", "error")
 
 # Diccionario de handlers para esta categoría
 HANDLERS = {
@@ -368,5 +275,6 @@ HANDLERS = {
     "cleanup_checkpoints": handle_cleanup_checkpoints,
     "refresh_experiments": handle_refresh_experiments,
     "list_quantum_models": handle_list_quantum_models,
+    "load_checkpoint_snapshot": handle_load_checkpoint_snapshot,
 }
 

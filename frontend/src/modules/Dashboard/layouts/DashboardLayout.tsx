@@ -61,6 +61,12 @@ export const DashboardLayout: React.FC = () => {
     map_data: number[][];
   } | null>(null);
   const [theaterMode, setTheaterMode] = useState(false);
+  
+  // Gateway Process: Binary Observer State
+  const [binaryMode, setBinaryMode] = useState(false);
+  const [binaryThreshold, setBinaryThreshold] = useState(0.5);
+  const [binaryColor, setBinaryColor] = useState('#ffffff'); // Default white
+
   const { simData, selectedViz, connectionStatus, inferenceStatus } = useWebSocket();
 
   // Efecto para Modo Teatro: Colapsar paneles cuando se activa
@@ -133,6 +139,9 @@ export const DashboardLayout: React.FC = () => {
                   vizType={selectedViz}
                   threshold={0.01}
                   channels={flatMapData.length === gridWidth * gridHeight * 3 ? 3 : 1}
+                  binaryMode={binaryMode}
+                  binaryThreshold={binaryThreshold}
+                  binaryColor={binaryColor}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-dark-300 text-sm">
@@ -280,6 +289,12 @@ export const DashboardLayout: React.FC = () => {
               onLayerChange={setSelectedLayer}
               theaterMode={theaterMode}
               onToggleTheaterMode={setTheaterMode}
+              binaryMode={binaryMode}
+              onToggleBinaryMode={setBinaryMode}
+              binaryThreshold={binaryThreshold}
+              onChangeBinaryThreshold={setBinaryThreshold}
+              binaryColor={binaryColor}
+              onChangeBinaryColor={setBinaryColor}
             />
           ) : (
             <PhysicsSection />

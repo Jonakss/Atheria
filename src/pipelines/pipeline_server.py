@@ -15,6 +15,9 @@ from ..services.simulation_service import SimulationService
 from ..services.data_processing_service import DataProcessingService
 from ..services.websocket_service import WebSocketService
 from ..services.grpc_service import GRPCService
+from ..analysis.epoch_detector import EpochDetector  # Import EpochDetector
+from ..services.websocket_service import WebSocketService
+from ..services.grpc_service import GRPCService
 from .. import config as global_cfg
 from ..utils import save_experiment_config
 from ..model_loader import MODEL_MAP

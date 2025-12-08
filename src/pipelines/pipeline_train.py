@@ -248,10 +248,12 @@ def _run_v4_training_loop(trainer: QC_Trainer_v4, exp_cfg: SimpleNamespace):
     last_loss = 0.0
     last_metrics = {}
     
+    snapshot = None
     try:
         for episode in range(start_episode, total_episodes):
             try:
-                loss, metrics = trainer.train_episode(episode)
+                # V4 train_episode returns (loss, metrics, snapshot)
+                loss, metrics, snapshot = trainer.train_episode(episode)
                 last_loss = loss
                 last_metrics = metrics
                 
@@ -288,7 +290,8 @@ def _run_v4_training_loop(trainer: QC_Trainer_v4, exp_cfg: SimpleNamespace):
                         episode,
                         current_metrics=metrics,
                         current_loss=loss,
-                        is_best=is_best
+                        is_best=is_best,
+                        state_snapshot=snapshot
                     )
                 
                 # Limpiar caché CUDA periódicamente para evitar OutOfMemoryError
@@ -310,7 +313,7 @@ def _run_v4_training_loop(trainer: QC_Trainer_v4, exp_cfg: SimpleNamespace):
                     logging.warning(f"⚠️ Memoria CUDA limpiada. Intentando continuar...")
                     try:
                         # Reintentar el episodio
-                        loss, metrics = trainer.train_episode(episode)
+                        loss, metrics, snapshot = trainer.train_episode(episode)
                         last_loss = loss
                         last_metrics = metrics
                         logging.info(f"✅ Episodio {episode} completado después de limpiar memoria")
@@ -321,7 +324,8 @@ def _run_v4_training_loop(trainer: QC_Trainer_v4, exp_cfg: SimpleNamespace):
                             episode - 1 if episode > 0 else 0,
                             current_metrics=last_metrics,
                             current_loss=last_loss,
-                            is_best=False
+                            is_best=False,
+                            state_snapshot=snapshot
                         )
                         raise
                 else:
@@ -350,7 +354,8 @@ def _run_v4_training_loop(trainer: QC_Trainer_v4, exp_cfg: SimpleNamespace):
             total_episodes - 1,
             current_metrics=last_metrics,
             current_loss=last_loss,
-            is_best=is_final_best
+            is_best=is_final_best,
+            state_snapshot=snapshot
         )
         
         # Actualizar tiempo de entrenamiento en config
@@ -387,6 +392,7 @@ def _run_v4_training_loop(trainer: QC_Trainer_v4, exp_cfg: SimpleNamespace):
             episode,
             current_metrics=last_metrics,
             current_loss=last_loss,
-            is_best=False
+            is_best=False,
+            state_snapshot=snapshot
         )
         raise

@@ -79,6 +79,19 @@ class StateAnalyzer:
             else:
                 flat_state = state_tensor.detach().cpu().numpy().flatten()
                 
+            # Check consistency with previous data (history or pending)
+            last_shape = None
+            if self.pending_states:
+                last_shape = self.pending_states[-1]['data'].shape
+            elif self.history_buffer:
+                last_shape = self.history_buffer[-1].shape
+            
+            if last_shape is not None and last_shape != flat_state.shape:
+                logging.warning(f"State dimension changed. Clearing UMAP buffer. Old: {last_shape}, New: {flat_state.shape}")
+                self.history_buffer.clear()
+                self.timestamps_buffer.clear()
+                self.pending_states.clear()
+                
             self.pending_states.append({
                 'data': flat_state,
                 'step': step or time.time(),

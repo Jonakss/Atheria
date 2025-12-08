@@ -1,4 +1,4 @@
-import { Activity, Brain, Shield, Zap } from 'lucide-react';
+import { Activity, Brain, Eye, Shield, Zap } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     CartesianGrid as RechartsCartesianGrid,
@@ -34,7 +34,7 @@ interface TrainingDataPoint {
 }
 
 export const TrainingView: React.FC = () => {
-  const { trainingProgress, trainingStatus, trainingCheckpoints } = useWebSocket();
+  const { trainingProgress, trainingStatus, trainingCheckpoints, activeExperiment, sendCommand } = useWebSocket();
   const [history, setHistory] = useState<TrainingDataPoint[]>([]);
 
   // Ref to track last processed episode to avoid duplicates
@@ -136,13 +136,24 @@ export const TrainingView: React.FC = () => {
                     ) : (
                         <div className="flex flex-col gap-2">
                             {trainingCheckpoints.map((cp) => (
-                                <div key={cp.episode} className="flex items-center justify-between p-2 rounded bg-white/5 border border-white/5">
+                                <div key={cp.episode} className="flex items-center justify-between p-2 rounded bg-white/5 border border-white/5 group hover:border-emerald-500/30 transition-colors">
                                     <div className="flex flex-col">
                                         <span className="font-mono text-emerald-400 font-bold">Ep {cp.episode}</span>
                                         <span className="text-[10px] text-gray-500">{new Date(cp.timestamp * 1000).toLocaleTimeString()}</span>
                                     </div>
                                     <div className="flex flex-col items-end gap-1">
-                                        {cp.is_best && <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1 rounded border border-amber-500/30">BEST</span>}
+                                        <div className="flex items-center gap-1">
+                                            {cp.is_best && <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1 rounded border border-amber-500/30">BEST</span>}
+                                            {cp.has_snapshot && (
+                                                <button
+                                                    onClick={() => activeExperiment && sendCommand('experiment', 'load_checkpoint_snapshot', { EXPERIMENT_NAME: activeExperiment, EPISODE: cp.episode })}
+                                                    className="p-1 rounded bg-blue-500/20 text-blue-300 hover:bg-blue-500/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100"
+                                                    title="Load Snapshot"
+                                                >
+                                                    <Eye size={12} />
+                                                </button>
+                                            )}
+                                        </div>
                                         <span className="font-mono text-[10px]">L: {cp.metrics?.loss?.toFixed(4) ?? 'N/A'}</span>
                                         {cp.metrics?.combined && <span className="font-mono text-[10px] text-gray-400">C: {cp.metrics.combined.toFixed(4)}</span>}
                                     </div>
