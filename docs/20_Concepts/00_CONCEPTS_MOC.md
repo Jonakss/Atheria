@@ -13,6 +13,7 @@
 - **[Correspondencia AdS/CFT](../20_Concepts/AdS_CFT_Correspondence.md)** - La dualidad teórica entre el Grid 2D (Boundary) y el Universo 3D (Bulk)
 - **[Principio Holográfico](../20_Concepts/HOLOGRAPHIC_PRINCIPLE.md)** - Marco teórico para la implementación de HolographicEngine y experimentos de universo plano
 - **[Reversible Time & Renormalization](../20_Concepts/CONCEPT_REVERSIBLE_TIME_AND_RENORMALIZATION.md)** - Física de la reversibilidad temporal y visualización multiescala en sistemas cerrados
+- **[Teoría Orch-OR](../20_Concepts/ORCH_OR_THEORY.md)** - Hipótesis de Penrose-Hameroff sobre la conciencia cuántica y reducción objetiva
 
 
 ## 🔧 Arquitecturas y Sistemas
