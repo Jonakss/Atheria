@@ -20,6 +20,17 @@ El comando `atheria` estará disponible globalmente.
 
 ### Comandos Disponibles
 
+#### `atheria -q "query"` / `atheria --query "query"`
+Buscar en la Knowledge Base (`docs/`).
+
+**Ejemplo:**
+```bash
+atheria -q "Harmonic Engine"
+ath -q "quantum tools"
+```
+
+Muestra los documentos más relevantes con su ruta y un snippet del contenido.
+
 #### `atheria dev`
 Build + Install + Run (workflow completo de desarrollo).
 

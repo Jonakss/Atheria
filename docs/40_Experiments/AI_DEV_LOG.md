@@ -17,6 +17,10 @@
 
 ## 📋 Índice de Entradas
 
+### 2025-12-07
+
+- [[logs/2025-12-07_bm25_rag_implementation|Feature: BM25 RAG for Knowledge Base]]: Sistema de búsqueda integrado en CLI (`atheria -q`).
+
 ### 2025-12-05
 
 - [[logs/2025-12-05_frontend_dependency_fix|Fix: Frontend Dependency & GlassPanel]]: Resolución de alias `@`, componentes faltantes y error TS.

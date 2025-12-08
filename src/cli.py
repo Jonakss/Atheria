@@ -200,6 +200,37 @@ def dev(no_frontend=True, port=None, host=None, fast=False, skip_install=False):
         sys.exit(1)
 
 
+def handle_query(query):
+    """Maneja la búsqueda en la Knowledge Base."""
+    try:
+        from src.services.knowledge_base import KnowledgeBaseService
+        print(f"🔍 Buscando: '{query}' en Knowledge Base...")
+        
+        kb = KnowledgeBaseService()
+        results = kb.search(query)
+        
+        if not results:
+            print("❌ No se encontraron resultados relevantes.")
+            return
+
+        print(f"✅ Se encontraron {len(results)} documentos relevantes:\n")
+        print("=" * 60)
+        for i, res in enumerate(results, 1):
+            print(f"{i}. {res['filename']}")
+            print(f"   📂 {res['relative_path']}")
+            # Mostrar un snippet corto
+            snippet = " ".join(res['content'].split()[:40]) + "..."
+            print(f"   📝 {snippet}\n")
+        print("=" * 60)
+            
+    except ImportError:
+        print("❌ Error: rank_bm25 no instalado. Ejecuta 'pip install rank_bm25'")
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Error durante la búsqueda: {e}")
+        sys.exit(1)
+
+
 def main():
     """Función principal del CLI."""
     parser = argparse.ArgumentParser(
@@ -208,6 +239,7 @@ def main():
         epilog="""
 Ejemplos:
   atheria dev                  # Build + Install + Run (sin frontend)
+  atheria -q "Harmonic"        # Buscar en documentación
   atheria dev --frontend       # Build + Install + Run (con frontend)
   atheria frontend-dev         # Solo frontend en modo desarrollo (npm run dev)
   atheria frontend-dev --port 3000  # Frontend en puerto 3000
@@ -217,6 +249,9 @@ Ejemplos:
   atheria clean                # Limpiar builds
         """
     )
+    
+    # Argumentos globales
+    parser.add_argument('-q', '--query', type=str, help='Buscar en la Knowledge Base (docs/)')
     
     subparsers = parser.add_subparsers(dest='command', help='Comando a ejecutar')
     
@@ -276,6 +311,11 @@ Ejemplos:
                             help='Solo mostrar cambios sin aplicar')
     
     args = parser.parse_args()
+    
+    # Manejar query directamente
+    if args.query:
+        handle_query(args.query)
+        sys.exit(0)
     
     if not args.command:
         parser.print_help()

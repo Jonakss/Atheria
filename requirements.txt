@@ -21,6 +21,7 @@ msgpack>=1.0.0  # Serialización binaria eficiente (más rápido que CBOR para a
 # Herramientas de desarrollo y análisis
 psutil>=5.9.0  # Monitoreo de sistema y memoria (usado en benchmarks)
 tensorboard>=2.10.0  # Para logging de métricas de entrenamiento
+rank_bm25>=0.2.2  # Para RAG Knowledge Base
 
 # Caché distribuido (Dragonfly/Redis)
 redis>=5.0.0  # Cliente Redis compatible con Dragonfly
