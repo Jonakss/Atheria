@@ -1034,10 +1034,15 @@ export function PanZoomCanvas({ historyFrame, theaterMode = false }: PanZoomCanv
                     maxValue={1} // Fields viz is normalized
                     channelMode={channelMode}
                     style={{
+                        position: 'absolute',
+                        left: '50%',
+                        top: '50%',
+                        width: gridWidth > 0 ? gridWidth : '100%',
+                        height: gridHeight > 0 ? gridHeight : '100%',
+                        marginLeft: gridWidth > 0 ? -gridWidth / 2 : 0,
+                        marginTop: gridHeight > 0 ? -gridHeight / 2 : 0,
                         transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                         transformOrigin: 'center center',
-                        width: '100%',
-                        height: '100%',
                         imageRendering: zoom > 2 ? 'pixelated' : 'auto'
                     }}
                 />
@@ -1067,10 +1072,15 @@ export function PanZoomCanvas({ historyFrame, theaterMode = false }: PanZoomCanv
                 <canvas
                     ref={canvasRef}
                     style={{
+                        position: 'absolute',
+                        left: '50%',
+                        top: '50%',
+                        width: gridWidth > 0 ? gridWidth : '100%',
+                        height: gridHeight > 0 ? gridHeight : '100%',
+                        marginLeft: gridWidth > 0 ? -gridWidth / 2 : 0,
+                        marginTop: gridHeight > 0 ? -gridHeight / 2 : 0,
                         transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                         transformOrigin: 'center center',
-                        width: '100%',
-                        height: '100%',
                         imageRendering: zoom > 2 ? 'pixelated' : 'auto'
                     }}
                 />
