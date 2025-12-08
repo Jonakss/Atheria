@@ -66,6 +66,7 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
     { id: 8, vizType: 'poincare_3d', label: 'Poincaré 3D', desc: 'Visualización 3D de la esfera de Poincaré.', icon: <Globe size={18} />, color: 'text-rose-400', border: 'border-rose-500/50' },
     { id: 9, vizType: 'real', label: 'Parte Real', desc: 'Visualiza la parte real de la Función de Onda.', icon: <Activity size={18} />, color: 'text-emerald-400', border: 'border-emerald-500/50' },
     { id: 10, vizType: 'imag', label: 'Parte Imag', desc: 'Visualiza la parte imaginaria de la Función de Onda.', icon: <Activity size={18} />, color: 'text-fuchsia-400', border: 'border-fuchsia-500/50' },
+    { id: 11, vizType: 'holographic_bulk', label: 'Bulk', desc: 'Holografía real 3D usando scale-space.', icon: <Layers size={18} />, color: 'text-orange-400', border: 'border-orange-500/50' },
   ];
 
   const handleGammaChange = (value: number) => {

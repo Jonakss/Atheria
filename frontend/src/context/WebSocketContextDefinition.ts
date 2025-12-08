@@ -45,6 +45,7 @@ export interface SimData {
   };
   roi_info?: any;
   analysis_data?: Array<{ x: number; y: number; step: number }>;
+  metadata?: any;
 }
 
 export interface QuantumStatus {

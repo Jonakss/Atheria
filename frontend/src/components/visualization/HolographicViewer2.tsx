@@ -10,6 +10,7 @@ interface HolographicViewerProps {
     threshold?: number; // Umbral para no renderizar vacío
     vizType?: string; // Tipo de visualización (ej: 'poincare')
     channels?: number; // Número de canales (1 para mono, 3 para RGB)
+    shape?: number[]; // [D, H, W] para volumétrico
     // Gateway Props
     binaryMode?: boolean;
     binaryThreshold?: number;
@@ -21,6 +22,7 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
     phaseData, 
     width, 
     height,
+    shape,
     threshold = 0.05,
     vizType = 'holographic',
     channels = 1,
@@ -30,6 +32,7 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
 }) => {
     const mountRef = useRef<HTMLDivElement>(null);
     const sceneRef = useRef<THREE.Scene | null>(null);
+    // ... refs ...
     const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
     const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
     const pointsRef = useRef<THREE.Points | null>(null);
@@ -79,38 +82,25 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
         };
         animate();
 
-        // Handler de resize que solo ajusta el renderer sin cambiar la vista
+        // Handler de resize
         const handleResize = () => {
             if (!currentMount || !renderer || !camera) return;
-            
             const width = currentMount.clientWidth;
             const height = currentMount.clientHeight;
-            
             if (width === 0 || height === 0) return;
-            
-            // Solo ajustar tamaño del renderer y aspect ratio de la cámara
-            // NO cambiar posición de la cámara ni controles (mantiene vista del usuario)
             camera.aspect = width / height;
             camera.updateProjectionMatrix();
             renderer.setSize(width, height);
         };
 
-        // Listener de resize
         window.addEventListener('resize', handleResize);
-        
-        // También ajustar si el contenedor cambia de tamaño
         const resizeObserver = new ResizeObserver(handleResize);
-        if (currentMount) {
-            resizeObserver.observe(currentMount);
-        }
+        if (currentMount) resizeObserver.observe(currentMount);
 
-        // Limpieza
         return () => {
             window.removeEventListener('resize', handleResize);
             resizeObserver.disconnect();
-            if (currentMount && renderer.domElement) {
-                currentMount.removeChild(renderer.domElement);
-            }
+            if (currentMount && renderer.domElement) currentMount.removeChild(renderer.domElement);
             renderer.dispose();
         };
     }, []);
@@ -119,20 +109,32 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
     useEffect(() => {
         if (!sceneRef.current || !data || data.length === 0) return;
 
-        // Si ya existen puntos, eliminarlos para recrearlos
         if (pointsRef.current) {
             sceneRef.current.remove(pointsRef.current);
             pointsRef.current.geometry.dispose();
             (pointsRef.current.material as THREE.Material).dispose();
         }
 
-        const particleCount = width * height;
+        // Determine dimensions based on shape or fallback to width/height props
+        let volDepth = 1;
+        let volHeight = height;
+        let volWidth = width;
+        let isVolumetric = false;
+
+        if (shape && shape.length === 3) {
+            volDepth = shape[0];
+            volHeight = shape[1];
+            volWidth = shape[2];
+            isVolumetric = true;
+        }
+
+        const particleCount = volDepth * volHeight * volWidth;
         
         // Atributos para el shader
         const indices: number[] = [];
         const magnitudes: number[] = [];
         const phases: number[] = [];
-        const colors: number[] = []; // RGB [r, g, b, r, g, b...]
+        const colors: number[] = []; 
 
         // Llenar buffers
         for (let i = 0; i < particleCount; i++) {
@@ -140,36 +142,26 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
             let r = 0, g = 0, b = 0;
 
             if (channels === 3) {
-                 // Estructura plana: [r,g,b, r,g,b ...]
                  const idx = i * 3;
                  if (idx + 2 < data.length) {
                      r = data[idx];
                      g = data[idx + 1];
                      b = data[idx + 2];
-                     
-                     // Magnitude for positioning can be luminance or max
                      magnitude = (r + g + b) / 3.0; 
                  }
             } else {
-                 magnitude = data[i];
+                 if (i < data.length) magnitude = data[i];
             }
             
-            // Optimización: Skip puntos con muy poca energía
             if (magnitude > threshold) {
                 indices.push(i);
                 magnitudes.push(magnitude);
                 phases.push(phaseData ? phaseData[i] : 0);
-                
-                if (channels === 3) {
-                    colors.push(r, g, b);
-                }
+                if (channels === 3) colors.push(r, g, b);
             }
         }
 
         const geometry = new THREE.BufferGeometry();
-        // Usamos 'position' para pasar el índice (x) y magnitud (y) para ahorrar atributos? 
-        // Mejor usar atributos explícitos para claridad.
-        // Pasamos índice como atributo float para calcular UV en vertex shader
         geometry.setAttribute('particleIndex', new THREE.Float32BufferAttribute(indices, 1));
         geometry.setAttribute('magnitude', new THREE.Float32BufferAttribute(magnitudes, 1));
         geometry.setAttribute('phase', new THREE.Float32BufferAttribute(phases, 1));
@@ -178,37 +170,37 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
             geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
         }
         
-        // Dummy position attribute needed for Three.js to render count correctly?
-        // Actually, drawRange or explicit count in geometry is needed if no position.
-        // But Points usually expects position. Let's pass zeros and displace in shader.
         const zeros = new Float32Array(indices.length * 3);
         geometry.setAttribute('position', new THREE.BufferAttribute(zeros, 3));
 
         // Uniforms
         const uniforms = {
-            uWidth: { value: width },
-            uHeight: { value: height },
+            uWidth: { value: volWidth },
+            uHeight: { value: volHeight },
+            uDepth: { value: volDepth },
+            uIsVolumetric: { value: isVolumetric },
             uTime: { value: 0 },
             uIsPoincare: { value: vizType === 'poincare' || vizType === 'poincare_3d' },
-            uScale: { value: 100.0 }, // Radio del disco
+            uScale: { value: 100.0 }, 
             uUseColorAttribute: { value: channels === 3 },
-            // Gateway Uniforms
             uBinaryMode: { value: binaryMode },
             uBinaryThreshold: { value: binaryThreshold },
             uBinaryColor: { value: new THREE.Color(binaryColor) }
         };
 
-        // Vertex Shader: Proyección Hiperbólica
+        // Vertex Shader
         const vertexShader = `
             attribute float particleIndex;
             attribute float magnitude;
             attribute float phase;
-            attribute vec3 color; // Optional RGB
+            attribute vec3 color;
             
             uniform float uWidth;
             uniform float uHeight;
+            uniform float uDepth;
             uniform float uScale;
             uniform bool uIsPoincare;
+            uniform bool uIsVolumetric;
             uniform bool uUseColorAttribute;
             uniform bool uBinaryMode;
             uniform float uBinaryThreshold;
@@ -217,65 +209,81 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
             varying vec3 vColor;
             varying float vAlpha;
 
-            // Función para convertir HSL a RGB
             vec3 hsl2rgb(vec3 c) {
                 vec3 rgb = clamp(abs(mod(c.x*6.0+vec3(0.0,4.0,2.0),6.0)-3.0)-1.0, 0.0, 1.0);
                 return c.z + c.y * (rgb-0.5)*(1.0-abs(2.0*c.z-1.0));
             }
 
             void main() {
-                // 1. Calcular coordenadas UV normalizadas [-1, 1]
-                float u = (mod(particleIndex, uWidth) / uWidth) * 2.0 - 1.0;
-                float v = (floor(particleIndex / uWidth) / uHeight) * 2.0 - 1.0;
-                
                 vec3 pos;
-                
-                if (uIsPoincare) {
-                    // 2. Mapeo Cuadrado -> Disco de Poincaré
-                    float diskX = u * sqrt(1.0 - (v * v) / 2.0);
-                    float diskY = v * sqrt(1.0 - (u * u) / 2.0);
-                    pos = vec3(diskX * uScale, diskY * uScale, magnitude * 50.0);
+
+                if (uIsVolumetric) {
+                    // Volumétrico: Index -> (x, y, z)
+                    float sliceSize = uWidth * uHeight;
+                    float zIndex = floor(particleIndex / sliceSize);
+                    float rem = mod(particleIndex, sliceSize);
+                    float yIndex = floor(rem / uWidth);
+                    float xIndex = mod(rem, uWidth);
+
+                    // Normalize [-1, 1]
+                    float u = (xIndex / uWidth) * 2.0 - 1.0;
+                    float v = (yIndex / uHeight) * 2.0 - 1.0;
+                    
+                    // Cone Geometry: Scale layers down as Z increases (Renormalization flow)
+                    // Z=0 is Boundary (Wide), Z=Depth is Bulk (Narrow)
+                    float zNorm = zIndex / max(1.0, uDepth - 1.0); // 0 to 1
+                    float scale = 1.0 - (zNorm * 0.5); // Shrink by 50% at deepest
+
+                    // Spread layers in Z
+                    float zPos = zIndex * 15.0; // Distance between layers
+
+                    pos = vec3(u * uWidth * 0.5 * scale, v * uHeight * 0.5 * scale, zPos);
+                    
                 } else {
-                    // Cartesiano estándar
-                    pos = vec3(u * uWidth * 0.5, v * uHeight * 0.5, magnitude * 50.0);
+                    // 2D Logic
+                    float u = (mod(particleIndex, uWidth) / uWidth) * 2.0 - 1.0;
+                    float v = (floor(particleIndex / uWidth) / uHeight) * 2.0 - 1.0;
+                    
+                    if (uIsPoincare) {
+                        float diskX = u * sqrt(1.0 - (v * v) / 2.0);
+                        float diskY = v * sqrt(1.0 - (u * u) / 2.0);
+                        pos = vec3(diskX * uScale, diskY * uScale, magnitude * 50.0);
+                    } else {
+                        pos = vec3(u * uWidth * 0.5, v * uHeight * 0.5, magnitude * 50.0);
+                    }
                 }
 
                 vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
                 gl_Position = projectionMatrix * mvPosition;
 
-                // 4. Color Logic
+                // Color Logic
                 if (uBinaryMode) {
-                   // Binary Mode: White (1.0) or Black/Transparent (0.0) based on threshold
-                   // Calculation is done in fragment shader usually for per-pixel, but here per-vertex is fine for points
                    if (magnitude > uBinaryThreshold) {
-                       if (uUseColorAttribute) {
-                           vColor = color; // Use Field Colors (superimposed)
-                       } else {
-                           vColor = uBinaryColor; // Use Custom Single Color
-                       }
-                       vAlpha = 1.0; // Solid
+                       vColor = uUseColorAttribute ? color : uBinaryColor;
+                       vAlpha = 1.0;
                    } else {
-                       vColor = vec3(0.0, 0.0, 0.0);
-                       vAlpha = 0.0; // Void
+                       vColor = vec3(0.0);
+                       vAlpha = 0.0;
                    }
                 } else {
-                   // Normal Holographic Mode
                     if (uUseColorAttribute) {
                         vColor = color;
                     } else {
                         float hue = (phase + 3.14159) / (2.0 * 3.14159);
                         vec3 hslColor = hsl2rgb(vec3(hue, 1.0, 0.2 + magnitude * 0.2)); 
-                        
-                        if (phase == 0.0) {
-                             hslColor = hsl2rgb(vec3(0.6 - magnitude * 0.2, 1.0, 0.15 + magnitude * 0.25)); 
-                        }
+                        if (phase == 0.0) hslColor = hsl2rgb(vec3(0.6 - magnitude * 0.2, 1.0, 0.15 + magnitude * 0.25)); 
                         vColor = hslColor;
                     }
                     vAlpha = min(1.0, magnitude * 2.0);
-                }
                 
                 // 5. Size Attenuation
-                gl_PointSize = max(2.0, magnitude * 10.0) * (300.0 / -mvPosition.z);
+                // Base size * Magnitude * Perspective
+                float perspectiveSize = (300.0 / -mvPosition.z);
+                // Clamp max perspective scaling to avoid huge near-camera blobs
+                perspectiveSize = min(perspectiveSize, 50.0); 
+                
+                float finalSize = max(2.0, magnitude * 8.0) * perspectiveSize;
+                gl_PointSize = clamp(finalSize, 2.0, 60.0); // Hard clamp to hardware limits/sanity
             }
         `;
 
@@ -284,16 +292,10 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
             varying float vAlpha;
             
             void main() {
-                // Check Binary cutoff passed from vertex
                 if (vAlpha <= 0.001) discard;
-
-                // Círculo suave
                 vec2 coord = gl_PointCoord - vec2(0.5);
-                float dist = length(coord);
-                
-                if (dist > 0.5) discard;
-                
-                float alpha = 1.0 - smoothstep(0.4, 0.5, dist);
+                if (length(coord) > 0.5) discard;
+                float alpha = 1.0 - smoothstep(0.4, 0.5, length(coord));
                 gl_FragColor = vec4(vColor, alpha * vAlpha);
             }
         `;
@@ -311,7 +313,7 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
         sceneRef.current.add(points);
         pointsRef.current = points;
 
-    }, [data, phaseData, width, height, threshold, vizType, channels, binaryMode, binaryThreshold, binaryColor]);
+    }, [data, phaseData, width, height, shape, threshold, vizType, channels, binaryMode, binaryThreshold, binaryColor]);
 
     return (
         <div className="relative w-full h-full">
