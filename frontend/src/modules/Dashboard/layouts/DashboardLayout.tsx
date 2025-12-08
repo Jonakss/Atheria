@@ -142,6 +142,7 @@ export const DashboardLayout: React.FC = () => {
                   binaryMode={binaryMode}
                   binaryThreshold={binaryThreshold}
                   binaryColor={binaryColor}
+                  shape={simData?.metadata?.shape}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-dark-300 text-sm">

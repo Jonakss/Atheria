@@ -73,6 +73,10 @@ class StateAnalyzer:
             
         with self._lock:
             # Flatten state: [H, W, C] -> [H*W*C]
+            # Handle Complex -> Real (Magnitude) for UMAP support
+            if state_tensor.is_complex():
+                state_tensor = state_tensor.abs()
+                
             # Use only first batch item
             if state_tensor.dim() == 4:
                 flat_state = state_tensor[0].detach().cpu().numpy().flatten()

@@ -3,7 +3,9 @@ import torch.nn as nn
 import numpy as np
 import logging
 
-class LatticeEngine:
+from .holographic_mixin import HolographicMixin
+
+class LatticeEngine(HolographicMixin):
     """
     Motor de Simulación para Lattice Gauge Theory (Phase 4).
     Simula campos de gauge SU(3) en un retículo espacio-temporal 2D+1.
@@ -18,10 +20,21 @@ class LatticeEngine:
         self.N = 3
         
         # Pre-compute identity for efficiency
-        self.identity = torch.eye(self.N, dtype=torch.complex64, device=self.device).view(1, 1, 1, 1, self.N, self.N)
+        self.Id = torch.eye(self.N, dtype=torch.complex64, device=self.device)
         
-        self.step_count = 0
-        self.links = self._initialize_links()
+        # Initialize links: [2, H, W, 3, 3] (Complex)
+        # 2 directions (Right, Down), HxW grid, 3x3 SU(3) matrices
+        self.config = {
+            'grid_size': grid_size,
+            'beta': beta
+        }
+        self.t = 0
+        self.dt = 0.01
+
+        # holographic depth default
+        self.bulk_depth = 8
+        
+        self.reset()
         
         # Gateway Process: Click-Out Mechanism
         self.click_out_enabled = False

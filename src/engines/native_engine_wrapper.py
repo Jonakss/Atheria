@@ -1005,10 +1005,10 @@ class NativeEngineWrapper(EngineProtocol):
         Obtiene datos de visualización directamente del motor nativo.
 
         Args:
-            viz_type: Tipo de visualización ("density", "phase", "energy")
+            viz_type: Tipo de visualización ("density", "phase", "energy", "holographic_bulk")
 
         Returns:
-            Tensor denso [H, W] con los valores calculados, o None si falla.
+            Tensor denso [H, W] o Dict para bulk.
         """
         try:
             if hasattr(self.native_engine, "compute_visualization"):
@@ -1018,7 +1018,24 @@ class NativeEngineWrapper(EngineProtocol):
                 # Asegurar que esté en el mismo dispositivo que self.device
                 if viz_tensor.device != self.device:
                     viz_tensor = viz_tensor.to(self.device)
-
+                
+                # Handling specialized types
+                if viz_type == 'holographic_bulk':
+                    # C++ returns [Depth, H, W] stack
+                    # Retrieve shape
+                    if viz_tensor.ndim == 3:
+                        depth, h, w = viz_tensor.shape
+                        flat_data = viz_tensor.flatten().tolist()
+                        return {
+                            "data": flat_data,
+                            "shape": [depth, h, w],
+                            "engine": "native",
+                            "is_volumetric": True
+                        }
+                    else:
+                        logging.warning(f"Native holographic bulk returned unexpected shape: {viz_tensor.shape}")
+                        return None
+                        
                 return viz_tensor
             else:
                 logging.warning(

@@ -113,4 +113,43 @@ bool DenseEngine::apply_tool(const std::string& action, const std::map<std::stri
     return false; 
 }
 
+torch::Tensor DenseEngine::generate_bulk_state(torch::Tensor base_field, int64_t depth) {
+    // Asegurar dimensiones [1, C, H, W]
+    torch::Tensor current = base_field;
+    if (current.dim() == 2) current = current.view({1, 1, current.size(0), current.size(1)});
+    else if (current.dim() == 3) current = current.unsqueeze(0);
+    
+    // Mover a device
+    if (current.device() != device_) current = current.to(device_);
+    
+    // Preparar Kernel Gaussiano 3x3
+    // [[1, 2, 1], [2, 4, 2], [1, 2, 1]] / 16.0
+    auto kernel = torch::tensor({
+        {0.0625f, 0.125f, 0.0625f},
+        {0.125f, 0.25f,  0.125f},
+        {0.0625f, 0.125f, 0.0625f}
+    }, torch::TensorOptions().dtype(torch::kFloat32).device(device_));
+    
+    kernel = kernel.reshape({1, 1, 3, 3});
+    
+    // Ajustar kernel a canales (Grouped Conv: input channels = groups)
+    int64_t channels = current.size(1);
+    kernel = kernel.repeat({channels, 1, 1, 1});
+    
+    std::vector<torch::Tensor> layers;
+    layers.reserve(depth);
+    layers.push_back(current);
+    
+    // Iterative Blurring (Renormalization Flow)
+    for (int i = 1; i < depth; ++i) {
+        // Padding=1 para mantener tamaño
+        current = torch::conv2d(current, kernel, {}, {1}, {1}, {1}, channels);
+        layers.push_back(current);
+    }
+    
+    // Retornar stack [1, Depth*C, H, W]
+    // Si C=1 -> [1, Depth, H, W]
+    return torch::cat(layers, 1);
+}
+
 } // namespace atheria

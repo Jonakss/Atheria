@@ -521,6 +521,49 @@ torch::Tensor Engine::compute_visualization(const std::string& viz_type) {
             float energy = torch::sum(torch::abs(state).pow(2)).item<float>();
             viz_tensor[coord.y][coord.x] = energy;
         }
+    } else if (viz_type == "holographic_bulk") {
+        // 1. Compute Base Density (Z=0)
+        for (const auto& coord : coord_keys) {
+            if (coord.z != 0 || coord.x < 0 || coord.x >= grid_size_ || coord.y < 0 || coord.y >= grid_size_) {
+                continue;
+            }
+            torch::Tensor state = matter_map_.get_tensor(coord);
+            // Action Density / Magnitude
+            float density = torch::sum(torch::abs(state).pow(2)).item<float>();
+            viz_tensor[coord.y][coord.x] = density;
+        }
+        
+        // 2. Generate Bulk (Gaussian Renormalization Flow)
+        // Ensure inputs are on device
+        if (viz_tensor.device() != device_) viz_tensor = viz_tensor.to(device_);
+        
+        // Prepare Kernel (3x3 Gaussian)
+        auto kernel = torch::tensor({
+            {0.0625f, 0.125f, 0.0625f},
+            {0.125f, 0.25f,  0.125f},
+            {0.0625f, 0.125f, 0.0625f}
+        }, torch::TensorOptions().dtype(torch::kFloat32).device(device_));
+        kernel = kernel.reshape({1, 1, 3, 3});
+        
+        // Setup input [1, 1, H, W]
+        torch::Tensor current = viz_tensor.unsqueeze(0).unsqueeze(0);
+        
+        std::vector<torch::Tensor> layers;
+        int bulk_depth = 5; // Default depth for native
+        layers.reserve(bulk_depth);
+        layers.push_back(current);
+        
+        for (int i = 1; i < bulk_depth; ++i) {
+             current = torch::conv2d(current, kernel, {}, {1}, {1}, {1}, 1);
+             layers.push_back(current);
+        }
+        
+        // Flatten layers for simple return or return stacked?
+        // Python expects: { "data": flat_array, "shape": [D, H, W] }
+        // We return Tensor. Python wrapper handles the rest.
+        // Return [1, Depth, H, W] --> Squeeze to [Depth, H, W]
+        auto bulk_stack = torch::cat(layers, 1).squeeze(0);
+        return bulk_stack; // [Depth, H, W]
     }
     
     return viz_tensor;

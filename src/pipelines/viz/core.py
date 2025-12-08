@@ -67,6 +67,30 @@ def get_visualization_data(psi, viz_type: str, delta_psi: torch.Tensor = None, m
     Returns:
         Dict con map_data, hist_data, etc.
     """
+    
+    # 0. SPECIAL HANDLING: Holographic Bulk (Delegado al motor)
+    if viz_type == 'holographic_bulk' and motor is not None and hasattr(motor, 'get_visualization_data'):
+        try:
+            logging.info("✨ Delegating holographic_bulk to engine...")
+            engine_result = motor.get_visualization_data(viz_type)
+            if engine_result and 'data' in engine_result:
+                return {
+                    "map_data": engine_result['data'],
+                    "metadata": {
+                        "shape": engine_result.get('shape'),
+                        "is_volumetric": True,
+                        "engine": engine_result.get('engine', 'unknown')
+                    },
+                    "hist_data": {},
+                    "poincare_coords": [],
+                    "phase_attractor": None,
+                    "flow_data": None
+                }
+        except Exception as e:
+            logging.error(f"❌ Error in engine bulk viz: {e}")
+            # Fallback to standard processing
+            pass
+
     # Validar entrada
     # Allow QuantumStatePolar object (duck typing)
     is_polar = hasattr(psi, 'magnitude') and hasattr(psi, 'phase')
@@ -83,7 +107,8 @@ def get_visualization_data(psi, viz_type: str, delta_psi: torch.Tensor = None, m
     elif isinstance(psi, torch.Tensor):
         psi_min = psi.abs().min().item() if psi.numel() > 0 else 0.0
         psi_max = psi.abs().max().item() if psi.numel() > 0 else 0.0
-        logging.debug(f"🔍 psi stats: min={psi_min:.6f}, max={psi_max:.6f}")
+        # Reduced logging to avoid spam
+        # logging.debug(f"🔍 psi stats: min={psi_min:.6f}, max={psi_max:.6f}")
 
     # 2. MÁSCARA DE VACÍO (The Noise Filter)
     # Si la energía es menor al 5%, lo consideramos "Vacío Cuántico" y no lo dibujamos.

@@ -183,6 +183,9 @@ PYBIND11_MODULE(atheria_core, m) {
         .def("set_state", &DenseEngine::set_state)
         .def("load_model", &DenseEngine::load_model)
         .def("apply_tool", &DenseEngine::apply_tool)
+        .def("generate_bulk_state", &DenseEngine::generate_bulk_state,
+             "Genera el estado volumétrico (holográfico) usando flujo de renormalización",
+             py::arg("base_field"), py::arg("depth"))
         .def("get_step_count", &DenseEngine::get_step_count);
 #endif
 }

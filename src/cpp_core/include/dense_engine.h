@@ -23,6 +23,10 @@ public:
     // Métodos específicos de DenseEngine
     void set_state(torch::Tensor new_state);
     
+    // Holographic Principle
+    torch::Tensor generate_bulk_state(torch::Tensor base_field, int64_t depth);
+    
+    
     // Getters
     int64_t get_step_count() const { return step_count_; }
 

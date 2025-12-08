@@ -164,6 +164,8 @@
   },
   "active": "5692398a7a86fa0e",
   "lastOpenFiles": [
+    "40_Experiments/logs/2025-12-08_holographic_native_port.md",
+    "20_Concepts/ORCH_OR_THEORY.md",
     "40_Experiments/logs/2025-12-08_training_snapshots_and_viz.md",
     "40_Experiments/logs/2025-12-08_native_engine_optimizations.md",
     "logs/2025-12-03_holographic_engine_implementation.md",
@@ -188,9 +190,7 @@
     "90_Troubleshooting/ENGINE_SWITCHING.md",
     "50_Backlog/CUDA_MEMORY_OPTIMIZATION.md",
     "99_Templates/AGENT_GUIDELINES.md",
-    "40_Experiments/logs/2025-12-01_obsidian_kb_optimization.md",
     "Untitled.canvas",
-    "README.md",
     "40_Experiments/assets/verification_training_section.png",
     "40_Experiments/assets/verification_settings_modal.png",
     "40_Experiments/assets/verification_lab_menu.png",

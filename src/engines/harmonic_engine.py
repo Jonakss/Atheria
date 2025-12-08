@@ -79,7 +79,9 @@ class DummyState:
     def __init__(self, psi):
         self.psi = psi
 
-class SparseHarmonicEngine:
+from .holographic_mixin import HolographicMixin
+
+class SparseHarmonicEngine(HolographicMixin):
     """
     Motor de Inferencia Masiva.
     Combina Materia Real (almacenada en diccionario) con Vacío Armónico (calculado).
@@ -98,20 +100,106 @@ class SparseHarmonicEngine:
         self.active_coords = set()
         self.step_count = 0
 
-        # Cache para optimización de visualización
-        self._cached_state_obj = None
-        self._cache_step = -1
-        self._cache_valid = False
-
-        # Quantum Tools
-        from ..physics.quantum_collapse import IonQCollapse
-        from ..physics.steering import QuantumSteering
-        self.collider = IonQCollapse(device)
-        self.steering = QuantumSteering(device)
-
-        # Gateway Process: Click-Out Mechanism
+        # holographic depth default
+        self.bulk_depth = 8
+        
+        # Gateway Click-Out default params
         self.click_out_enabled = False
         self.click_out_chance = 0.01
+
+        # ... (Rest of init) ...
+
+    # ... (Methods) ...
+
+    def get_visualization_data(self, viz_type: str = "density"):
+        """
+        Retorna datos de visualización para shaders.
+        """
+        try:
+             # Universal Bulk Handling via Mixin
+            bulk_data = self.get_bulk_visualization_data(viz_type, lambda: self.get_dense_state(), self.bulk_depth)
+            if bulk_data:
+                return bulk_data
+
+            # Obtener estado denso del viewport
+            # [1, H, W, C] complex
+            psi = self.get_dense_state()
+            
+            if psi is None:
+                return {"data": None, "type": viz_type, "error": "No state"}
+            
+            # Reducir canales si múltiples (promediar)
+            # psi is [1, H, W, C]
+            psi = psi[0]  # [H, W, C]
+            
+            if viz_type == "density" or viz_type == "magnitude":
+                # Densidad = suma de magnitudes al cuadrado sobre canales
+                data = psi.abs().pow(2).sum(dim=-1)  # [H, W]
+                
+            elif viz_type == "phase":
+                # Fase del campo agregado (primer canal o promedio)
+                # Ensure we handle empty last dim if C=0 (unlikely)
+                if psi.shape[-1] > 0:
+                     raw_phase = torch.angle(psi[..., 0]) 
+                else: 
+                     raw_phase = torch.angle(psi.sum(dim=-1))
+                
+                # Normalizar a [0, 1]
+                data = (raw_phase / (2 * 3.14159) + 0.5) % 1.0
+                
+            elif viz_type == "energy":
+                data = psi.abs().pow(2).sum(dim=-1)
+                
+            elif viz_type == "gradient":
+                # Gradiente de la densidad
+                density = psi.abs().pow(2).sum(dim=-1)
+                gy = torch.diff(density, dim=0, prepend=density[:1, :])
+                gx = torch.diff(density, dim=1, prepend=density[:, :1])
+                data = torch.sqrt(gx**2 + gy**2)
+                
+            elif viz_type == "real":
+                data = psi.real.sum(dim=-1) # Sum over channels
+                
+            elif viz_type == "imag":
+                data = psi.imag.sum(dim=-1) # Sum over channels
+
+            elif viz_type == "phase_hsv":
+                 # Return raw angle for HSV mapping in frontend
+                 if psi.shape[-1] > 0:
+                     data = torch.angle(psi[..., 0])
+                 else:
+                     data = torch.angle(psi.sum(dim=-1))
+                
+            else:
+                logging.warning(f"⚠️ Tipo de visualización '{viz_type}' no soportado. Usando density.")
+                data = psi.abs().pow(2).sum(dim=-1)
+            
+            # Convertir a numpy
+            data_np = data.detach().cpu().numpy().astype(np.float32)
+            
+            # NORMALIZACIÓN: Los shaders esperan datos en [0, 1]
+            min_val = float(data_np.min())
+            max_val = float(data_np.max())
+            if max_val > min_val and abs(max_val - min_val) > 1e-10:
+                data_np = (data_np - min_val) / (max_val - min_val)
+            else:
+                # Si todos los valores son iguales, usar 0.5 (gris medio)
+                data_np = np.full_like(data_np, 0.5)
+            
+            return {
+                "data": data_np.flatten(),
+                "type": viz_type,
+                "shape": list(data_np.shape),
+                "min": 0.0,  # Ya normalizado
+                "max": 1.0,  # Ya normalizado
+                "engine": "SparseHarmonicEngine"
+            }
+            
+        except Exception as e:
+            logging.error(f"Error en get_visualization_data: {e}")
+            import traceback
+            traceback.print_exc()
+            return {"data": None, "type": viz_type, "error": str(e)}
 
     @property
     def state(self):

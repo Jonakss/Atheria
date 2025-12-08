@@ -264,6 +264,71 @@ async def handle_load_checkpoint_snapshot(args):
         logging.error(f"Error cargando snapshot de entrenamiento: {e}", exc_info=True)
         if ws: await send_notification(ws, f"Error cargando snapshot: {str(e)}", "error")
 
+async def handle_delete_checkpoint(args):
+    """Elimina un checkpoint específico."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    exp_name = args.get("EXPERIMENT_NAME")
+    filename = args.get("FILENAME")
+    
+    if not exp_name or not filename:
+        if ws: await send_notification(ws, "Faltan parámetros (EXPERIMENT_NAME, FILENAME).", "error")
+        return
+
+    try:
+        checkpoint_dir = os.path.join(global_cfg.TRAINING_CHECKPOINTS_DIR, exp_name)
+        file_path = os.path.join(checkpoint_dir, filename)
+        
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            # También intentar borrar el snapshot asociado si existe
+            # Checkpoint name usually: checkpoint_ep10.pth
+            # Snapshot name usually: snapshot_ep10.pt
+            if 'ep' in filename and filename.endswith('.pth'):
+                try:
+                    episode_str = filename.split('ep')[-1].split('.')[0]
+                    snapshot_path = os.path.join(checkpoint_dir, f"snapshot_ep{episode_str}.pt")
+                    if os.path.exists(snapshot_path):
+                        os.remove(snapshot_path)
+                        logging.info(f"Snapshot asociado eliminado: {snapshot_path}")
+                except:
+                    pass
+            
+            msg = f"✅ Checkpoint '{filename}' eliminado."
+            logging.info(msg)
+            if ws: await send_notification(ws, msg, "success")
+            await handle_list_checkpoints(args)
+        else:
+            if ws: await send_notification(ws, f"No se encontró el archivo {filename}.", "error")
+            
+    except Exception as e:
+        logging.error(f"Error eliminando checkpoint: {e}")
+        if ws: await send_notification(ws, f"Error eliminando checkpoint: {str(e)}", "error")
+
+async def handle_cleanup_checkpoints(args):
+    """Elimina checkpoints antiguos, manteniendo solo los mejores."""
+    # TODO: Implementar lógica de limpieza inteligente (ej: mantener ultimos 5 + todos los 'best')
+    # Por ahora solo un placeholder
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    if ws: await send_notification(ws, "Limpieza automática aún no implementada.", "warning")
+
+async def handle_refresh_experiments(args):
+    """Refresca la lista de experimentos y la envía al cliente."""
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    try:
+        experiments = get_experiment_list()
+        if ws: await send_to_websocket(ws, "experiments_list", {"experiments": experiments})
+    except Exception as e:
+        logging.error(f"Error refrescando experimentos: {e}")
+
+async def handle_list_quantum_models(args):
+    """Lista modelos cuánticos disponibles (placeholder)."""
+    # Esta función parece que faltaba o se movió.
+    # Implementación básica para evitar crash.
+    ws = g_state['websockets'].get(args.get('ws_id'))
+    # TODO: Implementar listado real si es necesario
+    if ws: await send_to_websocket(ws, "quantum_models_list", {"models": []})
+
+
 # Diccionario de handlers para esta categoría
 HANDLERS = {
     "create": handle_create_experiment,

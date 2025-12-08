@@ -556,12 +556,14 @@ async def handle_load_experiment(args):
                         from ...engines.native_engine_wrapper import export_model_to_jit
 
                         d_state = exp_cfg_thread.MODEL_PARAMS.d_state
-                        # Usar grid size de inferencia actual
-                        grid_size_export = g_state.get(
+                        # Usar grid size de inferencia actual, pero asegurar mínimo seguro para JIT
+                        # U-Net con múltiples downsamples falla si el grid es muy pequeño (<16) durante el trace
+                        current_grid = g_state.get(
                             "inference_grid_size", global_cfg.GRID_SIZE_INFERENCE
                         )
+                        grid_size_export = max(current_grid, 64)
                         
-                        logging.info(f"📐 Exportando con grid_size={grid_size_export}, d_state={d_state}")
+                        logging.info(f"📐 Exportando con grid_size={grid_size_export} (Force Min 64), d_state={d_state}")
                         
                         # CRÍTICO: El modelo espera input real concatenado (Real + Imag)
                         jit_p = export_model_to_jit(
@@ -1353,6 +1355,7 @@ HANDLERS = {
     "set_viz": handle_set_viz,
     "set_roi_mode": handle_set_roi_mode,
     "tool_action": handle_tool_action,
+    "apply_tool": handle_tool_action,  # Alias for inference.apply_tool
     "get_bulk_volume": handle_get_bulk_volume,
     "get_holographic_projection": handle_get_holographic_projection,
 }
