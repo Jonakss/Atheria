@@ -14,6 +14,7 @@
 - **[Principio Holográfico](../20_Concepts/HOLOGRAPHIC_PRINCIPLE.md)** - Marco teórico para la implementación de HolographicEngine y experimentos de universo plano
 - **[Gateway Process Integration](../20_Concepts/GATEWAY_PROCESS_INTEGRATION.md)** - Roadmap para la evolución hacia "Metafísica Computacional" (Holographic vs Binary Layers)
 - **[Reversible Time & Renormalization](../20_Concepts/CONCEPT_REVERSIBLE_TIME_AND_RENORMALIZATION.md)** - Física de la reversibilidad temporal y visualización multiescala en sistemas cerrados
+- **[Teoría Orch-OR](../20_Concepts/ORCH_OR_THEORY.md)** - Hipótesis de Penrose-Hameroff sobre la conciencia cuántica y reducción objetiva
 
 
 ## 🔧 Arquitecturas y Sistemas
