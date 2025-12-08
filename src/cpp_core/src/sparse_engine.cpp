@@ -193,44 +193,36 @@ int64_t Engine::step_native() {
                             int64_t center_idx = patch_size / 2;
 
                             for (size_t j = 0; j < local_batch_coords.size(); j++) {
-                                // Extraer salida del centro del patch
+                                // Extract center output
                                 torch::Tensor output_center = batch_output[j].select(2, center_idx).select(1, center_idx);
 
-                                // Dividir en real e imag
-                                torch::Tensor delta_real = output_center.slice(0, 0, d_state_);
-                                torch::Tensor delta_imag = output_center.slice(0, d_state_, 2 * d_state_);
-                                torch::Tensor delta_complex = torch::complex(delta_real, delta_imag);
+                                // Get views of delta (Real/Imag) - No Allocation
+                                auto delta_real = output_center.slice(0, 0, d_state_);
+                                auto delta_imag = output_center.slice(0, d_state_, 2 * d_state_);
+                                
+                                // Acquire reuseable tensor from pool (avoid new_state allocation)
+                                torch::Tensor candidate = pool_.acquire();
+                                
+                                // Initialize with current state
+                                candidate.copy_(local_batch_states[j]);
+                                
+                                // Apply delta in-place using functional views
+                                torch::real(candidate).add_(delta_real);
+                                torch::imag(candidate).add_(delta_imag);
 
-                                // Obtener estado actual
-                                torch::Tensor current_state_j = local_batch_states[j];
-                                if (!current_state_j.is_complex()) {
-                                    current_state_j = torch::complex(current_state_j, torch::zeros_like(current_state_j));
-                                }
-
-                                // Aplicar delta
-                                torch::Tensor new_state = current_state_j + delta_complex;
-
-                                // Normalizar
-                                torch::Tensor abs_squared = torch::abs(new_state).pow(2);
-                                float norm = torch::sum(abs_squared).item<float>();
+                                // Calculate norm efficiently
+                                float norm = torch::norm(candidate).item<float>();
+                                
                                 if (norm > 1e-6f) {
-                                    new_state = new_state / std::sqrt(norm);
+                                    candidate.div_(norm); // In-place normalization
                                 }
 
-                                // Filtrar estados con energía muy baja
+                                // Filter low energy
                                 if (norm > 0.01f) {
-                                    // Use pool to acquire tensor
-                                    // std::cout << "DEBUG: Acquiring tensor from pool" << std::endl;
-                                    torch::Tensor pooled_state = pool_.acquire();
-                                    // std::cout << "DEBUG: Acquired tensor" << std::endl;
-                                    
-                                    // Copy data to pooled tensor
-                                    // new_state might be a view or a new tensor, we need to copy its content
-                                    // to the pooled storage.
-                                    pooled_state.copy_(new_state);
-                                    
-                                    local_next_matter_map.insert_tensor(local_batch_coords[j], pooled_state);
+                                    local_next_matter_map.insert_tensor(local_batch_coords[j], candidate);
                                     update_active_region({local_batch_coords[j]}, local_next_active_region);
+                                } else {
+                                    pool_.release(candidate);
                                 }
                             }
                         } catch (const c10::Error& e) {
@@ -277,29 +269,33 @@ int64_t Engine::step_native() {
 
                     for (size_t j = 0; j < local_batch_coords.size(); j++) {
                         torch::Tensor output_center = batch_output[j].select(2, center_idx).select(1, center_idx);
-                        torch::Tensor delta_real = output_center.slice(0, 0, d_state_);
-                        torch::Tensor delta_imag = output_center.slice(0, d_state_, 2 * d_state_);
-                        torch::Tensor delta_complex = torch::complex(delta_real, delta_imag);
                         
-                        torch::Tensor current_state_j = local_batch_states[j];
-                        if (!current_state_j.is_complex()) {
-                            current_state_j = torch::complex(current_state_j, torch::zeros_like(current_state_j));
-                        }
+                        // Views
+                        auto delta_real = output_center.slice(0, 0, d_state_);
+                        auto delta_imag = output_center.slice(0, d_state_, 2 * d_state_);
                         
-                        torch::Tensor new_state = current_state_j + delta_complex;
-                        torch::Tensor abs_squared = torch::abs(new_state).pow(2);
-                        float norm = torch::sum(abs_squared).item<float>();
+                        // Acquire from pool
+                        torch::Tensor candidate = pool_.acquire();
+                        
+                        // Init
+                        candidate.copy_(local_batch_states[j]);
+                        
+                        // In-place update using functional views
+                        torch::real(candidate).add_(delta_real);
+                        torch::imag(candidate).add_(delta_imag);
+                        
+                        // Norm
+                        float norm = torch::norm(candidate).item<float>();
+                        
                         if (norm > 1e-6f) {
-                            new_state = new_state / std::sqrt(norm);
+                            candidate.div_(norm);
                         }
                         
                         if (norm > 0.01f) {
-                            // Use pool
-                            torch::Tensor pooled_state = pool_.acquire();
-                            pooled_state.copy_(new_state);
-                            
-                            local_next_matter_map.insert_tensor(local_batch_coords[j], pooled_state);
+                            local_next_matter_map.insert_tensor(local_batch_coords[j], candidate);
                             update_active_region({local_batch_coords[j]}, local_next_active_region);
+                        } else {
+                            pool_.release(candidate);
                         }
                     }
                 }
@@ -374,70 +370,61 @@ std::vector<Coord3D> Engine::get_neighbors(const Coord3D& center, int radius) co
 }
 
 torch::Tensor Engine::build_batch_input(const std::vector<Coord3D>& coords) {
-    // Construir batch input para el modelo
-    // IMPORTANTE: El modelo UNet fue entrenado con inputs de tamaño completo del grid.
-    // Para mantener compatibilidad con los skip connections, necesitamos usar el mismo
-    // tamaño que el modelo espera. El modelo típicamente espera inputs de 64x64 o similar.
-    //
-    // SOLUCIÓN: Usar el tamaño del grid con el que fue entrenado el modelo.
-    // Este tamaño se pasa al constructor del Engine y se almacena en grid_size_.
-
     int64_t batch_size = static_cast<int64_t>(coords.size());
-
-    // Usar un tamaño de patch pequeño para inferencia local eficiente
-    int64_t patch_size = 3;  // Tamaño del patch (3x3 es suficiente para reglas locales)
-    int64_t patch_radius = patch_size / 2;  // Radio del patch (para centrar)
-
+    int64_t patch_size = 3;
+    int64_t patch_radius = patch_size / 2;
     int64_t height = patch_size;
     int64_t width = patch_size;
 
-    auto options = torch::TensorOptions()
-        .dtype(torch::kFloat32)
-        .device(device_)
-        .requires_grad(false);
+    // Pre-allocate vector to avoid re-allocations
+    std::vector<torch::Tensor> collected_tensors;
+    collected_tensors.reserve(batch_size * height * width);
 
-    // Crear tensor de entrada: [batch, 2*d_state, patch_size, patch_size]
-    torch::Tensor batch_input = torch::zeros({batch_size, 2 * d_state_, height, width}, options);
-
-    // Para cada coordenada, construir un patch centrado
     for (int64_t i = 0; i < batch_size; i++) {
         const Coord3D& center = coords[i];
-
-        // Obtener vecindario del tamaño del patch
         for (int64_t py = 0; py < height; py++) {
             for (int64_t px = 0; px < width; px++) {
-                // Mapear posición del patch a coordenada global
-                // El centro del patch está en (patch_radius, patch_radius)
                 int64_t dx = static_cast<int64_t>(px) - patch_radius;
                 int64_t dy = static_cast<int64_t>(py) - patch_radius;
-
                 Coord3D patch_coord(center.x + dx, center.y + dy, center.z);
-
-                // Obtener estado en esta coordenada (materia o vacío)
+                
                 torch::Tensor state = get_state_at(patch_coord);
-
-                // Convertir estado complejo a [real, imag] concatenado
-                torch::Tensor real, imag;
-                if (state.is_complex()) {
-                    real = torch::real(state);
-                    imag = torch::imag(state);
-                } else {
-                    real = state;
-                    imag = torch::zeros_like(state);
-                }
-
-                // Copiar a batch_input [batch, channels, y, x]
-                if (real.dim() == 1 && real.size(0) == d_state_) {
-                    for (int64_t c = 0; c < d_state_; c++) {
-                        batch_input[i][c][py][px] = real[c].item<float>();
-                        batch_input[i][c + d_state_][py][px] = imag[c].item<float>();
-                    }
-                }
+                // Ensure state is 1D [d_state]
+                if (state.dim() > 1) state = state.flatten();
+                
+                collected_tensors.push_back(state);
             }
         }
     }
+    
+    if (collected_tensors.empty()) {
+         auto options = torch::TensorOptions().dtype(torch::kFloat32).device(device_);
+         return torch::zeros({batch_size, 2 * d_state_, height, width}, options);
+    }
 
-    return batch_input;
+    // Stack all tensors efficiently: [Batch*H*W, d_state]
+    auto stacked = torch::stack(collected_tensors);
+    
+    // Handle Complex -> Real/Imag conversion
+    torch::Tensor stacked_real, stacked_imag;
+    if (stacked.is_complex()) {
+        stacked_real = torch::real(stacked);
+        stacked_imag = torch::imag(stacked);
+    } else {
+        stacked_real = stacked;
+        stacked_imag = torch::zeros_like(stacked);
+    }
+    
+    // Concatenate channels: [Batch*H*W, 2*d_state]
+    auto combined = torch::cat({stacked_real, stacked_imag}, 1);
+    
+    // Reshape to [Batch, Height, Width, 2*d_state]
+    auto reshaped = combined.view({batch_size, height, width, 2 * d_state_});
+    
+    // Permute to [Batch, 2*d_state, Height, Width] (NCHW format)
+    auto permuted = reshaped.permute({0, 3, 1, 2});
+    
+    return permuted.contiguous();
 }
 
 void Engine::update_active_region(const std::vector<Coord3D>& coords, 

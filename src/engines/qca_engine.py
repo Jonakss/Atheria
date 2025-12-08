@@ -335,6 +335,10 @@ class CartesianEngine:
         from ..optimization.gpu_optimizer import GPUOptimizer
         self.optimizer = GPUOptimizer(self.device)
 
+        # Gateway Process: Click-Out Mechanism
+        self.click_out_enabled = False
+        self.click_out_chance = 0.01
+
     def evolve_internal_state(self, step=None):
         if self.state.psi is None: return
         
@@ -376,6 +380,41 @@ class CartesianEngine:
                     logging.debug(f"💾 Estado guardado en Dragonfly para paso {step}")
                 except Exception as e:
                     logging.warning(f"⚠️ Error guardando estado en caché: {e}")
+
+        # 3. Gateway Process: Click-Out Mechanism
+        if self.click_out_enabled:
+            self._apply_click_out()
+
+    def _apply_click_out(self):
+        """
+        Simulates Gateway Click-Out in Cartesian Engine.
+        Non-local exchange of quantum states (Tunneling) between random points.
+        """
+        if np.random.random() > self.click_out_chance:
+             return
+        
+        # Pick random pairs
+        n_pairs = int(self.grid_size * 0.5) 
+        
+        # Random coordinates
+        src_y = torch.randint(0, self.grid_size, (n_pairs,), device=self.device)
+        src_x = torch.randint(0, self.grid_size, (n_pairs,), device=self.device)
+        dst_y = torch.randint(0, self.grid_size, (n_pairs,), device=self.device)
+        dst_x = torch.randint(0, self.grid_size, (n_pairs,), device=self.device)
+        
+        # Swap States directly on the complex tensor
+        # psi is [1, H, W, d_state] or similar. Let's refer to get_initial_state: [B, Grid, Grid, D]
+        # self.state.psi shape is usually [1, H, W, C]
+        
+        psi = self.state.psi
+        if psi is None: return
+
+        # Clone to avoid in-place issues during swap
+        src_vals = psi[..., src_y, src_x, :].clone()
+        dst_vals = psi[..., dst_y, dst_x, :].clone()
+        
+        psi[..., src_y, src_x, :] = dst_vals
+        psi[..., dst_y, dst_x, :] = src_vals
 
     def evolve_step(self, current_psi):
         with torch.set_grad_enabled(True):
@@ -764,7 +803,13 @@ class CartesianEngine:
                 
                 steering = QuantumSteering(device)
                 new_psi = steering.inject(self.state.psi, 'plane_wave', x=cx, y=cy, radius=radius, k_x=k_x, k_y=k_y)
-                
+            
+            elif action == 'set_click_out':
+                self.click_out_enabled = bool(params.get('enabled', False))
+                self.click_out_chance = float(params.get('chance', 0.01))
+                logging.info(f"🌀 CartesianEngine Click-Out: Enabled={self.click_out_enabled}, Chance={self.click_out_chance}")
+                return True
+
             else:
                 logging.warning(f"⚠️ Herramienta no soportada: {action}")
                 return False

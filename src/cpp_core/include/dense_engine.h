@@ -39,6 +39,9 @@ private:
     
     // Helpers
     void ensure_device();
+    
+    // Optimization: Buffer pre-allocated
+    torch::Tensor input_buffer_;
 };
 
 } // namespace atheria

@@ -14,6 +14,10 @@ DenseEngine::DenseEngine(int64_t grid_size, int64_t d_state, const std::string& 
     // [1, C, H, W] format for PyTorch models (Channels First)
     state_ = torch::zeros({1, d_state, grid_size, grid_size}, 
                           torch::TensorOptions().dtype(torch::kComplexFloat).device(device_));
+                          
+    // Pre-allocate input buffer [1, 2*C, H, W] (Float)
+    input_buffer_ = torch::zeros({1, 2 * d_state_, grid_size, grid_size}, 
+                                 torch::TensorOptions().dtype(torch::kFloat32).device(device_));
 }
 
 void DenseEngine::ensure_device() {
@@ -37,41 +41,47 @@ bool DenseEngine::load_model(const std::string& model_path) {
 int64_t DenseEngine::step() {
     if (!model_loaded_) return 0;
     
-    torch::NoGradGuard no_grad; // Deshabilitar gradientes para inferencia
+    torch::NoGradGuard no_grad; 
     
     try {
-        // Preparar input para el modelo
-        // El modelo espera [1, 2*C, H, W] (concatenado real+imag)
-        auto real = torch::real(state_);
-        auto imag = torch::imag(state_);
+        // Ensure input buffer matches state size (in case state_ changed size)
+        if (input_buffer_.size(2) != state_.size(2) || input_buffer_.size(3) != state_.size(3)) {
+            input_buffer_ = torch::zeros({1, 2 * d_state_, state_.size(2), state_.size(3)}, 
+                                         torch::TensorOptions().dtype(torch::kFloat32).device(device_));
+        }
+    
+        // Copy Real/Imag parts to buffer (Avoids allocation of 'input')
+        using namespace torch::indexing;
+        input_buffer_.index({Slice(), Slice(0, d_state_), Slice(), Slice()}).copy_(torch::real(state_));
+        input_buffer_.index({Slice(), Slice(d_state_, 2 * d_state_), Slice(), Slice()}).copy_(torch::imag(state_));
         
-        // Fix for torch::cat: Explicitly create vector
-        std::vector<torch::Tensor> tensors = {real, imag};
-        auto input = torch::cat(tensors, 1); // Concatenar en canales
-        
-        // Ejecutar modelo
+        // Execute model
         std::vector<torch::jit::IValue> inputs;
-        inputs.push_back(input);
+        inputs.push_back(input_buffer_); // Use buffer
         
-        // Asumimos que el modelo retorna delta_psi (complejo simulado)
-        // Salida: [1, 2*C, H, W]
+        // Output: [1, 2*C, H, W]
         auto output = model_.forward(inputs).toTensor();
         
-        // Reconstruir complejo: delta_psi
+        // Reconstruct complex delta_psi
+        // Optimization: Create views, don't copy
         auto out_real = output.slice(1, 0, d_state_);
         auto out_imag = output.slice(1, d_state_, 2 * d_state_);
         auto delta_psi = torch::complex(out_real, out_imag);
         
-        // Euler step: psi_new = psi + delta_psi
-        state_ = state_ + delta_psi;
+        // In-place update: state_ += delta_psi
+        state_.add_(delta_psi);
         
-        // Normalización (opcional pero recomendada para estabilidad)
-        // Norm per pixel: sqrt(sum(|psi|^2))
-        auto norm = torch::sqrt(state_.abs().pow(2).sum(1, true)); // Sum over channels
-        state_ = state_ / (norm + 1e-9);
+        // Normalization (In-place where possible)
+        // norm = sqrt(sum(|psi|^2)) over channel dim
+        // Use keepdim=true to allow broadcasting
+        // Replaced torch::linalg::vector_norm with torch::norm for compatibility
+        auto norm = torch::norm(state_, 2, {1}, true);
+        
+        // state_ /= (norm + eps)
+        state_.div_(norm.add_(1e-9));
         
         step_count_++;
-        return grid_size_ * grid_size_; // Retornar total de celdas (denso)
+        return state_.size(2) * state_.size(3);
         
     } catch (const c10::Error& e) {
         std::cerr << "Error in step(): " << e.what() << std::endl;
