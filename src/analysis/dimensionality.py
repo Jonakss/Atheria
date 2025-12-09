@@ -150,7 +150,8 @@ class StateAnalyzer:
                     min_dist=self.min_dist,
                     n_components=2,
                     metric='euclidean',
-                    random_state=42
+                    random_state=42,
+                    n_jobs=1 # Fix UserWarning: n_jobs value 1 overridden to 1 by setting random_state.
                 )
                 
                 # Subsample if too large for real-time

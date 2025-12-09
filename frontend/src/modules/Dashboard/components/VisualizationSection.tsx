@@ -88,8 +88,10 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
       setClickOutEnabled(newState);
       sendCommand('inference', 'apply_tool', { 
           action: 'set_click_out', 
-          enabled: newState, 
-          chance: clickOutChance 
+          params: {
+            enabled: newState, 
+            chance: clickOutChance 
+          }
       });
   };
 
@@ -98,8 +100,10 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
       if (clickOutEnabled) {
           sendCommand('inference', 'apply_tool', { 
               action: 'set_click_out', 
-              enabled: true, 
-              chance: value 
+              params: {
+                enabled: true, 
+                chance: value 
+              }
           });
       }
   };

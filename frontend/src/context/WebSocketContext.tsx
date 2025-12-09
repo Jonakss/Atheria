@@ -6,11 +6,11 @@ import { saveFrameToTimeline } from '../utils/timelineStorage';
 import {
     CompileStatus,
     InferenceSnapshot,
+    QuantumStatus,
     SimData,
     TrainingProgress,
     TrainingSnapshot,
-    WebSocketContext,
-    QuantumStatus
+    WebSocketContext
 } from './WebSocketContextDefinition';
 
 /**
@@ -401,6 +401,13 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         // IMPORTANTE: Preservar step, timestamp y simulation_info
                         // Usar función de actualización para evitar condiciones de carrera
                         try {
+                            if (!payload) {
+                                if (process.env.NODE_ENV === 'development') {
+                                    console.warn("⚠️ WebSocketContext - Payload nulo o indefinido en simulation_frame");
+                                }
+                                break;
+                            }
+
                             const finalPayload = {
                                 ...payload,
                                 step: payload.step ?? payload.simulation_info?.step ?? null,
@@ -505,6 +512,7 @@ export const WebSocketProvider = ({ children }: { children: ReactNode }) => {
                         // Actualizar solo step y simulation_info, preservando otros datos existentes (incluyendo map_data)
                         // Usar función de actualización para evitar condiciones de carrera
                         try {
+                            if (!payload) break;
                             setSimData(prev => {
                                 const newStep = payload.step ?? payload.simulation_info?.step ?? prev?.step ?? null;
                                 const newTimestamp = payload.timestamp ?? prev?.timestamp ?? Date.now();

@@ -20,7 +20,7 @@ class LatticeEngine(HolographicMixin):
         self.N = 3
         
         # Pre-compute identity for efficiency
-        self.Id = torch.eye(self.N, dtype=torch.complex64, device=self.device)
+        self.identity = torch.eye(self.N, dtype=torch.complex64, device=self.device)
         
         # Initialize links: [2, H, W, 3, 3] (Complex)
         # 2 directions (Right, Down), HxW grid, 3x3 SU(3) matrices
@@ -41,6 +41,13 @@ class LatticeEngine(HolographicMixin):
         self.click_out_chance = 0.01 # Probability of tunneling event per step
 
         logging.info(f"🌌 LatticeEngine (SU3) inicializado: Grid={grid_size}x{grid_size}, Beta={beta}")
+
+    def reset(self):
+        """Reinicia el estado del retículo."""
+        self.step_count = 0
+        self.t = 0
+        self.links = self._initialize_links()
+        logging.info("🌌 LatticeEngine reseteado.")
 
     def _initialize_links(self):
         """Inicializa los links del retículo (Cold Start)."""

@@ -11,10 +11,14 @@
             "id": "5692398a7a86fa0e",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "type": "markdown",
+              "state": {
+                "file": "40_Experiments/3D_VIEWER_IMPROVEMENTS.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "3D_VIEWER_IMPROVEMENTS"
             }
           }
         ]
@@ -164,6 +168,8 @@
   },
   "active": "5692398a7a86fa0e",
   "lastOpenFiles": [
+    "40_Experiments/00_EXPERIMENTS_MOC.md",
+    "40_Experiments/logs/2025-12-08_fix_engine_and_frontend_loops.md",
     "40_Experiments/logs/2025-12-08_holographic_native_port.md",
     "20_Concepts/ORCH_OR_THEORY.md",
     "40_Experiments/logs/2025-12-08_training_snapshots_and_viz.md",
@@ -177,7 +183,6 @@
     "40_Experiments/logs/2025-12-01_fix_engine_support_and_native_crash.md",
     "40_Experiments/logs/2025-12-01_fix_trainer_engine_and_motor_factory.md",
     "40_Experiments/logs/2025-12-01_native_freeze_debugging.md",
-    "40_Experiments/00_EXPERIMENTS_MOC.md",
     "30_Components/00_COMPONENTS_MOC.md",
     "20_Concepts/00_CONCEPTS_MOC.md",
     "10_core/ATHERIA_4_MASTER_BRIEF.md",
@@ -189,7 +194,6 @@
     "90_Troubleshooting/COMMON_BUGS.md",
     "90_Troubleshooting/ENGINE_SWITCHING.md",
     "50_Backlog/CUDA_MEMORY_OPTIMIZATION.md",
-    "99_Templates/AGENT_GUIDELINES.md",
     "Untitled.canvas",
     "40_Experiments/assets/verification_training_section.png",
     "40_Experiments/assets/verification_settings_modal.png",

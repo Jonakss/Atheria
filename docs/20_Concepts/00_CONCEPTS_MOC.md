@@ -26,6 +26,7 @@
 - **[Paralelismo Nativo (OpenMP)](../20_Concepts/NATIVE_PARALLELISM.md)** - Documentación sobre la implementación de paralelismo en el motor C++
 - **[Migración Python → Nativo](../20_Concepts/PYTHON_TO_NATIVE_MIGRATION.md)** - Guía para migrar experimentos del motor Python al motor C++ nativo
 - **[History Buffer Architecture](../20_Concepts/HISTORY_BUFFER_ARCHITECTURE.md)** - Sistema de buffer circular para navegación temporal (rewind/replay)
+- **[RISC-V Voxel Architecture](../20_Concepts/RISCV_VOXEL_ARCHITECTURE_CONCEPT.md)** - Concepto de arquitectura masiva de inferencia usando clusters RISC-V y Voxel Ray Casting
 
 ## 🧠 Teoría de IA y Aprendizaje
 
@@ -58,6 +59,7 @@
 - [[ADVANCED_QUANTUM_FEATURES]] - Tuner, Hybrid Compute, Steering
 - [[QUANTUM_COMPUTE_SERVICES]]imulating Many Worlds via Batch Inference.
 - **[History Buffer Future](../20_Concepts/HISTORY_BUFFER_FUTURE.md)** - Visión futura para el sistema de historial (Compression, Streaming)
+- **[Quantum Knowledge Distillation (IonQ)](../20_Concepts/QUANTUM_KNOWLEDGE_DISTILLATION_IONQ.md)** - Propuesta para usar IonQ como "Maestro" físico para calibrar la Ley M
 
 ---
 

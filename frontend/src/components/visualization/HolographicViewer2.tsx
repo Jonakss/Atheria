@@ -275,7 +275,8 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
                         vColor = hslColor;
                     }
                     vAlpha = min(1.0, magnitude * 2.0);
-                
+                }
+
                 // 5. Size Attenuation
                 // Base size * Magnitude * Perspective
                 float perspectiveSize = (300.0 / -mvPosition.z);

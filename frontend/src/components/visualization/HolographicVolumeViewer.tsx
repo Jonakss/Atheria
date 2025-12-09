@@ -145,20 +145,21 @@ export const HolographicVolumeViewer: React.FC<HolographicVolumeViewerProps> = (
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
         geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-        geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+        geometry.setAttribute('pSize', new THREE.Float32BufferAttribute(sizes, 1));
 
         const vertexShader = `
-            attribute float size;
+            attribute float pSize;
             varying vec3 vColor;
             void main() {
                 vColor = color;
                 vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-                gl_PointSize = size * (400.0 / -mvPosition.z);
+                gl_PointSize = pSize * (400.0 / -mvPosition.z);
                 gl_Position = projectionMatrix * mvPosition;
             }
         `;
 
         const fragmentShader = `
+            precision mediump float;
             varying vec3 vColor;
             void main() {
                 vec2 coord = gl_PointCoord - vec2(0.5);

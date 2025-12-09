@@ -43,6 +43,17 @@
 - **[EXP_003: Integración LibTorch](../40_Experiments/EXP_003_CPP_LIBTORCH.md)** - Integración con LibTorch
 - **[EXP_004: Benchmark V1](../40_Experiments/EXP_004_BENCHMARK_CPP_V1.md)** - Benchmark del motor C++ V1
 - **[EXP_005: Victoria Motor Nativo](../40_Experiments/EXP_005_CPP_NATIVE_VICTORY.md)** - Resultados del motor nativo
+ 
+ ---
+ 
+ ## ⚛️ Experimentos Cuánticos
+ 
+ - **[EXP_004: IonQ Engine Simulations](../40_Experiments/EXP_004_IONQ_ENGINE_SIMULATIONS.md)** - Primeras pruebas con IonQ
+ - **[EXP_008: Quantum Genesis Sim](../40_Experiments/EXP_008_QUANTUM_GENESIS_SIM.md)** - Simulación del Génesis Cuántico
+ - **[EXP_008: Quantum Native Training](../40_Experiments/EXP_008_QUANTUM_NATIVE_TRAINING.md)** - Entrenamiento nativo cuántico
+ - **[EXP_009: Advanced Ansatz](../40_Experiments/EXP_009_ADVANCED_ANSATZ.md)** - Investigación de Ansatz avanzados
+ - **[EXP_009: Quantum Tuner PoC](../40_Experiments/EXP_009_QUANTUM_TUNER_POC.md)** - Prueba de concepto del Tuner Cuántico
+ - **[EXP_011: IonQ Time Engine](../40_Experiments/EXP_011_IONQ_TIME_ENGINE.md)** - Implementación del Motor de Tiempo con IonQ (Trotterization)
 
 ---
 

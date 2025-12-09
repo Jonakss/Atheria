@@ -41,6 +41,13 @@ related: [[30_Components/00_COMPONENTS_MOC]], [[40_Experiments/00_EXPERIMENTS_MO
 - [[ROADMAP_PHASE_5_BACKLOG]] - Backlog de ideas y características futuras
 
 **Ver:** [[40_Experiments/PHASE_STATUS_REPORT|Informe de Estado de Fases]] para detalles completos
+ 
+ ---
+ 
+ ## 📚 Protocolos y Referencia
+ 
+ - **[WebSocket Protocol](../10_core/WEBSOCKET_PROTOCOL.md)** - Especificación del protocolo de comunicación WebSocket
+ - **[API Commands Reference](../10_core/API_COMMANDS_REFERENCE.md)** - Lista completa de comandos disponibles en el WebSocket
 
 ---
 

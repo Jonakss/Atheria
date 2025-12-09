@@ -3,6 +3,9 @@ import numpy as np
 import math
 import logging
 
+from ..physics.quantum_collapse import IonQCollapse
+from ..physics.steering import QuantumSteering
+
 class HarmonicVacuum:
     """
     Generador de Vacío basado en Interferencias de Ondas (QFT Procedural).
@@ -94,6 +97,10 @@ class SparseHarmonicEngine(HolographicMixin):
         self.cfg = cfg
         self.grid_size = grid_size
         self.vacuum = HarmonicVacuum(d_state, device)
+        
+        # Tools
+        self.collider = IonQCollapse(device)
+        self.steering = QuantumSteering(device)
         
         # La Materia: Diccionario {(x,y,z): Tensor}
         self.matter = {} 

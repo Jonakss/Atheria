@@ -5,8 +5,8 @@
  */
 
 const STORAGE_KEY_PREFIX = "atheria_timeline_";
-const DEFAULT_MAX_FRAMES = 100; // Por defecto, mantener últimos 100 frames
-const STORAGE_SIZE_LIMIT = 5 * 1024 * 1024; // 5MB límite total (aprox.)
+const DEFAULT_MAX_FRAMES = 25; // Reducido de 100 a 25 para evitar QuotaExceeded
+const STORAGE_SIZE_LIMIT = 2 * 1024 * 1024; // Reducido a 2MB para ser conservador
 
 export interface TimelineFrame {
   step: number;
@@ -171,6 +171,7 @@ export function saveFrameToTimeline(
       }
     }
     console.error("Error guardando frame en timeline:", error);
+    // Si falla repetidamente, podríamos deshabilitar el guardado temporalmente aquí
     return false;
   }
 }
