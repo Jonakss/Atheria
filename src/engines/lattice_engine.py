@@ -290,6 +290,37 @@ class LatticeEngine(HolographicMixin):
                 # Create contrast: (1 - val) * gain
                 data = 1.0 - data
                 
+            elif viz_type == "holographic_bulk":
+                # Generate Bulk 3D data from 2D surface (AdS/CFT style)
+                # We simulate an emergent radial dimension (z) via coarse-graining (renormalization)
+                # D = 8 layers
+                depth = self.bulk_depth
+                
+                # Base layer (z=0): Energy Density
+                U_p = self._compute_plaquettes(self.links)
+                trace = torch.diagonal(U_p, dim1=-2, dim2=-1).sum(-1)
+                base_layer = (1.0 - (1.0 / self.N) * trace.real)
+                
+                # Stack layers
+                # We apply convolution to smooth out higher layers (simulating RG flow)
+                # In PyTorch we can use avg_pool or gaussian blur
+                
+                layers = [base_layer]
+                current = base_layer.unsqueeze(0).unsqueeze(0) # [1, 1, H, W]
+                
+                # Gaussian kernel approximation (3x3)
+                kernel = torch.tensor([[1, 2, 1], [2, 4, 2], [1, 2, 1]], 
+                                     device=self.device, dtype=torch.float32) / 16.0
+                kernel = kernel.view(1, 1, 3, 3)
+                
+                for _ in range(depth - 1):
+                    # Pad to keep size
+                    current = torch.nn.functional.conv2d(current, kernel, padding=1)
+                    layers.append(current.squeeze(0).squeeze(0))
+                    
+                # Stack to [Depth, H, W]
+                data = torch.stack(layers, dim=0) # [D, H, W]
+                
             else:
                 # Default: density
                 U_p = self._compute_plaquettes(self.links)

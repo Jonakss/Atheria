@@ -181,7 +181,7 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
             uIsVolumetric: { value: isVolumetric },
             uTime: { value: 0 },
             uIsPoincare: { value: vizType === 'poincare' || vizType === 'poincare_3d' },
-            uScale: { value: 100.0 }, 
+            uScale: { value: 300.0 }, 
             uUseColorAttribute: { value: channels === 3 },
             uBinaryMode: { value: binaryMode },
             uBinaryThreshold: { value: binaryThreshold },

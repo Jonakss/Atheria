@@ -4,6 +4,7 @@ import { ColorScaleLegend } from '../../../components/ui/ColorScaleLegend';
 import { LabSider } from '../../../components/ui/LabSider';
 import { PanZoomCanvas } from '../../../components/ui/PanZoomCanvas';
 import HolographicViewer2 from '../../../components/visualization/HolographicViewer2';
+import { HolographicVolumeViewer } from '../../../components/visualization/HolographicVolumeViewer';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import PhaseSpaceViewer from '../../PhaseSpaceViewer/PhaseSpaceViewer';
 import { AnalysisView } from '../components/AnalysisView';
@@ -137,7 +138,7 @@ export const DashboardLayout: React.FC = () => {
                   width={gridWidth}
                   height={gridHeight}
                   vizType={selectedViz}
-                  threshold={0.01}
+                  threshold={0.001}
                   channels={flatMapData.length === gridWidth * gridHeight * 3 ? 3 : 1}
                   binaryMode={binaryMode}
                   binaryThreshold={binaryThreshold}
@@ -156,6 +157,33 @@ export const DashboardLayout: React.FC = () => {
               </div>
             </div>
           );
+        } else if (selectedViz === 'holographic_bulk') {
+            const hasVolumeData = flatMapData.length > 0 && simData?.metadata?.shape?.length === 3;
+            const volD = simData?.metadata?.shape?.[0] || 1;
+            const volH = simData?.metadata?.shape?.[1] || gridHeight;
+            const volW = simData?.metadata?.shape?.[2] || gridWidth;
+            
+            return (
+                <div className="absolute inset-0 z-0 bg-black overflow-hidden">
+                    {hasVolumeData ? (
+                         <HolographicVolumeViewer
+                            volumeData={flatMapData}
+                            depth={volD}
+                            height={volH}
+                            width={volW}
+                            threshold={0.01}
+                         />
+                    ) : (
+                        <div className="flex items-center justify-center h-full text-dark-300 text-sm">
+                            Esperando datos volumétricos...
+                        </div>
+                    )}
+                    <div className="absolute bottom-4 right-4 text-[9px] font-mono text-orange-500 pointer-events-none text-right">
+                        VIEWPORT: PERSPECTIVE (BULK)<br/>
+                        RENDER: RAYMARCHING / VOLUMETRIC
+                    </div>
+                </div>
+            );
         } else if (selectedViz === 'phase_space') {
             return (
                 <div className="absolute inset-0 z-0 bg-slate-900 overflow-hidden p-4">
