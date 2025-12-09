@@ -68,6 +68,11 @@ export const DashboardLayout: React.FC = () => {
   const [binaryThreshold, setBinaryThreshold] = useState(0.5);
   const [binaryColor, setBinaryColor] = useState('#ffffff'); // Default white
 
+  // 3D Visualization State
+  const [pointSize, setPointSize] = useState(2.0);
+  const [densityThreshold, setDensityThreshold] = useState(0.001);
+  const [renderMode, setRenderMode] = useState<'points' | 'wireframe' | 'mesh'>('points');
+
   const { simData, selectedViz, connectionStatus, inferenceStatus } = useWebSocket();
 
   // Efecto para Modo Teatro: Colapsar paneles cuando se activa
@@ -138,7 +143,7 @@ export const DashboardLayout: React.FC = () => {
                   width={gridWidth}
                   height={gridHeight}
                   vizType={selectedViz}
-                  threshold={0.001}
+                  threshold={densityThreshold}
                   channels={flatMapData.length === gridWidth * gridHeight * 3 ? 3 : 1}
                   binaryMode={binaryMode}
                   binaryThreshold={binaryThreshold}
@@ -171,7 +176,7 @@ export const DashboardLayout: React.FC = () => {
                             depth={volD}
                             height={volH}
                             width={volW}
-                            threshold={0.01}
+                            threshold={densityThreshold}
                          />
                     ) : (
                         <div className="flex items-center justify-center h-full text-dark-300 text-sm">
@@ -324,6 +329,12 @@ export const DashboardLayout: React.FC = () => {
               onChangeBinaryThreshold={setBinaryThreshold}
               binaryColor={binaryColor}
               onChangeBinaryColor={setBinaryColor}
+              pointSize={pointSize}
+              onPointSizeChange={setPointSize}
+              densityThreshold={densityThreshold}
+              onDensityThresholdChange={setDensityThreshold}
+              renderMode={renderMode}
+              onRenderModeChange={setRenderMode}
             />
           ) : (
             <PhysicsSection />

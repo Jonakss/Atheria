@@ -305,8 +305,17 @@ class LatticeEngine(HolographicMixin):
                 # We apply convolution to smooth out higher layers (simulating RG flow)
                 # In PyTorch we can use avg_pool or gaussian blur
                 
-                layers = [base_layer]
-                current = base_layer.unsqueeze(0).unsqueeze(0) # [1, 1, H, W]
+                # base_layer is [B, H, W] or [H, W]. If [1, H, W], we need [1, 1, H, W] for conv2d.
+                # Check shape first
+                if base_layer.dim() == 3:
+                     current = base_layer.unsqueeze(1) # [B, 1, H, W]
+                elif base_layer.dim() == 2:
+                     current = base_layer.unsqueeze(0).unsqueeze(0) # [1, 1, H, W]
+                else:
+                     # Unexpected, force reshape
+                     current = base_layer.view(1, 1, self.grid_size, self.grid_size)
+
+                layers = [base_layer.squeeze()] # Store as [H, W] for stacking
                 
                 # Gaussian kernel approximation (3x3)
                 kernel = torch.tensor([[1, 2, 1], [2, 4, 2], [1, 2, 1]], 

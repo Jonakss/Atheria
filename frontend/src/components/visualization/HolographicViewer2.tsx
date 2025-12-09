@@ -15,6 +15,9 @@ interface HolographicViewerProps {
     binaryMode?: boolean;
     binaryThreshold?: number;
     binaryColor?: string;
+    // 3D Control Props
+    pointSize?: number;
+    renderMode?: 'points' | 'wireframe' | 'mesh';
 }
 
 export const HolographicViewer2: React.FC<HolographicViewerProps> = ({ 
@@ -28,7 +31,9 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
     channels = 1,
     binaryMode = false,
     binaryThreshold = 0.5,
-    binaryColor = '#FFFFFF'
+    binaryColor = '#FFFFFF',
+    pointSize = 2.0,
+    renderMode = 'points'
 }) => {
     const mountRef = useRef<HTMLDivElement>(null);
     const sceneRef = useRef<THREE.Scene | null>(null);
@@ -185,7 +190,8 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
             uUseColorAttribute: { value: channels === 3 },
             uBinaryMode: { value: binaryMode },
             uBinaryThreshold: { value: binaryThreshold },
-            uBinaryColor: { value: new THREE.Color(binaryColor) }
+            uBinaryColor: { value: new THREE.Color(binaryColor) },
+            uPointSize: { value: pointSize }
         };
 
         // Vertex Shader
@@ -205,6 +211,7 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
             uniform bool uBinaryMode;
             uniform float uBinaryThreshold;
             uniform vec3 uBinaryColor;
+            uniform float uPointSize;
             
             varying vec3 vColor;
             varying float vAlpha;
@@ -278,13 +285,19 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
                 }
 
                 // 5. Size Attenuation
-                // Base size * Magnitude * Perspective
-                float perspectiveSize = (300.0 / -mvPosition.z);
-                // Clamp max perspective scaling to avoid huge near-camera blobs
-                perspectiveSize = min(perspectiveSize, 50.0); 
+                // Base size * Magnitude * Perspective * uScaleProp
+                // Use a dedicated uniform for point size multiplier ? 
+                // Or just bake it into the constant.
+                // Let's pass it via uniform if possible, but recreating shader is expensive.
+                // For now, let's just use hardcoded multiplier since we don't restart shader often?
+                // Actually, uniform Update is cheap. We should add uPointSize uniform.
                 
-                float finalSize = max(2.0, magnitude * 8.0) * perspectiveSize;
-                gl_PointSize = clamp(finalSize, 2.0, 60.0); // Hard clamp to hardware limits/sanity
+                float perspectiveSize = (uScale / -mvPosition.z);
+                perspectiveSize = min(perspectiveSize, 80.0); 
+                
+                // Use the uPointSize uniform (we need to add it to uniforms first)
+                float finalSize = max(2.0, magnitude * uPointSize * 4.0) * (300.0 / -mvPosition.z);
+                gl_PointSize = clamp(finalSize, 1.0, 100.0); 
             }
         `;
 
@@ -310,11 +323,18 @@ export const HolographicViewer2: React.FC<HolographicViewerProps> = ({
             depthWrite: false
         });
 
+        // Handle Render Mode (Wireframe simulation for points?)
+        // For now, points is the only valid mode for this viewer.
+        // We could change blending or size based on mode.
+        if (renderMode === 'wireframe') {
+            material.blending = THREE.NormalBlending;
+        }
+
         const points = new THREE.Points(geometry, material);
         sceneRef.current.add(points);
         pointsRef.current = points;
 
-    }, [data, phaseData, width, height, shape, threshold, vizType, channels, binaryMode, binaryThreshold, binaryColor]);
+    }, [data, phaseData, width, height, shape, threshold, vizType, channels, binaryMode, binaryThreshold, binaryColor, pointSize, renderMode]);
 
     return (
         <div className="relative w-full h-full">

@@ -15,6 +15,13 @@ interface VisualizationSectionProps {
   onChangeBinaryThreshold?: (val: number) => void;
   binaryColor?: string;
   onChangeBinaryColor?: (val: string) => void;
+  // 3D Visualizer Props
+  pointSize?: number;
+  onPointSizeChange?: (val: number) => void;
+  densityThreshold?: number;
+  onDensityThresholdChange?: (val: number) => void;
+  renderMode?: 'points' | 'wireframe' | 'mesh';
+  onRenderModeChange?: (val: 'points' | 'wireframe' | 'mesh') => void;
 }
 
 export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
@@ -27,14 +34,17 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
   binaryThreshold = 0.5,
   onChangeBinaryThreshold,
   binaryColor = '#FFFFFF',
-  onChangeBinaryColor
+  onChangeBinaryColor,
+  pointSize = 1.0,
+  onPointSizeChange,
+  densityThreshold = 0.01,
+  onDensityThresholdChange,
+  renderMode = 'points',
+  onRenderModeChange
 }) => {
   const { sendCommand, selectedViz, setSelectedViz, roiInfo } = useWebSocket();
   const [gammaDecay, setGammaDecay] = useState(0.015);
   const [thermalNoise, setThermalNoise] = useState(0.002);
-  const [pointSize, setPointSize] = useState(1.0);
-  const [threshold, setThreshold] = useState(0.01); // Umbral más bajo para ver más estructura
-  const [renderMode, setRenderMode] = useState<'points' | 'wireframe' | 'mesh'>('points');
   
   const [internalLayer, setInternalLayer] = useState(0);
   const activeLayer = onLayerChange ? selectedLayer : internalLayer;
