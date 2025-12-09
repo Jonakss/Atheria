@@ -19,6 +19,10 @@
 
 ### 2025-12-07
 
+### 2025-12-09
+
+- [[logs/2025-12-09_native_holographic_viz|Feature: Native Engine Holographic Viz]]: Implementación de soporte RGB (Holographic) en motor C++.
+
 ### 2025-12-08
 
 - [[logs/2025-12-08_holographic_native_port|Feature: Native Engine Holographic Port]]: Native C++ bulk gen, runtime fixes (JIT, UMAP, Harmonic).

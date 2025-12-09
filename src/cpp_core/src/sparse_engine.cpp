@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <omp.h> // OpenMP re-enabled
 #include "../include/morton_utils.h"
+#include <cmath>
 
 namespace atheria {
 
@@ -521,6 +522,48 @@ torch::Tensor Engine::compute_visualization(const std::string& viz_type) {
             float energy = torch::sum(torch::abs(state).pow(2)).item<float>();
             viz_tensor[coord.y][coord.x] = energy;
         }
+    } else if (viz_type == "holographic") {
+        // Holographic: 3 Channels [R, G, B]
+        // R: Energy (Normalized)
+        // G: Phase (Mapped to 0-1)
+        // B: Real Part / Structure
+        
+        // Output tensor: [H, W, 3] -> But typically we return [H, W, C] or [C, H, W]?
+        // Python wrapper expects [H, W, C] usually or we need to align with conventions.
+        // Let's create [H, W, 3]
+        
+        // Re-create viz_tensor with 3 channels
+        viz_tensor = torch::zeros({grid_size_, grid_size_, 3}, options);
+        
+        for (const auto& coord : coord_keys) {
+            if (coord.z != 0 || coord.x < 0 || coord.x >= grid_size_ || coord.y < 0 || coord.y >= grid_size_) {
+                continue;
+            }
+            
+            torch::Tensor state = matter_map_.get_tensor(coord);
+            
+            // Channel 1 (Red): Energy / Magnitude (Log scale option?)
+            float mag_sq = torch::sum(torch::abs(state).pow(2)).item<float>();
+            // Simple normalization attempt (local) - global norm handled by frontend usually
+            // but for safety let's clamp
+            float r_val = std::min(1.0f, mag_sq * 5.0f); // *5 boost
+            
+            // Channel 2 (Green): Phase
+            float phase = torch::angle(state[0]).item<float>(); 
+            // Map [-pi, pi] -> [0, 1]
+            float g_val = (phase + M_PI) / (2.0f * M_PI);
+            
+            // Channel 3 (Blue): Real part dominance or Imag part?
+            // Let's use real part of first component
+            float real_val = torch::real(state[0]).item<float>();
+            float b_val = (real_val + 1.0f) * 0.5f; // [-1,1] -> [0,1]
+            b_val = std::max(0.0f, std::min(1.0f, b_val));
+
+            viz_tensor[coord.y][coord.x][0] = r_val;
+            viz_tensor[coord.y][coord.x][1] = g_val;
+            viz_tensor[coord.y][coord.x][2] = b_val;
+        }
+
     } else if (viz_type == "holographic_bulk") {
         // 1. Compute Base Density (Z=0)
         for (const auto& coord : coord_keys) {
