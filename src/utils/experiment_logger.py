@@ -83,7 +83,8 @@ class ExperimentLogger:
                    metrics: Dict[str, float],
                    loss: float,
                    is_best: bool = False,
-                   checkpoint_path: Optional[str] = None) -> None:
+                   checkpoint_path: Optional[str] = None,
+                   snapshot_path: Optional[str] = None) -> None:
         """
         Registra un resultado de entrenamiento en el log Markdown.
         
@@ -93,6 +94,7 @@ class ExperimentLogger:
             loss: Pérdida total del episodio
             is_best: Si este checkpoint es el mejor hasta ahora
             checkpoint_path: Ruta al archivo de checkpoint (opcional)
+            snapshot_path: Ruta al archivo snapshot (opcional)
         """
         timestamp = datetime.now().isoformat()
         
@@ -102,7 +104,8 @@ class ExperimentLogger:
             'loss': loss,
             'metrics': metrics.copy(),
             'is_best': is_best,
-            'checkpoint_path': checkpoint_path
+            'checkpoint_path': checkpoint_path,
+            'snapshot_path': snapshot_path
         }
         
         # Añadir a historial

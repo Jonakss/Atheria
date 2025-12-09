@@ -23,6 +23,7 @@
 
 - [[logs/2025-12-09_native_holographic_viz|2025-12-09: Native Engine Holographic Viz Support]]
 - [[logs/2025-12-09_restored_3d_bulk|2025-12-09: Restored 3D Visualization and Implemented Dimensional Bulk]]: Implementación de soporte RGB (Holographic) en motor C++.
+- [[logs/2025-12-09_fix_training_and_controls|2025-12-09: Fix Training Crashes and 3D Controls Wiring]]: Corrección de crashes en loop de entrenamiento y conexión de controles UI 3D.
 
 ### 2025-12-08
 

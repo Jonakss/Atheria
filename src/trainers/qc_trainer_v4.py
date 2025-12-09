@@ -203,6 +203,9 @@ class QC_Trainer_v4:
         # Mixed Precision Training: autocast context para forward pass
         autocast_context = torch.cuda.amp.autocast() if self.use_amp else torch.cuda.amp.autocast(enabled=False)
         
+        psi = psi_initial # Initialize psi for the loop
+        loss_kwargs = {} # Initialize loss_kwargs
+
         # Simulación temporal
         with autocast_context:
             for t in range(self.qca_steps):
