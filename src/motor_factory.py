@@ -5,6 +5,7 @@ from .engines.qca_engine_polar import PolarEngine
 from .engines.lattice_engine import LatticeEngine
 from .engines.harmonic_engine import SparseHarmonicEngine
 from .engines.holographic_engine import HolographicEngine
+from .engines.lagrangian_engine import LagrangianEngine
 from .engines.compute_backend import LocalBackend, MockQuantumBackend, ComputeBackend
 
 def get_motor(config, device, model: nn.Module = None):
@@ -95,6 +96,23 @@ def get_motor(config, device, model: nn.Module = None):
     elif engine_type == 'HOLOGRAPHIC':
         logging.info("🔮 Initializing Holographic Engine (AdS/CFT Projection)")
         return HolographicEngine(model, grid_size, d_state, backend.get_device(), cfg=config)
+    
+    elif engine_type == 'LAGRANGIAN':
+        logging.info("⚡ Initializing Lagrangian Engine (Action Minimization)")
+        # Make sure config dict has all required fields
+        lnn_cfg = {
+            'grid_size': grid_size,
+            'd_state': d_state,
+            'device': backend.get_device(),
+            'dt': getattr(config, 'dt', 0.1)
+        }
+        # Optionally merge other config fields
+        if isinstance(config, dict):
+            lnn_cfg.update(config)
+        elif hasattr(config, '__dict__'):
+            lnn_cfg.update(config.__dict__)
+            
+        return LagrangianEngine(lnn_cfg, model=model)
         
     else: # CARTESIAN or default
         if engine_type != 'CARTESIAN':
