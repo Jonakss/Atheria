@@ -17,7 +17,9 @@
 
 ## 📋 Índice de Entradas
 
-### 2025-12-07
+### 2025-12-10
+
+- [[logs/2025-12-10_LNN_Implementation|Implementación de LNN (Lagrangian Neural Network)]]: Implementación de motor físico basado en minimización de acción (Euler-Lagrange) y VariationalIntegrator reutilizable.
 
 ### 2025-12-09
 
