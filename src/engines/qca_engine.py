@@ -79,11 +79,12 @@ class QuantumState:
             
             # Initialize Backend
             # Check for MOCK override or missing key in dev mode
-            if getattr(cfg, 'USE_MOCK_QUANTUM', False) or (not cfg.IONQ_API_KEY and getattr(cfg, 'DEV_MODE', False)):
+            ionq_key = getattr(cfg, 'IONQ_API_KEY', None)
+            if getattr(cfg, 'USE_MOCK_QUANTUM', False) or (not ionq_key and getattr(cfg, 'DEV_MODE', False)):
                 logging.info("🧪 Using MockQuantumBackend for Quantum Genesis (Dev Mode/No Key)")
                 backend = MockQuantumBackend(num_qubits=11)
             else:
-                backend = IonQBackend(api_key=cfg.IONQ_API_KEY, backend_name=cfg.IONQ_BACKEND_NAME)
+                backend = IonQBackend(api_key=ionq_key, backend_name=cfg.IONQ_BACKEND_NAME)
             
             # Create a Quantum Circuit (Superposition + Entanglement)
             # We use a simple circuit to generate complex correlations
