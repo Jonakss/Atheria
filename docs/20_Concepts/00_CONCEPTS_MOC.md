@@ -15,6 +15,8 @@
 - **[Gateway Process Integration](../20_Concepts/GATEWAY_PROCESS_INTEGRATION.md)** - Roadmap para la evolución hacia "Metafísica Computacional" (Holographic vs Binary Layers)
 - **[Reversible Time & Renormalization](../20_Concepts/CONCEPT_REVERSIBLE_TIME_AND_RENORMALIZATION.md)** - Física de la reversibilidad temporal y visualización multiescala en sistemas cerrados
 - **[Teoría Orch-OR](../20_Concepts/ORCH_OR_THEORY.md)** - Hipótesis de Penrose-Hameroff sobre la conciencia cuántica y reducción objetiva
+- **[Aetheria 5.0 Vision](../20_Concepts/AETHERIA_5_0_VISION.md)** - Visión integral de Orbitales, ORT, 37 Dimensiones y el Efecto Observador
+- **[Observer Effect Implementation](../20_Concepts/OBSERVER_EFFECT_IMPLEMENTATION.md)** - Detalle técnico de la arquitectura Niebla vs. Realidad
 
 
 ## 🔧 Arquitecturas y Sistemas
