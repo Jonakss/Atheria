@@ -195,3 +195,91 @@ class ObserverEffect:
         For now, we can just randomly un-collapse edges or similar.
         """
         pass
+
+    def unobserve(self, roi: Tuple[int, int, int, int]):
+        """
+        Explicitly 'unobserves' a region, allowing it to return to the Fog (superposition).
+        The current state in this region is integrated back into the background statistics
+        before being cleared from the collapsed state.
+
+        Args:
+            roi: (x_min, y_min, x_max, y_max)
+        """
+        x_min, y_min, x_max, y_max = roi
+
+        # Clip to grid
+        x_min, y_min = max(0, x_min), max(0, y_min)
+        x_max, y_max = min(self.grid_size, x_max), min(self.grid_size, y_max)
+
+        # 1. Update Background Stats from Current Reality
+        # We need to downsample the collapsed state to update the background
+        # Calculate moments (mu, sigma) from the high-res data
+
+        collapsed_slice = self.collapsed_state[..., y_min:y_max, x_min:x_max, :]
+        mask_slice = self.collapse_mask[..., y_min:y_max, x_min:x_max]
+
+        if not torch.any(mask_slice):
+            return
+
+        # We only care about valid pixels
+        # Calculate local mean/std. Since downscale factor is 8, we have blocks of 8x8.
+        # We can use avg_pool2d to get the mean for the background grid
+
+        # We need to match the background grid alignment.
+        # Strategy: Only unobserve fully aligned blocks.
+        # Any partial blocks at the edges remain collapsed (part of reality) until the ROI shifts enough to clear them.
+
+        # Calculate aligned boundaries (inclusive of start, exclusive of end)
+        bg_x_min = (x_min + self.downscale_factor - 1) // self.downscale_factor
+        bg_y_min = (y_min + self.downscale_factor - 1) // self.downscale_factor
+        bg_x_max = x_max // self.downscale_factor
+        bg_y_max = y_max // self.downscale_factor
+
+        # Convert back to high-res coordinates to see what we are actually processing
+        aligned_x_min = bg_x_min * self.downscale_factor
+        aligned_y_min = bg_y_min * self.downscale_factor
+        aligned_x_max = bg_x_max * self.downscale_factor
+        aligned_y_max = bg_y_max * self.downscale_factor
+
+        # Ensure we have a valid region
+        if aligned_x_max > aligned_x_min and aligned_y_max > aligned_y_min:
+            # Extract high-res region corresponding to these BG cells
+            high_res_block = self.collapsed_state[..., aligned_y_min:aligned_y_max, aligned_x_min:aligned_x_max, :]
+
+            # Calculate mean (downsample)
+            # Permute to [B, C, H, W] for pooling
+            block_tensor = high_res_block.real.permute(0, 3, 1, 2)
+
+            new_mu = torch.nn.functional.avg_pool2d(
+                block_tensor,
+                kernel_size=self.downscale_factor,
+                stride=self.downscale_factor
+            )
+
+            # Calculate variance (std)
+            # Var = E[X^2] - (E[X])^2
+            block_sq = block_tensor ** 2
+            new_sq_mean = torch.nn.functional.avg_pool2d(
+                block_sq,
+                kernel_size=self.downscale_factor,
+                stride=self.downscale_factor
+            )
+            new_sigma = torch.sqrt(torch.abs(new_sq_mean - new_mu**2) + 1e-6)
+
+            # Permute back to [1, H_bg, W_bg, C]
+            new_mu = new_mu.permute(0, 2, 3, 1)
+            new_sigma = new_sigma.permute(0, 2, 3, 1)
+
+            # Update Background Stats
+            self.background_stats[..., bg_y_min:bg_y_max, bg_x_min:bg_x_max, :self.d_state] = new_mu
+            self.background_stats[..., bg_y_min:bg_y_max, bg_x_min:bg_x_max, self.d_state:] = new_sigma
+
+            # Clear Collapsed State ONLY for the processed region
+            self.collapsed_state[..., aligned_y_min:aligned_y_max, aligned_x_min:aligned_x_max, :] = 0
+            self.collapse_mask[..., aligned_y_min:aligned_y_max, aligned_x_min:aligned_x_max] = False
+
+            logging.info(f"🌫️ Observer Effect: Unobserved aligned region [{aligned_x_min}:{aligned_x_max}, {aligned_y_min}:{aligned_y_max}] -> Returned to Fog.")
+        else:
+            logging.debug("Skipping unobserve: Region too small to cover full background blocks.")
+
+        logging.info(f"🌫️ Observer Effect: Unobserved region [{x_min}:{x_max}, {y_min}:{y_max}] -> Returned to Fog.")

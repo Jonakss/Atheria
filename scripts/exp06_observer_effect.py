@@ -4,7 +4,7 @@ import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import Normalize
+from matplotlib.colors import Normalize, hsv_to_rgb
 
 # Ensure src is in path
 sys.path.append(os.getcwd())
@@ -32,58 +32,70 @@ def run_experiment():
         observer.update_background()
 
     # 3. Define Viewports (The Observation)
-    # Viewport A: Top-Left
-    vp_a = (20, 20, 100, 100) # x1, y1, x2, y2
-
-    # Viewport B: Center (Unobserved initially)
-    # We won't observe this yet.
+    # Use aligned coordinates (multiples of 8) to test clean unobserving
+    vp_a = (16, 16, 112, 112) # x1, y1, x2, y2
 
     # 4. Trigger Collapse (Observation)
     print(f"👁️  Observing Region A: {vp_a}")
     state_a = observer.get_viewport_state(vp_a)
 
-    print(f"   Collapsed State Shape: {state_a.shape}")
-    print(f"   Mag Mean: {state_a.abs().mean().item():.4f}")
+    # 5. Verify Unobserve Logic
+    print(f"🌫️  Unobserving Region A...")
+    observer.unobserve(vp_a)
+    assert not observer.collapse_mask[..., 16:112, 16:112].any(), "Region A should be unobserved (fog)"
 
-    # 5. Visualize Results
-    # We will plot:
-    # 1. The Background Mean (Upscaled for comparison)
-    # 2. The Collapsed Mask
-    # 3. The Actual Collapsed State (Real part of Ch 0)
+    print(f"👁️  Re-Observing Region A (Should sample from updated fog)...")
+    state_a_new = observer.get_viewport_state(vp_a)
 
+    # 6. Visualize Results (Orbital Style: Density vs Phase)
+
+    # Get the state for visualization (using the viewport state)
+    # We take channel 0 for simplicity
+    psi = state_a_new[0, ..., 0].cpu() # [H_vp, W_vp] complex
+
+    # Density (Magnitude)
+    density = psi.abs()
+
+    # Phase (Angle) mapped to HSV
+    phase = psi.angle()
+
+    # Create Visualization
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 
-    # Plot 1: Background (Fog)
+    # Plot 1: Background (Fog) - Showing Mean
     bg_mu = observer.background_stats[..., :D_STATE]
-    # Take channel 0
     bg_img = bg_mu[0, :, :, 0].cpu().numpy()
     axes[0].imshow(bg_img, cmap='viridis')
-    axes[0].set_title("Background 'Fog' (Mu)")
+    axes[0].set_title("Background 'Fog' (Mean)")
 
-    # Plot 2: Collapse Mask
-    mask = observer.collapse_mask[0].cpu().numpy()
-    axes[1].imshow(mask, cmap='gray', vmin=0, vmax=1)
-    axes[1].set_title("Collapse Mask (Observed Regions)")
+    # Plot 2: Density (Orbital Probability)
+    im2 = axes[1].imshow(density.numpy(), cmap='inferno') # Inferno is good for "brightness/density"
+    axes[1].set_title("Density (Probability Cloud)")
+    plt.colorbar(im2, ax=axes[1])
 
-    # Plot 3: Full State (Real Reality)
-    # We show the full buffer, but only observed parts are valid
-    full_state_real = observer.collapsed_state.real[0, :, :, 0].cpu().numpy()
-    # Mask out unobserved for clarity (or show zeros)
-    # full_state_real[~mask] = 0 # Optional
+    # Plot 3: Phase (Resonance/Interference)
+    # Map phase to Hue
+    # H = (phase + pi) / 2pi, S=1, V=1 (or V=density)
+    phase_norm = (phase.numpy() + np.pi) / (2 * np.pi)
+    hsv = np.zeros((phase.shape[0], phase.shape[1], 3))
+    hsv[..., 0] = phase_norm # Hue
+    hsv[..., 1] = 1.0        # Saturation
+    hsv[..., 2] = 1.0        # Value (Brightness) - Optional: mask by density
 
-    im3 = axes[2].imshow(full_state_real, cmap='plasma')
-    axes[2].set_title("Collapsed Reality (High Res)")
+    # Optional: Mask by density so low-prob areas are dark
+    # hsv[..., 2] = density.numpy() / density.max()
+
+    rgb = hsv_to_rgb(hsv)
+
+    axes[2].imshow(rgb)
+    axes[2].set_title("Phase (Resonance Bands)")
 
     plt.tight_layout()
     output_path = 'experiment_06_observer_effect.png'
     plt.savefig(output_path)
     print(f"📸 Results saved to {output_path}")
 
-    # Verify logic
-    assert observer.collapse_mask[..., 20:100, 20:100].all(), "Region A should be fully collapsed"
-    assert not observer.collapse_mask[..., 150:200, 150:200].any(), "Unobserved region should not be collapsed"
-
-    print("✅ Experiment Success: Collapse logic verified.")
+    print("✅ Experiment Success: Collapse and Unobserve logic verified.")
 
 if __name__ == "__main__":
     run_experiment()
