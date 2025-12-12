@@ -81,8 +81,33 @@ class MockQuantumBackend(ComputeBackend):
     def execute(self, operation: str, *args, **kwargs) -> Any:
         if operation == 'run_circuit':
             import time
+            import random
+
+            # Simulate processing time
             time.sleep(0.1) 
-            return {"00": 0.5, "11": 0.5}
+
+            # Get arguments
+            shots = kwargs.get('shots', 1024)
+            # Try to guess n_qubits from circuit or default
+            circuit = args[0] if args else None
+            n_qubits = self.num_qubits
+            if circuit and hasattr(circuit, 'num_qubits'):
+                n_qubits = circuit.num_qubits
+
+            # Generate random bitstrings (simulating entropy)
+            # This mimics the "Quantum Genesis" process where we get a distribution of bitstrings
+            counts = {}
+            for _ in range(shots):
+                # Generate a random bitstring of length n_qubits
+                # This provides "Entropy" for testing without real hardware
+                val = random.getrandbits(n_qubits)
+                bitstring = format(val, f'0{n_qubits}b')
+
+                counts[bitstring] = counts.get(bitstring, 0) + 1
+
+            logging.info(f"🔮 MockQuantumBackend generated {len(counts)} unique bitstrings from {shots} shots.")
+            return counts
+
         return None
 
     def get_device(self) -> torch.device:
