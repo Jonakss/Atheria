@@ -68,17 +68,23 @@ class QuantumState:
 
     def _get_ionq_state(self, strength=0.1):
         """
-        Generates an initial state using the IonQ Quantum Computer.
+        Generates an initial state using the IonQ Quantum Computer (or Mock if configured).
         "Quantum Genesis": The universe starts from true quantum superposition/entanglement.
         """
         logging.info("⚛️ Quantum Genesis: Initializing universe from IonQ...")
         try:
             # Lazy import to avoid circular dependencies/errors if not used
-            from .compute_backend import IonQBackend
+            from .compute_backend import IonQBackend, MockQuantumBackend
             from .. import config as cfg
             
             # Initialize Backend
-            backend = IonQBackend(api_key=cfg.IONQ_API_KEY, backend_name=cfg.IONQ_BACKEND_NAME)
+            # Check for MOCK override or missing key in dev mode
+            ionq_key = getattr(cfg, 'IONQ_API_KEY', None)
+            if getattr(cfg, 'USE_MOCK_QUANTUM', False) or (not ionq_key and getattr(cfg, 'DEV_MODE', False)):
+                logging.info("🧪 Using MockQuantumBackend for Quantum Genesis (Dev Mode/No Key)")
+                backend = MockQuantumBackend(num_qubits=11)
+            else:
+                backend = IonQBackend(api_key=ionq_key, backend_name=cfg.IONQ_BACKEND_NAME)
             
             # Create a Quantum Circuit (Superposition + Entanglement)
             # We use a simple circuit to generate complex correlations
@@ -111,14 +117,23 @@ class QuantumState:
             
             # Flatten results into a long string of bits
             bit_stream = []
-            for bitstring, count in counts.items():
-                # Repeat bitstring 'count' times to respect probability distribution
-                # or just use unique bitstrings? 
-                # For "noise", respecting distribution is better representation of the wavefunction
-                bits = [1.0 if c == '1' else -1.0 for c in bitstring]
-                bit_stream.extend(bits * count)
+            # Ensure counts is a dictionary (IonQ backend returns dict)
+            if isinstance(counts, dict):
+                for bitstring, count in counts.items():
+                    # Repeat bitstring 'count' times to respect probability distribution
+                    # or just use unique bitstrings?
+                    # For "noise", respecting distribution is better representation of the wavefunction
+                    bits = [1.0 if c == '1' else -1.0 for c in bitstring]
+                    bit_stream.extend(bits * count)
+            else:
+                logging.warning(f"⚠️ Unexpected counts format: {type(counts)}. Using fallback noise.")
+                raise ValueError("Invalid counts format")
                 
             # Convert to tensor
+            if not bit_stream:
+                 logging.warning("⚠️ No bits generated from quantum execution. Using fallback.")
+                 raise ValueError("Empty bit stream")
+
             quantum_data = torch.tensor(bit_stream, device=self.device, dtype=torch.float32)
             
             # Reshape/Resize to match grid
