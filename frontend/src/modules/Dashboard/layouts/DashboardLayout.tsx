@@ -163,10 +163,24 @@ export const DashboardLayout: React.FC = () => {
             </div>
           );
         } else if (selectedViz === 'holographic_bulk') {
-            const hasVolumeData = flatMapData.length > 0 && simData?.metadata?.shape?.length === 3;
-            const volD = simData?.metadata?.shape?.[0] || 1;
-            const volH = simData?.metadata?.shape?.[1] || gridHeight;
-            const volW = simData?.metadata?.shape?.[2] || gridWidth;
+            const shape = simData?.metadata?.shape;
+            let volD = 1;
+            let volH = gridHeight;
+            let volW = gridWidth;
+
+            // Robust shape detection for 2D vs 3D
+            if (shape && shape.length === 3) {
+                volD = shape[0];
+                volH = shape[1];
+                volW = shape[2];
+            } else if (shape && shape.length === 2) {
+                volD = 1;
+                volH = shape[0];
+                volW = shape[1];
+            }
+
+            // Allow rendering even if it's just a single slice (2D treated as volume)
+            const hasVolumeData = flatMapData.length > 0;
             
             return (
                 <div className="absolute inset-0 z-0 bg-black overflow-hidden">
