@@ -398,7 +398,7 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
                     ? 'bg-pink-500/20 text-pink-200 border border-pink-500/30' 
                     : 'text-gray-500 hover:text-gray-300'
                 }`}
-                onClick={() => setRenderMode('points')}
+                onClick={() => onRenderModeChange?.('points')}
               >
                 Puntos
               </button>
@@ -408,7 +408,7 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
                     ? 'bg-pink-500/20 text-pink-200 border border-pink-500/30' 
                     : 'text-gray-500 hover:text-gray-300'
                 }`}
-                onClick={() => setRenderMode('wireframe')}
+                onClick={() => onRenderModeChange?.('wireframe')}
               >
                 Wireframe
               </button>
@@ -418,7 +418,7 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
                     ? 'bg-pink-500/20 text-pink-200 border border-pink-500/30' 
                     : 'text-gray-500 hover:text-gray-300'
                 }`}
-                onClick={() => setRenderMode('mesh')}
+                onClick={() => onRenderModeChange?.('mesh')}
               >
                 Mesh
               </button>
@@ -437,7 +437,7 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
               max="5.0"
               step="0.1"
               value={pointSize}
-              onChange={(e) => setPointSize(parseFloat(e.target.value))}
+              onChange={(e) => onPointSizeChange?.(parseFloat(e.target.value))}
               className="w-full h-1 bg-gray-800 rounded-full appearance-none cursor-pointer slider-thumb"
               style={{
                 background: `linear-gradient(to right, rgb(236, 72, 153) 0%, rgb(236, 72, 153) ${((pointSize - 0.5) / 4.5) * 100}%, rgb(31, 41, 55) ${((pointSize - 0.5) / 4.5) * 100}%, rgb(31, 41, 55) 100%)`
@@ -449,18 +449,18 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
           <div className="space-y-1.5">
             <div className="flex justify-between text-[10px]">
               <span className="text-gray-400">Umbral de Densidad</span>
-              <span className="font-mono text-gray-200 bg-white/5 px-1.5 rounded">{threshold.toFixed(3)}</span>
+              <span className="font-mono text-gray-200 bg-white/5 px-1.5 rounded">{densityThreshold.toFixed(3)}</span>
             </div>
             <input
               type="range"
               min="0.001"
               max="0.5"
               step="0.001"
-              value={threshold}
-              onChange={(e) => setThreshold(parseFloat(e.target.value))}
+              value={densityThreshold}
+              onChange={(e) => onDensityThresholdChange?.(parseFloat(e.target.value))}
               className="w-full h-1 bg-gray-800 rounded-full appearance-none cursor-pointer slider-thumb"
               style={{
-                background: `linear-gradient(to right, rgb(14, 165, 233) 0%, rgb(14, 165, 233) ${(threshold / 0.5) * 100}%, rgb(31, 41, 55) ${(threshold / 0.5) * 100}%, rgb(31, 41, 55) 100%)`
+                background: `linear-gradient(to right, rgb(14, 165, 233) 0%, rgb(14, 165, 233) ${(densityThreshold / 0.5) * 100}%, rgb(31, 41, 55) ${(densityThreshold / 0.5) * 100}%, rgb(31, 41, 55) 100%)`
               }}
             />
           </div>

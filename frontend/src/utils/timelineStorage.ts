@@ -5,8 +5,8 @@
  */
 
 const STORAGE_KEY_PREFIX = "atheria_timeline_";
-const DEFAULT_MAX_FRAMES = 25; // Reducido de 100 a 25 para evitar QuotaExceeded
-const STORAGE_SIZE_LIMIT = 2 * 1024 * 1024; // Reducido a 2MB para ser conservador
+const DEFAULT_MAX_FRAMES = 5; // Drastically reduced for 256x256 grids
+const STORAGE_SIZE_LIMIT = 4 * 1024 * 1024; // Use 4MB (mostly full usage)
 
 export interface TimelineFrame {
   step: number;
@@ -60,8 +60,39 @@ export function saveFrameToTimeline(
   maxFrames: number = DEFAULT_MAX_FRAMES
 ): boolean {
   try {
+    // Check approximate size of the frame
+    // Heuristic: estimate total number of numerical elements
+    let effectiveMaxFrames = maxFrames;
+    if (frame.map_data && Array.isArray(frame.map_data)) {
+      let totalElements = frame.map_data.length; // dim 0
+
+      if (totalElements > 0 && Array.isArray(frame.map_data[0])) {
+        const dim1 = frame.map_data[0].length;
+        totalElements *= dim1;
+
+        if (dim1 > 0 && Array.isArray(frame.map_data[0][0])) {
+          const dim2 = frame.map_data[0][0].length;
+          totalElements *= dim2;
+        }
+      }
+
+      // 100x100 = 10k elements. 256x256 = 65k. 256x256x8 (bulk) = 524k.
+      // JSON overhead is roughly 10 chars per number + punctuation.
+      // 500k elements ~ 5MB.
+      if (totalElements > 50000) {
+        // 50k elements (approx 500KB)
+        // Aggressively reduce max frames for large payloads
+        if (totalElements > 200000) {
+          // > 200k (e.g. 2MB+) -> 1 or 2 frames max
+          effectiveMaxFrames = Math.min(effectiveMaxFrames, 2);
+        } else {
+          effectiveMaxFrames = Math.min(effectiveMaxFrames, 5);
+        }
+      }
+    }
+
     const storageKey = getStorageKey(experimentName);
-    const existing = loadTimeline(experimentName, maxFrames);
+    const existing = loadTimeline(experimentName, effectiveMaxFrames);
 
     // Optimizar frame: solo guardar datos esenciales
     const optimizedFrame: TimelineFrame = {
@@ -81,12 +112,12 @@ export function saveFrameToTimeline(
     const updatedFrames = [...existing.frames, optimizedFrame];
 
     // Limpiar frames antiguos si exceden el límite
-    const cleanedFrames = cleanupFrames(updatedFrames, maxFrames);
+    const cleanedFrames = cleanupFrames(updatedFrames, effectiveMaxFrames);
 
     // Actualizar metadata
     const steps = cleanedFrames.map((f) => f.step);
     const metadata: TimelineMetadata = {
-      max_frames: maxFrames,
+      max_frames: effectiveMaxFrames,
       total_frames: cleanedFrames.length,
       min_step: steps.length > 0 ? Math.min(...steps) : 0,
       max_step: steps.length > 0 ? Math.max(...steps) : 0,
@@ -104,21 +135,28 @@ export function saveFrameToTimeline(
 
     // Si excede el límite, reducir más agresivamente
     if (dataSize > STORAGE_SIZE_LIMIT) {
-      // Reducir a la mitad
-      const reducedFrames = cleanupFrames(
-        cleanedFrames,
-        Math.floor(maxFrames / 2)
-      );
+      // Reducir a 1 frame si es necesario
+      const reduceTo = Math.max(1, Math.floor(effectiveMaxFrames / 2));
+      const reducedFrames = cleanupFrames(cleanedFrames, reduceTo);
+
       const reducedMetadata: TimelineMetadata = {
         ...metadata,
         total_frames: reducedFrames.length,
-        max_frames: Math.floor(maxFrames / 2),
+        max_frames: reduceTo,
       };
 
       const reducedData = {
         metadata: reducedMetadata,
         frames: reducedFrames,
       };
+
+      // Si aun así es demasiado grande (un solo frame > 5MB), abortar
+      if (JSON.stringify(reducedData).length * 2 > STORAGE_SIZE_LIMIT) {
+        console.warn(
+          "Frame too large for localStorage, skipping timeline save."
+        );
+        return false;
+      }
 
       localStorage.setItem(storageKey, JSON.stringify(reducedData));
       console.warn(
@@ -130,48 +168,35 @@ export function saveFrameToTimeline(
     localStorage.setItem(storageKey, JSON.stringify(dataToStore));
     return true;
   } catch (error) {
-    // Si hay error (ej: cuota excedida), intentar limpiar y reducir
     if (error instanceof Error && error.name === "QuotaExceededError") {
-      console.warn("Cuota de localStorage excedida. Limpiando timeline...");
+      // Just clear it and try to save ONE frame, or give up
+      console.warn("QuotaExceededError caught. Clever clearing...");
       try {
-        const existing = loadTimeline(
-          experimentName,
-          Math.floor(maxFrames / 2)
+        // Hard clear
+        clearTimeline(experimentName);
+        // Try saving just this current frame
+        const dataToStore = {
+          metadata: {
+            max_frames: 1,
+            total_frames: 1,
+            min_step: frame.step,
+            max_step: frame.step,
+            last_updated: Date.now(),
+          },
+          frames: [frame],
+        };
+        localStorage.setItem(
+          getStorageKey(experimentName),
+          JSON.stringify(dataToStore)
         );
-        // Intentar guardar con menos frames
-        if (existing.frames.length > 0) {
-          const reduced = cleanupFrames(
-            existing.frames,
-            Math.floor(maxFrames / 4)
-          );
-          const reducedData = {
-            metadata: {
-              max_frames: Math.floor(maxFrames / 4),
-              total_frames: reduced.length,
-              min_step:
-                reduced.length > 0
-                  ? Math.min(...reduced.map((f) => f.step))
-                  : 0,
-              max_step:
-                reduced.length > 0
-                  ? Math.max(...reduced.map((f) => f.step))
-                  : 0,
-              last_updated: Date.now(),
-            },
-            frames: reduced,
-          };
-          localStorage.setItem(
-            getStorageKey(experimentName),
-            JSON.stringify(reducedData)
-          );
-          return true;
-        }
       } catch (e) {
-        console.error("Error al limpiar timeline:", e);
+        console.error(
+          "Critical timeline failure, disabling saving for this frame."
+        );
       }
+      return false;
     }
     console.error("Error guardando frame en timeline:", error);
-    // Si falla repetidamente, podríamos deshabilitar el guardado temporalmente aquí
     return false;
   }
 }

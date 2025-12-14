@@ -26,6 +26,7 @@ const ENGINE_OPTIONS = [
     { value: "HARMONIC", label: "🌪️ Harmonic (Emergent Structure)" },
     { value: "LATTICE", label: "🕸️ Lattice (Gauge Theory)" },
     { value: "HOLOGRAPHIC", label: "🔮 Holographic (Viz Mode)" }, // Marcado como Viz Mode
+    { value: "LAGRANGIAN", label: "⚡ Lagrangian (Neural Actions)" },
 ];
 
 const BACKEND_OPTIONS = [
@@ -42,6 +43,7 @@ const COMPATIBILITY_MAP: Record<string, string[]> = {
     "HARMONIC": ["PYTHON", "GPU"], 
     "LATTICE": ["PYTHON", "GPU"], 
     "HOLOGRAPHIC": ["PYTHON", "GPU"], 
+    "LAGRANGIAN": ["PYTHON", "GPU"],
 };
 
 export function LabSider({ activeSection, onClose }: LabSiderProps) {
@@ -193,8 +195,9 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
     const handleLoadExperiment = () => { 
         if (!isConnected) return;
         if (activeExperiment) {
-            const exp = experimentsData?.find(e => e.name === activeExperiment);
-            if (exp && !exp.has_checkpoint) return;
+            // Permitir cargar sin checkpoint
+            // const exp = experimentsData?.find(e => e.name === activeExperiment);
+            // if (exp && !exp.has_checkpoint) return;
             sendCommand('inference', 'load_experiment', { 
                 experiment_name: activeExperiment,
                 grid_size: gridSizeInference,
@@ -296,6 +299,7 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
                                         <option value="harmonic">🌊 Harmonic (Sparse)</option>
                                         <option value="lattice">🕸️ Lattice (AdS/CFT)</option>
                                         <option value="holographic">🔮 Holographic (Bulk Projection)</option>
+                                        <option value="lagrangian">⚡ Lagrangian (Neural Actions)</option>
                                         <option value="native">⚡ Nativo C++ (Experimental)</option>
                                     </select>
                                 </div>
@@ -303,9 +307,9 @@ export function LabSider({ activeSection, onClose }: LabSiderProps) {
                                 <div className="flex gap-2">
                                     <button
                                         onClick={handleLoadExperiment}
-                                        disabled={!isConnected || !activeExperiment || !currentExperiment?.has_checkpoint || inferenceStatus === 'running'}
+                                        disabled={!isConnected || !activeExperiment || inferenceStatus === 'running'}
                                         className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded text-xs font-bold border transition-all ${
-                                            currentExperiment?.has_checkpoint && inferenceStatus !== 'running' && isConnected
+                                            activeExperiment && inferenceStatus !== 'running' && isConnected
                                                 ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/20'
                                                 : 'bg-white/5 text-gray-500 border-white/10'
                                         } disabled:opacity-50 disabled:cursor-not-allowed`}

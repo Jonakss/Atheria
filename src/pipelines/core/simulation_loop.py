@@ -527,6 +527,7 @@ async def simulation_loop():
                                             "step": updated_step,
                                             "timestamp": asyncio.get_event_loop().time(),
                                             "map_data": map_data,
+                                            "metadata": viz_data.get("metadata", {}),
                                             "hist_data": viz_data.get("hist_data", {}),
                                             "poincare_coords": viz_data.get("poincare_coords", []),
                                             "phase_attractor": viz_data.get("phase_attractor"),

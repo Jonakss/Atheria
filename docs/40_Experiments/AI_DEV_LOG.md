@@ -150,4 +150,4 @@
 > [!NOTE]
 > Este archivo es solo un **ÍNDICE de enlaces**. 
 > Las entradas detalladas deben estar en archivos separados en `logs/`.
-> Formato: `logs/YYYY-MM-DD_nombre_descriptivo.md`
+> Formato: `logs/YYYY-MM-DD_nombre_descriptivo.md`- **[[logs/2025-12-14_atheria_5_backend|2025-12-14: Atheria 5 Backend Migration (3D + ORT)]]** - Implementation of Volumetric UNet3D (37 dims) and Observer Effect Kernel.

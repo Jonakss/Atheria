@@ -420,6 +420,7 @@ async def handle_set_viz(args):
             frame_payload = {
                 "step": g_state.get('simulation_step', 0),
                 "map_data": viz_data.get("map_data", []),
+                "metadata": viz_data.get("metadata", {}),
                 "hist_data": viz_data.get("hist_data", {}),
                 "poincare_coords": viz_data.get("poincare_coords", []),
                 "phase_attractor": viz_data.get("phase_attractor"),
@@ -535,17 +536,31 @@ async def handle_load_experiment(args):
         
         checkpoint_path = get_latest_checkpoint(exp_name)
         if not checkpoint_path:
-            msg = f"⚠️ '{exp_name}' no tiene checkpoints. Entrena primero."
-            logging.warning(msg)
-            if ws: await send_notification(ws, msg, "warning")
-            return
-        
-        model, state_dict = load_model(config, checkpoint_path)
-        if model is None:
-            msg = f"❌ Error al cargar el modelo."
-            logging.error(msg)
-            if ws: await send_notification(ws, msg, "error")
-            return
+            msg = f"ℹ️ '{exp_name}' no tiene checkpoints. Inicializando modelo aleatorio (Sopa Primordial)."
+            logging.info(msg)
+            if ws: await send_notification(ws, msg, "info")
+            
+            # Instanciar nuevo modelo con pesos aleatorios
+            from ..model_loader import instantiate_model
+            try:
+                # Usar configuración para instanciar modelo
+                model = instantiate_model(config)
+                # Inicializar pesos aleatorios
+                model.apply(lambda m: m.reset_parameters() if hasattr(m, 'reset_parameters') else None)
+                state_dict = None # No hay estado guardado
+                logging.info(f"Modelo aleatorio '{config.MODEL_ARCHITECTURE}' instanciado.")
+            except Exception as e:
+                msg = f"❌ Error al instanciar modelo aleatorio: {e}"
+                logging.error(msg)
+                if ws: await send_notification(ws, msg, "error")
+                return
+        else:
+            model, state_dict = load_model(config, checkpoint_path)
+            if model is None:
+                msg = f"❌ Error al cargar el modelo."
+                logging.error(msg)
+                if ws: await send_notification(ws, msg, "error")
+                return
         
         model.eval()
         
@@ -605,6 +620,7 @@ async def handle_load_experiment(args):
                     frame_payload = {
                         "step": 0,
                         "map_data": viz_data.get("map_data", []),
+                        "metadata": viz_data.get("metadata", {}),
                         "hist_data": viz_data.get("hist_data", {}),
                         "poincare_coords": viz_data.get("poincare_coords", []),
                         "phase_attractor": viz_data.get("phase_attractor"),
@@ -694,6 +710,7 @@ async def handle_reset(args):
                         frame_payload = {
                             "step": 0,
                             "map_data": map_data,
+                            "metadata": viz_data.get("metadata", {}),
                             "hist_data": viz_data.get("hist_data", {}),
                             "poincare_coords": viz_data.get("poincare_coords", []),
                             "phase_attractor": viz_data.get("phase_attractor"),

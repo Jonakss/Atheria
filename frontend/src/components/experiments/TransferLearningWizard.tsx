@@ -507,6 +507,7 @@ export function TransferLearningWizard({ opened, onClose }: TransferLearningWiza
                                                     <option value="NATIVE">Native (C++ Optimized)</option>
                                                     <option value="LATTICE">Lattice (Gauge Theory)</option>
                                                     <option value="HARMONIC">Harmonic (Spectral)</option>
+                                                    <option value="LAGRANGIAN">Lagrangian (Neural Actions)</option>
                                                 </select>
                                             </TableTd>
                                             <TableTd>

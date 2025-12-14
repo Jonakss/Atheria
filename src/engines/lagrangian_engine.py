@@ -22,11 +22,34 @@ class LagrangianEngine:
         
         # Modelo
         if model:
-            self.model = model
+            # Check if model needs adaptation (e.g. UNet takes 1 arg, we send 2)
+            # We wrap it in an Adapter if it's not a LagrangianNetwork
+            if hasattr(model, 'forward') and model.__class__.__name__ != 'LagrangianNetwork':
+                self.model = LagrangianAdapter(model)
+            else:
+                self.model = model
         else:
             # Fallback si no se pasa modelo externo, útil para tests
             from src.models.lagrangian_net import LagrangianNetwork
             self.model = LagrangianNetwork(state_dim=self.d_state).to(self.device)
+
+class LagrangianAdapter(nn.Module):
+    """
+    Adapta modelos standard (UNet) que toman 1 input (concatenado)
+    para funcionar con la firma del Integrador (q, v).
+    """
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+        
+    def forward(self, q, v):
+        # Concatenar q, v en canales [B, 2*C, H, W]
+        x = torch.cat([q, v], dim=1)
+        # Pasar por modelo base
+        out = self.model(x)
+        # Reducir a escalar/densidad [B, 1, H, W] para que sea una "Acción"
+        # Usamos mean() sobre canales para preservar espacialidad pero colapsar features
+        return out.mean(dim=1, keepdim=True)
             
     # ---------------------
     # IMPLEMENTACIÓN PROTOCOLO
