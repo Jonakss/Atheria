@@ -2,6 +2,7 @@
 import torch
 import numpy as np
 import logging
+from collections import deque
 
 from .utils import (
     apply_downsampling, 
@@ -341,6 +342,68 @@ def select_map_data(viz_type, density, phase, real_part, imag_part, gradient_mag
             return tensor_to_numpy(fields, "fields_map")
         else:
             return density
+    elif viz_type == 'interference':
+        # Quantum Hack 1: Temporal Interference
+        # Visualiza la diferencia entre T actual y T-5.
+        if motor is None:
+            return density
+
+        # Inicializar estado si no existe
+        if not hasattr(motor, 'viz_state'):
+            motor.viz_state = {}
+
+        # Resetear si cambia el tamaño
+        if 'last_shape' not in motor.viz_state or motor.viz_state['last_shape'] != density.shape:
+            motor.viz_state['last_shape'] = density.shape
+            motor.viz_state['interference_buffer'] = deque(maxlen=5)
+
+        buffer = motor.viz_state.get('interference_buffer')
+        if buffer is None: # Should be init above but safe guard
+            buffer = deque(maxlen=5)
+            motor.viz_state['interference_buffer'] = buffer
+
+        # Añadir frame actual (copia para evitar referencias mutables)
+        buffer.append(density.copy())
+
+        if len(buffer) < 2:
+            return np.zeros_like(density)
+
+        # Calcular diferencia: |Actual - Antiguo|
+        # Usamos el frame más antiguo disponible en el buffer (T-N)
+        diff = np.abs(density - buffer[0])
+
+        return diff
+
+    elif viz_type == 'orbital':
+        # Quantum Hack 2: Probability Map (Orbitals)
+        # Acumula la densidad a lo largo del tiempo (Larga Exposición)
+        if motor is None:
+            return density
+
+        if not hasattr(motor, 'viz_state'):
+            motor.viz_state = {}
+
+        # Resetear si cambia el tamaño
+        if 'last_shape' not in motor.viz_state or motor.viz_state['last_shape'] != density.shape:
+            motor.viz_state['last_shape'] = density.shape
+            # Reiniciar acumulador
+            motor.viz_state['orbital_accumulator'] = np.zeros_like(density)
+
+        accumulator = motor.viz_state.get('orbital_accumulator')
+        if accumulator is None:
+             accumulator = np.zeros_like(density)
+             motor.viz_state['orbital_accumulator'] = accumulator
+
+        # Acumular
+        # Usamos += in-place. density es positivo.
+        accumulator += density
+
+        # Para visualización: Escala logarítmica para ver detalles finos y picos altos
+        # log1p(x) = log(1+x)
+        viz_out = np.log1p(accumulator)
+
+        return viz_out
+
     else:
         return density
 
