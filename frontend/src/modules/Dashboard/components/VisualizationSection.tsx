@@ -1,4 +1,4 @@
-import { Activity, Box, Eye, Globe, Layers, Maximize, Minimize, Palette, Waves, Zap } from 'lucide-react';
+import { Activity, Box, Clock, Eye, Flame, Globe, Layers, Maximize, Minimize, Palette, Waves, Zap } from 'lucide-react';
 import React, { useState } from 'react';
 import { Tooltip } from '../../../components/ui/common/Tooltip';
 import { useWebSocket } from '../../../hooks/useWebSocket';
@@ -77,6 +77,8 @@ export const VisualizationSection: React.FC<VisualizationSectionProps> = ({
     { id: 9, vizType: 'real', label: 'Parte Real', desc: 'Visualiza la parte real de la Función de Onda.', icon: <Activity size={18} />, color: 'text-emerald-400', border: 'border-emerald-500/50' },
     { id: 10, vizType: 'imag', label: 'Parte Imag', desc: 'Visualiza la parte imaginaria de la Función de Onda.', icon: <Activity size={18} />, color: 'text-fuchsia-400', border: 'border-fuchsia-500/50' },
     { id: 11, vizType: 'holographic_bulk', label: 'Bulk', desc: 'Holografía real 3D usando scale-space.', icon: <Layers size={18} />, color: 'text-orange-400', border: 'border-orange-500/50' },
+    { id: 12, vizType: 'interference', label: 'Interferencia', desc: 'Diferencia temporal (T vs T-5). Revela cambios dinámicos.', icon: <Clock size={18} />, color: 'text-cyan-400', border: 'border-cyan-500/50' },
+    { id: 13, vizType: 'orbital', label: 'Orbitales', desc: 'Mapa de probabilidad acumulada (Larga Exposición).', icon: <Flame size={18} />, color: 'text-red-400', border: 'border-red-500/50' },
   ];
 
   const handleGammaChange = (value: number) => {
