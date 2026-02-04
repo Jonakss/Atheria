@@ -51,6 +51,7 @@
 
 ## 🏗️ Arquitecturas Experimentales
 
+- **[Arquitectura Hiper-Fractal](../20_Concepts/HYPER_FRACTAL_ARCHITECTURE.md)** - Topología Dinámica Recursiva y Despliegue Dimensional
 - **[Polar Architecture V3](../20_Concepts/POLAR_ARCHITECTURE_V3.md)** - Arquitectura basada en coordenadas polares (Deprecada/Referencia)
 - **[Quantum Native Architecture V1](../20_Concepts/QUANTUM_NATIVE_ARCHITECTURE_V1.md)** - Propuesta inicial de arquitectura cuántica nativa
 - **[Quantum Compute Services](../20_Concepts/QUANTUM_COMPUTE_SERVICES.md)** - Abstracción para backends de computación cuántica (IonQ, Braket, IBM)
